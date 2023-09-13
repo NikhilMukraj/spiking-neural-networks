@@ -1,5 +1,5 @@
 # notes
 
-add packages in toml
+general spiking neural network system
 
 ## sources
