@@ -1,3 +1,718 @@
-fn main() {
-    println!("Hello, world!");
+use std::{
+    collections::HashMap, 
+    fs::{File, read_to_string}, 
+    io::{self, Write, Result, Error, ErrorKind}, 
+    env,
+};
+use rand::{Rng, seq::SliceRandom};
+use rand_distr::{Normal, Distribution};
+use toml::{from_str, Value};
+use meval;
+
+
+#[derive(Debug)]
+struct LIFParameters {
+    v_th: f64,
+    v_reset: f64,
+    tau_m: f64,
+    g_l: f64,
+    v_init: f64,
+    e_l: f64,
+    tref: f64,
+    w_init: f64,
+    a: f64,
+    b: f64,
+    dt: f64,
+    exp_dt: f64,
+    bayesian_mean: f64,
+    bayesian_std: f64,
+    bayesian_max: f64,
+    bayesian_min: f64,
+    // total_time: f64,
 }
+
+impl Default for LIFParameters {
+    fn default() -> Self {
+        LIFParameters { 
+            v_th: -55., // spike threshold (mV)
+            v_reset: -75., // reset potential (mV)
+            tau_m: 10., // membrane time constant (ms)
+            g_l: 10., // leak conductance (nS)
+            v_init: -75., // initial potential (mV)
+            e_l: -75., // leak reversal potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            w_init: 0., // initial w value
+            a: 6., // arbitrary a value
+            b: 10., // arbitrary b value
+            dt: 0.1, // simulation time step (ms)
+            exp_dt: 1., // exponential time step (ms)
+            bayesian_mean: 1.0, // center of norm distr
+            bayesian_std: 0.0, // std of norm distr
+            bayesian_max: 2.0, // maximum cutoff for norm distr
+            bayesian_min: 0.0, // minimum cutoff for norm distr
+            // total_time: 400., // total simulation time (ms), may not be necessary
+        }
+    }
+}
+
+pub trait ScaledDefault {
+    fn scaled_default() -> Self;
+}
+
+impl ScaledDefault for LIFParameters {
+    fn scaled_default() -> Self {
+        LIFParameters { 
+            v_th: 1., // spike threshold (mV)
+            v_reset: 0., // reset potential (mV)
+            tau_m: 10., // membrane time constant (ms)
+            g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
+            v_init: 0., // initial potential (mV)
+            e_l: 0., // leak reversal potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            w_init: 0., // initial w value
+            a: 6., // arbitrary a value
+            b: 10., // arbitrary b value
+            dt: 0.1, // simulation time step (ms)
+            exp_dt: 1., // exponential time step (ms)
+            bayesian_mean: 1.0, // center of norm distr
+            bayesian_std: 0.0, // std of norm distr
+            bayesian_max: 2.0, // maximum cutoff for norm distr
+            bayesian_min: 0.0, // minimum cutoff for norm distr
+            // total_time: 400., // total simulation time (ms), may not be necessary
+        }
+    }
+}
+
+enum LIFType {
+    Basic,
+    Adaptive,
+    AdaptiveExponentatial,
+}
+
+impl LIFType {
+    fn from_str(string: &str) -> Result<LIFType> {
+        let output = match string.to_ascii_lowercase().as_str() {
+            "basic" => { LIFType::Basic },
+            "adaptive" => { LIFType::Adaptive },
+            "adaptive exponential" => { LIFType::AdaptiveExponentatial },
+            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); }
+        };
+
+        Ok(output)
+    }
+}
+
+// needs option to scale down params to smaller range (ex: 0 to 1)
+
+#[derive(Clone)]
+enum PotentiationType {
+    Excitatory,
+    Inhibitory,
+}
+
+impl PotentiationType {
+    // fn get_types() -> Vec<PotentiationType> {
+    //     vec![PotentiationType::Excitatory, PotentiationType::Inhibitory]
+    // }
+
+    // fn get_random_type() -> PotentiationType {
+    //     let types = PotentiationType::get_types();
+    //     types.choose(&mut rand::thread_rng()).expect("No types found").clone()
+    // }
+
+    fn weighted_random_type(prob: f64) -> PotentiationType {
+        if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
+            PotentiationType::Excitatory
+        } else {
+            PotentiationType::Inhibitory
+        }
+    }
+}
+
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2777263/
+// concentration generally measured in mmoles (ranging at like 10^-14)
+#[derive(Clone)]
+struct Cell {
+    current_voltage: f64, // membrane potential
+    refractory_count: f64, // keeping track of refractory period
+    leak_constant: f64, // leak constant gene
+    integration_constant: f64, // integration constant gene
+    potentiation_type: PotentiationType,
+    neurotransmission_concentration: f64, // concentration of neurotransmitter in synapse
+    neurotransmission_release: f64, // concentration of neurotransmitter released at spiking
+    receptor_density: f64, // factor of how many receiving receptors for a given neurotransmitter
+    chance_of_releasing: f64, // chance cell can produce neurotransmitter
+    dissipation_rate: f64, // how quickly neurotransmitter concentration decreases
+    chance_of_random_release: f64, // likelyhood of neuron randomly releasing neurotransmitter
+    random_release_concentration: f64, // how much neurotransmitter is randomly released
+    w_value: f64, // adaptive value 
+}
+
+type CellGrid = Vec<Vec<Cell>>;
+
+impl Cell {
+    fn get_dv_change_and_spike(&mut self, lif: &LIFParameters, i: f64) -> (f64, bool) {
+        let mut is_spiking = false;
+
+        if self.refractory_count > 0. {
+            self.current_voltage = lif.v_reset;
+            self.refractory_count -= 1.;
+        } else if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = lif.v_reset;
+            self.refractory_count = lif.tref / lif.dt
+        }
+
+        // let dv = (-1. * (self.current_voltage - lif.e_l) + i / lif.g_l) * (lif.dt / lif.tau_m);
+        let dv = (
+            (self.leak_constant * (self.current_voltage - lif.e_l)) +
+            (self.integration_constant * (i / lif.g_l))
+        ) * (lif.dt / lif.tau_m);
+        // could be varied with a leak constant instead of -1 *
+        // input could be varied with a integration constant times the input
+
+        return (dv, is_spiking);
+    }
+
+    fn apply_dw_change_and_get_spike(&mut self, lif: &LIFParameters) -> bool {
+        // dw = (self.a * (v[it]-self.V_L) - w[it]) * (self.dt/self.tau_m)
+        let dw = (
+            lif.a * (self.current_voltage - lif.e_l) -
+            self.w_value
+        ) * (lif.dt / lif.tau_m);
+
+        self.w_value += dw;
+
+        let mut is_spiking = false;
+
+        if self.refractory_count > 0. {
+            self.current_voltage = lif.v_reset;
+            self.refractory_count -= 1.;
+        } else if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = lif.v_reset;
+            self.w_value += lif.b;
+            self.refractory_count = lif.tref / lif.dt
+        }
+
+        return is_spiking;
+    }
+
+    fn adaptive_get_dv_change(&mut self, lif: &LIFParameters, i: f64) -> f64 {
+        let dv = (
+            (self.leak_constant * (self.current_voltage - lif.e_l)) +
+            (self.integration_constant * (i / lif.g_l)) - 
+            (self.w_value / lif.g_l)
+        ) * (lif.dt / lif.tau_m);
+
+        dv
+    }
+
+    fn exp_adaptive_get_dv_change(&mut self, lif: &LIFParameters, i: f64) -> f64 {
+        let dv = (
+            (self.leak_constant * (self.current_voltage - lif.e_l)) +
+            (lif.exp_dt * ((self.current_voltage - lif.v_th) / lif.exp_dt).exp()) +
+            (self.integration_constant * (i / lif.g_l)) - 
+            (self.w_value / lif.g_l)
+        ) * (lif.dt / lif.tau_m);
+
+        dv
+    }
+
+    fn determine_neurotransmitter_concentration(&mut self, is_spiking: bool) {
+        // (excitatory should increase voltage)
+        // (inhibitory should decrease voltage)
+        // (may also depend on kind of receptor)
+        let prob = rand::thread_rng().gen_range(0.0..=1.0);
+        if is_spiking && (prob <= self.chance_of_releasing) {
+            self.neurotransmission_concentration += self.neurotransmission_release;
+        } else if self.neurotransmission_concentration > 0. {
+            let concentration = (
+                    self.neurotransmission_concentration - self.dissipation_rate
+                )
+                .max(0.0); // reduce concentration until 0
+            self.neurotransmission_concentration = concentration;
+        }
+        
+        let prob = rand::thread_rng().gen_range(0.0..=1.0);
+        if self.refractory_count <= 0. && prob <= self.chance_of_random_release {
+            self.neurotransmission_concentration += self.random_release_concentration;
+        }
+    }
+
+    // voltage of cell should be initial voltage + this change
+    fn run_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+
+        for _ in 0..iterations {
+            let (dv, _is_spiking) = if bayesian {
+                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.get_dv_change_and_spike(lif, i)
+            };
+            self.current_voltage += dv;
+
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+
+    fn run_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        
+        for _ in 0..iterations {
+            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+            let dv = if bayesian {
+                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.adaptive_get_dv_change(lif, i)
+            };
+            self.current_voltage += dv;
+
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+
+    fn run_exp_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        
+        for _ in 0..iterations {
+            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+            let dv = if bayesian {
+                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.exp_adaptive_get_dv_change(lif, i)
+            };
+            self.current_voltage += dv;
+
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+}
+
+fn positions_within_square(
+    center_row: usize, 
+    center_col: usize, 
+    extent: usize, 
+    size: (usize, usize)
+) -> Vec<(usize, usize)> {
+    let (row_length, col_length) = size;
+    let mut positions = Vec::new();
+
+    for row in center_row.saturating_sub(extent)..=(center_row + extent) {
+        for col in center_col.saturating_sub(extent)..=(center_col + extent) {
+            if (row != center_row || col != center_col) && (row < row_length && col < col_length) {
+                positions.push((row, col));
+            }
+        }
+    }
+
+    positions
+}
+
+fn randomly_select_positions(mut positions: Vec<(usize, usize)>, num_to_select: usize) -> Vec<(usize, usize)> {
+    let mut rng = rand::thread_rng();
+    // let mut selected_positions = positions.clone(); // Clone the original positions
+
+    // Shuffle the selected_positions randomly
+    positions.shuffle(&mut rng);
+
+    // Take the first num_to_select positions as the random selection
+    positions.truncate(num_to_select);
+
+    positions
+}
+
+fn limited_distr(mean: f64, std_dev: f64, minimum: f64, maximum: f64) -> f64 {
+    if std_dev == 0.0 {
+        return mean;
+    }
+
+    let normal = Normal::new(mean, std_dev).unwrap();
+    let output: f64 = normal.sample(&mut rand::thread_rng());
+   
+    output.max(minimum).min(maximum)
+}
+
+fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
+    let volt_mean: f64 = cell_grid
+        .iter()
+        .flatten()
+        .map(|x| x.current_voltage)
+        .sum();
+
+    volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
+}
+
+fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
+    let neuro_mean: f64 = cell_grid
+        .iter()
+        .flatten()
+        .map(|x| x.neurotransmission_concentration)
+        .sum();
+
+    neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
+}
+
+fn get_input_from_positions(
+    cell_grid: &CellGrid, 
+    input_positions: &Vec<(usize, usize)>, 
+    input_calculation: &dyn Fn(&[f64]) -> f64,
+    bayesian_params: Option<&LIFParameters>,
+) -> f64 {
+    let mut input_val = input_positions
+        .iter()
+        .map(|input_position| {
+            let (pos_x, pos_y) = input_position;
+            let input_cell = &cell_grid[*pos_x][*pos_y];
+            
+            let sign = match input_cell.potentiation_type { 
+                PotentiationType::Excitatory => -1., 
+                PotentiationType::Inhibitory => 1.,
+            };
+
+            let final_input = input_calculation(&[
+                sign,
+                input_cell.current_voltage,
+                input_cell.receptor_density,
+                input_cell.neurotransmission_concentration,
+            ]);
+            
+            final_input
+
+            // could weight certain connections alongside adjacency list
+        })
+        .sum();
+
+    match bayesian_params {
+        Some(params) => { 
+            input_val *= limited_distr(
+                params.bayesian_mean, 
+                params.bayesian_std, 
+                params.bayesian_min, 
+                params.bayesian_max
+            ); 
+        },
+        None => {},
+    }
+
+    return input_val;
+
+    // before run_simulation, if bayesian is not default or true then write within run_simulation
+    // to bayesian_params into the input function, else None
+}
+
+
+// add cloned cell grid each iteration and return a vec of that
+// or return average voltage per iteration and return a vec of that
+// encapsulate these vectors within output type
+
+struct NeuroAndVoltage {
+    neurotransmitter_concentration: f64,
+    voltage: f64,
+}
+
+enum Output {
+    Grid(Vec<CellGrid>),
+    Averaged(Vec<NeuroAndVoltage>)
+}
+
+impl Output {
+    fn add(&mut self, cell_grid: &CellGrid) {
+        match self {
+            Output::Grid(grids) => { grids.push(cell_grid.clone()) }
+            Output::Averaged(averages) => { 
+                averages.push(NeuroAndVoltage {
+                    neurotransmitter_concentration: get_neuro_avg(cell_grid),
+                    voltage: get_volt_avg(cell_grid)
+                });
+            }
+        }
+    }
+}
+
+type AdjacencyList = HashMap<(usize, usize), Vec<(usize, usize)>>;
+
+// speed test this with averaging single threaded
+// add enum type for just voltage
+
+fn run_simulation(
+    num_rows: usize, 
+    num_cols: usize, 
+    iterations: usize, 
+    radius: usize, 
+    lif_type: LIFType, // adaptive: bool
+    lif_params: &LIFParameters,
+    default_cell_values: &HashMap<&str, f64>,
+    input_calculation: &dyn Fn(&[f64]) -> f64,
+    mut output_val: Output,
+) -> Result<Output> {
+    if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
+        // println!("Radius must be less than both number of rows or number of cols divided by 2 and greater than 0");
+        let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
+        return Err(Error::new(ErrorKind::InvalidInput, err_msg));
+    }
+
+    let neurotransmission_release = *default_cell_values.get("neurotransmission_release")
+        .unwrap_or(&1.);
+    let receptor_density = *default_cell_values.get("receptor_density")
+        .unwrap_or(&1.);
+    let chance_of_releasing = *default_cell_values.get("chance_of_releasing")
+        .unwrap_or(&0.5);
+    let dissipation_rate = *default_cell_values.get("dissipation_rate")
+        .unwrap_or(&0.1);
+    let chance_of_random_release = *default_cell_values.get("chance_of_random_release")
+        .unwrap_or(&0.2);
+    let random_release_concentration = *default_cell_values.get("random_release_concentration")
+        .unwrap_or(&0.1);    
+    let excitatory_chance = *default_cell_values.get("excitatory_chance")
+        .unwrap_or(&0.5);
+
+    let neurotransmission_release_std = *default_cell_values.get("neurotransmission_release_std")
+        .unwrap_or(&0.);
+    let receptor_density_std = *default_cell_values.get("receptor_density_std")
+        .unwrap_or(&0.);
+    let dissipation_rate_std = *default_cell_values.get("dissipation_rate_std")
+        .unwrap_or(&0.);
+    let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
+        .unwrap_or(&0.);
+
+    let mean_change = &lif_params.bayesian_mean != &LIFParameters::default().bayesian_mean;
+    let std_change = &lif_params.bayesian_std != &LIFParameters::default().bayesian_std;
+    let bayesian = if mean_change || std_change {
+        Some(lif_params)
+    } else {
+        None
+    };
+
+    let mut cell_grid: CellGrid = (0..num_rows)
+        .map(|_| {
+            (0..num_cols)
+                .map(|_| Cell { 
+                    current_voltage: lif_params.v_init, 
+                    refractory_count: 0.0,
+                    leak_constant: -1.,
+                    integration_constant: 1.,
+                    potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
+                    neurotransmission_concentration: 0., 
+                    neurotransmission_release: limited_distr(neurotransmission_release, neurotransmission_release_std, 0.0, 1.0),
+                    receptor_density: limited_distr(receptor_density, receptor_density_std, 0.0, 1.0),
+                    chance_of_releasing: chance_of_releasing, 
+                    dissipation_rate: limited_distr(dissipation_rate, dissipation_rate_std, 0.0, 1.0), 
+                    chance_of_random_release: chance_of_random_release,
+                    random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
+                    w_value: lif_params.w_init,
+                })
+                .collect::<Vec<Cell>>()
+        })
+        .collect::<CellGrid>();
+
+    let mut adjacency_list: AdjacencyList = HashMap::new(); 
+
+    let mut rng = rand::thread_rng();
+    
+    for row in 0..num_rows {
+        for col in 0..num_cols {
+            let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
+            let num_to_select = rng.gen_range(1..positions.len());
+            let positions = randomly_select_positions(positions, num_to_select);
+            adjacency_list
+                .entry((row, col))
+                .or_insert(positions);
+        }
+    }
+
+    match lif_type {
+        LIFType::Basic => {
+            for _ in 0..iterations {
+                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+                    .cloned()
+                    .map(|key| (key, (0.0, false)))
+                    .collect();
+
+                // loop through every cell
+                // calculate the dv given the inputs
+                // write 
+                // end loop
+
+                for pos in adjacency_list.keys() {
+                    let (x, y) = pos;
+                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    // println!("{:#?}", input_positions);
+
+                    // let receptor_density = cell_grid[*x][*y].receptor_density;
+                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+                    // let cell_to_update = &mut cell_grid[*x][*y];
+                    let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(lif_params, input);
+
+                    changes.insert(*pos, (dv, is_spiking));
+                }
+
+                // loop through every cell
+                // modify the voltage
+                // end loop
+
+                for (pos, (dv_value, is_spiking_value)) in changes {
+                    let (x, y) = pos;
+                    
+                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].current_voltage += dv_value;
+                }
+
+                // repeat until simulation is over
+
+                output_val.add(&cell_grid);
+            }
+        },
+        LIFType::Adaptive => {
+            for _ in 0..iterations {
+                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+                    .cloned()
+                    .map(|key| (key, (0.0, false)))
+                    .collect();
+
+                // loop through every cell
+                // calculate the dv given the inputs
+                // write 
+                // end loop
+
+                for pos in adjacency_list.keys() {
+                    let (x, y) = pos;
+                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    // println!("{:#?}", input_positions);
+
+                    // let receptor_density = cell_grid[*x][*y].receptor_density;
+                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+
+                    // apply dw change and get whether neuron is spiking
+                    let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
+
+                    changes.insert(*pos, (input, is_spiking));
+                }
+
+                // find dv change and apply it
+                // find neurotransmitter change and apply it
+                for (pos, (input_value, is_spiking_value)) in changes {
+                    let (x, y) = pos;
+
+                    // maybe index cell_grid once
+                    // let mut neuron = cell_grid[x][y];
+                    let dv = cell_grid[x][y].adaptive_get_dv_change(lif_params, input_value);
+
+                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].current_voltage += dv;
+                }
+
+                output_val.add(&cell_grid);
+            }
+        },
+        LIFType::AdaptiveExponentatial => {
+            for _ in 0..iterations {
+                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+                    .cloned()
+                    .map(|key| (key, (0.0, false)))
+                    .collect();
+
+                // loop through every cell
+                // calculate the dv given the inputs
+                // write 
+                // end loop
+
+                for pos in adjacency_list.keys() {
+                    let (x, y) = pos;
+                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    // println!("{:#?}", input_positions);
+
+                    // let receptor_density = cell_grid[*x][*y].receptor_density;
+                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+
+                    // apply dw change and get whether neuron is spiking
+                    let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
+
+                    changes.insert(*pos, (input, is_spiking));
+                }
+
+                // find dv change and apply it
+                // find neurotransmitter change and apply it
+                for (pos, (input_value, is_spiking_value)) in changes {
+                    let (x, y) = pos;
+
+                    // maybe index cell_grid once
+                    // let mut neuron = cell_grid[x][y];
+                    let dv = cell_grid[x][y].exp_adaptive_get_dv_change(lif_params, input_value);
+
+                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].current_voltage += dv;
+                }
+
+                output_val.add(&cell_grid);
+            }
+        },
+    }
+
+    return Ok(output_val);
+}
+
+fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
+    value
+        .as_bool()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
+        .map(|v| v as bool)
+}
+
+fn parse_usize(value: &Value, field_name: &str) -> Result<usize> {
+    value
+        .as_integer()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as unsigned integer", field_name)))
+        .map(|v| v as usize)
+}
+
+fn parse_f64(value: &Value, field_name: &str) -> Result<f64> {
+    value
+        .as_float()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as float32", field_name)))
+        .map(|v| v as f64)
+}
+
+// fn parse_str<'a, 'b>(value: &'a Value, field_name: &'b str) -> &'b str 
+// where
+// 'a: 'b
+// {
+//     value
+//         .as_str()
+//         .expect(&format!("Cannot parse {} as string", field_name))
+// }
+
+// fn parse_bool(value: &Value, field_name: &str) -> bool {
+//     value
+//         .as_bool()
+//         .expect(&format!("Cannot parse {} as boolean", field_name))
+// }
+
+fn parse_value_with_default<T>(
+    table: &Value,
+    key: &str,
+    parser: impl Fn(&Value, &str) -> Result<T>,
+    default: T,
+) -> Result<T> {
+    table
+        .get(key)
+        .map_or(Ok(default), |value| parser(value, key))
+}
+
+fn main() -> Result<()> {
+
+    Ok(())
+}
+
+// voltage input should be just the output of the connected neuron times a weight
+// that weight should be signed either excitatory or inhibitory (+ or -)
+// the non sign float value of the weight could scale the voltage to around 100 or so if necessary 
