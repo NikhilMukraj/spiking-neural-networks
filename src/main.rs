@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap, 
-    fs::{File, read_to_string}, 
-    io::{self, Write, Result, Error, ErrorKind}, 
+    fs::read_to_string, 
+    io::{self, Result, Error, ErrorKind}, 
     env,
 };
 use rand::{Rng, seq::SliceRandom};
@@ -241,58 +241,58 @@ impl Cell {
     }
 
     // voltage of cell should be initial voltage + this change
-    fn run_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    // fn run_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+    //     let mut file = File::create(filename)
+    //         .expect("Unable to create file");
+    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
-        for _ in 0..iterations {
-            let (dv, _is_spiking) = if bayesian {
-                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-            } else {
-                self.get_dv_change_and_spike(lif, i)
-            };
-            self.current_voltage += dv;
+    //     for _ in 0..iterations {
+    //         let (dv, _is_spiking) = if bayesian {
+    //             self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+    //         } else {
+    //             self.get_dv_change_and_spike(lif, i)
+    //         };
+    //         self.current_voltage += dv;
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
+    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    //     }
+    // }
 
-    fn run_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    // fn run_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+    //     let mut file = File::create(filename)
+    //         .expect("Unable to create file");
+    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
-        for _ in 0..iterations {
-            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-            let dv = if bayesian {
-                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-            } else {
-                self.adaptive_get_dv_change(lif, i)
-            };
-            self.current_voltage += dv;
+    //     for _ in 0..iterations {
+    //         let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+    //         let dv = if bayesian {
+    //             self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+    //         } else {
+    //             self.adaptive_get_dv_change(lif, i)
+    //         };
+    //         self.current_voltage += dv;
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
+    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    //     }
+    // }
 
-    fn run_exp_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    // fn run_exp_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
+    //     let mut file = File::create(filename)
+    //         .expect("Unable to create file");
+    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
-        for _ in 0..iterations {
-            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-            let dv = if bayesian {
-                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-            } else {
-                self.exp_adaptive_get_dv_change(lif, i)
-            };
-            self.current_voltage += dv;
+    //     for _ in 0..iterations {
+    //         let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+    //         let dv = if bayesian {
+    //             self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+    //         } else {
+    //             self.exp_adaptive_get_dv_change(lif, i)
+    //         };
+    //         self.current_voltage += dv;
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
+    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    //     }
+    // }
 }
 
 fn positions_within_square(
@@ -412,6 +412,8 @@ fn get_input_from_positions(
 // or return average voltage per iteration and return a vec of that
 // encapsulate these vectors within output type
 
+#[derive(Debug)]
+#[allow(dead_code)]
 struct NeuroAndVoltage {
     neurotransmitter_concentration: f64,
     voltage: f64,
@@ -434,6 +436,14 @@ impl Output {
             }
         }
     }
+
+    fn from_str(string: &str) -> Result<Output> {
+        match string.to_ascii_lowercase().as_str() {
+            "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
+            "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVoltage>::new())) },
+            _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
+        }
+    }
 }
 
 type AdjacencyList = HashMap<(usize, usize), Vec<(usize, usize)>>;
@@ -446,7 +456,7 @@ fn run_simulation(
     num_cols: usize, 
     iterations: usize, 
     radius: usize, 
-    lif_type: LIFType, // adaptive: bool
+    lif_type: LIFType,
     lif_params: &LIFParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &dyn Fn(&[f64]) -> f64,
@@ -661,12 +671,12 @@ fn run_simulation(
     return Ok(output_val);
 }
 
-fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
-    value
-        .as_bool()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
-        .map(|v| v as bool)
-}
+// fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
+//     value
+//         .as_bool()
+//         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
+//         .map(|v| v as bool)
+// }
 
 fn parse_usize(value: &Value, field_name: &str) -> Result<usize> {
     value
@@ -709,6 +719,184 @@ fn parse_value_with_default<T>(
 }
 
 fn main() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        println!("Requires .toml argument file");
+        return Err(Error::new(ErrorKind::InvalidInput, "Requires .toml argument file"));
+    }
+
+    let toml_content = read_to_string(&args[1]).expect("Cannot read file");
+    let config: Value = from_str(&toml_content).expect("Cannot read config");
+
+    if let Some(simulation_table) = config.get("simulation") {
+
+        let num_rows: usize = parse_value_with_default(simulation_table, "num_rows", parse_usize, 0)?;
+        println!("num_rows: {}", num_rows);
+
+        let num_cols: usize = parse_value_with_default(&simulation_table, "num_cols", parse_usize, 0)?;
+        println!("num_cols: {}", num_cols);
+
+        let iterations: usize = parse_value_with_default(&simulation_table, "iterations", parse_usize, 1000)?;
+        println!("iterations: {}", iterations);
+
+        let radius: usize = parse_value_with_default(&simulation_table, "radius", parse_usize, 1)?;
+        println!("radius: {}", radius);
+
+        let output_tag: &str = match simulation_table.get("output_tag") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'output_tag' as string")); }
+                }
+            },
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'output_tag' not found")); },
+        };
+        println!("output_tag: {}", output_tag);
+
+        let lif_type: &str = match simulation_table.get("lif_type") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as string")); }
+                }
+            },
+            None => "basic",
+        };
+        println!("lif_type: {}", lif_type);
+
+        let lif_type = match LIFType::from_str(&lif_type) {
+            Ok(lif_type_val) => lif_type_val,
+            Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as one of the valid types")) }
+        };
+
+        let equation: &str = match simulation_table.get("input_equation") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
+                }
+            },
+            None => "sign * mp + 100 + rd * (nc^2 * 200)",
+        };
+        println!("equation: {}", equation.trim());
+
+        let expr: meval::Expr = equation.parse().unwrap();
+
+        let mut ctx = meval::Context::new();
+        ctx.var("sign", 0.);
+        ctx.var("mp", 0.);
+        ctx.var("rd", 0.);
+        ctx.var("nc", 0.);
+        let input_func = expr.bindn_with_context(&ctx, &["sign", "mp", "rd", "nc"]).unwrap();
+
+        let output_type: &str = match simulation_table.get("output_type") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
+                }
+            },
+            None => "averaged",
+        };
+        println!("output_type: {}", output_type);
+
+        let output_type = Output::from_str(&output_type)?;
+
+        // neurotranmission_release: 1.,
+        // receptor_density: 1.,
+        // chance_of_releasing: 0.5, 
+        // dissipation_rate: 0.1, 
+        // chance_of_random_release: 0.2,
+        // random_release_concentration: 0.1,
+
+        let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
+        default_cell_values.insert("neurotransmission_release", 1.);
+        default_cell_values.insert("receptor_density", 1.);
+        default_cell_values.insert("chance_of_releasing", 0.5);
+        default_cell_values.insert("dissipation_rate", 0.1);
+        default_cell_values.insert("chance_of_random_release", 0.2);
+        default_cell_values.insert("random_release_concentration", 0.1);
+        default_cell_values.insert("excitatory_chance", 0.5);
+
+        default_cell_values.insert("neurotransmission_release_std", 0.);
+        default_cell_values.insert("receptor_density_std", 0.);
+        default_cell_values.insert("dissipation_rate_std", 0.);
+        default_cell_values.insert("random_release_concentration_std", 0.);
+
+        let updates: Vec<(&str, Result<f64>)> = default_cell_values
+            .iter()
+            .map(|(&key, &default_value)| {
+                let value_to_update = parse_value_with_default(
+                    &simulation_table, key, parse_f64, default_value
+                );
+
+                (key, value_to_update)
+            })
+            .collect();
+
+        for (key, value_to_update) in updates {
+            let value_to_update = match value_to_update {
+                Ok(output_value) => output_value,
+                Err(e) => { 
+                    let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
+                    return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
+                }
+            };
+
+            default_cell_values.insert(key, value_to_update);
+            println!("{}: {}", key, value_to_update);
+        }
+
+        // dt, exp dt, tau_m, tref, a, b should be editable
+
+        let mut lif_params = LIFParameters {
+            ..LIFParameters::default()
+        };
+
+        lif_params.dt = parse_value_with_default(simulation_table, "dt", parse_f64, lif_params.dt)?;
+        lif_params.exp_dt = parse_value_with_default(simulation_table, "exp_dt", parse_f64, lif_params.exp_dt)?;
+        lif_params.tau_m = parse_value_with_default(simulation_table, "tau_m", parse_f64, lif_params.tau_m)?;
+        lif_params.tref = parse_value_with_default(simulation_table, "tref", parse_f64, lif_params.tref)?;
+        lif_params.a = parse_value_with_default(simulation_table, "a", parse_f64, lif_params.a)?;
+        lif_params.b = parse_value_with_default(simulation_table, "b", parse_f64, lif_params.b)?;
+        lif_params.bayesian_mean = parse_value_with_default(simulation_table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
+        lif_params.bayesian_std = parse_value_with_default(simulation_table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
+        lif_params.bayesian_max = parse_value_with_default(simulation_table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
+        lif_params.bayesian_min = parse_value_with_default(simulation_table, "bayesian_min", parse_f64, lif_params.bayesian_min)?;
+
+        println!("{:#?}", lif_params);
+
+        let output_value = run_simulation(
+            num_rows, 
+            num_cols, 
+            iterations, 
+            radius, 
+            lif_type,
+            &lif_params,
+            &default_cell_values,
+            &input_func,
+            output_type,
+        )?;
+
+        match output_value {
+            Output::Grid(grid_vec) => {
+                let voltage_matrix = grid_vec.last().expect("Cannot get last value");
+
+                for row in voltage_matrix {
+                    for neuron in row {
+                        print!("{:.3} ", neuron.current_voltage);
+                    }
+                    println!();
+                }
+            }
+            Output::Averaged(averaged_vec) => {
+                println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
+            }
+        }
+    } else {
+        return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
+    }
 
     Ok(())
 }
