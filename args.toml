@@ -1,0 +1,13 @@
+[simulation]
+num_rows = 20
+num_cols = 20
+iterations = 2000 # if changing dt change iterations accordingly
+dt = 0.1 # maybe try results with 1.0
+radius = 2
+# excitatory_chance = 0.8
+output_tag = "20x20"
+output_type = "averaged"
+lif_type = "adaptive exponential"
+input_equation = """
+    sign * mp + 100. + rd * (nc^2 * 200.)
+"""
