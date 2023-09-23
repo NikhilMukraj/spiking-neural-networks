@@ -7,7 +7,7 @@ use std::{
 use rand::{Rng, seq::SliceRandom};
 use rand_distr::{Normal, Distribution};
 use toml::{from_str, Value};
-use meval;
+use exprtk_rs::{Expression, SymbolTable};
 
 
 #[derive(Debug)]
@@ -362,7 +362,7 @@ fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<(usize, usize)>, 
-    input_calculation: &dyn Fn(&[f64]) -> f64,
+    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     bayesian_params: Option<&LIFParameters>,
 ) -> f64 {
     let mut input_val = input_positions
@@ -376,12 +376,12 @@ fn get_input_from_positions(
                 PotentiationType::Inhibitory => 1.,
             };
 
-            let final_input = input_calculation(&[
+            let final_input = input_calculation(
                 sign,
                 input_cell.current_voltage,
                 input_cell.receptor_density,
                 input_cell.neurotransmission_concentration,
-            ]);
+            );
             
             final_input
 
@@ -459,7 +459,7 @@ fn run_simulation(
     lif_type: LIFType,
     lif_params: &LIFParameters,
     default_cell_values: &HashMap<&str, f64>,
-    input_calculation: &dyn Fn(&[f64]) -> f64,
+    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
 ) -> Result<Output> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
@@ -743,17 +743,6 @@ fn main() -> Result<()> {
         let radius: usize = parse_value_with_default(&simulation_table, "radius", parse_usize, 1)?;
         println!("radius: {}", radius);
 
-        let output_tag: &str = match simulation_table.get("output_tag") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'output_tag' as string")); }
-                }
-            },
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'output_tag' not found")); },
-        };
-        println!("output_tag: {}", output_tag);
-
         let lif_type: &str = match simulation_table.get("lif_type") {
             Some(value) => {
                 match value.as_str() {
@@ -781,14 +770,22 @@ fn main() -> Result<()> {
         };
         println!("equation: {}", equation.trim());
 
-        let expr: meval::Expr = equation.parse().unwrap();
+        let mut symbol_table = SymbolTable::new();
+        let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+        let mp_id = symbol_table.add_variable("mp",  0.).unwrap().unwrap();
+        let rd_id = symbol_table.add_variable("rd",  0.).unwrap().unwrap();
+        let nc_id = symbol_table.add_variable("nc",  0.).unwrap().unwrap();
 
-        let mut ctx = meval::Context::new();
-        ctx.var("sign", 0.);
-        ctx.var("mp", 0.);
-        ctx.var("rd", 0.);
-        ctx.var("nc", 0.);
-        let input_func = expr.bindn_with_context(&ctx, &["sign", "mp", "rd", "nc"]).unwrap();
+        let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+
+        let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
+            expr.symbols().value_cell(sign_id).set(sign);
+            expr.symbols().value_cell(mp_id).set(mp);
+            expr.symbols().value_cell(rd_id).set(rd);
+            expr.symbols().value_cell(nc_id).set(nc);
+
+            expr.value()
+        };
 
         let output_type: &str = match simulation_table.get("output_type") {
             Some(value) => {
@@ -875,7 +872,7 @@ fn main() -> Result<()> {
             lif_type,
             &lif_params,
             &default_cell_values,
-            &input_func,
+            &mut input_func,
             output_type,
         )?;
 
@@ -900,7 +897,3 @@ fn main() -> Result<()> {
 
     Ok(())
 }
-
-// voltage input should be just the output of the connected neuron times a weight
-// that weight should be signed either excitatory or inhibitory (+ or -)
-// the non sign float value of the weight could scale the voltage to around 100 or so if necessary 
