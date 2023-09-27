@@ -1,8 +1,9 @@
 [simulation]
 num_rows = 20
 num_cols = 20
-iterations = 2000 # if changing dt change iterations accordingly
-dt = 0.1 # maybe try results with 1.0
+iterations = 2000
+# total_time = 200 # total_time is in ms
+dt = 0.1
 radius = 2
 # excitatory_chance = 0.8
 output_tag = "20x20"
