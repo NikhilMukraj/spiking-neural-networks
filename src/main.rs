@@ -721,9 +721,6 @@ fn main() -> Result<()> {
         let num_cols: usize = parse_value_with_default(&simulation_table, "num_cols", parse_usize, 10)?;
         println!("num_cols: {}", num_cols);
 
-        let iterations: usize = parse_value_with_default(&simulation_table, "iterations", parse_usize, 1000)?;
-        println!("iterations: {}", iterations);
-
         let radius: usize = parse_value_with_default(&simulation_table, "radius", parse_usize, 1)?;
         println!("radius: {}", radius);
 
@@ -847,6 +844,31 @@ fn main() -> Result<()> {
         lif_params.bayesian_min = parse_value_with_default(simulation_table, "bayesian_min", parse_f64, lif_params.bayesian_min)?;
 
         println!("{:#?}", lif_params);
+
+        // in ms
+        let total_time: Option<usize> = match simulation_table.get("total_time") {
+            Some(value) => {
+                match value.as_integer() {
+                    Some(output_value) => Some(output_value as usize),
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'total_time' as unsigned integer")); }
+                }
+            },
+            None => None,
+        };
+
+        // might revert to a default of 1000 iterations
+        let iterations: usize = match (simulation_table.get("iterations"), total_time) {
+            (Some(_), Some(_)) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot have both 'iterations' and 'total_time' argument")); }
+            (Some(value), None) => {
+                match value.as_integer() {
+                    Some(output_value) => output_value as usize,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'iterations' as unsigned integer")); }
+                }
+            },
+            (None, Some(total_time_value)) => { (total_time_value as f64 / lif_params.dt) as usize },
+            (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
+        };
+        println!("iterations: {}", iterations);
 
         let output_value = run_simulation(
             num_rows, 
