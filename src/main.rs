@@ -50,7 +50,6 @@ impl Default for LIFParameters {
             bayesian_std: 0.0, // std of norm distr
             bayesian_max: 2.0, // maximum cutoff for norm distr
             bayesian_min: 0.0, // minimum cutoff for norm distr
-            // total_time: 400., // total simulation time (ms), may not be necessary
         }
     }
 }
@@ -78,7 +77,6 @@ impl ScaledDefault for LIFParameters {
             bayesian_std: 0.0, // std of norm distr
             bayesian_max: 2.0, // maximum cutoff for norm distr
             bayesian_min: 0.0, // minimum cutoff for norm distr
-            // total_time: 400., // total simulation time (ms), may not be necessary
         }
     }
 }
@@ -102,8 +100,6 @@ impl LIFType {
     }
 }
 
-// needs option to scale down params to smaller range (ex: 0 to 1)
-
 #[derive(Clone)]
 enum PotentiationType {
     Excitatory,
@@ -111,15 +107,6 @@ enum PotentiationType {
 }
 
 impl PotentiationType {
-    // fn get_types() -> Vec<PotentiationType> {
-    //     vec![PotentiationType::Excitatory, PotentiationType::Inhibitory]
-    // }
-
-    // fn get_random_type() -> PotentiationType {
-    //     let types = PotentiationType::get_types();
-    //     types.choose(&mut rand::thread_rng()).expect("No types found").clone()
-    // }
-
     fn weighted_random_type(prob: f64) -> PotentiationType {
         if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
             PotentiationType::Excitatory
@@ -129,8 +116,6 @@ impl PotentiationType {
     }
 }
 
-// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2777263/
-// concentration generally measured in mmoles (ranging at like 10^-14)
 #[derive(Clone)]
 struct Cell {
     current_voltage: f64, // membrane potential
@@ -730,11 +715,10 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("simulation") {
-
-        let num_rows: usize = parse_value_with_default(simulation_table, "num_rows", parse_usize, 0)?;
+        let num_rows: usize = parse_value_with_default(simulation_table, "num_rows", parse_usize, 10)?;
         println!("num_rows: {}", num_rows);
 
-        let num_cols: usize = parse_value_with_default(&simulation_table, "num_cols", parse_usize, 0)?;
+        let num_cols: usize = parse_value_with_default(&simulation_table, "num_cols", parse_usize, 10)?;
         println!("num_cols: {}", num_cols);
 
         let iterations: usize = parse_value_with_default(&simulation_table, "iterations", parse_usize, 1000)?;
