@@ -446,6 +446,7 @@ fn run_simulation(
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
+    random_volt_initialization: bool,
 ) -> Result<Output> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
         // println!("Radius must be less than both number of rows or number of cols divided by 2 and greater than 0");
@@ -507,9 +508,17 @@ fn run_simulation(
         })
         .collect::<CellGrid>();
 
-    let mut adjacency_list: AdjacencyList = HashMap::new(); 
-
     let mut rng = rand::thread_rng();
+
+    if random_volt_initialization {
+        for section in &mut cell_grid {
+            for neuron in section {
+                neuron.current_voltage = rng.gen_range(lif_params.v_init..=lif_params.v_th);
+            }
+        }
+    }
+
+    let mut adjacency_list: AdjacencyList = HashMap::new(); 
     
     for row in 0..num_rows {
         for col in 0..num_cols {
@@ -656,12 +665,12 @@ fn run_simulation(
     return Ok(output_val);
 }
 
-// fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
-//     value
-//         .as_bool()
-//         .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
-//         .map(|v| v as bool)
-// }
+fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
+    value
+        .as_bool()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
+        .map(|v| v as bool)
+}
 
 fn parse_usize(value: &Value, field_name: &str) -> Result<usize> {
     value
@@ -684,12 +693,6 @@ fn parse_f64(value: &Value, field_name: &str) -> Result<f64> {
 //     value
 //         .as_str()
 //         .expect(&format!("Cannot parse {} as string", field_name))
-// }
-
-// fn parse_bool(value: &Value, field_name: &str) -> bool {
-//     value
-//         .as_bool()
-//         .expect(&format!("Cannot parse {} as boolean", field_name))
 // }
 
 fn parse_value_with_default<T>(
@@ -723,6 +726,9 @@ fn main() -> Result<()> {
 
         let radius: usize = parse_value_with_default(&simulation_table, "radius", parse_usize, 1)?;
         println!("radius: {}", radius);
+
+        let random_volt_initialization = parse_value_with_default(&simulation_table, "random_volt_initialization", parse_bool, false)?;
+        println!("random_volt_initialization: {}", random_volt_initialization);
 
         let lif_type: &str = match simulation_table.get("lif_type") {
             Some(value) => {
@@ -880,6 +886,7 @@ fn main() -> Result<()> {
             &default_cell_values,
             &mut input_func,
             output_type,
+            random_volt_initialization,
         )?;
 
         match output_value {
