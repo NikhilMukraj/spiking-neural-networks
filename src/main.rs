@@ -302,12 +302,8 @@ fn positions_within_square(
 
 fn randomly_select_positions(mut positions: Vec<(usize, usize)>, num_to_select: usize) -> Vec<(usize, usize)> {
     let mut rng = rand::thread_rng();
-    // let mut selected_positions = positions.clone(); // Clone the original positions
 
-    // Shuffle the selected_positions randomly
     positions.shuffle(&mut rng);
-
-    // Take the first num_to_select positions as the random selection
     positions.truncate(num_to_select);
 
     positions
