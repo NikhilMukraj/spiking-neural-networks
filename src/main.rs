@@ -383,15 +383,8 @@ fn get_input_from_positions(
     }
 
     return input_val;
-
-    // before run_simulation, if bayesian is not default or true then write within run_simulation
-    // to bayesian_params into the input function, else None
 }
 
-
-// add cloned cell grid each iteration and return a vec of that
-// or return average voltage per iteration and return a vec of that
-// encapsulate these vectors within output type
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -429,9 +422,6 @@ impl Output {
 
 type AdjacencyList = HashMap<(usize, usize), Vec<(usize, usize)>>;
 
-// speed test this with averaging single threaded
-// add enum type for just voltage
-
 fn run_simulation(
     num_rows: usize, 
     num_cols: usize, 
@@ -445,7 +435,6 @@ fn run_simulation(
     random_volt_initialization: bool,
 ) -> Result<Output> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
-        // println!("Radius must be less than both number of rows or number of cols divided by 2 and greater than 0");
         let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
         return Err(Error::new(ErrorKind::InvalidInput, err_msg));
     }
@@ -544,11 +533,8 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    // println!("{:#?}", input_positions);
-
-                    // let receptor_density = cell_grid[*x][*y].receptor_density;
+                    
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    // let cell_to_update = &mut cell_grid[*x][*y];
                     let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(lif_params, input);
 
                     changes.insert(*pos, (dv, is_spiking));
@@ -586,12 +572,7 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    // println!("{:#?}", input_positions);
-
-                    // let receptor_density = cell_grid[*x][*y].receptor_density;
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-
-                    // apply dw change and get whether neuron is spiking
                     let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
 
                     changes.insert(*pos, (input, is_spiking));
@@ -602,8 +583,6 @@ fn run_simulation(
                 for (pos, (input_value, is_spiking_value)) in changes {
                     let (x, y) = pos;
 
-                    // maybe index cell_grid once
-                    // let mut neuron = cell_grid[x][y];
                     let dv = cell_grid[x][y].adaptive_get_dv_change(lif_params, input_value);
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
@@ -629,12 +608,8 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    // println!("{:#?}", input_positions);
-
-                    // let receptor_density = cell_grid[*x][*y].receptor_density;
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
 
-                    // apply dw change and get whether neuron is spiking
                     let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
 
                     changes.insert(*pos, (input, is_spiking));
@@ -645,8 +620,6 @@ fn run_simulation(
                 for (pos, (input_value, is_spiking_value)) in changes {
                     let (x, y) = pos;
 
-                    // maybe index cell_grid once
-                    // let mut neuron = cell_grid[x][y];
                     let dv = cell_grid[x][y].exp_adaptive_get_dv_change(lif_params, input_value);
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
@@ -783,13 +756,6 @@ fn main() -> Result<()> {
 
         let output_type = Output::from_str(&output_type)?;
 
-        // neurotranmission_release: 1.,
-        // receptor_density: 1.,
-        // chance_of_releasing: 0.5, 
-        // dissipation_rate: 0.1, 
-        // chance_of_random_release: 0.2,
-        // random_release_concentration: 0.1,
-
         let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
         default_cell_values.insert("neurotransmission_release", 1.);
         default_cell_values.insert("receptor_density", 1.);
@@ -828,8 +794,6 @@ fn main() -> Result<()> {
             println!("{}: {}", key, value_to_update);
         }
 
-        // dt, exp dt, tau_m, tref, a, b should be editable
-
         let mut lif_params = LIFParameters {
             ..LIFParameters::default()
         };
@@ -858,7 +822,6 @@ fn main() -> Result<()> {
             None => None,
         };
 
-        // might revert to a default of 1000 iterations
         let iterations: usize = match (simulation_table.get("iterations"), total_time) {
             (Some(_), Some(_)) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot have both 'iterations' and 'total_time' argument")); }
             (Some(value), None) => {
