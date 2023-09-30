@@ -26,8 +26,6 @@ fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Arr
     let x_fft_array: Array1<Complex<f64>> = x_fft_slice.to_owned().into();
 
     let sxx: Array1<Complex<f64>> = x_fft_array.mapv(|val| {
-        // let real = val.re;
-        // let imag = val.im;
         let conj = val.conj();
         2.0 * dt.powi(2) / (x.len() as f64 * dt) * (val * conj)
     });
@@ -35,7 +33,6 @@ fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Arr
     let sxx_positive = sxx.slice(s![0..(x.len() / 2)]);
     let sxx_positive = sxx_positive.mapv(|val| val.re);
 
-    // let df: f64 = 1.0 / (x.len() as f64 * dt);
     let df: f64 = 1.0 / total_time as f64;
 
     let fnq: f64 = 1.0 / (2.0 * dt);

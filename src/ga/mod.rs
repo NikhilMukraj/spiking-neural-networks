@@ -1,6 +1,8 @@
-use std::io;
-use std::io::{Error, ErrorKind};
-use std::collections::HashMap;
+use std::{
+    io::{self, Error, ErrorKind},
+    collections::HashMap,
+    marker::Sync,
+};
 use rand::Rng;
 use rayon::prelude::*;
 
@@ -41,10 +43,7 @@ fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f64) -> (BitStri
     if rng_thread.gen::<f64>() <= r_cross {
         let end_point = parent1.length();
         let crossover_point = rng_thread.gen_range(1..end_point); // change for variable length
-        
-        // c1 = p1[:pt] + p2[pt:]
-		// c2 = p2[:pt] + p1[pt:]
-
+       
         let string1 = format!("{}{}", &parent1.string[0..crossover_point as usize], &parent2.string[crossover_point as usize..]);
         let string2 = format!("{}{}", &parent2.string[0..crossover_point as usize], &parent1.string[crossover_point as usize..]);
 
@@ -88,9 +87,6 @@ fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: i32) -> BitString {
     return pop[selection_index].clone();
 }
 
-// decode in objective function
-// write settings for objective function into hashmap
-
 fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: i32) -> Result<Vec<f64>, io::Error> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
@@ -110,7 +106,6 @@ fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: i32) -> Result<
         let (start, end) = (i * n_bits, (i * n_bits) + n_bits);
         let substring = &bitstring.string[start..end];
 
-        // let mut value = i32::from_str_radix(substring, 2).expect("Non binary") as f64;
         let mut value = match i32::from_str_radix(substring, 2) {
             Ok(value_result) => value_result as f64,
             Err(_e) => return Err(Error::new(ErrorKind::Other, "Non binary found")),
@@ -121,29 +116,6 @@ fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: i32) -> Result<
     }
 
     return Ok(decoded_vec);
-}
-
-fn objective<T>(
-    bitstring: &BitString, 
-    bounds: &Vec<Vec<f64>>, 
-    n_bits: i32, 
-    settings: &HashMap<&str, T>
-) -> Result<f64, io::Error> {
-    // example objective function
-    if bounds.len() != 1 {
-        return Err(Error::new(ErrorKind::Other, "Bounds length must be 1"));
-    }
-    if !settings.contains_key("val") {
-        return Err(Error::new(ErrorKind::Other, r#""val" not found"#));
-    }
-
-    let decoded = match decode(bitstring, bounds, n_bits) {
-        Ok(decoded_value) => decoded_value,
-        Err(_e) => return Err(Error::new(ErrorKind::Other, "Non binary found")),
-    };
-    let val: f64 = *settings.get("val").unwrap();
-
-    return Ok(-1. * (decoded[0] - val));
 }
 
 fn create_random_string(length: usize) -> BitString {
@@ -161,8 +133,8 @@ fn create_random_string(length: usize) -> BitString {
 }
 
 // use par_iter to calculate objective scores
-fn genetic_algo<T>(
-    f: fn(&BitString, &Vec<Vec<f64>>, i32, &HashMap<&str, f64>) -> Result<f64, io::Error>, 
+fn genetic_algo<T: Sync>(
+    f: fn(&BitString, &Vec<Vec<f64>>, i32, &HashMap<&str, T>) -> Result<f64, io::Error>, 
     bounds: &Vec<Vec<f64>>, 
     n_bits: i32, 
     n_iter: i32, 
@@ -186,13 +158,9 @@ fn genetic_algo<T>(
     for gen in 0..n_iter {
         println!("gen: {}", gen + 1);
         let scores_results: &Result<Vec<f64>, _> = &pop
-            .par_iter() // https://users.rust-lang.org/t/calling-a-trait-object-within-a-rayon-par-iter-closure/63521
+            .par_iter() 
             .map(|p| f(p, &bounds, n_bits, &settings))
-            .collect(); // maybe replace with for each and see if par iter works 
-        // maybe try this instead
-        // https://docs.rs/par-map/latest/par_map/
-        // maybe implement by hand
-        // https://doc.rust-lang.org/book/ch16-01-threads.html
+            .collect(); 
         
         // check if objective failed anywhere
         let scores = match scores_results {
@@ -204,45 +172,44 @@ fn genetic_algo<T>(
 
         for i in 0..n_pop as usize {
             if scores[i] < best_eval {
-                // let (mut best, mut best_eval) = (&pop[i], &scores[i]);
                 best = pop[i].clone();
                 best_eval = scores[i];
                 println!("new string: {}, score: {}", &pop[i].string, &scores[i]);
             }
         }
 
-        let selected: Vec<BitString> = (0..n_pop)
-            .map(|_x| selection(&pop, &scores, k))
+        // let selected: Vec<BitString> = (0..n_pop)
+        //     .map(|_x| selection(&pop, &scores, k))
+        //     .collect();
+
+        let new_strings = (0..n_pop)
+            .into_par_iter()
+            .map(|_| selection(&pop, &scores, k))
             .collect();
 
-        // let new_strings = (0..n_pop)
-        //     .into_par_iter()
-        //     .map(|_| selection(&pop, &scores, k))
-        //     .collect();
+        // let mut children: Vec<BitString> = Vec::new();
+        // for i in (0..n_pop as usize).step_by(2) {
+        //     // let (parent1, parent2) = (selected[i].clone(), selected[i+1].clone());
+        //     let new_children = crossover(&selected[i], &selected[i+1], r_cross);
+        //     let mut new_children_vec = vec![new_children.0, new_children.1];
+        //     for child in new_children_vec.iter_mut() {
+        //         mutate(child, r_mut);
+        //         children.push(child.clone());
+        //     }
+        // }
 
-        let mut children: Vec<BitString> = Vec::new();
-        for i in (0..n_pop as usize).step_by(2) {
-            // let (parent1, parent2) = (selected[i].clone(), selected[i+1].clone());
-            let new_children = crossover(&selected[i], &selected[i+1], r_cross);
-            let mut new_children_vec = vec![new_children.0, new_children.1];
-            for child in new_children_vec.iter_mut() {
-                mutate(child, r_mut);
-                children.push(child.clone());
-            }
-        }
-
-        // let children = (0..n_pop)
-        //     .into_par_iter()
-        //     .step_by(2)
-        //     .flat_map(|i| {
-        //         let new_children = crossover(&selected[i], &selected[i + 1], r_cross);
-        //         vec![new_children.0, new_children.1]
-        //     })
-        //     .map(|mut child| {
-        //         mutate(&mut child, r_mut);
-        //         child
-        //     })
-        //     .collect();
+        let children = (0..n_pop)
+            .into_par_iter()
+            .step_by(2)
+            .flat_map(|i| {
+                let new_children = crossover(&selected[i], &selected[i + 1], r_cross);
+                vec![new_children.0, new_children.1]
+            })
+            .map(|mut child| {
+                mutate(&mut child, r_mut);
+                child
+            })
+            .collect();
 
         pop = children;
     }

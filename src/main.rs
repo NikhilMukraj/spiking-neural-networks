@@ -427,12 +427,12 @@ fn run_simulation(
     num_cols: usize, 
     iterations: usize, 
     radius: usize, 
+    random_volt_initialization: bool,
     lif_type: LIFType,
     lif_params: &LIFParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
-    random_volt_initialization: bool,
 ) -> Result<Output> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
         let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
@@ -818,30 +818,46 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     });
 }
 
-// fn objective<T>(
+// struct GASettings<'a> {
+//     equation: &'a str,
+//     eeg: &'a Array1<f64>,
+//     sim_params: SimulationParameters,
+// }
+
+// fn objective(
 //     bitstring: &BitString, 
 //     bounds: &Vec<Vec<f64>>, 
 //     n_bits: i32, 
-//     settings: &HashMap<&str, T>
+//     settings: &HashMap<&str, GASettings>
 // ) -> Result<f64, io::Error> {
-//     // example objective function
-//     if bounds.len() != 1 {
-//         return Err(Error::new(ErrorKind::Other, "Bounds length must be 1"));
-//     }
-//     if !settings.contains_key("val") {
-//         return Err(Error::new(ErrorKind::Other, r#""val" not found"#));
-//     }
-
 //     let decoded = match decode(bitstring, bounds, n_bits) {
 //         Ok(decoded_value) => decoded_value,
-//         Err(_e) => return Err(Error::new(ErrorKind::Other, "Non binary found")),
+//         Err(ee) => return Err(e),
 //     };
 
-//     let equation = *settings.get("equation").unwrap();
-//     let eeg = *settings.get("eeg").unwrap();
-//     let sim_parmas = *settings.get("sim_params").unwrap();
+    // let ga_settings = *settings.get("ga_settings").unwrap();
+//     let equation: &str = ga_settings.equation;
+//     let eeg: &Array1<f64> = ga_settings.eeg;
+//     let sim_parmas: &SimulationParameters = ga_settings.sim_params;
 
-//     return Ok(-1. * (decoded[0] - val));
+    // let output_value = run_simulation(
+    //     sim_params.num_rows, 
+    //     sim_params.num_cols, 
+    //     sim_params.iterations, 
+    //     sim_params.radius, 
+    //     sim_params.random_volt_initialization,
+    //     sim_params.lif_type,
+    //     &sim_params.lif_params,
+    //     &sim_params.default_cell_values,
+    //     &mut input_func,
+    //     OutputType::Averaged(vec![]),
+    // )?;
+
+    // let total_time = sim_params.iterations * sim_params.lif_params.dt;
+    // let (_faxis, sxx) = get_power_density(output_value, sim_params.lif_params.dt, total_time);
+    // let score = power_density_mse(eeg, sxx)?;
+
+//     return Ok(score);
 // }
 
 fn main() -> Result<()> {
@@ -904,12 +920,12 @@ fn main() -> Result<()> {
             sim_params.num_cols, 
             sim_params.iterations, 
             sim_params.radius, 
+            sim_params.random_volt_initialization,
             sim_params.lif_type,
             &sim_params.lif_params,
             &sim_params.default_cell_values,
             &mut input_func,
             output_type,
-            sim_params.random_volt_initialization,
         )?;
 
         match output_value {
