@@ -675,6 +675,175 @@ fn parse_value_with_default<T>(
         .map_or(Ok(default), |value| parser(value, key))
 }
 
+struct SimulationParameters<'a> {
+    num_rows: usize, 
+    num_cols: usize, 
+    iterations: usize, 
+    radius: usize, 
+    random_volt_initialization: bool,
+    lif_params: LIFParameters,
+    lif_type: LIFType,
+    default_cell_values: HashMap<&'a str, f64>,
+}
+
+
+fn get_parameters(table: &Value) -> Result<SimulationParameters> {
+    let num_rows: usize = parse_value_with_default(table, "num_rows", parse_usize, 10)?;
+    println!("num_rows: {}", num_rows);
+
+    let num_cols: usize = parse_value_with_default(&table, "num_cols", parse_usize, 10)?;
+    println!("num_cols: {}", num_cols);
+
+    let radius: usize = parse_value_with_default(&table, "radius", parse_usize, 1)?;
+    println!("radius: {}", radius);
+
+    let random_volt_initialization = parse_value_with_default(&table, "random_volt_initialization", parse_bool, false)?;
+    println!("random_volt_initialization: {}", random_volt_initialization);
+
+    let lif_type: &str = match table.get("lif_type") {
+        Some(value) => {
+            match value.as_str() {
+                Some(output_value) => output_value,
+                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as string")); }
+            }
+        },
+        None => "basic",
+    };
+    println!("lif_type: {}", lif_type);
+
+    let lif_type = match LIFType::from_str(&lif_type) {
+        Ok(lif_type_val) => lif_type_val,
+        Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as one of the valid types")) }
+    };
+
+    let output_type: &str = match table.get("output_type") {
+        Some(value) => {
+            match value.as_str() {
+                Some(output_value) => output_value,
+                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
+            }
+        },
+        None => "averaged",
+    };
+    println!("output_type: {}", output_type);
+
+    let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
+    default_cell_values.insert("neurotransmission_release", 1.);
+    default_cell_values.insert("receptor_density", 1.);
+    default_cell_values.insert("chance_of_releasing", 0.5);
+    default_cell_values.insert("dissipation_rate", 0.1);
+    default_cell_values.insert("chance_of_random_release", 0.2);
+    default_cell_values.insert("random_release_concentration", 0.1);
+    default_cell_values.insert("excitatory_chance", 0.5);
+
+    default_cell_values.insert("neurotransmission_release_std", 0.);
+    default_cell_values.insert("receptor_density_std", 0.);
+    default_cell_values.insert("dissipation_rate_std", 0.);
+    default_cell_values.insert("random_release_concentration_std", 0.);
+
+    let updates: Vec<(&str, Result<f64>)> = default_cell_values
+        .iter()
+        .map(|(&key, &default_value)| {
+            let value_to_update = parse_value_with_default(
+                &table, key, parse_f64, default_value
+            );
+
+            (key, value_to_update)
+        })
+        .collect();
+
+    for (key, value_to_update) in updates {
+        let value_to_update = match value_to_update {
+            Ok(output_value) => output_value,
+            Err(e) => { 
+                let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
+                return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
+            }
+        };
+
+        default_cell_values.insert(key, value_to_update);
+        println!("{}: {}", key, value_to_update);
+    }
+
+    let mut lif_params = LIFParameters {
+        ..LIFParameters::default()
+    };
+
+    lif_params.dt = parse_value_with_default(table, "dt", parse_f64, lif_params.dt)?;
+    lif_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, lif_params.exp_dt)?;
+    lif_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, lif_params.tau_m)?;
+    lif_params.tref = parse_value_with_default(table, "tref", parse_f64, lif_params.tref)?;
+    lif_params.a = parse_value_with_default(table, "a", parse_f64, lif_params.a)?;
+    lif_params.b = parse_value_with_default(table, "b", parse_f64, lif_params.b)?;
+    lif_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
+    lif_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
+    lif_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
+    lif_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, lif_params.bayesian_min)?;
+
+    println!("{:#?}", lif_params);
+
+    // in ms
+    let total_time: Option<usize> = match table.get("total_time") {
+        Some(value) => {
+            match value.as_integer() {
+                Some(output_value) => Some(output_value as usize),
+                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'total_time' as unsigned integer")); }
+            }
+        },
+        None => None,
+    };
+
+    let iterations: usize = match (table.get("iterations"), total_time) {
+        (Some(_), Some(_)) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot have both 'iterations' and 'total_time' argument")); }
+        (Some(value), None) => {
+            match value.as_integer() {
+                Some(output_value) => output_value as usize,
+                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'iterations' as unsigned integer")); }
+            }
+        },
+        (None, Some(total_time_value)) => { (total_time_value as f64 / lif_params.dt) as usize },
+        (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
+    };
+    println!("iterations: {}", iterations);
+
+    return Ok(SimulationParameters {
+        num_rows: num_rows, 
+        num_cols: num_cols, 
+        iterations: iterations, 
+        radius: radius, 
+        random_volt_initialization: random_volt_initialization,
+        lif_params: lif_params,
+        lif_type: lif_type,
+        default_cell_values: default_cell_values,
+    });
+}
+
+// fn objective<T>(
+//     bitstring: &BitString, 
+//     bounds: &Vec<Vec<f64>>, 
+//     n_bits: i32, 
+//     settings: &HashMap<&str, T>
+// ) -> Result<f64, io::Error> {
+//     // example objective function
+//     if bounds.len() != 1 {
+//         return Err(Error::new(ErrorKind::Other, "Bounds length must be 1"));
+//     }
+//     if !settings.contains_key("val") {
+//         return Err(Error::new(ErrorKind::Other, r#""val" not found"#));
+//     }
+
+//     let decoded = match decode(bitstring, bounds, n_bits) {
+//         Ok(decoded_value) => decoded_value,
+//         Err(_e) => return Err(Error::new(ErrorKind::Other, "Non binary found")),
+//     };
+
+//     let equation = *settings.get("equation").unwrap();
+//     let eeg = *settings.get("eeg").unwrap();
+//     let sim_parmas = *settings.get("sim_params").unwrap();
+
+//     return Ok(-1. * (decoded[0] - val));
+// }
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -687,62 +856,6 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("simulation") {
-        let num_rows: usize = parse_value_with_default(simulation_table, "num_rows", parse_usize, 10)?;
-        println!("num_rows: {}", num_rows);
-
-        let num_cols: usize = parse_value_with_default(&simulation_table, "num_cols", parse_usize, 10)?;
-        println!("num_cols: {}", num_cols);
-
-        let radius: usize = parse_value_with_default(&simulation_table, "radius", parse_usize, 1)?;
-        println!("radius: {}", radius);
-
-        let random_volt_initialization = parse_value_with_default(&simulation_table, "random_volt_initialization", parse_bool, false)?;
-        println!("random_volt_initialization: {}", random_volt_initialization);
-
-        let lif_type: &str = match simulation_table.get("lif_type") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as string")); }
-                }
-            },
-            None => "basic",
-        };
-        println!("lif_type: {}", lif_type);
-
-        let lif_type = match LIFType::from_str(&lif_type) {
-            Ok(lif_type_val) => lif_type_val,
-            Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as one of the valid types")) }
-        };
-
-        let equation: &str = match simulation_table.get("input_equation") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-                }
-            },
-            None => "sign * mp + 100 + rd * (nc^2 * 200)",
-        };
-        println!("equation: {}", equation.trim());
-
-        let mut symbol_table = SymbolTable::new();
-        let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-        let mp_id = symbol_table.add_variable("mp",  0.).unwrap().unwrap();
-        let rd_id = symbol_table.add_variable("rd",  0.).unwrap().unwrap();
-        let nc_id = symbol_table.add_variable("nc",  0.).unwrap().unwrap();
-
-        let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
-
-        let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-            expr.symbols().value_cell(sign_id).set(sign);
-            expr.symbols().value_cell(mp_id).set(mp);
-            expr.symbols().value_cell(rd_id).set(rd);
-            expr.symbols().value_cell(nc_id).set(nc);
-
-            expr.value()
-        };
-
         let output_type: &str = match simulation_table.get("output_type") {
             Some(value) => {
                 match value.as_str() {
@@ -756,96 +869,47 @@ fn main() -> Result<()> {
 
         let output_type = Output::from_str(&output_type)?;
 
-        let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
-        default_cell_values.insert("neurotransmission_release", 1.);
-        default_cell_values.insert("receptor_density", 1.);
-        default_cell_values.insert("chance_of_releasing", 0.5);
-        default_cell_values.insert("dissipation_rate", 0.1);
-        default_cell_values.insert("chance_of_random_release", 0.2);
-        default_cell_values.insert("random_release_concentration", 0.1);
-        default_cell_values.insert("excitatory_chance", 0.5);
-
-        default_cell_values.insert("neurotransmission_release_std", 0.);
-        default_cell_values.insert("receptor_density_std", 0.);
-        default_cell_values.insert("dissipation_rate_std", 0.);
-        default_cell_values.insert("random_release_concentration_std", 0.);
-
-        let updates: Vec<(&str, Result<f64>)> = default_cell_values
-            .iter()
-            .map(|(&key, &default_value)| {
-                let value_to_update = parse_value_with_default(
-                    &simulation_table, key, parse_f64, default_value
-                );
-
-                (key, value_to_update)
-            })
-            .collect();
-
-        for (key, value_to_update) in updates {
-            let value_to_update = match value_to_update {
-                Ok(output_value) => output_value,
-                Err(e) => { 
-                    let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
-                    return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
-                }
-            };
-
-            default_cell_values.insert(key, value_to_update);
-            println!("{}: {}", key, value_to_update);
-        }
-
-        let mut lif_params = LIFParameters {
-            ..LIFParameters::default()
-        };
-
-        lif_params.dt = parse_value_with_default(simulation_table, "dt", parse_f64, lif_params.dt)?;
-        lif_params.exp_dt = parse_value_with_default(simulation_table, "exp_dt", parse_f64, lif_params.exp_dt)?;
-        lif_params.tau_m = parse_value_with_default(simulation_table, "tau_m", parse_f64, lif_params.tau_m)?;
-        lif_params.tref = parse_value_with_default(simulation_table, "tref", parse_f64, lif_params.tref)?;
-        lif_params.a = parse_value_with_default(simulation_table, "a", parse_f64, lif_params.a)?;
-        lif_params.b = parse_value_with_default(simulation_table, "b", parse_f64, lif_params.b)?;
-        lif_params.bayesian_mean = parse_value_with_default(simulation_table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
-        lif_params.bayesian_std = parse_value_with_default(simulation_table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
-        lif_params.bayesian_max = parse_value_with_default(simulation_table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
-        lif_params.bayesian_min = parse_value_with_default(simulation_table, "bayesian_min", parse_f64, lif_params.bayesian_min)?;
-
-        println!("{:#?}", lif_params);
-
-        // in ms
-        let total_time: Option<usize> = match simulation_table.get("total_time") {
+        let equation: &str = match &simulation_table.get("input_equation") {
             Some(value) => {
-                match value.as_integer() {
-                    Some(output_value) => Some(output_value as usize),
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'total_time' as unsigned integer")); }
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
                 }
             },
-            None => None,
+            None => "sign * mp + 100 + rd * (nc^2 * 200)",
+        };
+        println!("equation: {}", equation.trim());
+    
+        let mut symbol_table = SymbolTable::new();
+        let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+        let mp_id = symbol_table.add_variable("mp",  0.).unwrap().unwrap();
+        let rd_id = symbol_table.add_variable("rd",  0.).unwrap().unwrap();
+        let nc_id = symbol_table.add_variable("nc",  0.).unwrap().unwrap();
+    
+        let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+    
+        let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
+            expr.symbols().value_cell(sign_id).set(sign);
+            expr.symbols().value_cell(mp_id).set(mp);
+            expr.symbols().value_cell(rd_id).set(rd);
+            expr.symbols().value_cell(nc_id).set(nc);
+    
+            expr.value()
         };
 
-        let iterations: usize = match (simulation_table.get("iterations"), total_time) {
-            (Some(_), Some(_)) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot have both 'iterations' and 'total_time' argument")); }
-            (Some(value), None) => {
-                match value.as_integer() {
-                    Some(output_value) => output_value as usize,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'iterations' as unsigned integer")); }
-                }
-            },
-            (None, Some(total_time_value)) => { (total_time_value as f64 / lif_params.dt) as usize },
-            (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
-        };
-        println!("iterations: {}", iterations);
+        let sim_params = get_parameters(&simulation_table)?;
 
         let output_value = run_simulation(
-            num_rows, 
-            num_cols, 
-            iterations, 
-            radius, 
-            lif_type,
-            &lif_params,
-            &default_cell_values,
+            sim_params.num_rows, 
+            sim_params.num_cols, 
+            sim_params.iterations, 
+            sim_params.radius, 
+            sim_params.lif_type,
+            &sim_params.lif_params,
+            &sim_params.default_cell_values,
             &mut input_func,
             output_type,
-            random_volt_initialization,
+            sim_params.random_volt_initialization,
         )?;
 
         match output_value {
@@ -863,6 +927,8 @@ fn main() -> Result<()> {
                 println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
             }
         }
+    } else if let Some(_ga_table) = config.get("ga_table") {
+
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
