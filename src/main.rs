@@ -985,7 +985,7 @@ fn main() -> Result<()> {
                 println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
             }
         }
-    } else if let Some(ga_table) = config.get("ga_table") {
+    } else if let Some(ga_table) = config.get("ga") {
         let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
         println!("n_bits: {}", n_bits);
 
