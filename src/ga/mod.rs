@@ -87,7 +87,7 @@ fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: usize) -> BitString
     return pop[selection_index].clone();
 }
 
-fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>, io::Error> {
+pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>, io::Error> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
