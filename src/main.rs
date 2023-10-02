@@ -8,6 +8,10 @@ use rand::{Rng, seq::SliceRandom};
 use rand_distr::{Normal, Distribution};
 use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
+// mod eeg;
+// use eeg::{read_eeg_csv, get_power_density, power_density_mse};
+// mod ga;
+// use ga::{BitString, genetic_algo};
 
 
 #[derive(Debug)]
@@ -688,7 +692,7 @@ struct SimulationParameters<'a> {
 
 
 fn get_parameters(table: &Value) -> Result<SimulationParameters> {
-    let num_rows: usize = parse_value_with_default(table, "num_rows", parse_usize, 10)?;
+    let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
 
     let num_cols: usize = parse_value_with_default(&table, "num_cols", parse_usize, 10)?;
@@ -819,7 +823,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
 }
 
 // struct GASettings<'a> {
-//     equation: &'a str,
+//     equation: &'a str, 
 //     eeg: &'a Array1<f64>,
 //     sim_params: SimulationParameters,
 // }
@@ -839,6 +843,30 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
 //     let equation: &str = ga_settings.equation;
 //     let eeg: &Array1<f64> = ga_settings.eeg;
 //     let sim_parmas: &SimulationParameters = ga_settings.sim_params;
+
+    // let equation: &str = *settings.get("equation").unwrap(); // "sign * mp + x + rd * (nc^2 * y)"
+    // let mut symbol_table = SymbolTable::new();
+    // let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    // let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    // let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    // let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+    // let x_id = symbol_table.add_variable("x", 0.).unwrap().unwrap();
+    // let y_id = symbol_table.add_variable("y", 0.).unwrap().unwrap();
+
+    // let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+
+    // let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
+    //     expr.symbols().value_cell(sign_id).set(sign);
+    //     expr.symbols().value_cell(mp_id).set(mp);
+    //     expr.symbols().value_cell(rd_id).set(rd);
+    //     expr.symbols().value_cell(nc_id).set(nc);
+    //     expr.symbols().value_cell(x_id).set(decoded[0]);
+    //     expr.symbols().value_cell(y_id).set(decoded[1]);
+
+    //     expr.value()
+    // };
+
+    // make sure lif_params.exp_dt = lif_params.dt
 
     // let output_value = run_simulation(
     //     sim_params.num_rows, 
@@ -898,9 +926,9 @@ fn main() -> Result<()> {
     
         let mut symbol_table = SymbolTable::new();
         let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-        let mp_id = symbol_table.add_variable("mp",  0.).unwrap().unwrap();
-        let rd_id = symbol_table.add_variable("rd",  0.).unwrap().unwrap();
-        let nc_id = symbol_table.add_variable("nc",  0.).unwrap().unwrap();
+        let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+        let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+        let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
     
         let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
     
@@ -944,7 +972,78 @@ fn main() -> Result<()> {
             }
         }
     } else if let Some(_ga_table) = config.get("ga_table") {
+        // let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
+        // println!("n_bits: {}", n_bits);
 
+        // let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
+        // println!("n_iter: {}", n_iter);
+
+        // let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
+        // println!("n_iter: {}", n_iter);
+
+        // let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.4)?;
+        // println!("r_cross: {}", r_cross);
+
+        // let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.4)?;
+        // println!("r_mut: {}", r_mut);
+
+        // let k: usize = 3;
+
+        // let equation: &str = match &ga_table.get("input_equation") {
+        //     Some(value) => {
+        //         match value.as_str() {
+        //             Some(output_value) => output_value,
+        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
+        //         }
+        //     },
+        //     None => "sign * mp + x + rd * (nc^2 * y)", // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+        // };
+        // println!("equation: {}", equation.trim());
+
+        // let sim_params = get_parameters(&ga_table)?;
+
+        // sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
+
+        // let eeg_file: &str = match ga_table.get("eeg_file") {
+        //     Some(value) => {
+        //         match value.as_str() {
+        //             Some(output_value) => output_value,
+        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'eeg_file' as string")); }
+        //         }
+        //     },
+        //     None => { return Err(Error::new(ErrorKind::InvalidInput, "Requires 'eeg_file' argument")); },
+        // };
+
+        // let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
+        // let (_faxis, sxx) = get_power_density(x, dt, total_time);
+
+        // // let ga_settings = GASettings {
+        // //     equation: equation, 
+        // //     eeg: sxx,
+        // //     sim_params: sim_params,
+        // // }
+
+        // let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
+        // let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
+
+        // let bounds: Vec<Vec<f64>> = (0..2)
+        //     .map(|_| vec![bounds_min, bounds_max])
+        //     .collect();
+
+        // let (best_bitstring, best_score, _scores) = genetic_algo(
+        //     objective, 
+        //     &bounds, 
+        //     n_bits, 
+        //     n_iter, 
+        //     n_pop, 
+        //     r_cross,
+        //     r_mut, 
+        //     k, 
+        //     settings,
+        // )?;
+
+        // println!("best bitstring: {}", best_bitstring.string);
+        // println!("best score: {}", best_score);
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
