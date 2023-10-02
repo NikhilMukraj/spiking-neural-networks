@@ -8,8 +8,8 @@ use rayon::prelude::*;
 
 
 #[derive(Clone)]
-struct BitString {
-    string: String
+pub struct BitString {
+    pub string: String
 }
 
 impl BitString {
@@ -31,8 +31,8 @@ impl BitString {
         return self.check();
     }
 
-    fn length(&self) -> i32 {
-        self.string.len() as i32
+    fn length(&self) -> usize {
+        self.string.len()
     }
 }
 
@@ -56,7 +56,7 @@ fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f64) -> (BitStri
 
 fn mutate(bitstring: &mut BitString, r_mut: f64) {
     let mut rng_thread = rand::thread_rng(); 
-    for i in 0..bitstring.length() as usize {
+    for i in 0..bitstring.length() {
         let do_mut = rng_thread.gen::<f64>() <= r_mut;
 
         // does in place bit flip if do_mut
@@ -68,7 +68,7 @@ fn mutate(bitstring: &mut BitString, r_mut: f64) {
     }
 }
 
-fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: i32) -> BitString {
+fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: usize) -> BitString {
     // default should be 3
     let mut rng_thread = rand::thread_rng(); 
     let mut selection_index = rng_thread.gen_range(1..pop.len());
@@ -87,21 +87,20 @@ fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: i32) -> BitString {
     return pop[selection_index].clone();
 }
 
-fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: i32) -> Result<Vec<f64>, io::Error> {
+fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>, io::Error> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
-    if bounds.len() != bitstring.length() as usize / n_bits as usize {
+    if bounds.len() != bitstring.length() / n_bits {
         return Err(Error::new(ErrorKind::Other, "Bounds length does not match n_bits"));
     }
-    if bitstring.length() as usize % n_bits as usize != 0 {
+    if bitstring.length() % n_bits != 0 {
         return Err(Error::new(ErrorKind::Other, "String length is indivisible by n_bits"));
     }
 
     let maximum = i32::pow(2, n_bits as u32) as f64 - 1.;
     let mut decoded_vec = vec![0.; bounds.len()];
 
-    let n_bits = n_bits as usize;
     for i in 0..bounds.len() {
         let (start, end) = (i * n_bits, (i * n_bits) + n_bits);
         let substring = &bitstring.string[start..end];
@@ -133,18 +132,19 @@ fn create_random_string(length: usize) -> BitString {
 }
 
 // use par_iter to calculate objective scores
-fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<Vec<f64>>, i32, &HashMap<&str, T>) -> Result<f64, io::Error>, 
+pub fn genetic_algo<T: Sync>(
+    f: fn(&BitString, &Vec<Vec<f64>>, usize, &HashMap<&str, T>) -> Result<f64, io::Error>, 
     bounds: &Vec<Vec<f64>>, 
-    n_bits: i32, 
-    n_iter: i32, 
-    n_pop: i32, 
+    n_bits: usize, 
+    n_iter: usize, 
+    n_pop: usize, 
     r_cross: f64,
     r_mut: f64, 
-    k: i32, settings: &HashMap<&str, T>
+    k: usize, 
+    settings: &HashMap<&str, T>,
 ) -> Result<(BitString, f64, Vec<Vec<f64>>), io::Error> {
     let mut pop: Vec<BitString> = (0..n_pop)
-        .map(|_x| create_random_string(n_bits as usize * bounds.len()))
+        .map(|_x| create_random_string(n_bits * bounds.len()))
         .collect();
     // let (mut best, mut best_eval) = (&pop[0], objective(&pop[0], &bounds, n_bits, &settings));
     let mut best = pop[0].clone();
@@ -170,7 +170,7 @@ fn genetic_algo<T: Sync>(
 
         all_scores.push(scores.clone());
 
-        for i in 0..n_pop as usize {
+        for i in 0..n_pop {
             if scores[i] < best_eval {
                 best = pop[i].clone();
                 best_eval = scores[i];
@@ -182,7 +182,7 @@ fn genetic_algo<T: Sync>(
         //     .map(|_x| selection(&pop, &scores, k))
         //     .collect();
 
-        let new_strings = (0..n_pop)
+        let selected: Vec<BitString> = (0..n_pop)
             .into_par_iter()
             .map(|_| selection(&pop, &scores, k))
             .collect();

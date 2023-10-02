@@ -1,15 +1,11 @@
-use std::{
-    env, 
-    cmp::min,
-    io::{Result, Error, ErrorKind}
-};
+use std::io::{Result, Error, ErrorKind};
 use csv::Reader;
 use ndarray::{Array1, s};
 use num_complex::Complex;
 use rustfft::{FftPlanner, FftDirection};
 
 
-fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Array1<f64>) {
+pub fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Array1<f64>) {
     let x_mean = x.iter().sum::<f64>() / x.len() as f64;
 
     let mut planner = FftPlanner::new();
@@ -42,7 +38,7 @@ fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Arr
     return (faxis, sxx_positive.to_owned())
 }
 
-fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
+pub fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
     let mut x: Vec<f64> = Vec::new();
     let mut reader = Reader::from_path(filename)?;
 
@@ -79,7 +75,7 @@ fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
     Ok((x, dt, total_time))
 }
 
-fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
+pub fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
     if sxx1.len() != sxx2.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
     }
