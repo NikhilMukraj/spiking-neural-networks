@@ -1,5 +1,5 @@
 use std::{
-    io::{self, Error, ErrorKind},
+    io::{Error, ErrorKind, Result},
     collections::HashMap,
     marker::Sync,
 };
@@ -13,7 +13,7 @@ pub struct BitString {
 }
 
 impl BitString {
-    fn check(&self) -> io::Result<()> {
+    fn check(&self) -> Result<()> {
         for i in self.string.chars() {
             if i != '1' && i != '0' {
                 return Err(Error::new(ErrorKind::Other, "Non binary found"));
@@ -23,7 +23,7 @@ impl BitString {
         return Ok(());
     }
 
-    fn set(&mut self, new_string: String) -> io::Result<()> {
+    fn set(&mut self, new_string: String) -> Result<()> {
         // check after initalization
 
         self.string = new_string;
@@ -87,7 +87,7 @@ fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: usize) -> BitString
     return pop[selection_index].clone();
 }
 
-pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>, io::Error> {
+pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
@@ -133,7 +133,7 @@ fn create_random_string(length: usize) -> BitString {
 
 // use par_iter to calculate objective scores
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<Vec<f64>>, usize, &HashMap<&str, T>) -> Result<f64, io::Error>, 
+    f: fn(&BitString, &Vec<Vec<f64>>, usize, &HashMap<&str, T>) -> Result<f64>, 
     bounds: &Vec<Vec<f64>>, 
     n_bits: usize, 
     n_iter: usize, 
@@ -142,7 +142,7 @@ pub fn genetic_algo<T: Sync>(
     r_mut: f64, 
     k: usize, 
     settings: &HashMap<&str, T>,
-) -> Result<(BitString, f64, Vec<Vec<f64>>), io::Error> {
+) -> Result<(BitString, f64, Vec<Vec<f64>>)> {
     let mut pop: Vec<BitString> = (0..n_pop)
         .map(|_x| create_random_string(n_bits * bounds.len()))
         .collect();
@@ -157,7 +157,7 @@ pub fn genetic_algo<T: Sync>(
 
     for gen in 0..n_iter {
         println!("gen: {}", gen + 1);
-        let scores_results: &Result<Vec<f64>, _> = &pop
+        let scores_results: &Result<Vec<f64>> = &pop
             .par_iter() 
             .map(|p| f(p, &bounds, n_bits, &settings))
             .collect(); 
