@@ -2,19 +2,21 @@ use std::{
     collections::HashMap, 
     fs::read_to_string, 
     io::{self, Result, Error, ErrorKind}, 
+    result,
     env,
 };
 use rand::{Rng, seq::SliceRandom};
 use rand_distr::{Normal, Distribution};
 use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
-// mod eeg;
-// use eeg::{read_eeg_csv, get_power_density, power_density_mse};
-// mod ga;
-// use ga::{BitString, genetic_algo};
+use ndarray::Array1;
+mod eeg;
+use eeg::{read_eeg_csv, get_power_density, power_density_mse};
+mod ga;
+use ga::{BitString, decode, genetic_algo};
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LIFParameters {
     v_th: f64,
     v_reset: f64,
@@ -85,6 +87,7 @@ impl ScaledDefault for LIFParameters {
     }
 }
 
+#[derive(Clone)]
 enum LIFType {
     Basic,
     Adaptive,
@@ -679,6 +682,7 @@ fn parse_value_with_default<T>(
         .map_or(Ok(default), |value| parser(value, key))
 }
 
+#[derive(Clone)]
 struct SimulationParameters<'a> {
     num_rows: usize, 
     num_cols: usize, 
@@ -822,71 +826,81 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     });
 }
 
-// struct GASettings<'a> {
-//     equation: &'a str, 
-//     eeg: &'a Array1<f64>,
-//     sim_params: SimulationParameters,
-// }
+#[derive(Clone)]
+struct GASettings<'a> {
+    equation: &'a str, 
+    eeg: &'a Array1<f64>,
+    sim_params: SimulationParameters<'a>,
+}
 
-// fn objective(
-//     bitstring: &BitString, 
-//     bounds: &Vec<Vec<f64>>, 
-//     n_bits: i32, 
-//     settings: &HashMap<&str, GASettings>
-// ) -> Result<f64, io::Error> {
-//     let decoded = match decode(bitstring, bounds, n_bits) {
-//         Ok(decoded_value) => decoded_value,
-//         Err(ee) => return Err(e),
-//     };
+fn objective(
+    bitstring: &BitString, 
+    bounds: &Vec<Vec<f64>>, 
+    n_bits: usize, 
+    settings: &HashMap<&str, GASettings>
+) -> result::Result<f64, io::Error> {
+    let decoded = match decode(bitstring, bounds, n_bits) {
+        Ok(decoded_value) => decoded_value,
+        Err(e) => return Err(e),
+    };
 
-    // let ga_settings = *settings.get("ga_settings").unwrap();
-//     let equation: &str = ga_settings.equation;
-//     let eeg: &Array1<f64> = ga_settings.eeg;
-//     let sim_parmas: &SimulationParameters = ga_settings.sim_params;
+    let ga_settings = settings
+        .get("ga_settings")
+        .unwrap()
+        .clone();
+    let equation: &str = ga_settings.equation; // "sign * mp + x + rd * (nc^2 * y)"
+    let eeg: &Array1<f64> = ga_settings.eeg;
+    let sim_params: SimulationParameters = ga_settings.sim_params;
 
-    // let equation: &str = *settings.get("equation").unwrap(); // "sign * mp + x + rd * (nc^2 * y)"
-    // let mut symbol_table = SymbolTable::new();
-    // let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-    // let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-    // let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-    // let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-    // let x_id = symbol_table.add_variable("x", 0.).unwrap().unwrap();
-    // let y_id = symbol_table.add_variable("y", 0.).unwrap().unwrap();
+    let mut symbol_table = SymbolTable::new();
+    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+    let x_id = symbol_table.add_variable("x", 0.).unwrap().unwrap();
+    let y_id = symbol_table.add_variable("y", 0.).unwrap().unwrap();
 
-    // let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+    let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
 
-    // let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-    //     expr.symbols().value_cell(sign_id).set(sign);
-    //     expr.symbols().value_cell(mp_id).set(mp);
-    //     expr.symbols().value_cell(rd_id).set(rd);
-    //     expr.symbols().value_cell(nc_id).set(nc);
-    //     expr.symbols().value_cell(x_id).set(decoded[0]);
-    //     expr.symbols().value_cell(y_id).set(decoded[1]);
+    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
+        expr.symbols().value_cell(sign_id).set(sign);
+        expr.symbols().value_cell(mp_id).set(mp);
+        expr.symbols().value_cell(rd_id).set(rd);
+        expr.symbols().value_cell(nc_id).set(nc);
+        expr.symbols().value_cell(x_id).set(decoded[0]);
+        expr.symbols().value_cell(y_id).set(decoded[1]);
 
-    //     expr.value()
-    // };
+        expr.value()
+    };
 
-    // make sure lif_params.exp_dt = lif_params.dt
+    let output_value = run_simulation(
+        sim_params.num_rows, 
+        sim_params.num_cols, 
+        sim_params.iterations, 
+        sim_params.radius, 
+        sim_params.random_volt_initialization,
+        sim_params.lif_type,
+        &sim_params.lif_params,
+        &sim_params.default_cell_values,
+        &mut input_func,
+        Output::Averaged(vec![]),
+    )?;
 
-    // let output_value = run_simulation(
-    //     sim_params.num_rows, 
-    //     sim_params.num_cols, 
-    //     sim_params.iterations, 
-    //     sim_params.radius, 
-    //     sim_params.random_volt_initialization,
-    //     sim_params.lif_type,
-    //     &sim_params.lif_params,
-    //     &sim_params.default_cell_values,
-    //     &mut input_func,
-    //     OutputType::Averaged(vec![]),
-    // )?;
+    let x: Vec<f64> = if let Output::Averaged(value) = output_value {
+        value
+            .iter()
+            .map(|i| i.voltage)
+            .collect()
+    } else {
+        unreachable!() 
+    };
 
-    // let total_time = sim_params.iterations * sim_params.lif_params.dt;
-    // let (_faxis, sxx) = get_power_density(output_value, sim_params.lif_params.dt, total_time);
-    // let score = power_density_mse(eeg, sxx)?;
+    let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
+    let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
+    let score = power_density_mse(eeg, &sxx)?;
 
-//     return Ok(score);
-// }
+    return Ok(score);
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -971,79 +985,84 @@ fn main() -> Result<()> {
                 println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
             }
         }
-    } else if let Some(_ga_table) = config.get("ga_table") {
-        // let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
-        // println!("n_bits: {}", n_bits);
+    } else if let Some(ga_table) = config.get("ga_table") {
+        let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
+        println!("n_bits: {}", n_bits);
 
-        // let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
-        // println!("n_iter: {}", n_iter);
+        let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
+        println!("n_iter: {}", n_iter);
 
-        // let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
-        // println!("n_iter: {}", n_iter);
+        let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
+        println!("n_iter: {}", n_iter);
 
-        // let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.4)?;
-        // println!("r_cross: {}", r_cross);
+        let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.4)?;
+        println!("r_cross: {}", r_cross);
 
-        // let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.4)?;
-        // println!("r_mut: {}", r_mut);
+        let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.4)?;
+        println!("r_mut: {}", r_mut);
 
-        // let k: usize = 3;
+        let k: usize = 3;
 
-        // let equation: &str = match &ga_table.get("input_equation") {
-        //     Some(value) => {
-        //         match value.as_str() {
-        //             Some(output_value) => output_value,
-        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-        //         }
-        //     },
-        //     None => "sign * mp + x + rd * (nc^2 * y)", // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
-        // };
-        // println!("equation: {}", equation.trim());
+        let equation: &str = match &ga_table.get("input_equation") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
+                }
+            },
+            None => "sign * mp + x + rd * (nc^2 * y)", // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+        };
+        println!("equation: {}", equation.trim());
 
-        // let sim_params = get_parameters(&ga_table)?;
+        let mut sim_params = get_parameters(&ga_table)?;
 
-        // sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
+        // make sure lif_params.exp_dt = lif_params.dt
+        sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
 
-        // let eeg_file: &str = match ga_table.get("eeg_file") {
-        //     Some(value) => {
-        //         match value.as_str() {
-        //             Some(output_value) => output_value,
-        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'eeg_file' as string")); }
-        //         }
-        //     },
-        //     None => { return Err(Error::new(ErrorKind::InvalidInput, "Requires 'eeg_file' argument")); },
-        // };
+        let eeg_file: &str = match ga_table.get("eeg_file") {
+            Some(value) => {
+                match value.as_str() {
+                    Some(output_value) => output_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'eeg_file' as string")); }
+                }
+            },
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "Requires 'eeg_file' argument")); },
+        };
 
-        // let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
-        // let (_faxis, sxx) = get_power_density(x, dt, total_time);
+        // eeg should have column specifying dt and total time
+        let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
+        let (_faxis, sxx) = get_power_density(x, dt, total_time);
 
-        // // let ga_settings = GASettings {
-        // //     equation: equation, 
-        // //     eeg: sxx,
-        // //     sim_params: sim_params,
-        // // }
+        let ga_settings = GASettings {
+            equation: equation, 
+            eeg: &sxx,
+            sim_params: sim_params,
+        };
 
-        // let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
-        // let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
+        let mut settings: HashMap<&str, GASettings<'_>> = HashMap::new();
+        settings.insert("ga_settings", ga_settings);
 
-        // let bounds: Vec<Vec<f64>> = (0..2)
-        //     .map(|_| vec![bounds_min, bounds_max])
-        //     .collect();
+        let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
+        let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
 
-        // let (best_bitstring, best_score, _scores) = genetic_algo(
-        //     objective, 
-        //     &bounds, 
-        //     n_bits, 
-        //     n_iter, 
-        //     n_pop, 
-        //     r_cross,
-        //     r_mut, 
-        //     k, 
-        //     settings,
-        // )?;
+        let bounds: Vec<Vec<f64>> = (0..2)
+            .map(|_| vec![bounds_min, bounds_max])
+            .collect();
 
-        // println!("best bitstring: {}", best_bitstring.string);
-        // println!("best score: {}", best_score);
+        let (best_bitstring, best_score, _scores) = genetic_algo(
+            objective, 
+            &bounds, 
+            n_bits, 
+            n_iter, 
+            n_pop, 
+            r_cross,
+            r_mut, 
+            k, 
+            &settings,
+        )?;
+
+        println!("best bitstring: {}", best_bitstring.string);
+        println!("best score: {}", best_score);
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
