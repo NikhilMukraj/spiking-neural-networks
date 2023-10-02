@@ -1,8 +1,7 @@
 use std::{
     collections::HashMap, 
     fs::read_to_string, 
-    io::{self, Result, Error, ErrorKind}, 
-    result,
+    io::{Result, Error, ErrorKind}, 
     env,
 };
 use rand::{Rng, seq::SliceRandom};
@@ -644,32 +643,30 @@ fn run_simulation(
 fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
     value
         .as_bool()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Cannot parse {} as boolean", field_name)))
         .map(|v| v as bool)
 }
 
 fn parse_usize(value: &Value, field_name: &str) -> Result<usize> {
     value
         .as_integer()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as unsigned integer", field_name)))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Cannot parse {} as unsigned integer", field_name)))
         .map(|v| v as usize)
 }
 
 fn parse_f64(value: &Value, field_name: &str) -> Result<f64> {
     value
         .as_float()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, format!("Cannot parse {} as float32", field_name)))
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Cannot parse {} as float32", field_name)))
         .map(|v| v as f64)
 }
 
-// fn parse_str<'a, 'b>(value: &'a Value, field_name: &'b str) -> &'b str 
-// where
-// 'a: 'b
-// {
-//     value
-//         .as_str()
-//         .expect(&format!("Cannot parse {} as string", field_name))
-// }
+fn parse_str(value: &Value, field_name: &str) -> Result<String> {
+    value
+        .as_str()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Cannot parse {} as string", field_name)))
+        .map(|v| String::from(v))
+}
 
 fn parse_value_with_default<T>(
     table: &Value,
@@ -838,7 +835,7 @@ fn objective(
     bounds: &Vec<Vec<f64>>, 
     n_bits: usize, 
     settings: &HashMap<&str, GASettings>
-) -> result::Result<f64, io::Error> {
+) -> Result<f64> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
         Err(e) => return Err(e),
@@ -886,13 +883,14 @@ fn objective(
         Output::Averaged(vec![]),
     )?;
 
-    let x: Vec<f64> = if let Output::Averaged(value) = output_value {
-        value
-            .iter()
-            .map(|i| i.voltage)
-            .collect()
-    } else {
-        unreachable!() 
+    let x: Vec<f64> = match output_value {
+        Output::Averaged(value) => {
+            value
+                .iter()
+                .map(|i| i.voltage)
+                .collect()
+        },
+        _ => { unreachable!() },
     };
 
     let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
@@ -914,29 +912,14 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("simulation") {
-        let output_type: &str = match simulation_table.get("output_type") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-                }
-            },
-            None => "averaged",
-        };
+        let output_type: String = parse_value_with_default(&simulation_table, "output_type", parse_str, String::from("averaged"))?;
         println!("output_type: {}", output_type);
 
         let output_type = Output::from_str(&output_type)?;
 
-        let equation: &str = match &simulation_table.get("input_equation") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-                }
-            },
-            None => "sign * mp + 100 + rd * (nc^2 * 200)",
-        };
-        println!("equation: {}", equation.trim());
+        let equation: String = parse_value_with_default(&simulation_table, "input_equation", parse_str, String::from("sign * mp + 100 + rd * (nc^2 * 200)"))?;
+        let equation: &str = equation.trim();
+        println!("equation: {}", equation);
     
         let mut symbol_table = SymbolTable::new();
         let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
@@ -1003,16 +986,10 @@ fn main() -> Result<()> {
 
         let k: usize = 3;
 
-        let equation: &str = match &ga_table.get("input_equation") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-                }
-            },
-            None => "sign * mp + x + rd * (nc^2 * y)", // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
-        };
-        println!("equation: {}", equation.trim());
+        let equation: String = parse_value_with_default(&ga_table, "input_equation", parse_str, String::from("sign * mp + x + rd * (nc^2 * y)"))?;
+        // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+        let equation: &str = equation.trim();
+        println!("equation: {}", equation);
 
         let mut sim_params = get_parameters(&ga_table)?;
 
