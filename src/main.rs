@@ -336,15 +336,15 @@ fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
     volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
 }
 
-fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
-    let neuro_mean: f64 = cell_grid
-        .iter()
-        .flatten()
-        .map(|x| x.neurotransmission_concentration)
-        .sum();
+// fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
+//     let neuro_mean: f64 = cell_grid
+//         .iter()
+//         .flatten()
+//         .map(|x| x.neurotransmission_concentration)
+//         .sum();
 
-    neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
-}
+//     neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
+// }
 
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
@@ -392,16 +392,16 @@ fn get_input_from_positions(
 }
 
 
-#[derive(Debug)]
-#[allow(dead_code)]
-struct NeuroAndVoltage {
-    neurotransmitter_concentration: f64,
-    voltage: f64,
-}
+// #[derive(Debug)]
+// #[allow(dead_code)]
+// struct NeuroAndVoltage {
+//     neurotransmitter_concentration: f64,
+//     voltage: f64,
+// }
 
 enum Output {
     Grid(Vec<CellGrid>),
-    Averaged(Vec<NeuroAndVoltage>)
+    Averaged(Vec<f64>)
 }
 
 impl Output {
@@ -409,10 +409,12 @@ impl Output {
         match self {
             Output::Grid(grids) => { grids.push(cell_grid.clone()) }
             Output::Averaged(averages) => { 
-                averages.push(NeuroAndVoltage {
-                    neurotransmitter_concentration: get_neuro_avg(cell_grid),
-                    voltage: get_volt_avg(cell_grid)
-                });
+                // averages.push(NeuroAndVoltage {
+                //     neurotransmitter_concentration: get_neuro_avg(cell_grid),
+                //     voltage: get_volt_avg(cell_grid)
+                // });
+
+                averages.push(get_volt_avg(cell_grid));
             }
         }
     }
@@ -420,7 +422,7 @@ impl Output {
     fn from_str(string: &str) -> Result<Output> {
         match string.to_ascii_lowercase().as_str() {
             "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
-            "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVoltage>::new())) },
+            "averaged" => { Ok(Output::Averaged(Vec::<f64>::new())) },
             _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
         }
     }
@@ -884,12 +886,7 @@ fn objective(
     )?;
 
     let x: Vec<f64> = match output_value {
-        Output::Averaged(value) => {
-            value
-                .iter()
-                .map(|i| i.voltage)
-                .collect()
-        },
+        Output::Averaged(value) => { value },
         _ => { unreachable!() },
     };
 
