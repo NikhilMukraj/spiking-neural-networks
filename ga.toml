@@ -1,2 +1,21 @@
 [ga]
 # maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+# change exp_dt with respect to dt (.001?)
+# start with small population and iterations for first testing
+
+# if modifying equation constants alone doesnt work move on to
+# modifying lif parameters like tau_m as well
+
+eeg_file = "EEG-1.csv"
+dt = 0.001
+exp_dt = 0.001
+total_time = 10
+input_equation = "(sign * mp + x + rd * (nc^2 * y)) * 100"
+
+n_pop = 100
+n_iter = 100
+r_cross = 0.4
+r_mut = 0.4
+n_bits = 10
+bounds_min = 0.0
+bounds_max = 200.0
