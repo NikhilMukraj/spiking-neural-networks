@@ -6,6 +6,7 @@
 # if modifying equation constants alone doesnt work move on to
 # modifying lif parameters like tau_m as well
 
+random_volt_initialization = true # may want to test with and without
 eeg_file = "EEG-1.csv"
 dt = 0.001
 exp_dt = 0.001
