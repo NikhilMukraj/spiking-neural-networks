@@ -976,7 +976,7 @@ fn main() -> Result<()> {
         println!("n_iter: {}", n_iter);
 
         let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
-        println!("n_iter: {}", n_iter);
+        println!("n_pop: {}", n_pop);
 
         let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.4)?;
         println!("r_cross: {}", r_cross);
@@ -991,10 +991,10 @@ fn main() -> Result<()> {
         let equation: &str = equation.trim();
         println!("equation: {}", equation);
 
-        let mut sim_params = get_parameters(&ga_table)?;
+        let sim_params = get_parameters(&ga_table)?;
 
         // make sure lif_params.exp_dt = lif_params.dt
-        sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
+        // sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
 
         let eeg_file: &str = match ga_table.get("eeg_file") {
             Some(value) => {
@@ -1026,6 +1026,7 @@ fn main() -> Result<()> {
             .map(|_| vec![bounds_min, bounds_max])
             .collect();
 
+        println!("\nstarting genetitc algorithm...");
         let (best_bitstring, best_score, _scores) = genetic_algo(
             objective, 
             &bounds, 
