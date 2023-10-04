@@ -178,6 +178,19 @@ pub fn genetic_algo<T: Sync>(
             }
         }
 
+        // parallel refactor needs testing
+        // let min_score_index: Option<usize> = scores
+        //     .iter()
+        //     .enumerate()
+        //     .min_by(|(_, a), (_, b)| a.total_cmp(b))
+        //     .map(|(index, _)| index);
+
+        // if scores[min_score_index] < best_eval {
+        //     best = pop[min_score_index];
+        //     best_eval = scores[min_score_index];
+        //     println!("new string: {}, score: {}", &pop[min_score_index].string, &scores[min_score_index]);
+        // }
+
         // let selected: Vec<BitString> = (0..n_pop)
         //     .map(|_x| selection(&pop, &scores, k))
         //     .collect();
