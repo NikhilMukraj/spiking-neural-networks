@@ -86,7 +86,7 @@ impl ScaledDefault for LIFParameters {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum LIFType {
     Basic,
     Adaptive,
@@ -663,7 +663,7 @@ fn parse_f64(value: &Value, field_name: &str) -> Result<f64> {
         .map(|v| v as f64)
 }
 
-fn parse_str(value: &Value, field_name: &str) -> Result<String> {
+fn parse_string(value: &Value, field_name: &str) -> Result<String> {
     value
         .as_str()
         .ok_or_else(|| Error::new(ErrorKind::InvalidData, format!("Cannot parse {} as string", field_name)))
@@ -707,31 +707,15 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     let random_volt_initialization = parse_value_with_default(&table, "random_volt_initialization", parse_bool, false)?;
     println!("random_volt_initialization: {}", random_volt_initialization);
 
-    let lif_type: &str = match table.get("lif_type") {
-        Some(value) => {
-            match value.as_str() {
-                Some(output_value) => output_value,
-                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as string")); }
-            }
-        },
-        None => "basic",
-    };
-    println!("lif_type: {}", lif_type);
+    let lif_type: String = parse_value_with_default(table, "lif_type", parse_string, String::from("basic"))?;
 
     let lif_type = match LIFType::from_str(&lif_type) {
         Ok(lif_type_val) => lif_type_val,
         Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as one of the valid types")) }
     };
+    println!("lif_type: {:#?}", lif_type);
 
-    let output_type: &str = match table.get("output_type") {
-        Some(value) => {
-            match value.as_str() {
-                Some(output_value) => output_value,
-                None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'input_equation' as string")); }
-            }
-        },
-        None => "averaged",
-    };
+    let output_type: String = parse_value_with_default(table, "output_type", parse_string, String::from("averaged"))?;
     println!("output_type: {}", output_type);
 
     let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
@@ -909,12 +893,12 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("simulation") {
-        let output_type: String = parse_value_with_default(&simulation_table, "output_type", parse_str, String::from("averaged"))?;
+        let output_type: String = parse_value_with_default(&simulation_table, "output_type", parse_string, String::from("averaged"))?;
         println!("output_type: {}", output_type);
 
         let output_type = Output::from_str(&output_type)?;
 
-        let equation: String = parse_value_with_default(&simulation_table, "input_equation", parse_str, String::from("sign * mp + 100 + rd * (nc^2 * 200)"))?;
+        let equation: String = parse_value_with_default(&simulation_table, "input_equation", parse_string, String::from("sign * mp + 100 + rd * (nc^2 * 200)"))?;
         let equation: &str = equation.trim();
         println!("equation: {}", equation);
     
@@ -962,7 +946,8 @@ fn main() -> Result<()> {
                 }
             }
             Output::Averaged(averaged_vec) => {
-                println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
+                // println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
+                println!("{:#?}", averaged_vec);
             }
         }
     } else if let Some(ga_table) = config.get("ga") {
@@ -983,7 +968,7 @@ fn main() -> Result<()> {
 
         let k: usize = 3;
 
-        let equation: String = parse_value_with_default(&ga_table, "input_equation", parse_str, String::from("sign * mp + x + rd * (nc^2 * y)"))?;
+        let equation: String = parse_value_with_default(&ga_table, "input_equation", parse_string, String::from("sign * mp + x + rd * (nc^2 * y)"))?;
         // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
         let equation: &str = equation.trim();
         println!("equation: {}", equation);
