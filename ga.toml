@@ -11,6 +11,8 @@ eeg_file = "EEG-1.csv"
 dt = 0.001
 exp_dt = 0.001
 total_time = 10
+num_rows = 20
+num_cols = 20
 input_equation = "(sign * mp + x + rd * (nc^2 * y)) * 100" # perhaps scaling should also be optimized
 
 n_pop = 100
