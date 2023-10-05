@@ -87,3 +87,8 @@ pub fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> 
 
     Ok(mse)
 }
+
+// mse isnt great metric
+// pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
+
+// }
