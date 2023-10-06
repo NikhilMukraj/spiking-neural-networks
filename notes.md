@@ -5,3 +5,5 @@ read eeg data by converting to csv beforehand
 generated eeg data should have same dt as eeg data to replicate, downsampling isnt great so keep it to a minimum
 real eeg data and generated eeg data must have same timestep value or converted to the same timestep value when performing comparison
 use rustfft, ndarray_complex to calculate fouriers on eeg data
+mse doesnt work that well as an objective because it essentially says this is or is not correct, it doesnt give a good degree of correctness, the earth moving distance may be a better metric
+need to implemend emd
