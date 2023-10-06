@@ -75,6 +75,7 @@ pub fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
     Ok((x, dt, total_time))
 }
 
+// to be replaced with more detailed metric
 pub fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
     if sxx1.len() != sxx2.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
