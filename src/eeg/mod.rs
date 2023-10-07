@@ -3,6 +3,8 @@ use csv::Reader;
 use ndarray::{Array1, s};
 use num_complex::Complex;
 use rustfft::{FftPlanner, FftDirection};
+mod emd;
+use emd::earth_moving_distance;
 
 
 pub fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Array1<f64>) {
@@ -76,20 +78,42 @@ pub fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
 }
 
 // to be replaced with more detailed metric
-pub fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
+// pub fn power_density_mse(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
+//     if sxx1.len() != sxx2.len() {
+//         return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
+//     }
+
+//     let mse = sxx1.iter()
+//         .zip(sxx2.iter())
+//         .map(|(x, y)| (x - y).powf(2.0))
+//         .sum();
+
+//     Ok(mse)
+// }
+
+fn find_max(arr: &Array1<f64>) -> Option<&f64> {
+    arr.iter().max_by(|a, b| a.total_cmp(b))
+}
+
+// mse isnt great metric
+// this should be more applicable
+pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
     if sxx1.len() != sxx2.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
     }
 
-    let mse = sxx1.iter()
-        .zip(sxx2.iter())
-        .map(|(x, y)| (x - y).powf(2.0))
-        .sum();
+    let values = (0..sxx1.len()).map(|x| x as f64)
+        .collect::<Vec<f64>>();
 
-    Ok(mse)
+    let u_values = Array1::from(values.clone());
+    let v_values = Array1::from(values);
+
+    let u_max = find_max(&sxx1).expect("Cannot find maximum");
+    let v_max = find_max(&sxx2).expect("Cannot find maximum");
+
+    let u_weights = sxx1.map(|x| x / u_max);
+    let v_weights = sxx1.map(|x| x / v_max);
+
+    // scale earth moving distance based on heights
+    Ok(earth_moving_distance(u_values, v_values, u_weights, v_weights)) // * (u_max - v_max).abs()
 }
-
-// mse isnt great metric
-// pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
-
-// }

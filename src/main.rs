@@ -10,7 +10,7 @@ use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod eeg;
-use eeg::{read_eeg_csv, get_power_density, power_density_mse};
+use eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
 use ga::{BitString, decode, genetic_algo};
 
@@ -876,7 +876,7 @@ fn objective(
 
     let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
     let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
-    let score = power_density_mse(eeg, &sxx)?;
+    let score = power_density_comparison(eeg, &sxx)?;
 
     return Ok(score);
 }
