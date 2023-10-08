@@ -112,7 +112,7 @@ pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Resul
     let v_max = find_max(&sxx2).expect("Cannot find maximum");
 
     let u_weights = sxx1.map(|x| x / u_max);
-    let v_weights = sxx1.map(|x| x / v_max);
+    let v_weights = sxx2.map(|x| x / v_max);
 
     // scale earth moving distance based on heights
     Ok(earth_moving_distance(u_values, v_values, u_weights, v_weights)) // * (u_max - v_max).powf(2)
