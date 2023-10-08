@@ -1,18 +1,20 @@
 [simulation]
 num_rows = 20
 num_cols = 20
-iterations = 1000 # if changing dt change iterations accordingly
-dt = 0.001
-radius = 2
 # excitatory_chance = 0.8
-output_tag = "eeg_like"
-output_type = "binary averaged"
+dt = 0.1
+# exp_dt = 0.01
+iterations = 10000
+radius = 2
+# total_time = 10
+output_tag = "eeg_sim"
+output_type = "averaged"
 # tau_m = 50.0
 lif_type = "adaptive exponential"
 input_equation = """
-    s * m + 200. + r * (n^3 * 300.) 
+    (sign * mp + 80.35190615835778 + rd * (nc^2 * 121.21212121212122)) * 16.226783968719452
 """ # maybe n^3
-# random_volt_initialization = true
+random_volt_initialization = true
 
 # optimizable parameters:
 

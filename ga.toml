@@ -8,12 +8,16 @@
 
 random_volt_initialization = true # may want to test with and without
 eeg_file = "EEG-1.csv"
-dt = 0.001
-exp_dt = 0.001
-total_time = 10
+dt = 0.1
+# exp_dt = 0.001
+# total_time = 10
+iterations = 10000
 num_rows = 20
 num_cols = 20
-input_equation = "(sign * mp + x + rd * (nc^2 * y)) * 100" # perhaps scaling should also be optimized
+radius = 2
+bayesian_std = 0.2
+lif_type = "adaptive exponential"
+input_equation = "(sign * mp + x + rd * (nc^2 * y)) * z"
 
 n_pop = 100
 n_iter = 100
