@@ -795,7 +795,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         (None, Some(total_time_value)) => { (total_time_value as f64 / lif_params.dt) as usize },
         (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
     };
-    println!("iterations: {}", iterations);
+    println!("iterations: {}\n", iterations);
 
     return Ok(SimulationParameters {
         num_rows: num_rows, 
@@ -842,6 +842,7 @@ fn objective(
     let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
     let x_id = symbol_table.add_variable("x", 0.).unwrap().unwrap();
     let y_id = symbol_table.add_variable("y", 0.).unwrap().unwrap();
+    let z_id = symbol_table.add_variable("z", 0.).unwrap().unwrap();
 
     let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
 
@@ -852,6 +853,7 @@ fn objective(
         expr.symbols().value_cell(nc_id).set(nc);
         expr.symbols().value_cell(x_id).set(decoded[0]);
         expr.symbols().value_cell(y_id).set(decoded[1]);
+        expr.symbols().value_cell(z_id).set(decoded[2]);
 
         expr.value()
     };
@@ -875,7 +877,8 @@ fn objective(
     };
 
     let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
-    let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
+    // let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
+    let (_faxis, sxx) = get_power_density(x, 0.001, total_time);
     let score = power_density_comparison(eeg, &sxx)?;
 
     return Ok(score);
@@ -893,12 +896,22 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("simulation") {
-        let output_type: String = parse_value_with_default(&simulation_table, "output_type", parse_string, String::from("averaged"))?;
+        let output_type: String = parse_value_with_default(
+            &simulation_table, 
+            "output_type", 
+            parse_string, 
+            String::from("averaged")
+        )?;
         println!("output_type: {}", output_type);
 
         let output_type = Output::from_str(&output_type)?;
 
-        let equation: String = parse_value_with_default(&simulation_table, "input_equation", parse_string, String::from("sign * mp + 100 + rd * (nc^2 * 200)"))?;
+        let equation: String = parse_value_with_default(
+            &simulation_table, 
+            "input_equation", 
+            parse_string, 
+            String::from("sign * mp + 100 + rd * (nc^2 * 200)")
+        )?;
         let equation: &str = equation.trim();
         println!("equation: {}", equation);
     
@@ -918,6 +931,8 @@ fn main() -> Result<()> {
     
             expr.value()
         };
+
+        println!("here");
 
         let sim_params = get_parameters(&simulation_table)?;
 
@@ -968,8 +983,12 @@ fn main() -> Result<()> {
 
         let k: usize = 3;
 
-        let equation: String = parse_value_with_default(&ga_table, "input_equation", parse_string, String::from("sign * mp + x + rd * (nc^2 * y)"))?;
-        // maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+        let equation: String = parse_value_with_default(
+            &ga_table, 
+            "input_equation", 
+            parse_string, 
+            String::from("(sign * mp + x + rd * (nc^2 * y)) * z")
+        )?;
         let equation: &str = equation.trim();
         println!("equation: {}", equation);
 
@@ -1004,7 +1023,7 @@ fn main() -> Result<()> {
         let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
         let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
 
-        let bounds: Vec<Vec<f64>> = (0..2)
+        let bounds: Vec<Vec<f64>> = (0..3)
             .map(|_| vec![bounds_min, bounds_max])
             .collect();
 
@@ -1023,6 +1042,18 @@ fn main() -> Result<()> {
 
         println!("best bitstring: {}", best_bitstring.string);
         println!("best score: {}", best_score);
+
+        let decoded = match decode(&best_bitstring, &bounds, n_bits) {
+            Ok(decoded_value) => decoded_value,
+            Err(e) => return Err(e),
+        };
+
+        println!("decoded values: {:#?}", decoded);
+
+        // option to run a simulation and return the eeg signals
+        // option to write custom bounds
+        // option to use different dts 
+        // (option to use eeg dt in power density calculation and nowhere else)
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
