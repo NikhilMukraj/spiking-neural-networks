@@ -1008,7 +1008,7 @@ fn main() -> Result<()> {
             .map(|_| vec![bounds_min, bounds_max])
             .collect();
 
-        println!("\nstarting genetitc algorithm...");
+        println!("\nstarting genetic algorithm...");
         let (best_bitstring, best_score, _scores) = genetic_algo(
             objective, 
             &bounds, 
