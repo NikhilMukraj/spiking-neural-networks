@@ -58,7 +58,7 @@ pub fn read_eeg_csv(filename: &str) -> Result<(Vec<f64>, f64, f64)> {
         Ok(parsed_val) => { parsed_val },
         Err(e) => { return Err(Error::new(ErrorKind::InvalidInput, e.to_string())) },
     };
-    println!("dt: {}\nT: {}", dt, total_time);
+    println!("EEG parameters:\ndt: {}\nT: {}", dt, total_time);
 
     for record in reader.records() {
         let record = match record {
