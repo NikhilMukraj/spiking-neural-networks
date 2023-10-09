@@ -11,9 +11,10 @@ output_tag = "eeg_sim"
 output_type = "averaged"
 # tau_m = 50.0
 lif_type = "adaptive exponential"
-input_equation = """
-    (sign * mp + 80.35190615835778 + rd * (nc^2 * 121.21212121212122)) * 16.226783968719452
-""" # maybe n^3
+# input_equation = """
+#     (sign * mp + 80.35190615835778 + rd * (nc^2 * 121.21212121212122)) * 16.226783968719452
+# """ # maybe n^3
+# input_equation = "(sign * mp + 100 + rd * (-1 * sign * nc^2 * 100)) * 15" # maybe this instead
 random_volt_initialization = true
 
 # optimizable parameters:

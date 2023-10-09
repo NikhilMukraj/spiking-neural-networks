@@ -18,6 +18,9 @@ radius = 2
 bayesian_std = 0.2
 lif_type = "adaptive exponential"
 input_equation = "(sign * mp + x + rd * (nc^2 * y)) * z"
+# input_equation = "(sign * mp + x + rd * (-1 * sign * nc^2 * y)) * z" # maybe this instead
+# if that works better try optimizing amount of excitatory neurons
+# might have to work on evolving input equation sooner
 
 n_pop = 100
 n_iter = 100
@@ -26,3 +29,6 @@ r_mut = 0.4
 n_bits = 10
 bounds_min = 0.0
 bounds_max = 200.0
+
+# try with bayesian and see if that helps, then move to tau_m, maybe tref
+# then try evolving equation trees
