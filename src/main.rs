@@ -814,6 +814,7 @@ struct GASettings<'a> {
     equation: &'a str, 
     eeg: &'a Array1<f64>,
     sim_params: SimulationParameters<'a>,
+    power_density_dt: f64,
 }
 
 fn objective(
@@ -834,6 +835,7 @@ fn objective(
     let equation: &str = ga_settings.equation; // "sign * mp + x + rd * (nc^2 * y)"
     let eeg: &Array1<f64> = ga_settings.eeg;
     let sim_params: SimulationParameters = ga_settings.sim_params;
+    let power_density_dt: f64 = ga_settings.power_density_dt;
 
     let mut symbol_table = SymbolTable::new();
     let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
@@ -878,7 +880,7 @@ fn objective(
 
     let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
     // let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
-    let (_faxis, sxx) = get_power_density(x, 0.001, total_time);
+    let (_faxis, sxx) = get_power_density(x, power_density_dt, total_time);
     let score = power_density_comparison(eeg, &sxx)?;
 
     return Ok(score);
@@ -1011,10 +1013,19 @@ fn main() -> Result<()> {
         let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
         let (_faxis, sxx) = get_power_density(x, dt, total_time);
 
+        let power_density_dt: f64 = parse_value_with_default(
+            &ga_table, 
+            "power_density_dt", 
+            parse_f64, 
+            dt
+        )?;
+        println!("power density calculation dt: {}", power_density_dt);
+
         let ga_settings = GASettings {
             equation: equation, 
             eeg: &sxx,
             sim_params: sim_params,
+            power_density_dt: power_density_dt,
         };
 
         let mut settings: HashMap<&str, GASettings<'_>> = HashMap::new();
