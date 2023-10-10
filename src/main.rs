@@ -1063,8 +1063,6 @@ fn main() -> Result<()> {
 
         // option to run a simulation and return the eeg signals
         // option to write custom bounds
-        // option to use different dts 
-        // (option to use eeg dt in power density calculation and nowhere else)
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
