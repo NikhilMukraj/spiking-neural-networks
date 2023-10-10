@@ -96,7 +96,7 @@ pub fn earth_moving_distance(
     //                                           np.cumsum(u_weights[u_sorter])))
     //     u_cdf = u_sorted_cumweights[u_cdf_indices] / u_sorted_cumweights[-1]
 
-   let u_cdf = get_cdf(&u_weights, &u_sorter, &u_cdf_indices);
+    let u_cdf = get_cdf(&u_weights, &u_sorter, &u_cdf_indices);
 
     // if v_weights is None:
     //     v_cdf = v_cdf_indices / v_values.size
@@ -105,7 +105,7 @@ pub fn earth_moving_distance(
     //                                           np.cumsum(v_weights[v_sorter])))
     //     v_cdf = v_sorted_cumweights[v_cdf_indices] / v_sorted_cumweights[-1]
 
-   let v_cdf = get_cdf(&v_weights, &v_sorter, &v_cdf_indices);
+    let v_cdf = get_cdf(&v_weights, &v_sorter, &v_cdf_indices);
 
     // np.sum(np.multiply(np.abs(u_cdf - v_cdf), deltas))
 
