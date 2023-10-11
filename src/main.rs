@@ -883,7 +883,13 @@ fn objective(
     let (_faxis, sxx) = get_power_density(x, power_density_dt, total_time);
     let score = power_density_comparison(eeg, &sxx)?;
 
-    return Ok(score);
+    if score.is_nan() || !score.is_finite() {
+        return Ok(f64::MAX);
+    } else {
+        return Ok(score);
+    }
+
+    // return Ok(score);
 }
 
 fn main() -> Result<()> {
