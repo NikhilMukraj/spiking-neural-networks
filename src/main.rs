@@ -507,6 +507,7 @@ fn run_simulation(
         for section in &mut cell_grid {
             for neuron in section {
                 neuron.current_voltage = rng.gen_range(lif_params.v_init..=lif_params.v_th);
+                neuron.refractory_count = rng.gen_range(0.0..=lif_params.tref);
             }
         }
     }
