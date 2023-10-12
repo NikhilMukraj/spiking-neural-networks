@@ -984,10 +984,10 @@ fn main() -> Result<()> {
         let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
         println!("n_pop: {}", n_pop);
 
-        let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.4)?;
+        let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.9)?;
         println!("r_cross: {}", r_cross);
 
-        let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.4)?;
+        let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.1)?;
         println!("r_mut: {}", r_mut);
 
         let k: usize = 3;

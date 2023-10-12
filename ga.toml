@@ -24,8 +24,8 @@ input_equation = "(sign * mp + x + rd * (nc^2 * y)) * z"
 
 n_pop = 100
 n_iter = 100
-r_cross = 0.4
-r_mut = 0.4
+r_cross = 0.9
+r_mut = 0.1 # (1.0 / n_bits)
 n_bits = 10
 bounds_min = 0.0
 bounds_max = 200.0
