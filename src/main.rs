@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap, 
-    fs::read_to_string, 
-    io::{Result, Error, ErrorKind}, 
+    fs::{read_to_string, File}, 
+    io::{Result, Error, ErrorKind, Write}, 
     env,
 };
 use rand::{Rng, seq::SliceRandom};
@@ -16,7 +16,7 @@ use ga::{BitString, decode, genetic_algo};
 
 
 #[derive(Debug, Clone)]
-struct LIFParameters {
+struct IFParameters {
     v_th: f64,
     v_reset: f64,
     tau_m: f64,
@@ -25,8 +25,9 @@ struct LIFParameters {
     e_l: f64,
     tref: f64,
     w_init: f64,
-    a: f64,
-    b: f64,
+    alpha: f64,
+    beta: f64,
+    d: f64,
     dt: f64,
     exp_dt: f64,
     bayesian_mean: f64,
@@ -36,9 +37,9 @@ struct LIFParameters {
     // total_time: f64,
 }
 
-impl Default for LIFParameters {
+impl Default for IFParameters {
     fn default() -> Self {
-        LIFParameters { 
+        IFParameters { 
             v_th: -55., // spike threshold (mV)
             v_reset: -75., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
@@ -47,8 +48,9 @@ impl Default for LIFParameters {
             e_l: -75., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
-            a: 6., // arbitrary a value
-            b: 10., // arbitrary b value
+            alpha: 6., // arbitrary a value
+            beta: 10., // arbitrary b value
+            d: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: 1.0, // center of norm distr
@@ -63,9 +65,9 @@ pub trait ScaledDefault {
     fn scaled_default() -> Self;
 }
 
-impl ScaledDefault for LIFParameters {
+impl ScaledDefault for IFParameters {
     fn scaled_default() -> Self {
-        LIFParameters { 
+        IFParameters { 
             v_th: 1., // spike threshold (mV)
             v_reset: 0., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
@@ -74,8 +76,37 @@ impl ScaledDefault for LIFParameters {
             e_l: 0., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
-            a: 6., // arbitrary a value
-            b: 10., // arbitrary b value
+            alpha: 6., // arbitrary a value
+            beta: 10., // arbitrary b value
+            d: 2., // arbitrary d value
+            dt: 0.1, // simulation time step (ms)
+            exp_dt: 1., // exponential time step (ms)
+            bayesian_mean: 1.0, // center of norm distr
+            bayesian_std: 0.0, // std of norm distr
+            bayesian_max: 2.0, // maximum cutoff for norm distr
+            bayesian_min: 0.0, // minimum cutoff for norm distr
+        }
+    }
+}
+
+pub trait IzhikevichDefault {
+    fn izhikevich_default() -> Self;
+}
+
+impl IzhikevichDefault for IFParameters {
+    fn izhikevich_default() -> Self {
+        IFParameters { 
+            v_th: 30., // spike threshold (mV)
+            v_reset: -65., // reset potential (mV)
+            tau_m: 10., // membrane time constant (ms)
+            g_l: 10., // leak conductance (nS)
+            v_init: -65., // initial potential (mV)
+            e_l: -65., // leak reversal potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            w_init: 0., // initial w value
+            alpha: 0.02, // arbitrary a value
+            beta: 0.2, // arbitrary b value
+            d: 8.0, // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: 1.0, // center of norm distr
@@ -87,19 +118,21 @@ impl ScaledDefault for LIFParameters {
 }
 
 #[derive(Clone, Debug)]
-enum LIFType {
+enum IFType {
     Basic,
     Adaptive,
     AdaptiveExponentatial,
+    Izhikevich,
 }
 
-impl LIFType {
-    fn from_str(string: &str) -> Result<LIFType> {
+impl IFType {
+    fn from_str(string: &str) -> Result<IFType> {
         let output = match string.to_ascii_lowercase().as_str() {
-            "basic" => { LIFType::Basic },
-            "adaptive" => { LIFType::Adaptive },
-            "adaptive exponential" => { LIFType::AdaptiveExponentatial },
-            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); }
+            "basic" => { IFType::Basic },
+            "adaptive" => { IFType::Adaptive },
+            "adaptive exponential" => { IFType::AdaptiveExponentatial },
+            "izhikevich" | "adaptive quadratic" => { IFType::Izhikevich },
+            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); },
         };
 
         Ok(output)
@@ -142,7 +175,7 @@ struct Cell {
 type CellGrid = Vec<Vec<Cell>>;
 
 impl Cell {
-    fn get_dv_change_and_spike(&mut self, lif: &LIFParameters, i: f64) -> (f64, bool) {
+    fn get_dv_change_and_spike(&mut self, lif: &IFParameters, i: f64) -> (f64, bool) {
         let mut is_spiking = false;
 
         if self.refractory_count > 0. {
@@ -165,10 +198,10 @@ impl Cell {
         return (dv, is_spiking);
     }
 
-    fn apply_dw_change_and_get_spike(&mut self, lif: &LIFParameters) -> bool {
+    fn apply_dw_change_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         // dw = (self.a * (v[it]-self.V_L) - w[it]) * (self.dt/self.tau_m)
         let dw = (
-            lif.a * (self.current_voltage - lif.e_l) -
+            lif.alpha * (self.current_voltage - lif.e_l) -
             self.w_value
         ) * (lif.dt / lif.tau_m);
 
@@ -182,14 +215,14 @@ impl Cell {
         } else if self.current_voltage >= lif.v_th {
             is_spiking = !is_spiking;
             self.current_voltage = lif.v_reset;
-            self.w_value += lif.b;
+            self.w_value += lif.beta;
             self.refractory_count = lif.tref / lif.dt
         }
 
         return is_spiking;
     }
 
-    fn adaptive_get_dv_change(&mut self, lif: &LIFParameters, i: f64) -> f64 {
+    fn adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
             (self.integration_constant * (i / lif.g_l)) - 
@@ -199,12 +232,40 @@ impl Cell {
         dv
     }
 
-    fn exp_adaptive_get_dv_change(&mut self, lif: &LIFParameters, i: f64) -> f64 {
+    fn exp_adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
             (lif.exp_dt * ((self.current_voltage - lif.v_th) / lif.exp_dt).exp()) +
             (self.integration_constant * (i / lif.g_l)) - 
             (self.w_value / lif.g_l)
+        ) * (lif.dt / lif.tau_m);
+
+        dv
+    }
+
+    fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
+        let dw = (
+            lif.alpha * (lif.beta * self.current_voltage - self.w_value)
+        ) * (lif.dt / lif.tau_m);
+
+        self.w_value += dw;
+
+        let mut is_spiking = false;
+
+        if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = lif.v_reset;
+            self.w_value += lif.d;
+            self.refractory_count = lif.tref / lif.dt
+        }
+
+        return is_spiking;
+    }
+
+    fn izhikevich_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+        let dv = (
+            0.04 * self.current_voltage.powf(2.0) + 
+            5. * self.current_voltage + 140. - self.w_value + i
         ) * (lif.dt / lif.tau_m);
 
         dv
@@ -232,58 +293,107 @@ impl Cell {
     }
 
     // voltage of cell should be initial voltage + this change
-    // fn run_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-    //     let mut file = File::create(filename)
-    //         .expect("Unable to create file");
-    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    fn run_static_input(
+        &mut self, 
+        lif: &IFParameters, 
+        i: f64, 
+        bayesian: bool, 
+        iterations: usize, 
+        filename: &str,
+    ) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
-    //     for _ in 0..iterations {
-    //         let (dv, _is_spiking) = if bayesian {
-    //             self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-    //         } else {
-    //             self.get_dv_change_and_spike(lif, i)
-    //         };
-    //         self.current_voltage += dv;
+        for _ in 0..iterations {
+            let (dv, _is_spiking) = if bayesian {
+                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.get_dv_change_and_spike(lif, i)
+            };
+            self.current_voltage += dv;
 
-    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-    //     }
-    // }
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
 
-    // fn run_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-    //     let mut file = File::create(filename)
-    //         .expect("Unable to create file");
-    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    fn run_adaptive_static_input(
+        &mut self, 
+        lif: &IFParameters, 
+        i: f64, 
+        bayesian: bool, 
+        iterations: usize, 
+        filename: &str,
+    ) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
-    //     for _ in 0..iterations {
-    //         let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-    //         let dv = if bayesian {
-    //             self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-    //         } else {
-    //             self.adaptive_get_dv_change(lif, i)
-    //         };
-    //         self.current_voltage += dv;
+        for _ in 0..iterations {
+            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+            let dv = if bayesian {
+                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.adaptive_get_dv_change(lif, i)
+            };
+            self.current_voltage += dv;
 
-    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-    //     }
-    // }
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
 
-    // fn run_exp_adaptive_static_input(&mut self, lif: &LIFParameters, i: f64, bayesian: bool, iterations: usize, filename: &str) {
-    //     let mut file = File::create(filename)
-    //         .expect("Unable to create file");
-    //     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+    fn run_exp_adaptive_static_input(
+        &mut self, 
+        lif: &IFParameters, 
+        i: f64, 
+        bayesian: bool, 
+        iterations: usize, 
+        filename: &str,
+    ) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
-    //     for _ in 0..iterations {
-    //         let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-    //         let dv = if bayesian {
-    //             self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
-    //         } else {
-    //             self.exp_adaptive_get_dv_change(lif, i)
-    //         };
-    //         self.current_voltage += dv;
+        for _ in 0..iterations {
+            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
+            let dv = if bayesian {
+                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+            } else {
+                self.exp_adaptive_get_dv_change(lif, i)
+            };
+            self.current_voltage += dv;
 
-    //         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-    //     }
-    // }
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+
+    fn run_izhikevich_static_input(
+        &mut self, 
+        if_params: &IFParameters, 
+        i: f64, 
+        bayesian: bool, 
+        iterations: usize,
+        filename: &str,
+    ) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        
+        for _ in 0..iterations {
+            let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
+            let dv = if bayesian {
+                self.izhikevich_get_dv_change(if_params, i * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.))
+            } else {
+                self.izhikevich_get_dv_change(if_params, i)
+            };
+            self.current_voltage += dv;
+
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+
+    // ******* IMPLEMENT IZHIKEVICH DEFAULT PARAMETERS *******
+    // redo scaling input toml with this in mind too
 }
 
 fn positions_within_square(
@@ -350,7 +460,7 @@ fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<(usize, usize)>, 
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
-    bayesian_params: Option<&LIFParameters>,
+    bayesian_params: Option<&IFParameters>,
 ) -> f64 {
     let mut input_val = input_positions
         .iter()
@@ -436,8 +546,8 @@ fn run_simulation(
     iterations: usize, 
     radius: usize, 
     random_volt_initialization: bool,
-    lif_type: LIFType,
-    lif_params: &LIFParameters,
+    if_type: IFType,
+    lif_params: &IFParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
@@ -471,8 +581,8 @@ fn run_simulation(
     let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
         .unwrap_or(&0.);
 
-    let mean_change = &lif_params.bayesian_mean != &LIFParameters::default().bayesian_mean;
-    let std_change = &lif_params.bayesian_std != &LIFParameters::default().bayesian_std;
+    let mean_change = &lif_params.bayesian_mean != &IFParameters::default().bayesian_mean;
+    let std_change = &lif_params.bayesian_std != &IFParameters::default().bayesian_std;
     let bayesian = if mean_change || std_change {
         Some(lif_params)
     } else {
@@ -525,8 +635,8 @@ fn run_simulation(
         }
     }
 
-    match lif_type {
-        LIFType::Basic => {
+    match if_type {
+        IFType::Basic => {
             for _ in 0..iterations {
                 let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
                     .cloned()
@@ -565,7 +675,7 @@ fn run_simulation(
                 output_val.add(&cell_grid);
             }
         },
-        LIFType::Adaptive => {
+        IFType::Adaptive => {
             for _ in 0..iterations {
                 let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
                     .cloned()
@@ -601,7 +711,7 @@ fn run_simulation(
                 output_val.add(&cell_grid);
             }
         },
-        LIFType::AdaptiveExponentatial => {
+        IFType::AdaptiveExponentatial => {
             for _ in 0..iterations {
                 let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
                     .cloned()
@@ -638,6 +748,7 @@ fn run_simulation(
                 output_val.add(&cell_grid);
             }
         },
+        _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unimplemented 'if_type'")) }
     }
 
     return Ok(output_val);
@@ -689,8 +800,8 @@ struct SimulationParameters<'a> {
     iterations: usize, 
     radius: usize, 
     random_volt_initialization: bool,
-    lif_params: LIFParameters,
-    lif_type: LIFType,
+    lif_params: IFParameters,
+    if_type: IFType,
     default_cell_values: HashMap<&'a str, f64>,
 }
 
@@ -708,13 +819,13 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     let random_volt_initialization = parse_value_with_default(&table, "random_volt_initialization", parse_bool, false)?;
     println!("random_volt_initialization: {}", random_volt_initialization);
 
-    let lif_type: String = parse_value_with_default(table, "lif_type", parse_string, String::from("basic"))?;
+    let if_type: String = parse_value_with_default(table, "if_type", parse_string, String::from("basic"))?;
 
-    let lif_type = match LIFType::from_str(&lif_type) {
-        Ok(lif_type_val) => lif_type_val,
-        Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'lif_type' as one of the valid types")) }
+    let if_type = match IFType::from_str(&if_type) {
+        Ok(if_type_val) => if_type_val,
+        Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'if_type' as one of the valid types")) }
     };
-    println!("lif_type: {:#?}", lif_type);
+    println!("if_type: {:#?}", if_type);
 
     let output_type: String = parse_value_with_default(table, "output_type", parse_string, String::from("averaged"))?;
     println!("output_type: {}", output_type);
@@ -757,16 +868,17 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         println!("{}: {}", key, value_to_update);
     }
 
-    let mut lif_params = LIFParameters {
-        ..LIFParameters::default()
+    let mut lif_params = IFParameters {
+        ..IFParameters::default()
     };
 
     lif_params.dt = parse_value_with_default(table, "dt", parse_f64, lif_params.dt)?;
     lif_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, lif_params.exp_dt)?;
     lif_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, lif_params.tau_m)?;
     lif_params.tref = parse_value_with_default(table, "tref", parse_f64, lif_params.tref)?;
-    lif_params.a = parse_value_with_default(table, "a", parse_f64, lif_params.a)?;
-    lif_params.b = parse_value_with_default(table, "b", parse_f64, lif_params.b)?;
+    lif_params.alpha = parse_value_with_default(table, "alpha", parse_f64, lif_params.alpha)?;
+    lif_params.beta = parse_value_with_default(table, "beta", parse_f64, lif_params.beta)?;
+    lif_params.d = parse_value_with_default(table, "d", parse_f64, lif_params.d)?;
     lif_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
     lif_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
     lif_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
@@ -805,7 +917,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
         lif_params: lif_params,
-        lif_type: lif_type,
+        if_type: if_type,
         default_cell_values: default_cell_values,
     });
 }
@@ -867,7 +979,7 @@ fn objective(
         sim_params.iterations, 
         sim_params.radius, 
         sim_params.random_volt_initialization,
-        sim_params.lif_type,
+        sim_params.if_type,
         &sim_params.lif_params,
         &sim_params.default_cell_values,
         &mut input_func,
@@ -951,7 +1063,7 @@ fn main() -> Result<()> {
             sim_params.iterations, 
             sim_params.radius, 
             sim_params.random_volt_initialization,
-            sim_params.lif_type,
+            sim_params.if_type,
             &sim_params.lif_params,
             &sim_params.default_cell_values,
             &mut input_func,
@@ -1070,6 +1182,120 @@ fn main() -> Result<()> {
 
         // option to run a simulation and return the eeg signals
         // option to write custom bounds
+    } else if let Some(single_neuron_test) = config.get("single_neuron_test") {
+        // generalize this
+        // let normalized_scaling: bool = match volt_test_table.get("normalized_scaling") {
+        //     Some(value) => { 
+        //         match value.as_bool() {
+        //             Some(bool_value) => bool_value,
+        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse normalized_scaling")) },
+        //         }
+        //     },
+        //     None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse normalized_scaling")) },
+        // };
+        // println!("normalized_scaling: {}", normalized_scaling);
+
+        let filename: &str = match single_neuron_test.get("filename") {
+            Some(value) => { 
+                match value.as_str() {
+                    Some(str_value) => str_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse filename")) },
+                }
+            },
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse filename")) },
+        };
+        println!("filename: {}", filename);
+
+        let iterations: usize = match single_neuron_test.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+
+        let input: f64 = match single_neuron_test.get("input") {
+            Some(value) => parse_f64(value, "input")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input' value not found")); },
+        };
+        println!("input: {}", input);  
+
+        let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
+        // can eventually replace this with code that just takes in a mean and std 
+        // where std of 0 and mean of 1 means regular execution without bayesian modifications
+
+        let if_type: String = parse_value_with_default(
+            single_neuron_test, 
+            "if_type", 
+            parse_string, 
+            String::from("basic")
+        )?;
+        println!("if_type: {}", if_type);
+
+        let if_type = IFType::from_str(&if_type)?;
+
+        let scaling_type_default = match if_type {
+            IFType::Izhikevich => "izhikevich",
+            _ => "regular",
+        };
+        let scaling_type: String = parse_value_with_default(
+            single_neuron_test, 
+            "scaling_type", 
+            parse_string, 
+            String::from(scaling_type_default)
+        )?;
+
+        let mut if_params = match scaling_type.as_str() {
+            "regular" => IFParameters { ..IFParameters::default() },
+            "scaled" => IFParameters { ..IFParameters::scaled_default() },
+            "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
+            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
+        };
+
+        if_params.dt = parse_value_with_default(single_neuron_test, "dt", parse_f64, if_params.dt)?;
+        if_params.exp_dt = parse_value_with_default(single_neuron_test, "exp_dt", parse_f64, if_params.exp_dt)?;
+        if_params.tau_m = parse_value_with_default(single_neuron_test, "tau_m", parse_f64, if_params.tau_m)?;
+        if_params.tref = parse_value_with_default(single_neuron_test, "tref", parse_f64, if_params.tref)?;
+        if_params.alpha = parse_value_with_default(single_neuron_test, "a", parse_f64, if_params.alpha)?;
+        if_params.beta = parse_value_with_default(single_neuron_test, "b", parse_f64, if_params.beta)?;
+        if_params.d = parse_value_with_default(single_neuron_test, "d", parse_f64, if_params.d)?;
+        if_params.bayesian_mean = parse_value_with_default(single_neuron_test, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
+        if_params.bayesian_std = parse_value_with_default(single_neuron_test, "bayesian_std", parse_f64, if_params.bayesian_std)?;
+        if_params.bayesian_max = parse_value_with_default(single_neuron_test, "bayesian_max", parse_f64, if_params.bayesian_max)?;
+        if_params.bayesian_min = parse_value_with_default(single_neuron_test, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+
+        println!("{:#?}", if_params);
+
+        let mut test_cell = Cell { 
+            current_voltage: if_params.v_init, 
+            refractory_count: 0.0,
+            leak_constant: -1.,
+            integration_constant: 1.,
+            potentiation_type: PotentiationType::Excitatory,
+            neurotransmission_concentration: 0., 
+            neurotransmission_release: 1.,
+            receptor_density: 1.,
+            chance_of_releasing: 0.5, 
+            dissipation_rate: 0.1, 
+            chance_of_random_release: 0.2,
+            random_release_concentration: 0.1,
+            w_value: if_params.w_init,
+        };
+
+        match if_type {
+            IFType::Basic => { 
+                test_cell.run_static_input(&if_params, input, bayesian, iterations, filename); 
+            },
+            IFType::Adaptive => { 
+                test_cell.run_adaptive_static_input(&if_params, input, bayesian, iterations, filename); 
+            },
+            IFType::AdaptiveExponentatial => { 
+                test_cell.run_exp_adaptive_static_input(&if_params, input, bayesian, iterations, filename);
+            },
+            IFType::Izhikevich => { 
+                test_cell.run_izhikevich_static_input(&if_params, input, bayesian, iterations, filename); 
+            }
+        };
+
+        println!("Finished volt test");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
