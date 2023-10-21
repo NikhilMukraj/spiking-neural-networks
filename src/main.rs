@@ -103,11 +103,11 @@ impl IzhikevichDefault for IFParameters {
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 0., // initial w value
+            w_init: 80., // initial w value
             alpha: 0.02, // arbitrary a value
             beta: 0.2, // arbitrary b value
             d: 8.0, // arbitrary d value
-            dt: 0.1, // simulation time step (ms)
+            dt: 0.5, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: 1.0, // center of norm distr
             bayesian_std: 0.0, // std of norm distr
@@ -377,7 +377,7 @@ impl Cell {
     ) {
         let mut file = File::create(filename)
             .expect("Unable to create file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         
         for _ in 0..iterations {
             let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
@@ -388,7 +388,7 @@ impl Cell {
             };
             self.current_voltage += dv;
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+            writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         }
     }
 
@@ -878,7 +878,9 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     lif_params.tref = parse_value_with_default(table, "tref", parse_f64, lif_params.tref)?;
     lif_params.alpha = parse_value_with_default(table, "alpha", parse_f64, lif_params.alpha)?;
     lif_params.beta = parse_value_with_default(table, "beta", parse_f64, lif_params.beta)?;
+    lif_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, lif_params.v_reset)?; 
     lif_params.d = parse_value_with_default(table, "d", parse_f64, lif_params.d)?;
+    lif_params.w_init = parse_value_with_default(table, "w_init", parse_f64, lif_params.w_init)?;
     lif_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
     lif_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
     lif_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
@@ -1256,7 +1258,9 @@ fn main() -> Result<()> {
         if_params.tref = parse_value_with_default(single_neuron_test, "tref", parse_f64, if_params.tref)?;
         if_params.alpha = parse_value_with_default(single_neuron_test, "a", parse_f64, if_params.alpha)?;
         if_params.beta = parse_value_with_default(single_neuron_test, "b", parse_f64, if_params.beta)?;
+        if_params.v_reset = parse_value_with_default(single_neuron_test, "v_reset", parse_f64, if_params.v_reset)?; 
         if_params.d = parse_value_with_default(single_neuron_test, "d", parse_f64, if_params.d)?;
+        if_params.w_init = parse_value_with_default(single_neuron_test, "w_init", parse_f64, if_params.w_init)?;
         if_params.bayesian_mean = parse_value_with_default(single_neuron_test, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
         if_params.bayesian_std = parse_value_with_default(single_neuron_test, "bayesian_std", parse_f64, if_params.bayesian_std)?;
         if_params.bayesian_max = parse_value_with_default(single_neuron_test, "bayesian_max", parse_f64, if_params.bayesian_max)?;
