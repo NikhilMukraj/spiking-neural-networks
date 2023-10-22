@@ -256,7 +256,6 @@ impl Cell {
             is_spiking = !is_spiking;
             self.current_voltage = lif.v_reset;
             self.w_value += lif.d;
-            self.refractory_count = lif.tref / lif.dt
         }
 
         return is_spiking;
