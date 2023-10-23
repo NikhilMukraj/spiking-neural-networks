@@ -94,7 +94,7 @@ impl IzhikevichDefault for IFParameters {
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 80., // initial w value
+            w_init: 30., // initial w value
             alpha: 0.02, // arbitrary a value
             beta: 0.2, // arbitrary b value
             d: 8.0, // arbitrary d value
