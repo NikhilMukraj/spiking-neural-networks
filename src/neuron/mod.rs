@@ -114,6 +114,7 @@ pub enum IFType {
     Adaptive,
     AdaptiveExponentatial,
     Izhikevich,
+    IzhikevichLeaky,
 }
 
 impl IFType {
@@ -123,6 +124,7 @@ impl IFType {
             "adaptive" => { IFType::Adaptive },
             "adaptive exponential" => { IFType::AdaptiveExponentatial },
             "izhikevich" | "adaptive quadratic" => { IFType::Izhikevich },
+            "leaky izhikevich" | "leay adaptive quadratic" => { IFType::IzhikevichLeaky }
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); },
         };
 
@@ -270,6 +272,16 @@ impl Cell {
         dv
     }
 
+    pub fn izhikevich_leaky_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+        let dv = (
+            0.04 * self.current_voltage.powf(2.0) + 
+            5. * self.current_voltage + 140. - 
+            self.w_value * (self.current_voltage - lif.e_l) + i
+        ) * (lif.dt / lif.tau_m);
+
+        dv
+    }
+
     pub fn determine_neurotransmitter_concentration(&mut self, is_spiking: bool) {
         // (excitatory should increase voltage)
         // (inhibitory should decrease voltage)
@@ -384,6 +396,31 @@ impl Cell {
                 self.izhikevich_get_dv_change(if_params, i * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.))
             } else {
                 self.izhikevich_get_dv_change(if_params, i)
+            };
+            self.current_voltage += dv;
+
+            writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
+        }
+    }
+
+    pub fn run_izhikevich_leaky_static_input(
+        &mut self, 
+        if_params: &IFParameters, 
+        i: f64, 
+        bayesian: bool, 
+        iterations: usize,
+        filename: &str,
+    ) {
+        let mut file = File::create(filename)
+            .expect("Unable to create file");
+        writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
+        
+        for _ in 0..iterations {
+            let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
+            let dv = if bayesian {
+                self.izhikevich_leaky_get_dv_change(if_params, i * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.))
+            } else {
+                self.izhikevich_leaky_get_dv_change(if_params, i)
             };
             self.current_voltage += dv;
 

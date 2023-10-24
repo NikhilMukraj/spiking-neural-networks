@@ -908,7 +908,10 @@ fn main() -> Result<()> {
             },
             IFType::Izhikevich => { 
                 test_cell.run_izhikevich_static_input(&if_params, input, bayesian, iterations, filename); 
-            }
+            },
+            IFType::IzhikevichLeaky => {
+                test_cell.run_izhikevich_leaky_static_input(&if_params, input, bayesian, iterations, filename);
+            },
         };
 
         println!("Finished volt test");
