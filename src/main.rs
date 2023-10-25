@@ -264,7 +264,6 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
                     let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(lif_params, input);
 
@@ -340,7 +339,6 @@ fn run_simulation(
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-
                     let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
 
                     changes.insert(*pos, (input, is_spiking));
