@@ -124,7 +124,7 @@ impl IFType {
             "adaptive" => { IFType::Adaptive },
             "adaptive exponential" => { IFType::AdaptiveExponentatial },
             "izhikevich" | "adaptive quadratic" => { IFType::Izhikevich },
-            "leaky izhikevich" | "leay adaptive quadratic" => { IFType::IzhikevichLeaky }
+            "leaky izhikevich" | "leaky adaptive quadratic" => { IFType::IzhikevichLeaky }
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); },
         };
 
