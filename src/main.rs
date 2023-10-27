@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap, 
-    fs::read_to_string, 
-    io::{Result, Error, ErrorKind}, 
+    fs::{File, read_to_string}, 
+    io::{Write, Result, Error, ErrorKind}, 
     env,
 };
 use rand::{Rng, seq::SliceRandom};
@@ -46,16 +46,6 @@ fn randomly_select_positions(mut positions: Vec<(usize, usize)>, num_to_select: 
     positions.truncate(num_to_select);
 
     positions
-}
-
-fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
-    let volt_mean: f64 = cell_grid
-        .iter()
-        .flatten()
-        .map(|x| x.current_voltage)
-        .sum();
-
-    volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
 }
 
 // fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
@@ -113,30 +103,49 @@ fn get_input_from_positions(
     return input_val;
 }
 
+fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
+    let volt_mean: f64 = cell_grid
+        .iter()
+        .flatten()
+        .map(|x| x.current_voltage)
+        .sum();
 
-// #[derive(Debug)]
-// #[allow(dead_code)]
-// struct NeuroAndVoltage {
-//     neurotransmitter_concentration: f64,
-//     voltage: f64,
-// }
+    volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
+}
+
+fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
+    let neuro_mean: f64 = cell_grid
+        .iter()
+        .flatten()
+        .map(|x| x.neurotransmission_concentration)
+        .sum();
+
+    neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
+}
+
+struct NeuroAndVolts {
+    voltage: f64,
+    neurotransmitter: f64,
+}
 
 enum Output {
     Grid(Vec<CellGrid>),
-    Averaged(Vec<f64>)
+    GridBinary(Vec<CellGrid>),
+    Averaged(Vec<NeuroAndVolts>),
+    AveragedBinary(Vec<NeuroAndVolts>),
 }
 
 impl Output {
     fn add(&mut self, cell_grid: &CellGrid) {
         match self {
-            Output::Grid(grids) => { grids.push(cell_grid.clone()) }
-            Output::Averaged(averages) => { 
-                // averages.push(NeuroAndVoltage {
-                //     neurotransmitter_concentration: get_neuro_avg(cell_grid),
-                //     voltage: get_volt_avg(cell_grid)
-                // });
-
-                averages.push(get_volt_avg(cell_grid));
+            Output::Grid(grids) | Output::GridBinary(grids) => { grids.push(cell_grid.clone()) }
+            Output::Averaged(averages) | Output::AveragedBinary(averages) => { 
+                averages.push(
+                    NeuroAndVolts {
+                        voltage: get_volt_avg(cell_grid),
+                        neurotransmitter: get_neuro_avg(cell_grid),
+                    }
+                );
             }
         }
     }
@@ -144,8 +153,70 @@ impl Output {
     fn from_str(string: &str) -> Result<Output> {
         match string.to_ascii_lowercase().as_str() {
             "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
-            "averaged" => { Ok(Output::Averaged(Vec::<f64>::new())) },
+            "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid>::new())) },
+            "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVolts>::new())) },
+            "averaged binary" => { Ok(Output::AveragedBinary(Vec::<NeuroAndVolts>::new())) },
             _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
+        }
+    }
+
+    fn write_to_file(&self, voltage_file: &mut File, neurotransmitter_file: &mut File) {
+        match &self {
+            Output::Grid(grids) => {
+                for grid in grids {
+                    for row in grid {
+                        for value in row {
+                            write!(voltage_file, "{} ", value.current_voltage)
+                                .expect("Could not write to file");
+                            write!(neurotransmitter_file, "{} ", value.neurotransmission_concentration)
+                                .expect("Could not write to file");
+                        }
+                        writeln!(voltage_file)
+                            .expect("Could not write to file");
+                        writeln!(neurotransmitter_file)
+                            .expect("Could not write to file");
+
+                    }
+                    writeln!(voltage_file, "-----")
+                        .expect("Could not write to file"); 
+                    writeln!(neurotransmitter_file, "-----")
+                        .expect("Could not write to file"); 
+                }
+            },
+            Output::GridBinary(grids) => {
+                for grid in grids {
+                    for row in grid {
+                        for value in row {
+                            let bytes = value.current_voltage.to_le_bytes();
+                            voltage_file
+                                .write_all(&bytes)
+                                .expect("Could not write to file");
+                
+                            let bytes = value.neurotransmission_concentration.to_le_bytes();
+                            neurotransmitter_file
+                                .write_all(&bytes)
+                                .expect("Could not write to file");
+                        }
+                    }
+                }
+            },
+            Output::Averaged(averages) => {
+                for neuro_and_volt in averages {
+                    writeln!(voltage_file, "{}", neuro_and_volt.voltage)
+                        .expect("Could not write to file");
+                    writeln!(neurotransmitter_file, "{}", neuro_and_volt.neurotransmitter)
+                        .expect("Could not write to file");
+                } 
+            },
+            Output::AveragedBinary(averages) => {
+                for neuro_and_volt in averages {
+                    let volt_mean_bytes = neuro_and_volt.voltage.to_le_bytes();
+                    let neuro_mean_bytes = neuro_and_volt.neurotransmitter.to_le_bytes();
+
+                    voltage_file.write_all(&volt_mean_bytes).expect("Could not write to file"); 
+                    neurotransmitter_file.write_all(&neuro_mean_bytes).expect("Could not write to file");
+                }
+            }
         }
     }
 }
@@ -599,7 +670,11 @@ fn objective(
     )?;
 
     let x: Vec<f64> = match output_value {
-        Output::Averaged(value) => { value },
+        Output::Averaged(value) | Output::AveragedBinary(value) => { 
+            value.iter()
+                .map(|val| val.voltage)
+                .collect()
+        },
         _ => { unreachable!() },
     };
 
@@ -628,7 +703,7 @@ fn main() -> Result<()> {
     let toml_content = read_to_string(&args[1]).expect("Cannot read file");
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
-    if let Some(simulation_table) = config.get("simulation") {
+    if let Some(simulation_table) = config.get("lattice_simulation") {
         let output_type: String = parse_value_with_default(
             &simulation_table, 
             "output_type", 
@@ -638,6 +713,17 @@ fn main() -> Result<()> {
         println!("output_type: {}", output_type);
 
         let output_type = Output::from_str(&output_type)?;
+
+        let tag: &str = match simulation_table.get("tag") {
+            Some(value) => { 
+                match value.as_str() {
+                    Some(str_value) => str_value,
+                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'tag'")) },
+                }
+            },
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'tag'")) },
+        };
+        println!("filename: {}", tag);
 
         let equation: String = parse_value_with_default(
             &simulation_table, 
@@ -665,8 +751,6 @@ fn main() -> Result<()> {
             expr.value()
         };
 
-        println!("here");
-
         let sim_params = get_parameters(&simulation_table)?;
 
         let output_value = run_simulation(
@@ -682,22 +766,43 @@ fn main() -> Result<()> {
             output_type,
         )?;
 
-        match output_value {
-            Output::Grid(grid_vec) => {
-                let voltage_matrix = grid_vec.last().expect("Cannot get last value");
+        // match output_value {
+        //     Output::Grid(grid_vec) => {
+        //         let voltage_matrix = grid_vec.last().expect("Cannot get last value");
 
-                for row in voltage_matrix {
-                    for neuron in row {
-                        print!("{:.3} ", neuron.current_voltage);
-                    }
-                    println!();
-                }
-            }
-            Output::Averaged(averaged_vec) => {
-                // println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
-                println!("{:#?}", averaged_vec);
-            }
-        }
+        //         for row in voltage_matrix {
+        //             for neuron in row {
+        //                 print!("{:.3} ", neuron.current_voltage);
+        //             }
+        //             println!();
+        //         }
+        //     }
+        //     Output::Averaged(averaged_vec) => {
+        //         // println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
+        //         println!("{:#?}", averaged_vec);
+        //     }
+        // }
+
+        let (mut voltage_file, mut neurotransmitter_file) = match output_value {
+            Output::Grid(_) | Output::Averaged(_) => { 
+                (   
+                    File::create(format!("{}_voltage.txt", tag))
+                        .expect("Could not create file"),
+                    File::create(format!("{}_neurotransmitter.txt", tag))
+                        .expect("Could not create file")
+                )
+            },
+            Output::GridBinary(_) | Output::AveragedBinary(_) => { 
+                (   
+                    File::create(format!("{}_voltage.bin", tag))
+                        .expect("Could not create file"),
+                    File::create(format!("{}_neurotransmitter.bin", tag))
+                        .expect("Could not create file")
+                )
+            },
+        };
+
+        output_value.write_to_file(&mut voltage_file, &mut neurotransmitter_file);
     } else if let Some(ga_table) = config.get("ga") {
         let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
         println!("n_bits: {}", n_bits);
