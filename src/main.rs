@@ -723,7 +723,7 @@ fn main() -> Result<()> {
             },
             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'tag'")) },
         };
-        println!("filename: {}", tag);
+        println!("tag: {}", tag);
 
         let equation: String = parse_value_with_default(
             &simulation_table, 
@@ -803,6 +803,8 @@ fn main() -> Result<()> {
         };
 
         output_value.write_to_file(&mut voltage_file, &mut neurotransmitter_file);
+
+        println!("Finished lattice simulation");
     } else if let Some(ga_table) = config.get("ga") {
         let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
         println!("n_bits: {}", n_bits);
@@ -1017,7 +1019,7 @@ fn main() -> Result<()> {
             },
         };
 
-        println!("Finished volt test");
+        println!("\nFinished volt test");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }

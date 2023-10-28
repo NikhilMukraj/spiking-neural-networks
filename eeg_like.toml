@@ -1,4 +1,4 @@
-[simulation]
+[lattice_simulation]
 num_rows = 20
 num_cols = 20
 # excitatory_chance = 0.8
@@ -7,7 +7,7 @@ dt = 0.1
 iterations = 10000
 radius = 2
 # total_time = 10
-output_tag = "eeg_sim"
+tag = "eeg_sim"
 output_type = "averaged"
 # tau_m = 50.0
 lif_type = "adaptive exponential"
