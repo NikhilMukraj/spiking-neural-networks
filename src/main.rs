@@ -429,11 +429,163 @@ fn run_simulation(
                 output_val.add(&cell_grid);
             }
         },
-        _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unimplemented 'if_type'")) }
+        IFType::Izhikevich => {
+            for _ in 0..iterations {
+                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+                    .cloned()
+                    .map(|key| (key, (0.0, false)))
+                    .collect();
+
+                // loop through every cell
+                // calculate the dv given the inputs
+                // write 
+                // end loop
+
+                for pos in adjacency_list.keys() {
+                    let (x, y) = pos;
+                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+                    let is_spiking = cell_grid[*x][*y].izhikevich_apply_dw_and_get_spike(lif_params);
+
+                    changes.insert(*pos, (input, is_spiking));
+                }
+
+                // find dv change and apply it
+                // find neurotransmitter change and apply it
+                for (pos, (input_value, is_spiking_value)) in changes {
+                    let (x, y) = pos;
+
+                    let dv = cell_grid[x][y].izhikevich_get_dv_change(lif_params, input_value);
+
+                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].current_voltage += dv;
+                }
+
+                output_val.add(&cell_grid);
+            }
+        },
+        IFType::IzhikevichLeaky => {
+            for _ in 0..iterations {
+                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+                    .cloned()
+                    .map(|key| (key, (0.0, false)))
+                    .collect();
+
+                // loop through every cell
+                // calculate the dv given the inputs
+                // write 
+                // end loop
+
+                for pos in adjacency_list.keys() {
+                    let (x, y) = pos;
+                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+                    let is_spiking = cell_grid[*x][*y].izhikevich_apply_dw_and_get_spike(lif_params);
+
+                    changes.insert(*pos, (input, is_spiking));
+                }
+
+                // find dv change and apply it
+                // find neurotransmitter change and apply it
+                for (pos, (input_value, is_spiking_value)) in changes {
+                    let (x, y) = pos;
+
+                    let dv = cell_grid[x][y].izhikevich_leaky_get_dv_change(lif_params, input_value);
+
+                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].current_voltage += dv;
+                }
+
+                output_val.add(&cell_grid);
+            }
+        },
     }
 
     return Ok(output_val);
 }
+
+// rewrite function to do this if not basic if type
+
+// fn get_apply_adaptive_and_get_spike_func(
+//     if_type: IFType,
+//     if_params: &IFParameters
+// ) -> Fn(&Cell, &IFParameters) {
+//     match if_type {
+//         IFType::Adaptive | IFType::AdaptiveExponentatial => 
+//             |neuron: &Cell, if_params: &IFParameters| -> bool 
+//             {neuron.apply_dw_change_and_get_spike(if_params) },
+//         IFType::Izhikevich => 
+//             |neuron: &Cell, if_params: &IFParameters| -> bool 
+//             {neuron.izhikevich_apply_dw_and_get_spike(if_params) },
+//         IFType::IzhikevichLeaky => 
+//             |neuron: &Cell, if_params: &IFParameters| -> bool 
+//             {neuron.izhikevich_apply_dw_and_get_spike(if_params) },
+//         _ => unreachable!(),
+//     }    
+// }
+
+// fn get_adaptive_dv_change_func(
+//     if_type: IFType,
+//     if_params: &IFParameters
+// ) -> bool {
+//     match if_type {
+//         IFType::Adaptive =>
+//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
+//             { neuron.adaptive_get_dv_change(if_params, input_value) },
+//         IFType::AdaptiveExponentatial =>
+//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
+//             { neuron.exp_adaptive_get_dv_change(if_params, input_value) },
+//         IFType::Izhikevich =>
+//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
+//             { neuron.izhikevich_get_dv_change(if_params, input_value) },
+//         IFType::IzhikevichLeaky =>
+//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
+//             { neuron.izhikevich_get_dv_change(if_params, input_value) },
+//         _ => unreachable!(),
+//     }    
+// }
+
+// => {
+    // let apply_adaptive_and_get_spike = get_apply_adaptive_and_get_spike_func(if_type, if_params);
+    // let get_adaptive_dv_chance = get_adaptive_dv_change_func(if_type, if_params);
+
+//     for _ in 0..iterations {
+//         let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
+//             .cloned()
+//             .map(|key| (key, (0.0, false)))
+//             .collect();
+
+//         // loop through every cell
+//         // calculate the dv given the inputs
+//         // write 
+//         // end loop
+
+//         for pos in adjacency_list.keys() {
+//             let (x, y) = pos;
+//             let input_positions = adjacency_list.get(&pos).unwrap();
+
+//             let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+//             let is_spiking = apply_adaptive_and_get_spike(&neuron, &if_params);
+
+//             changes.insert(*pos, (input, is_spiking));
+//         }
+
+//         // find dv change and apply it
+//         // find neurotransmitter change and apply it
+//         for (pos, (input_value, is_spiking_value)) in changes {
+//             let (x, y) = pos;
+
+//             let dv = get_adaptive_dv_chance(&neuron, lif_params, input_value);
+
+//             cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+//             cell_grid[x][y].current_voltage += dv;
+//         }
+
+//         output_val.add(&cell_grid);
+//     }
+// }
 
 fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
     value
@@ -766,23 +918,6 @@ fn main() -> Result<()> {
             output_type,
         )?;
 
-        // match output_value {
-        //     Output::Grid(grid_vec) => {
-        //         let voltage_matrix = grid_vec.last().expect("Cannot get last value");
-
-        //         for row in voltage_matrix {
-        //             for neuron in row {
-        //                 print!("{:.3} ", neuron.current_voltage);
-        //             }
-        //             println!();
-        //         }
-        //     }
-        //     Output::Averaged(averaged_vec) => {
-        //         // println!("{:?}", averaged_vec.last().expect("Cannot get last value"));
-        //         println!("{:#?}", averaged_vec);
-        //     }
-        // }
-
         let (mut voltage_file, mut neurotransmitter_file) = match output_value {
             Output::Grid(_) | Output::Averaged(_) => { 
                 (   
@@ -902,18 +1037,6 @@ fn main() -> Result<()> {
         // option to run a simulation and return the eeg signals
         // option to write custom bounds
     } else if let Some(single_neuron_test) = config.get("single_neuron_test") {
-        // generalize this
-        // let normalized_scaling: bool = match volt_test_table.get("normalized_scaling") {
-        //     Some(value) => { 
-        //         match value.as_bool() {
-        //             Some(bool_value) => bool_value,
-        //             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse normalized_scaling")) },
-        //         }
-        //     },
-        //     None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse normalized_scaling")) },
-        // };
-        // println!("normalized_scaling: {}", normalized_scaling);
-
         let filename: &str = match single_neuron_test.get("filename") {
             Some(value) => { 
                 match value.as_str() {
@@ -936,11 +1059,7 @@ fn main() -> Result<()> {
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'input' value not found")); },
         };
         println!("input: {}", input);  
-
-        let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
-        // can eventually replace this with code that just takes in a mean and std 
-        // where std of 0 and mean of 1 means regular execution without bayesian modifications
-
+        
         let if_type: String = parse_value_with_default(
             single_neuron_test, 
             "if_type", 
@@ -983,6 +1102,16 @@ fn main() -> Result<()> {
         if_params.bayesian_max = parse_value_with_default(single_neuron_test, "bayesian_max", parse_f64, if_params.bayesian_max)?;
         if_params.bayesian_min = parse_value_with_default(single_neuron_test, "bayesian_min", parse_f64, if_params.bayesian_min)?;
 
+        // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
+
+        let mean_change = &if_params.bayesian_mean != &IFParameters::default().bayesian_mean;
+        let std_change = &if_params.bayesian_std != &IFParameters::default().bayesian_std;
+        let bayesian = if mean_change || std_change {
+            true
+        } else {
+            false
+        };
+        
         println!("{:#?}", if_params);
 
         let mut test_cell = Cell { 
