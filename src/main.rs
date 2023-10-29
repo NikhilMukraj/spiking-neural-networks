@@ -230,7 +230,7 @@ fn run_simulation(
     radius: usize, 
     random_volt_initialization: bool,
     if_type: IFType,
-    lif_params: &IFParameters,
+    if_params: &IFParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
@@ -264,10 +264,10 @@ fn run_simulation(
     let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
         .unwrap_or(&0.);
 
-    let mean_change = &lif_params.bayesian_mean != &IFParameters::default().bayesian_mean;
-    let std_change = &lif_params.bayesian_std != &IFParameters::default().bayesian_std;
+    let mean_change = &if_params.bayesian_mean != &IFParameters::default().bayesian_mean;
+    let std_change = &if_params.bayesian_std != &IFParameters::default().bayesian_std;
     let bayesian = if mean_change || std_change {
-        Some(lif_params)
+        Some(if_params)
     } else {
         None
     };
@@ -276,7 +276,7 @@ fn run_simulation(
         .map(|_| {
             (0..num_cols)
                 .map(|_| Cell { 
-                    current_voltage: lif_params.v_init, 
+                    current_voltage: if_params.v_init, 
                     refractory_count: 0.0,
                     leak_constant: -1.,
                     integration_constant: 1.,
@@ -288,7 +288,7 @@ fn run_simulation(
                     dissipation_rate: limited_distr(dissipation_rate, dissipation_rate_std, 0.0, 1.0), 
                     chance_of_random_release: chance_of_random_release,
                     random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
-                    w_value: lif_params.w_init,
+                    w_value: if_params.w_init,
                 })
                 .collect::<Vec<Cell>>()
         })
@@ -299,8 +299,8 @@ fn run_simulation(
     if random_volt_initialization {
         for section in &mut cell_grid {
             for neuron in section {
-                neuron.current_voltage = rng.gen_range(lif_params.v_init..=lif_params.v_th);
-                neuron.refractory_count = rng.gen_range(0.0..=lif_params.tref);
+                neuron.current_voltage = rng.gen_range(if_params.v_init..=if_params.v_th);
+                neuron.refractory_count = rng.gen_range(0.0..=if_params.tref);
             }
         }
     }
@@ -336,7 +336,7 @@ fn run_simulation(
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(lif_params, input);
+                    let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(if_params, input);
 
                     changes.insert(*pos, (dv, is_spiking));
                 }
@@ -357,7 +357,26 @@ fn run_simulation(
                 output_val.add(&cell_grid);
             }
         },
-        IFType::Adaptive => {
+        IFType::Adaptive | IFType::AdaptiveExponential | 
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+                match if_type {
+                    IFType::Basic => unreachable!(),
+                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
+                    IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                }
+            };
+
+            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+                match if_type {
+                    IFType::Basic => unreachable!(), 
+                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
+                }
+            };
+
             for _ in 0..iterations {
                 let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
                     .cloned()
@@ -374,7 +393,9 @@ fn run_simulation(
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
                     let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
+                    // let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(if_params);
+
+                    let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[*x][*y], if_params);
 
                     changes.insert(*pos, (input, is_spiking));
                 }
@@ -384,7 +405,7 @@ fn run_simulation(
                 for (pos, (input_value, is_spiking_value)) in changes {
                     let (x, y) = pos;
 
-                    let dv = cell_grid[x][y].adaptive_get_dv_change(lif_params, input_value);
+                    let dv = adaptive_dv(&mut cell_grid[x][y], if_params, input_value);
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv;
@@ -392,200 +413,11 @@ fn run_simulation(
 
                 output_val.add(&cell_grid);
             }
-        },
-        IFType::AdaptiveExponentatial => {
-            for _ in 0..iterations {
-                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-                    .cloned()
-                    .map(|key| (key, (0.0, false)))
-                    .collect();
-
-                // loop through every cell
-                // calculate the dv given the inputs
-                // write 
-                // end loop
-
-                for pos in adjacency_list.keys() {
-                    let (x, y) = pos;
-                    let input_positions = adjacency_list.get(&pos).unwrap();
-
-                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(lif_params);
-
-                    changes.insert(*pos, (input, is_spiking));
-                }
-
-                // find dv change and apply it
-                // find neurotransmitter change and apply it
-                for (pos, (input_value, is_spiking_value)) in changes {
-                    let (x, y) = pos;
-
-                    let dv = cell_grid[x][y].exp_adaptive_get_dv_change(lif_params, input_value);
-
-                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
-                    cell_grid[x][y].current_voltage += dv;
-                }
-
-                output_val.add(&cell_grid);
-            }
-        },
-        IFType::Izhikevich => {
-            for _ in 0..iterations {
-                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-                    .cloned()
-                    .map(|key| (key, (0.0, false)))
-                    .collect();
-
-                // loop through every cell
-                // calculate the dv given the inputs
-                // write 
-                // end loop
-
-                for pos in adjacency_list.keys() {
-                    let (x, y) = pos;
-                    let input_positions = adjacency_list.get(&pos).unwrap();
-
-                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    let is_spiking = cell_grid[*x][*y].izhikevich_apply_dw_and_get_spike(lif_params);
-
-                    changes.insert(*pos, (input, is_spiking));
-                }
-
-                // find dv change and apply it
-                // find neurotransmitter change and apply it
-                for (pos, (input_value, is_spiking_value)) in changes {
-                    let (x, y) = pos;
-
-                    let dv = cell_grid[x][y].izhikevich_get_dv_change(lif_params, input_value);
-
-                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
-                    cell_grid[x][y].current_voltage += dv;
-                }
-
-                output_val.add(&cell_grid);
-            }
-        },
-        IFType::IzhikevichLeaky => {
-            for _ in 0..iterations {
-                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-                    .cloned()
-                    .map(|key| (key, (0.0, false)))
-                    .collect();
-
-                // loop through every cell
-                // calculate the dv given the inputs
-                // write 
-                // end loop
-
-                for pos in adjacency_list.keys() {
-                    let (x, y) = pos;
-                    let input_positions = adjacency_list.get(&pos).unwrap();
-
-                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    let is_spiking = cell_grid[*x][*y].izhikevich_apply_dw_and_get_spike(lif_params);
-
-                    changes.insert(*pos, (input, is_spiking));
-                }
-
-                // find dv change and apply it
-                // find neurotransmitter change and apply it
-                for (pos, (input_value, is_spiking_value)) in changes {
-                    let (x, y) = pos;
-
-                    let dv = cell_grid[x][y].izhikevich_leaky_get_dv_change(lif_params, input_value);
-
-                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
-                    cell_grid[x][y].current_voltage += dv;
-                }
-
-                output_val.add(&cell_grid);
-            }
-        },
+        }
     }
 
     return Ok(output_val);
 }
-
-// rewrite function to do this if not basic if type
-
-// fn get_apply_adaptive_and_get_spike_func(
-//     if_type: IFType,
-//     if_params: &IFParameters
-// ) -> Fn(&Cell, &IFParameters) {
-//     match if_type {
-//         IFType::Adaptive | IFType::AdaptiveExponentatial => 
-//             |neuron: &Cell, if_params: &IFParameters| -> bool 
-//             {neuron.apply_dw_change_and_get_spike(if_params) },
-//         IFType::Izhikevich => 
-//             |neuron: &Cell, if_params: &IFParameters| -> bool 
-//             {neuron.izhikevich_apply_dw_and_get_spike(if_params) },
-//         IFType::IzhikevichLeaky => 
-//             |neuron: &Cell, if_params: &IFParameters| -> bool 
-//             {neuron.izhikevich_apply_dw_and_get_spike(if_params) },
-//         _ => unreachable!(),
-//     }    
-// }
-
-// fn get_adaptive_dv_change_func(
-//     if_type: IFType,
-//     if_params: &IFParameters
-// ) -> bool {
-//     match if_type {
-//         IFType::Adaptive =>
-//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
-//             { neuron.adaptive_get_dv_change(if_params, input_value) },
-//         IFType::AdaptiveExponentatial =>
-//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
-//             { neuron.exp_adaptive_get_dv_change(if_params, input_value) },
-//         IFType::Izhikevich =>
-//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
-//             { neuron.izhikevich_get_dv_change(if_params, input_value) },
-//         IFType::IzhikevichLeaky =>
-//             |neuron: &Cell, if_params: &IFParameters, input_value: f64| -> f64
-//             { neuron.izhikevich_get_dv_change(if_params, input_value) },
-//         _ => unreachable!(),
-//     }    
-// }
-
-// => {
-    // let apply_adaptive_and_get_spike = get_apply_adaptive_and_get_spike_func(if_type, if_params);
-    // let get_adaptive_dv_chance = get_adaptive_dv_change_func(if_type, if_params);
-
-//     for _ in 0..iterations {
-//         let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-//             .cloned()
-//             .map(|key| (key, (0.0, false)))
-//             .collect();
-
-//         // loop through every cell
-//         // calculate the dv given the inputs
-//         // write 
-//         // end loop
-
-//         for pos in adjacency_list.keys() {
-//             let (x, y) = pos;
-//             let input_positions = adjacency_list.get(&pos).unwrap();
-
-//             let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-//             let is_spiking = apply_adaptive_and_get_spike(&neuron, &if_params);
-
-//             changes.insert(*pos, (input, is_spiking));
-//         }
-
-//         // find dv change and apply it
-//         // find neurotransmitter change and apply it
-//         for (pos, (input_value, is_spiking_value)) in changes {
-//             let (x, y) = pos;
-
-//             let dv = get_adaptive_dv_chance(&neuron, lif_params, input_value);
-
-//             cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
-//             cell_grid[x][y].current_voltage += dv;
-//         }
-
-//         output_val.add(&cell_grid);
-//     }
-// }
 
 fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
     value
@@ -1137,7 +969,7 @@ fn main() -> Result<()> {
             IFType::Adaptive => { 
                 test_cell.run_adaptive_static_input(&if_params, input, bayesian, iterations, filename); 
             },
-            IFType::AdaptiveExponentatial => { 
+            IFType::AdaptiveExponential => { 
                 test_cell.run_exp_adaptive_static_input(&if_params, input, bayesian, iterations, filename);
             },
             IFType::Izhikevich => { 
