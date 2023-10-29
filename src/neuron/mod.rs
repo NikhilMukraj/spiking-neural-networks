@@ -112,7 +112,7 @@ impl IzhikevichDefault for IFParameters {
 pub enum IFType {
     Basic,
     Adaptive,
-    AdaptiveExponentatial,
+    AdaptiveExponential,
     Izhikevich,
     IzhikevichLeaky,
 }
@@ -122,7 +122,7 @@ impl IFType {
         let output = match string.to_ascii_lowercase().as_str() {
             "basic" => { IFType::Basic },
             "adaptive" => { IFType::Adaptive },
-            "adaptive exponential" => { IFType::AdaptiveExponentatial },
+            "adaptive exponential" => { IFType::AdaptiveExponential },
             "izhikevich" | "adaptive quadratic" => { IFType::Izhikevich },
             "leaky izhikevich" | "leaky adaptive quadratic" => { IFType::IzhikevichLeaky }
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown string")); },
