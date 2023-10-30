@@ -470,6 +470,24 @@ struct SimulationParameters<'a> {
     default_cell_values: HashMap<&'a str, f64>,
 }
 
+fn get_if_params(if_params: &mut IFParameters, table: &Value) -> Result<()> {
+    if_params.dt = parse_value_with_default(table, "dt", parse_f64, if_params.dt)?;
+    if_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, if_params.exp_dt)?;
+    if_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, if_params.tau_m)?;
+    if_params.tref = parse_value_with_default(table, "tref", parse_f64, if_params.tref)?;
+    if_params.alpha = parse_value_with_default(table, "alpha", parse_f64, if_params.alpha)?;
+    if_params.beta = parse_value_with_default(table, "beta", parse_f64, if_params.beta)?;
+    if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
+    if_params.d = parse_value_with_default(table, "d", parse_f64, if_params.d)?;
+    if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
+    if_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
+    if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
+    if_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_max)?;
+    if_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+
+    Ok(())
+}
+
 
 fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
@@ -533,25 +551,13 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         println!("{}: {}", key, value_to_update);
     }
 
-    let mut lif_params = IFParameters {
+    let mut if_params = IFParameters {
         ..IFParameters::default()
     };
 
-    lif_params.dt = parse_value_with_default(table, "dt", parse_f64, lif_params.dt)?;
-    lif_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, lif_params.exp_dt)?;
-    lif_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, lif_params.tau_m)?;
-    lif_params.tref = parse_value_with_default(table, "tref", parse_f64, lif_params.tref)?;
-    lif_params.alpha = parse_value_with_default(table, "alpha", parse_f64, lif_params.alpha)?;
-    lif_params.beta = parse_value_with_default(table, "beta", parse_f64, lif_params.beta)?;
-    lif_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, lif_params.v_reset)?; 
-    lif_params.d = parse_value_with_default(table, "d", parse_f64, lif_params.d)?;
-    lif_params.w_init = parse_value_with_default(table, "w_init", parse_f64, lif_params.w_init)?;
-    lif_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, lif_params.bayesian_mean)?;
-    lif_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, lif_params.bayesian_std)?;
-    lif_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, lif_params.bayesian_max)?;
-    lif_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, lif_params.bayesian_min)?;
-
-    println!("{:#?}", lif_params);
+    get_if_params(&mut if_params, table)?;
+    
+    println!("{:#?}", if_params);
 
     // in ms
     let total_time: Option<usize> = match table.get("total_time") {
@@ -572,7 +578,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
                 None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'iterations' as unsigned integer")); }
             }
         },
-        (None, Some(total_time_value)) => { (total_time_value as f64 / lif_params.dt) as usize },
+        (None, Some(total_time_value)) => { (total_time_value as f64 / if_params.dt) as usize },
         (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
     };
     println!("iterations: {}\n", iterations);
@@ -583,7 +589,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         iterations: iterations, 
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
-        lif_params: lif_params,
+        lif_params: if_params,
         if_type: if_type,
         default_cell_values: default_cell_values,
     });
@@ -920,19 +926,7 @@ fn main() -> Result<()> {
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
         };
 
-        if_params.dt = parse_value_with_default(single_neuron_test, "dt", parse_f64, if_params.dt)?;
-        if_params.exp_dt = parse_value_with_default(single_neuron_test, "exp_dt", parse_f64, if_params.exp_dt)?;
-        if_params.tau_m = parse_value_with_default(single_neuron_test, "tau_m", parse_f64, if_params.tau_m)?;
-        if_params.tref = parse_value_with_default(single_neuron_test, "tref", parse_f64, if_params.tref)?;
-        if_params.alpha = parse_value_with_default(single_neuron_test, "a", parse_f64, if_params.alpha)?;
-        if_params.beta = parse_value_with_default(single_neuron_test, "b", parse_f64, if_params.beta)?;
-        if_params.v_reset = parse_value_with_default(single_neuron_test, "v_reset", parse_f64, if_params.v_reset)?; 
-        if_params.d = parse_value_with_default(single_neuron_test, "d", parse_f64, if_params.d)?;
-        if_params.w_init = parse_value_with_default(single_neuron_test, "w_init", parse_f64, if_params.w_init)?;
-        if_params.bayesian_mean = parse_value_with_default(single_neuron_test, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
-        if_params.bayesian_std = parse_value_with_default(single_neuron_test, "bayesian_std", parse_f64, if_params.bayesian_std)?;
-        if_params.bayesian_max = parse_value_with_default(single_neuron_test, "bayesian_max", parse_f64, if_params.bayesian_max)?;
-        if_params.bayesian_min = parse_value_with_default(single_neuron_test, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+        get_if_params(&mut if_params, &single_neuron_test)?;
 
         // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
 
