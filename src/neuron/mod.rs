@@ -6,6 +6,24 @@ use rand::Rng;
 use rand_distr::{Normal, Distribution};
 
 
+pub struct BayesianParams {
+    pub mean: f64,
+    pub std: f64,
+    pub max: f64,
+    pub min: f64,
+}
+
+impl Default for BayesianParams {
+    fn default() -> Self {
+        BayesianParams { 
+            mean: 1.0, // center of norm distr
+            std: 0.0, // std of norm distr
+            max: 2.0, // maximum cutoff for norm distr
+            min: 0.0, // minimum cutoff for norm distr
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct IFParameters {
     pub v_th: f64,
@@ -44,10 +62,10 @@ impl Default for IFParameters {
             d: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: 1.0, // center of norm distr
-            bayesian_std: 0.0, // std of norm distr
-            bayesian_max: 2.0, // maximum cutoff for norm distr
-            bayesian_min: 0.0, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParams::default().mean, // center of norm distr
+            bayesian_std: BayesianParams::default().std, // std of norm distr
+            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
         }
     }
 }
@@ -72,10 +90,10 @@ impl ScaledDefault for IFParameters {
             d: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: 1.0, // center of norm distr
-            bayesian_std: 0.0, // std of norm distr
-            bayesian_max: 2.0, // maximum cutoff for norm distr
-            bayesian_min: 0.0, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParams::default().mean, // center of norm distr
+            bayesian_std: BayesianParams::default().std, // std of norm distr
+            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
         }
     }
 }
@@ -100,10 +118,10 @@ impl IzhikevichDefault for IFParameters {
             d: 8.0, // arbitrary d value
             dt: 0.5, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: 1.0, // center of norm distr
-            bayesian_std: 0.0, // std of norm distr
-            bayesian_max: 2.0, // maximum cutoff for norm distr
-            bayesian_min: 0.0, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParams::default().mean, // center of norm distr
+            bayesian_std: BayesianParams::default().std, // std of norm distr
+            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
         }
     }
 }
