@@ -8,7 +8,7 @@ radius = 2
 # excitatory_chance = 0.8
 output_tag = "20x20"
 output_type = "averaged"
-lif_type = "adaptive exponential"
+if_type = "adaptive exponential"
 input_equation = """
     sign * mp + 100. + rd * (nc^2 * 200.)
 """

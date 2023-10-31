@@ -1,5 +1,5 @@
 [package]
-name = "clean_lif_model"
+name = "clean_if_model"
 version = "0.1.0"
 edition = "2021"
 

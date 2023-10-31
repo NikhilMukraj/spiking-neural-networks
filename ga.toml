@@ -16,7 +16,7 @@ num_rows = 20
 num_cols = 20
 radius = 2
 bayesian_std = 0.2
-lif_type = "adaptive exponential"
+if_type = "adaptive exponential"
 input_equation = "(sign * mp + x + rd * (nc^2 * y)) * z"
 # input_equation = "(sign * mp + x + rd * (-1 * sign * nc^2 * y)) * z" # maybe this instead
 # if that works better try optimizing amount of excitatory neurons
