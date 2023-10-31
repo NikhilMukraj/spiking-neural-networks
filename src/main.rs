@@ -10,8 +10,8 @@ use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod neuron;
 use neuron::{
-    IFParameters, IFType, PotentiationType, Cell, 
-    CellGrid, limited_distr, ScaledDefault, IzhikevichDefault
+    IFParameters, IFType, PotentiationType, Cell, CellGrid, 
+    limited_distr, ScaledDefault, IzhikevichDefault, BayesianParams
 };
 mod eeg;
 use eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -264,8 +264,8 @@ fn run_simulation(
     let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
         .unwrap_or(&0.);
 
-    let mean_change = &if_params.bayesian_mean != &IFParameters::default().bayesian_mean;
-    let std_change = &if_params.bayesian_std != &IFParameters::default().bayesian_std;
+    let mean_change = &if_params.bayesian_mean != &BayesianParams::default().mean;
+    let std_change = &if_params.bayesian_std != &BayesianParams::default().std;
     let bayesian = if mean_change || std_change {
         Some(if_params)
     } else {
@@ -371,7 +371,8 @@ fn run_simulation(
             let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
                 match if_type {
                     IFType::Basic => unreachable!(), 
-                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
                     IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
                     IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
                 }
@@ -551,8 +552,23 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         println!("{}: {}", key, value_to_update);
     }
 
-    let mut if_params = IFParameters {
-        ..IFParameters::default()
+    let scaling_type_default = match if_type {
+        IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
+        _ => "regular",
+    };
+    let scaling_type: String = parse_value_with_default(
+        table, 
+        "scaling_type", 
+        parse_string, 
+        String::from(scaling_type_default)
+    )?;
+    println!("scaling_type: {}", scaling_type);
+
+    let mut if_params = match scaling_type.as_str() {
+        "regular" => IFParameters { ..IFParameters::default() },
+        "scaled" => IFParameters { ..IFParameters::scaled_default() },
+        "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
+        _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
     };
 
     get_if_params(&mut if_params, table)?;
@@ -909,7 +925,7 @@ fn main() -> Result<()> {
         let if_type = IFType::from_str(&if_type)?;
 
         let scaling_type_default = match if_type {
-            IFType::Izhikevich => "izhikevich",
+            IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
             _ => "regular",
         };
         let scaling_type: String = parse_value_with_default(
@@ -918,6 +934,7 @@ fn main() -> Result<()> {
             parse_string, 
             String::from(scaling_type_default)
         )?;
+        println!("scaling_type: {}", scaling_type);
 
         let mut if_params = match scaling_type.as_str() {
             "regular" => IFParameters { ..IFParameters::default() },
@@ -930,8 +947,8 @@ fn main() -> Result<()> {
 
         // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
 
-        let mean_change = &if_params.bayesian_mean != &IFParameters::default().bayesian_mean;
-        let std_change = &if_params.bayesian_std != &IFParameters::default().bayesian_std;
+        let mean_change = &if_params.bayesian_mean != &BayesianParams::default().mean;
+        let std_change = &if_params.bayesian_std != &BayesianParams::default().std;
         let bayesian = if mean_change || std_change {
             true
         } else {
