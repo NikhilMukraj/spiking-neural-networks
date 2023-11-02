@@ -62,7 +62,8 @@ fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<(usize, usize)>, 
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
-    bayesian_params: Option<&IFParameters>,
+    if_params: Option<&IFParameters>,
+    averaged: bool,
 ) -> f64 {
     let mut input_val = input_positions
         .iter()
@@ -88,7 +89,7 @@ fn get_input_from_positions(
         })
         .sum();
 
-    match bayesian_params {
+    match if_params {
         Some(params) => { 
             input_val *= limited_distr(
                 params.bayesian_mean, 
@@ -98,6 +99,10 @@ fn get_input_from_positions(
             ); 
         },
         None => {},
+    }
+
+    if averaged {
+        input_val /= input_positions.len() as f64;
     }
 
     return input_val;
@@ -229,6 +234,7 @@ fn run_simulation(
     iterations: usize, 
     radius: usize, 
     random_volt_initialization: bool,
+    averaged: bool,
     if_type: IFType,
     if_params: &IFParameters,
     default_cell_values: &HashMap<&str, f64>,
@@ -335,7 +341,13 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
+                    let input = get_input_from_positions(
+                        &cell_grid, 
+                        input_positions, 
+                        input_calculation, 
+                        bayesian,
+                        averaged,
+                    );
                     let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(if_params, input);
 
                     changes.insert(*pos, (dv, is_spiking));
@@ -393,8 +405,13 @@ fn run_simulation(
                     let (x, y) = pos;
                     let input_positions = adjacency_list.get(&pos).unwrap();
 
-                    let input = get_input_from_positions(&cell_grid, input_positions, input_calculation, bayesian);
-                    // let is_spiking = cell_grid[*x][*y].apply_dw_change_and_get_spike(if_params);
+                    let input = get_input_from_positions(
+                        &cell_grid, 
+                        input_positions, 
+                        input_calculation, 
+                        bayesian,
+                        averaged,
+                    );
 
                     let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[*x][*y], if_params);
 
@@ -466,6 +483,7 @@ struct SimulationParameters<'a> {
     iterations: usize, 
     radius: usize, 
     random_volt_initialization: bool,
+    averaged: bool,
     if_params: IFParameters,
     if_type: IFType,
     default_cell_values: HashMap<&'a str, f64>,
@@ -510,6 +528,9 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'if_type' as one of the valid types")) }
     };
     println!("if_type: {:#?}", if_type);
+
+    let averaged: bool = parse_value_with_default(table, "averaged", parse_bool, false)?;
+    println!("averaged: {}", averaged);
 
     let output_type: String = parse_value_with_default(table, "output_type", parse_string, String::from("averaged"))?;
     println!("output_type: {}", output_type);
@@ -605,6 +626,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         iterations: iterations, 
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
+        averaged: averaged,
         if_params,
         if_type: if_type,
         default_cell_values: default_cell_values,
@@ -668,6 +690,7 @@ fn objective(
         sim_params.iterations, 
         sim_params.radius, 
         sim_params.random_volt_initialization,
+        sim_params.averaged,
         sim_params.if_type,
         &sim_params.if_params,
         &sim_params.default_cell_values,
@@ -765,6 +788,7 @@ fn main() -> Result<()> {
             sim_params.iterations, 
             sim_params.radius, 
             sim_params.random_volt_initialization,
+            sim_params.averaged,
             sim_params.if_type,
             &sim_params.if_params,
             &sim_params.default_cell_values,
