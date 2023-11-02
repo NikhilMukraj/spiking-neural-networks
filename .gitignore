@@ -1,5 +1,5 @@
 /target
 /*.txt
 /*.bin
-/lattice_args.toml
 /single neuron tests
+/lattice simulations
