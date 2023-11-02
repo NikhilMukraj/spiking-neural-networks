@@ -466,7 +466,7 @@ struct SimulationParameters<'a> {
     iterations: usize, 
     radius: usize, 
     random_volt_initialization: bool,
-    lif_params: IFParameters,
+    if_params: IFParameters,
     if_type: IFType,
     default_cell_values: HashMap<&'a str, f64>,
 }
@@ -605,7 +605,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         iterations: iterations, 
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
-        lif_params: if_params,
+        if_params,
         if_type: if_type,
         default_cell_values: default_cell_values,
     });
@@ -669,7 +669,7 @@ fn objective(
         sim_params.radius, 
         sim_params.random_volt_initialization,
         sim_params.if_type,
-        &sim_params.lif_params,
+        &sim_params.if_params,
         &sim_params.default_cell_values,
         &mut input_func,
         Output::Averaged(vec![]),
@@ -684,7 +684,7 @@ fn objective(
         _ => { unreachable!() },
     };
 
-    let total_time: f64 = sim_params.iterations as f64 * sim_params.lif_params.dt;
+    let total_time: f64 = sim_params.iterations as f64 * sim_params.if_params.dt;
     // let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
     let (_faxis, sxx) = get_power_density(x, power_density_dt, total_time);
     let score = power_density_comparison(eeg, &sxx)?;
@@ -766,7 +766,7 @@ fn main() -> Result<()> {
             sim_params.radius, 
             sim_params.random_volt_initialization,
             sim_params.if_type,
-            &sim_params.lif_params,
+            &sim_params.if_params,
             &sim_params.default_cell_values,
             &mut input_func,
             output_type,
