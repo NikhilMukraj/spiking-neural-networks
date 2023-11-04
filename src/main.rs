@@ -10,8 +10,8 @@ use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod neuron;
 use neuron::{
-    IFParameters, IFType, PotentiationType, Cell, CellGrid, 
-    limited_distr, ScaledDefault, IzhikevichDefault, BayesianParams
+    IFParameters, IFType, PotentiationType, Cell, CellGrid, limited_distr, 
+    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters
 };
 mod eeg;
 use eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -270,8 +270,8 @@ fn run_simulation(
     let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
         .unwrap_or(&0.);
 
-    let mean_change = &if_params.bayesian_mean != &BayesianParams::default().mean;
-    let std_change = &if_params.bayesian_std != &BayesianParams::default().std;
+    let mean_change = &if_params.bayesian_mean != &BayesianParameters::default().mean;
+    let std_change = &if_params.bayesian_std != &BayesianParameters::default().std;
     let bayesian = if mean_change || std_change {
         Some(if_params)
     } else {
@@ -295,6 +295,10 @@ fn run_simulation(
                     chance_of_random_release: chance_of_random_release,
                     random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
                     w_value: if_params.w_init,
+                    a_plus: STDPParameters::default().a_plus,
+                    a_minus: STDPParameters::default().a_minus,
+                    tau_plus: STDPParameters::default().tau_plus,
+                    tau_minus: STDPParameters::default().tau_minus,
                 })
                 .collect::<Vec<Cell>>()
         })
@@ -507,7 +511,6 @@ fn get_if_params(if_params: &mut IFParameters, table: &Value) -> Result<()> {
     Ok(())
 }
 
-
 fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
@@ -717,8 +720,211 @@ fn objective(
     } else {
         return Ok(score);
     }
+}
 
-    // return Ok(score);
+fn write_row(
+    file: &mut File, 
+    neurons: &Vec<Cell>, 
+    neuron: &Cell, 
+    weights: &Vec<f64>,
+    pre_fires: &Vec<Option<usize>>,
+    post_fires: &Option<usize>,
+) {
+    write!(
+        file, 
+        "{}, ", 
+        neurons.iter()
+            .map(|i| i.current_voltage)
+            .collect::<Vec<f64>>()
+            .iter()
+            .map(|&x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+    ).expect("Cannot write to file");
+    write!(file, "{}, ", neuron.current_voltage)
+        .expect("Cannot write to file");
+    write!(
+        file, 
+        "{}, ", 
+        weights.iter()
+            .map(|&x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+    ).expect("Cannot write to file");
+    write!(
+        file, 
+        "{}, ", 
+        pre_fires.iter()
+            .map(|&x| {
+                match x {
+                    Some(value) => value.to_string(),
+                    None => String::from("None"),
+                }
+            })
+            .collect::<Vec<String>>()
+            .join(", ")
+    ).expect("Cannot write to file");
+    writeln!(
+        file, 
+        "{}", 
+        match post_fires {
+            Some(value) => value.to_string(),
+            None => String::from("None"),
+        }
+    ).expect("Cannot write to file");
+}
+
+fn update_weight(neuron: &Cell, pre_fires: Option<usize>, post_fires: Option<usize>) -> f64 {
+    let mut delta_w: f64 = 0.;
+
+    match (pre_fires, post_fires) {
+        (Some(t_pre), Some(t_post)) => {
+            let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
+
+            if t_pre < t_post {
+                delta_w = neuron.a_plus * (-1. * (t_pre - t_post).abs() / neuron.tau_plus).exp();
+            } else if t_pre > t_post {
+                delta_w = -1. * neuron.a_minus * (-1. * (t_post - t_pre).abs() / neuron.tau_minus).exp();
+            }
+        },
+        _ => {}
+    };
+
+    return delta_w;
+}
+
+fn run_isolated_stdp_test(
+    stdp_table: &Value,
+    stdp_params: &STDPParameters,
+    iterations: usize,
+    n: usize,
+    input_voltage: f64,
+    weight_init: f64,
+    filename: &str,
+) -> Result<()> {
+    let mut if_params = IFParameters {
+        ..IzhikevichDefault::izhikevich_default()
+    };
+
+    get_if_params(&mut if_params, &stdp_table)?;
+
+    println!("{:#?}", if_params);
+
+    let mut neuron = Cell { 
+        current_voltage: if_params.v_init, 
+        refractory_count: 0.0,
+        leak_constant: -1.,
+        integration_constant: 1.,
+        potentiation_type: PotentiationType::Excitatory,
+        neurotransmission_concentration: 0., 
+        neurotransmission_release: 0.,
+        receptor_density: 0.,
+        chance_of_releasing: 0., 
+        dissipation_rate: 0., 
+        chance_of_random_release: 0.,
+        random_release_concentration: 0.,
+        w_value: if_params.w_init,
+        a_plus: stdp_params.a_plus,
+        a_minus: stdp_params.a_minus,
+        tau_plus: stdp_params.tau_plus,
+        tau_minus: stdp_params.tau_minus,
+    };
+
+    let mut neurons: Vec<Cell> = (0..n).map(|_| neuron.clone())
+        .collect();
+
+    let i: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
+        .collect();
+
+    let mut pre_fires: Vec<Option<usize>> = (0..n).map(|_| None).collect();
+    let mut post_fires: Option<usize> = None;
+    let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
+        |_| limited_distr(weight_init, 0.1, weight_init * 0.5, weight_init * 1.5)
+    ).collect();
+    // let mut weights: Vec<f64> = (0..n)
+    //     .map(|_| rand::thread_rng().gen_range(0.0..=2.0))
+    //     .collect();
+    let mut delta_ws: Vec<f64> = (0..n)
+        .map(|_| 0.0)
+        .collect();
+
+    let mut file = File::create(&filename)
+        .expect("Unable to create file");
+
+    write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+
+    for timestep in 0..iterations {
+        let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+
+        for (n, input_neuron) in neurons.iter_mut().enumerate() {
+            let is_spiking = input_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+
+            let dv = if if_params.bayesian_std != 0. {
+                input_neuron.izhikevich_get_dv_change(
+                    &if_params, 
+                    i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                )
+            } else {
+                input_neuron.izhikevich_get_dv_change(&if_params, i[n])
+            };
+
+            dvs.push(dv);
+            is_spikings.push(is_spiking);
+
+            if is_spiking {
+                pre_fires[n] = Some(timestep);
+            }
+        }
+
+        let is_spiking = neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+        
+        let dv = if if_params.bayesian_std != 0. {
+            let input_voltage = (0..n)
+                .map(
+                    |i| 
+                    limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
+                    weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
+                )
+                .collect::<Vec<f64>>()
+                .iter()
+                .sum();
+
+            neuron.izhikevich_get_dv_change(&if_params, input_voltage)
+        } else {
+            let input_voltage = (0..n)
+                .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
+                .collect::<Vec<f64>>()
+                .iter()
+                .sum();
+
+            neuron.izhikevich_get_dv_change(&if_params, input_voltage)
+        };
+        
+        for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
+            input_neuron.current_voltage += *input_dv;
+        }
+        neuron.current_voltage += dv;
+
+        for (n, i) in is_spikings.iter().enumerate() {
+            if *i {
+                pre_fires[n] = Some(timestep);
+                delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+                weights[n] += delta_ws[n];
+            }
+        }
+
+        if is_spiking {
+            post_fires = Some(timestep);
+            for (n, i) in neurons.iter().enumerate() {
+                delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
+                weights[n] += delta_ws[n];
+            }
+        }
+
+        write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+    }
+
+    Ok(())
 }
 
 fn main() -> Result<()> {
@@ -971,8 +1177,8 @@ fn main() -> Result<()> {
 
         // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
 
-        let mean_change = &if_params.bayesian_mean != &BayesianParams::default().mean;
-        let std_change = &if_params.bayesian_std != &BayesianParams::default().std;
+        let mean_change = &if_params.bayesian_mean != &BayesianParameters::default().mean;
+        let std_change = &if_params.bayesian_std != &BayesianParameters::default().std;
         let bayesian = if mean_change || std_change {
             true
         } else {
@@ -995,6 +1201,10 @@ fn main() -> Result<()> {
             chance_of_random_release: 0.2,
             random_release_concentration: 0.1,
             w_value: if_params.w_init,
+            a_plus: STDPParameters::default().a_plus,
+            a_minus: STDPParameters::default().a_minus,
+            tau_plus: STDPParameters::default().tau_plus,
+            tau_minus: STDPParameters::default().tau_minus,
         };
 
         match if_type {
@@ -1016,6 +1226,84 @@ fn main() -> Result<()> {
         };
 
         println!("\nFinished volt test");
+    } else if let Some(stdp_table) = config.get("stdp_test") {
+        let iterations: usize = match stdp_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+    
+        let filename: String = match stdp_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+    
+        let n: usize = match stdp_table.get("n") {
+            Some(value) => parse_usize(value, "n")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'n' value not found")); },
+        };
+        println!("n: {}", n); 
+    
+        let input_voltage: f64 = match stdp_table.get("input_voltage") {
+            Some(value) => parse_f64(value, "input_voltage")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        };
+        println!("input_voltage: {}", input_voltage);
+
+        let a_plus: f64 = parse_value_with_default(
+            stdp_table, 
+            "a_plus", 
+            parse_f64, 
+            STDPParameters::default().a_plus
+        )?;
+        println!("a_plus: {}", a_plus);
+
+        let a_minus: f64 = parse_value_with_default(
+            stdp_table, 
+            "a_minus", 
+            parse_f64, 
+            STDPParameters::default().a_minus
+        )?;
+        println!("a_minus: {}", a_minus);
+
+        let tau_plus: f64 = parse_value_with_default(
+            stdp_table, 
+            "tau_plus", 
+            parse_f64, 
+            STDPParameters::default().tau_plus
+        )?; 
+        println!("tau_plus: {}", tau_plus);
+
+        let tau_minus: f64 = parse_value_with_default(
+            stdp_table, 
+            "tau_minus", 
+            parse_f64, 
+            STDPParameters::default().tau_minus
+        )?; 
+        println!("tau_minus: {}", tau_minus);
+
+        let weight_init: f64 = parse_value_with_default(stdp_table, "weight_init", parse_f64, 3.5)?;
+        println!("weight_init: {}", weight_init);
+
+        let stdp_params = STDPParameters {
+            a_minus: a_minus,
+            a_plus: a_plus,
+            tau_plus: tau_plus,
+            tau_minus: tau_minus,
+        };
+
+        run_isolated_stdp_test(
+            stdp_table,
+            &stdp_params,
+            iterations,
+            n,
+            input_voltage,
+            weight_init,
+            &filename,
+        )?;
+
+        println!("\nFinished STDP test");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }

@@ -6,16 +6,16 @@ use rand::Rng;
 use rand_distr::{Normal, Distribution};
 
 
-pub struct BayesianParams {
+pub struct BayesianParameters {
     pub mean: f64,
     pub std: f64,
     pub max: f64,
     pub min: f64,
 }
 
-impl Default for BayesianParams {
+impl Default for BayesianParameters {
     fn default() -> Self {
-        BayesianParams { 
+        BayesianParameters { 
             mean: 1.0, // center of norm distr
             std: 0.0, // std of norm distr
             max: 2.0, // maximum cutoff for norm distr
@@ -62,10 +62,10 @@ impl Default for IFParameters {
             d: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParams::default().mean, // center of norm distr
-            bayesian_std: BayesianParams::default().std, // std of norm distr
-            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
+            bayesian_std: BayesianParameters::default().std, // std of norm distr
+            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
         }
     }
 }
@@ -90,10 +90,10 @@ impl ScaledDefault for IFParameters {
             d: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParams::default().mean, // center of norm distr
-            bayesian_std: BayesianParams::default().std, // std of norm distr
-            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
+            bayesian_std: BayesianParameters::default().std, // std of norm distr
+            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
         }
     }
 }
@@ -118,10 +118,28 @@ impl IzhikevichDefault for IFParameters {
             d: 8.0, // arbitrary d value
             dt: 0.5, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParams::default().mean, // center of norm distr
-            bayesian_std: BayesianParams::default().std, // std of norm distr
-            bayesian_max: BayesianParams::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParams::default().min, // minimum cutoff for norm distr
+            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
+            bayesian_std: BayesianParameters::default().std, // std of norm distr
+            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
+            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
+        }
+    }
+}
+
+pub struct STDPParameters {
+    pub a_plus: f64, // postitive stdp modifier 
+    pub a_minus: f64, // negative stdp modifier 
+    pub tau_plus: f64, // postitive stdp decay modifier 
+    pub tau_minus: f64, // negative stdp decay modifier 
+}
+
+impl Default for STDPParameters {
+    fn default() -> Self {
+        STDPParameters { 
+            a_plus: 2., 
+            a_minus: 2., 
+            tau_plus: 45., 
+            tau_minus: 45., 
         }
     }
 }
@@ -181,6 +199,10 @@ pub struct Cell {
     pub chance_of_random_release: f64, // likelyhood of neuron randomly releasing neurotransmitter
     pub random_release_concentration: f64, // how much neurotransmitter is randomly released
     pub w_value: f64, // adaptive value 
+    pub a_plus: f64, // postitive stdp modifier 
+    pub a_minus: f64, // negative stdp modifier 
+    pub tau_plus: f64, // postitive stdp decay modifier 
+    pub tau_minus: f64, // negative stdp decay modifier 
 }
 
 pub fn limited_distr(mean: f64, std_dev: f64, minimum: f64, maximum: f64) -> f64 {
