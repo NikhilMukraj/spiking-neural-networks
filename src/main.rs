@@ -793,9 +793,33 @@ fn update_weight(neuron: &Cell, pre_fires: Option<usize>, post_fires: Option<usi
     return delta_w;
 }
 
+// fn update_isolated_neuron_weights(
+//     neurons: &mut Vec<Cell>,
+//     weights: &mut Vec<f64>,
+//     delta_ws: &mut Vec<f64>,
+//     pre_fires: &mut Vec<Option<usize>>,
+//     post_fires: Option<usize>,
+//     timestep: usize,
+//     dvs: Vec<f64>,
+//     is_spikings: Vec<bool>,
+// ) {
+//     for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
+//         input_neuron.current_voltage += *input_dv;
+//     }
+
+//     for (n, i) in is_spikings.iter().enumerate() {
+//         if *i {
+//             pre_fires[n] = Some(timestep);
+//             delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+//             weights[n] += delta_ws[n];
+//         }
+//     }
+// }
+
 fn run_isolated_stdp_test(
     stdp_table: &Value,
     stdp_params: &STDPParameters,
+    if_type: IFType,
     iterations: usize,
     n: usize,
     input_voltage: f64,
@@ -853,76 +877,169 @@ fn run_isolated_stdp_test(
 
     write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
 
-    for timestep in 0..iterations {
-        let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+    match if_type {
+        IFType::Basic => {
+            for timestep in 0..iterations {
+                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
-        for (n, input_neuron) in neurons.iter_mut().enumerate() {
-            let is_spiking = input_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+                for (n, input_neuron) in neurons.iter_mut().enumerate() {
+                    let (dv, is_spiking) = if if_params.bayesian_std != 0. {
+                        input_neuron.get_dv_change_and_spike(
+                            &if_params, 
+                            i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                        )
+                    } else {
+                        input_neuron.get_dv_change_and_spike(&if_params, i[n])
+                    };
 
-            let dv = if if_params.bayesian_std != 0. {
-                input_neuron.izhikevich_get_dv_change(
-                    &if_params, 
-                    i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
-                )
-            } else {
-                input_neuron.izhikevich_get_dv_change(&if_params, i[n])
+                    dvs.push(dv);
+                    is_spikings.push(is_spiking);
+
+                    if is_spiking {
+                        pre_fires[n] = Some(timestep);
+                    }
+                }
+                
+                let (dv, is_spiking) = if if_params.bayesian_std != 0. {
+                    let input_voltage = (0..n)
+                        .map(
+                            |i| 
+                            limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
+                            weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
+                        )
+                        .collect::<Vec<f64>>()
+                        .iter()
+                        .sum();
+
+                    neuron.get_dv_change_and_spike(&if_params, input_voltage)
+                } else {
+                    let input_voltage = (0..n)
+                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
+                        .collect::<Vec<f64>>()
+                        .iter()
+                        .sum();
+
+                    neuron.get_dv_change_and_spike(&if_params, input_voltage)
+                };
+                
+                for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
+                    input_neuron.current_voltage += *input_dv;
+                }
+                neuron.current_voltage += dv;
+
+                for (n, i) in is_spikings.iter().enumerate() {
+                    if *i {
+                        pre_fires[n] = Some(timestep);
+                        delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+                        weights[n] += delta_ws[n];
+                    }
+                }
+
+                if is_spiking {
+                    post_fires = Some(timestep);
+                    for (n, i) in neurons.iter().enumerate() {
+                        delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
+                        weights[n] += delta_ws[n];
+                    }
+                }
+
+                write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+            }
+        }
+        IFType::Adaptive | IFType::AdaptiveExponential | 
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+                match if_type {
+                    IFType::Basic => unreachable!(),
+                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
+                    IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                }
             };
 
-            dvs.push(dv);
-            is_spikings.push(is_spiking);
+            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+                match if_type {
+                    IFType::Basic => unreachable!(), 
+                    IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
+                    IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
+                }
+            };
 
-            if is_spiking {
-                pre_fires[n] = Some(timestep);
+            for timestep in 0..iterations {
+                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+
+                for (n, input_neuron) in neurons.iter_mut().enumerate() {
+                    let is_spiking = adaptive_apply_and_get_spike(input_neuron, &if_params);
+
+                    let dv = if if_params.bayesian_std != 0. {
+                        adaptive_dv(
+                            input_neuron,
+                            &if_params, 
+                            i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                        )
+                    } else {
+                        adaptive_dv(input_neuron, &if_params, i[n])
+                    };
+
+                    dvs.push(dv);
+                    is_spikings.push(is_spiking);
+
+                    if is_spiking {
+                        pre_fires[n] = Some(timestep);
+                    }
+                }
+
+                let is_spiking = adaptive_apply_and_get_spike(&mut neuron, &if_params);
+                
+                let dv = if if_params.bayesian_std != 0. {
+                    let input_voltage = (0..n)
+                        .map(
+                            |i| 
+                            limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
+                            weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
+                        )
+                        .collect::<Vec<f64>>()
+                        .iter()
+                        .sum();
+
+                    adaptive_dv(&mut neuron, &if_params, input_voltage)
+                } else {
+                    let input_voltage = (0..n)
+                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
+                        .collect::<Vec<f64>>()
+                        .iter()
+                        .sum();
+
+                    adaptive_dv(&mut neuron, &if_params, input_voltage)
+                };
+                
+                for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
+                    input_neuron.current_voltage += *input_dv;
+                }
+                neuron.current_voltage += dv;
+
+                for (n, i) in is_spikings.iter().enumerate() {
+                    if *i {
+                        pre_fires[n] = Some(timestep);
+                        delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+                        weights[n] += delta_ws[n];
+                    }
+                }
+
+                if is_spiking {
+                    post_fires = Some(timestep);
+                    for (n, i) in neurons.iter().enumerate() {
+                        delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
+                        weights[n] += delta_ws[n];
+                    }
+                }
+
+                write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
             }
         }
-
-        let is_spiking = neuron.izhikevich_apply_dw_and_get_spike(&if_params);
-        
-        let dv = if if_params.bayesian_std != 0. {
-            let input_voltage = (0..n)
-                .map(
-                    |i| 
-                    limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
-                    weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
-                )
-                .collect::<Vec<f64>>()
-                .iter()
-                .sum();
-
-            neuron.izhikevich_get_dv_change(&if_params, input_voltage)
-        } else {
-            let input_voltage = (0..n)
-                .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
-                .collect::<Vec<f64>>()
-                .iter()
-                .sum();
-
-            neuron.izhikevich_get_dv_change(&if_params, input_voltage)
-        };
-        
-        for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
-            input_neuron.current_voltage += *input_dv;
-        }
-        neuron.current_voltage += dv;
-
-        for (n, i) in is_spikings.iter().enumerate() {
-            if *i {
-                pre_fires[n] = Some(timestep);
-                delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
-                weights[n] += delta_ws[n];
-            }
-        }
-
-        if is_spiking {
-            post_fires = Some(timestep);
-            for (n, i) in neurons.iter().enumerate() {
-                delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
-                weights[n] += delta_ws[n];
-            }
-        }
-
-        write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
-    }
+    };
 
     Ok(())
 }
@@ -1227,6 +1344,16 @@ fn main() -> Result<()> {
 
         println!("\nFinished volt test");
     } else if let Some(stdp_table) = config.get("stdp_test") {
+        let if_type: String = parse_value_with_default(
+            stdp_table, 
+            "if_type", 
+            parse_string, 
+            String::from("basic")
+        )?;
+        println!("if_type: {}", if_type);
+
+        let if_type = IFType::from_str(&if_type)?;
+
         let iterations: usize = match stdp_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
@@ -1296,6 +1423,7 @@ fn main() -> Result<()> {
         run_isolated_stdp_test(
             stdp_table,
             &stdp_params,
+            if_type,
             iterations,
             n,
             input_voltage,
