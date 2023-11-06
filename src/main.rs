@@ -1014,7 +1014,7 @@ fn run_isolated_stdp_test(
 
                     adaptive_dv(&mut neuron, &if_params, input_voltage)
                 };
-                
+
                 update_isolated_neuron_weights(
                     &mut neurons, 
                     &mut weights, 
