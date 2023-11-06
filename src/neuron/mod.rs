@@ -203,7 +203,7 @@ pub struct Cell {
     pub a_minus: f64, // negative stdp modifier 
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
-    // pub last_firing_time: usize,
+    // pub last_firing_time: Option<usize>,
 }
 
 pub fn limited_distr(mean: f64, std_dev: f64, minimum: f64, maximum: f64) -> f64 {
