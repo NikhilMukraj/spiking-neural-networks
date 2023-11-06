@@ -299,6 +299,7 @@ fn run_simulation(
                     a_minus: STDPParameters::default().a_minus,
                     tau_plus: STDPParameters::default().tau_plus,
                     tau_minus: STDPParameters::default().tau_minus,
+                    last_firing_time: None,
                 })
                 .collect::<Vec<Cell>>()
         })
@@ -774,10 +775,10 @@ fn write_row(
     ).expect("Cannot write to file");
 }
 
-fn update_weight(neuron: &Cell, pre_fires: Option<usize>, post_fires: Option<usize>) -> f64 {
+fn update_weight(input_neuron: &Cell, neuron: &Cell) -> f64 {
     let mut delta_w: f64 = 0.;
 
-    match (pre_fires, post_fires) {
+    match (input_neuron.last_firing_time, neuron.last_firing_time) {
         (Some(t_pre), Some(t_post)) => {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
@@ -795,10 +796,9 @@ fn update_weight(neuron: &Cell, pre_fires: Option<usize>, post_fires: Option<usi
 
 fn update_isolated_neuron_weights(
     neurons: &mut Vec<Cell>,
+    neuron: &Cell,
     weights: &mut Vec<f64>,
     delta_ws: &mut Vec<f64>,
-    pre_fires: &mut Vec<Option<usize>>,
-    post_fires: Option<usize>,
     timestep: usize,
     dvs: Vec<f64>,
     is_spikings: Vec<bool>,
@@ -809,8 +809,8 @@ fn update_isolated_neuron_weights(
 
     for (n, i) in is_spikings.iter().enumerate() {
         if *i {
-            pre_fires[n] = Some(timestep);
-            delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+            neurons[n].last_firing_time = Some(timestep);
+            delta_ws[n] = update_weight(&neurons[n], &neuron);
             weights[n] += delta_ws[n];
         }
     }
@@ -852,6 +852,7 @@ fn run_isolated_stdp_test(
         a_minus: stdp_params.a_minus,
         tau_plus: stdp_params.tau_plus,
         tau_minus: stdp_params.tau_minus,
+        last_firing_time: None,
     };
 
     let mut neurons: Vec<Cell> = (0..n).map(|_| neuron.clone())
@@ -896,7 +897,7 @@ fn run_isolated_stdp_test(
                     is_spikings.push(is_spiking);
 
                     if is_spiking {
-                        pre_fires[n] = Some(timestep);
+                        input_neuron.last_firing_time = Some(timestep);
                     }
                 }
                 
@@ -924,21 +925,20 @@ fn run_isolated_stdp_test(
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
+                    &neuron,
                     &mut weights, 
                     &mut delta_ws, 
-                    &mut pre_fires, 
-                    post_fires, 
                     timestep, 
                     dvs, 
-                    is_spikings
+                    is_spikings,
                 );
 
                 neuron.current_voltage += dv;
 
                 if is_spiking {
-                    post_fires = Some(timestep);
+                    neuron.last_firing_time = Some(timestep);
                     for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
+                        delta_ws[n] = update_weight(&i, &neuron);
                         weights[n] += delta_ws[n];
                     }
                 }
@@ -1017,13 +1017,12 @@ fn run_isolated_stdp_test(
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
+                    &neuron,
                     &mut weights, 
                     &mut delta_ws, 
-                    &mut pre_fires, 
-                    post_fires, 
                     timestep, 
                     dvs, 
-                    is_spikings
+                    is_spikings,
                 );
 
                 neuron.current_voltage += dv;
@@ -1031,7 +1030,7 @@ fn run_isolated_stdp_test(
                 if is_spiking {
                     post_fires = Some(timestep);
                     for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, pre_fires[n], post_fires);
+                        delta_ws[n] = update_weight(&i, &neuron);
                         weights[n] += delta_ws[n];
                     }
                 }
@@ -1322,6 +1321,7 @@ fn main() -> Result<()> {
             a_minus: STDPParameters::default().a_minus,
             tau_plus: STDPParameters::default().tau_plus,
             tau_minus: STDPParameters::default().tau_minus,
+            last_firing_time: None,
         };
 
         match if_type {
