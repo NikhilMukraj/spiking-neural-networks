@@ -793,28 +793,28 @@ fn update_weight(neuron: &Cell, pre_fires: Option<usize>, post_fires: Option<usi
     return delta_w;
 }
 
-// fn update_isolated_neuron_weights(
-//     neurons: &mut Vec<Cell>,
-//     weights: &mut Vec<f64>,
-//     delta_ws: &mut Vec<f64>,
-//     pre_fires: &mut Vec<Option<usize>>,
-//     post_fires: Option<usize>,
-//     timestep: usize,
-//     dvs: Vec<f64>,
-//     is_spikings: Vec<bool>,
-// ) {
-//     for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
-//         input_neuron.current_voltage += *input_dv;
-//     }
+fn update_isolated_neuron_weights(
+    neurons: &mut Vec<Cell>,
+    weights: &mut Vec<f64>,
+    delta_ws: &mut Vec<f64>,
+    pre_fires: &mut Vec<Option<usize>>,
+    post_fires: Option<usize>,
+    timestep: usize,
+    dvs: Vec<f64>,
+    is_spikings: Vec<bool>,
+) {
+    for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
+        input_neuron.current_voltage += *input_dv;
+    }
 
-//     for (n, i) in is_spikings.iter().enumerate() {
-//         if *i {
-//             pre_fires[n] = Some(timestep);
-//             delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
-//             weights[n] += delta_ws[n];
-//         }
-//     }
-// }
+    for (n, i) in is_spikings.iter().enumerate() {
+        if *i {
+            pre_fires[n] = Some(timestep);
+            delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
+            weights[n] += delta_ws[n];
+        }
+    }
+}
 
 fn run_isolated_stdp_test(
     stdp_table: &Value,
@@ -921,19 +921,19 @@ fn run_isolated_stdp_test(
 
                     neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 };
-                
-                for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
-                    input_neuron.current_voltage += *input_dv;
-                }
-                neuron.current_voltage += dv;
 
-                for (n, i) in is_spikings.iter().enumerate() {
-                    if *i {
-                        pre_fires[n] = Some(timestep);
-                        delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
-                        weights[n] += delta_ws[n];
-                    }
-                }
+                update_isolated_neuron_weights(
+                    &mut neurons, 
+                    &mut weights, 
+                    &mut delta_ws, 
+                    &mut pre_fires, 
+                    post_fires, 
+                    timestep, 
+                    dvs, 
+                    is_spikings
+                );
+
+                neuron.current_voltage += dv;
 
                 if is_spiking {
                     post_fires = Some(timestep);
@@ -1015,18 +1015,18 @@ fn run_isolated_stdp_test(
                     adaptive_dv(&mut neuron, &if_params, input_voltage)
                 };
                 
-                for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
-                    input_neuron.current_voltage += *input_dv;
-                }
-                neuron.current_voltage += dv;
+                update_isolated_neuron_weights(
+                    &mut neurons, 
+                    &mut weights, 
+                    &mut delta_ws, 
+                    &mut pre_fires, 
+                    post_fires, 
+                    timestep, 
+                    dvs, 
+                    is_spikings
+                );
 
-                for (n, i) in is_spikings.iter().enumerate() {
-                    if *i {
-                        pre_fires[n] = Some(timestep);
-                        delta_ws[n] = update_weight(&neurons[n], pre_fires[n], post_fires);
-                        weights[n] += delta_ws[n];
-                    }
-                }
+                neuron.current_voltage += dv;
 
                 if is_spiking {
                     post_fires = Some(timestep);
