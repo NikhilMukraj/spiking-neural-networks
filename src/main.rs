@@ -85,7 +85,6 @@ fn get_input_from_positions(
             
             final_input
 
-            // could weight certain connections alongside adjacency list
         })
         .sum();
 
@@ -107,6 +106,56 @@ fn get_input_from_positions(
 
     return input_val;
 }
+
+// fn stdp_get_input_from_positions(
+//     cell_grid: &CellGrid, 
+//     input_positions: &Vec<(usize, usize)>, 
+//     extracted_weights: &HashMap<(usize, usize), Vec<f64>>,
+//     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
+//     if_params: Option<&IFParameters>,
+//     averaged: bool,
+// ) -> f64 {
+//     let mut input_val = input_positions
+//         .iter()
+//         .map(|input_position| {
+//             let (pos_x, pos_y) = input_position;
+//             let input_cell = &cell_grid[*pos_x][*pos_y];
+            
+//             let sign = match input_cell.potentiation_type { 
+//                 PotentiationType::Excitatory => -1., 
+//                 PotentiationType::Inhibitory => 1.,
+//             };
+
+//             let final_input = input_calculation(
+//                 sign,
+//                 input_cell.current_voltage,
+//                 input_cell.receptor_density,
+//                 input_cell.neurotransmission_concentration,
+//             );
+            
+//             final_input * extracted_weights[(pos_x, pos_y)]
+
+//         })
+//         .sum();
+
+//     match if_params {
+//         Some(params) => { 
+//             input_val *= limited_distr(
+//                 params.bayesian_mean, 
+//                 params.bayesian_std, 
+//                 params.bayesian_min, 
+//                 params.bayesian_max
+//             ); 
+//         },
+//         None => {},
+//     }
+
+//     if averaged {
+//         input_val /= input_positions.len() as f64;
+//     }
+
+//     return input_val;
+// }
 
 fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
     let volt_mean: f64 = cell_grid
@@ -329,6 +378,8 @@ fn run_simulation(
         }
     }
 
+    // let mut weights: HashMap<(usize, usize), HashMap<(usize, usize), Vec<f64>> = HashMap::new();
+
     match if_type {
         IFType::Basic => {
             for _ in 0..iterations {
@@ -353,6 +404,16 @@ fn run_simulation(
                         bayesian,
                         averaged,
                     );
+
+                    // let input = stdp_get_input_from_positions(
+                    //     &cell_grid,
+                    //     input_positions,
+                    //     &weights[(x, y)],
+                    //     input_calculation,
+                    //     bayesian,
+                    //     averaged,
+                    // );
+                    
                     let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(if_params, input);
 
                     changes.insert(*pos, (dv, is_spiking));
@@ -367,6 +428,14 @@ fn run_simulation(
                     
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv_value;
+
+                    // if is_spiking_value {
+                    //     cell_grid[x][y].last_firing_time = Some(timestep);
+                    //     for i in weights[(x, y)].keys() {
+                    //         let (x2, y2) = *i;
+                    //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
+                    //     }
+                    // }
                 }
 
                 // repeat until simulation is over
@@ -418,6 +487,15 @@ fn run_simulation(
                         averaged,
                     );
 
+                    // let input = stdp_get_input_from_positions(
+                    //     &cell_grid,
+                    //     input_positions,
+                    //     &weights[(x, y)],
+                    //     input_calculation,
+                    //     bayesian,
+                    //     averaged,
+                    // );
+
                     let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[*x][*y], if_params);
 
                     changes.insert(*pos, (input, is_spiking));
@@ -432,6 +510,14 @@ fn run_simulation(
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv;
+
+                    // if is_spiking_value {
+                    //     cell_grid[x][y].last_firing_time = Some(timestep);
+                    //     for i in weights[(x, y)].keys() {
+                    //         let (x2, y2) = *i;
+                    //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
+                    //     }
+                    // }
                 }
 
                 output_val.add(&cell_grid);
