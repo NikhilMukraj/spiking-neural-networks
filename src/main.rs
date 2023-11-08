@@ -916,8 +916,18 @@ fn run_isolated_stdp_test(
     weight_init: f64,
     filename: &str,
 ) -> Result<()> {
-    let mut if_params = IFParameters {
-        ..IzhikevichDefault::izhikevich_default()
+    let mut if_params = match if_type {
+        IFType::Basic | IFType::Adaptive |
+        IFType::AdaptiveExponential => {
+            IFParameters {
+                ..IFParameters::default()
+            }
+        },
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            IFParameters {
+                ..IzhikevichDefault::izhikevich_default()
+            }
+        }
     };
 
     get_if_params(&mut if_params, &stdp_table)?;
