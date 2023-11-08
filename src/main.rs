@@ -435,7 +435,9 @@ fn run_simulation(
                     //         let (x2, y2) = *i;
                     //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
                     //     }
-                    // }
+                    // } // need to also update neurons on receiving end of spiking neuron
+                    // create hashmap of what neurons existing neurons point to and use that
+                    // generate that hashmap alongside current adjancency list
                 }
 
                 // repeat until simulation is over
@@ -517,7 +519,9 @@ fn run_simulation(
                     //         let (x2, y2) = *i;
                     //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
                     //     }
-                    // }
+                    // } // need to also update neurons on receiving end of spiking neuron
+                    // create hashmap of what neurons existing neurons point to and use that
+                    // generate that hashmap alongside current adjancency list
                 }
 
                 output_val.add(&cell_grid);
@@ -861,17 +865,17 @@ fn write_row(
     ).expect("Cannot write to file");
 }
 
-fn update_weight(input_neuron: &Cell, neuron: &Cell) -> f64 {
+fn update_weight(presynaptic_neuron: &Cell, post_synaptic_neuron: &Cell) -> f64 {
     let mut delta_w: f64 = 0.;
 
-    match (input_neuron.last_firing_time, neuron.last_firing_time) {
+    match (presynaptic_neuron.last_firing_time, post_synaptic_neuron.last_firing_time) {
         (Some(t_pre), Some(t_post)) => {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
             if t_pre < t_post {
-                delta_w = neuron.a_plus * (-1. * (t_pre - t_post).abs() / neuron.tau_plus).exp();
+                delta_w = post_synaptic_neuron.a_plus * (-1. * (t_pre - t_post).abs() / post_synaptic_neuron.tau_plus).exp();
             } else if t_pre > t_post {
-                delta_w = -1. * neuron.a_minus * (-1. * (t_post - t_pre).abs() / neuron.tau_minus).exp();
+                delta_w = -1. * post_synaptic_neuron.a_minus * (-1. * (t_post - t_pre).abs() / post_synaptic_neuron.tau_minus).exp();
             }
         },
         _ => {}
@@ -920,7 +924,7 @@ fn run_isolated_stdp_test(
 
     println!("{:#?}", if_params);
 
-    let mut neuron = Cell { 
+    let mut postsynaptic_neuron = Cell { 
         current_voltage: if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -941,7 +945,7 @@ fn run_isolated_stdp_test(
         last_firing_time: None,
     };
 
-    let mut neurons: Vec<Cell> = (0..n).map(|_| neuron.clone())
+    let mut neurons: Vec<Cell> = (0..n).map(|_| postsynaptic_neuron.clone())
         .collect();
 
     let i: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
@@ -962,7 +966,7 @@ fn run_isolated_stdp_test(
     let mut file = File::create(&filename)
         .expect("Unable to create file");
 
-    write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+    write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
 
     match if_type {
         IFType::Basic => {
@@ -998,7 +1002,7 @@ fn run_isolated_stdp_test(
                         .iter()
                         .sum();
 
-                    neuron.get_dv_change_and_spike(&if_params, input_voltage)
+                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 } else {
                     let input_voltage = (0..n)
                         .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
@@ -1006,12 +1010,12 @@ fn run_isolated_stdp_test(
                         .iter()
                         .sum();
 
-                    neuron.get_dv_change_and_spike(&if_params, input_voltage)
+                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 };
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
-                    &neuron,
+                    &postsynaptic_neuron,
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
@@ -1019,17 +1023,17 @@ fn run_isolated_stdp_test(
                     is_spikings,
                 );
 
-                neuron.current_voltage += dv;
+                postsynaptic_neuron.current_voltage += dv;
 
                 if is_spiking {
-                    neuron.last_firing_time = Some(timestep);
+                    postsynaptic_neuron.last_firing_time = Some(timestep);
                     for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, &neuron);
+                        delta_ws[n] = update_weight(&i, &postsynaptic_neuron);
                         weights[n] += delta_ws[n];
                     }
                 }
 
-                write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
             }
         }
         IFType::Adaptive | IFType::AdaptiveExponential | 
@@ -1077,7 +1081,7 @@ fn run_isolated_stdp_test(
                     }
                 }
 
-                let is_spiking = adaptive_apply_and_get_spike(&mut neuron, &if_params);
+                let is_spiking = adaptive_apply_and_get_spike(&mut postsynaptic_neuron, &if_params);
                 
                 let dv = if if_params.bayesian_std != 0. {
                     let input_voltage = (0..n)
@@ -1090,7 +1094,7 @@ fn run_isolated_stdp_test(
                         .iter()
                         .sum();
 
-                    adaptive_dv(&mut neuron, &if_params, input_voltage)
+                    adaptive_dv(&mut postsynaptic_neuron, &if_params, input_voltage)
                 } else {
                     let input_voltage = (0..n)
                         .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
@@ -1098,12 +1102,12 @@ fn run_isolated_stdp_test(
                         .iter()
                         .sum();
 
-                    adaptive_dv(&mut neuron, &if_params, input_voltage)
+                    adaptive_dv(&mut postsynaptic_neuron, &if_params, input_voltage)
                 };
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
-                    &neuron,
+                    &postsynaptic_neuron,
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
@@ -1111,17 +1115,17 @@ fn run_isolated_stdp_test(
                     is_spikings,
                 );
 
-                neuron.current_voltage += dv;
+                postsynaptic_neuron.current_voltage += dv;
 
                 if is_spiking {
                     post_fires = Some(timestep);
                     for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, &neuron);
+                        delta_ws[n] = update_weight(&i, &postsynaptic_neuron);
                         weights[n] += delta_ws[n];
                     }
                 }
 
-                write_row(&mut file, &neurons, &neuron, &weights, &pre_fires, &post_fires);
+                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
             }
         }
     };
