@@ -277,6 +277,34 @@ impl Output {
 
 type AdjacencyList = HashMap<(usize, usize), Vec<(usize, usize)>>;
 
+// type Position = (usize, usize);
+
+// struct AdjacencyMatrix {
+//     positions_to_index: HashMap<Position, usize>,
+//     matrix: Vec<Vec<f64>>,
+// }
+
+// impl AdjacencyMatrix {
+//     fn add_vertex(&mut self, position: Position) {
+//         let index = self.positions_to_index.len();
+    
+//         self.positions_to_index.insert(position, index);
+
+//         self.matrix.push(vec![0.; index + 1]);
+//         for row in self.matrix.iter_mut() {
+//             row.push(0.);
+//         }
+//     }
+
+//     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> f64 {
+//         self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]]
+//     }
+
+//     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: f64) {
+//         self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]] = weight;
+//     }
+// }
+
 fn run_simulation(
     num_rows: usize, 
     num_cols: usize, 
@@ -366,6 +394,10 @@ fn run_simulation(
     }
 
     let mut adjacency_list: AdjacencyList = HashMap::new(); 
+    // let mut adjacency_matrix = AdjacencyMatrix {
+    //     positions_to_index: HashMap::new(),
+    //     matrix: vec![vec![]],
+    // };
     
     for row in 0..num_rows {
         for col in 0..num_cols {
@@ -374,7 +406,17 @@ fn run_simulation(
             let positions = randomly_select_positions(positions, num_to_select);
             adjacency_list
                 .entry((row, col))
-                .or_insert(positions);
+                .or_insert(positions); // .or_insert(positions.clone())
+
+            // if !adjacency_matrix.positions_to_index.contains_key(&(row, col)) {
+            //     adjacency_matrix.add_vertex((row, col))
+            // }
+            // for i in positions.iter() {
+            //     if !adjacency_matrix.positions_to_index.contains_key(i) {
+            //         adjacency_matrix.add_vertex(*i);
+            //         adjacency_matrix.edit_weight(i, &(row, col), 1.0)
+            //     }
+            // }
         }
     }
 
