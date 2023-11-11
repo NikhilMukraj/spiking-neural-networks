@@ -19,12 +19,14 @@ mod ga;
 use ga::{BitString, decode, genetic_algo};
 
 
+type Position = (usize, usize);
+
 fn positions_within_square(
     center_row: usize, 
     center_col: usize, 
     extent: usize, 
-    size: (usize, usize)
-) -> Vec<(usize, usize)> {
+    size: Position
+) -> Vec<Position> {
     let (row_length, col_length) = size;
     let mut positions = Vec::new();
 
@@ -39,7 +41,7 @@ fn positions_within_square(
     positions
 }
 
-fn randomly_select_positions(mut positions: Vec<(usize, usize)>, num_to_select: usize) -> Vec<(usize, usize)> {
+fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize) -> Vec<Position> {
     let mut rng = rand::thread_rng();
 
     positions.shuffle(&mut rng);
@@ -60,7 +62,7 @@ fn randomly_select_positions(mut positions: Vec<(usize, usize)>, num_to_select: 
 
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
-    input_positions: &Vec<(usize, usize)>, 
+    input_positions: &Vec<Position>, 
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
@@ -275,35 +277,39 @@ impl Output {
     }
 }
 
-type AdjacencyList = HashMap<(usize, usize), Vec<(usize, usize)>>;
+struct AdjacencyMatrix {
+    positions_to_index: HashMap<Position, usize>,
+    matrix: Vec<Vec<Option<f64>>>,
+}
 
-// type Position = (usize, usize);
+impl AdjacencyMatrix {
+    fn nodes_len(&self) -> usize {
+        self.positions_to_index.len()
+    }
 
-// struct AdjacencyMatrix {
-//     positions_to_index: HashMap<Position, usize>,
-//     matrix: Vec<Vec<f64>>,
-// }
+    fn get_every_node(&self) -> Vec<Position> {
+        self.positions_to_index.keys().cloned().collect()
+    }
 
-// impl AdjacencyMatrix {
-//     fn add_vertex(&mut self, position: Position) {
-//         let index = self.positions_to_index.len();
+    fn add_vertex(&mut self, position: Position) {
+        let index = self.nodes_len();
     
-//         self.positions_to_index.insert(position, index);
+        self.positions_to_index.insert(position, index);
 
-//         self.matrix.push(vec![0.; index + 1]);
-//         for row in self.matrix.iter_mut() {
-//             row.push(0.);
-//         }
-//     }
+        self.matrix.push(vec![None; index + 1]);
+        for row in self.matrix.iter_mut() {
+            row.push(None);
+        }
+    }
 
-//     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> f64 {
-//         self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]]
-//     }
+    fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64> {
+        self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]]
+    }
 
-//     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: f64) {
-//         self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]] = weight;
-//     }
-// }
+    fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>) {
+        self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]] = weight;
+    }
+}
 
 fn run_simulation(
     num_rows: usize, 
@@ -393,55 +399,57 @@ fn run_simulation(
         }
     }
 
-    let mut adjacency_list: AdjacencyList = HashMap::new(); 
-    // let mut adjacency_matrix = AdjacencyMatrix {
-    //     positions_to_index: HashMap::new(),
-    //     matrix: vec![vec![]],
-    // };
+    let mut adjacency_matrix = AdjacencyMatrix {
+        positions_to_index: HashMap::new(),
+        matrix: vec![vec![]],
+    };
     
     for row in 0..num_rows {
         for col in 0..num_cols {
             let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
             let num_to_select = rng.gen_range(1..positions.len());
             let positions = randomly_select_positions(positions, num_to_select);
-            adjacency_list
-                .entry((row, col))
-                .or_insert(positions); // .or_insert(positions.clone())
 
-            // if !adjacency_matrix.positions_to_index.contains_key(&(row, col)) {
-            //     adjacency_matrix.add_vertex((row, col))
-            // }
-            // for i in positions.iter() {
-            //     if !adjacency_matrix.positions_to_index.contains_key(i) {
-            //         adjacency_matrix.add_vertex(*i);
-            //         adjacency_matrix.edit_weight(i, &(row, col), 1.0)
-            //     }
-            // }
+            if !adjacency_matrix.positions_to_index.contains_key(&(row, col)) {
+                adjacency_matrix.add_vertex((row, col))
+            }
+            for i in positions.iter() {
+                if !adjacency_matrix.positions_to_index.contains_key(i) {
+                    adjacency_matrix.add_vertex(*i);
+                }
+
+                adjacency_matrix.edit_weight(i, &(row, col), Some(1.0))
+            }
         }
     }
-
-    // let mut weights: HashMap<(usize, usize), HashMap<(usize, usize), Vec<f64>> = HashMap::new();
 
     match if_type {
         IFType::Basic => {
             for _ in 0..iterations {
-                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-                    .cloned()
-                    .map(|key| (key, (0.0, false)))
-                    .collect();
+                let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
+                    .iter()
+                    .map(|key| (*key, (0.0, false)))
+                    .collect();          
 
                 // loop through every cell
                 // calculate the dv given the inputs
                 // write 
                 // end loop
 
-                for pos in adjacency_list.keys() {
+                for pos in adjacency_matrix.get_every_node() {
                     let (x, y) = pos;
-                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    let mut input_positions: Vec<Position> = Vec::new();
+                    for i in adjacency_matrix.positions_to_index.keys() {
+                        match adjacency_matrix.lookup_weight(i, &pos) {
+                            Some(_) => { input_positions.push(*i); },
+                            None => {}
+                        };
+                    }
 
                     let input = get_input_from_positions(
                         &cell_grid, 
-                        input_positions, 
+                        &input_positions, 
                         input_calculation, 
                         bayesian,
                         averaged,
@@ -456,9 +464,9 @@ fn run_simulation(
                     //     averaged,
                     // );
                     
-                    let (dv, is_spiking) = cell_grid[*x][*y].get_dv_change_and_spike(if_params, input);
+                    let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
 
-                    changes.insert(*pos, (dv, is_spiking));
+                    changes.insert(pos, (dv, is_spiking));
                 }
 
                 // loop through every cell
@@ -509,9 +517,9 @@ fn run_simulation(
             };
 
             for _ in 0..iterations {
-                let mut changes: HashMap<(usize, usize), (f64, bool)> = adjacency_list.keys()
-                    .cloned()
-                    .map(|key| (key, (0.0, false)))
+                let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
+                    .iter()
+                    .map(|key| (*key, (0.0, false)))
                     .collect();
 
                 // loop through every cell
@@ -519,13 +527,20 @@ fn run_simulation(
                 // write 
                 // end loop
 
-                for pos in adjacency_list.keys() {
+                for pos in adjacency_matrix.get_every_node() {
                     let (x, y) = pos;
-                    let input_positions = adjacency_list.get(&pos).unwrap();
+
+                    let mut input_positions: Vec<Position> = Vec::new();
+                    for i in adjacency_matrix.positions_to_index.keys() {
+                        match adjacency_matrix.lookup_weight(i, &pos) {
+                            Some(_) => { input_positions.push(*i); },
+                            None => {}
+                        };
+                    }
 
                     let input = get_input_from_positions(
                         &cell_grid, 
-                        input_positions, 
+                        &input_positions, 
                         input_calculation, 
                         bayesian,
                         averaged,
@@ -540,9 +555,9 @@ fn run_simulation(
                     //     averaged,
                     // );
 
-                    let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[*x][*y], if_params);
+                    let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[x][y], if_params);
 
-                    changes.insert(*pos, (input, is_spiking));
+                    changes.insert(pos, (input, is_spiking));
                 }
 
                 // find dv change and apply it
