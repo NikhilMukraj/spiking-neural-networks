@@ -50,16 +50,6 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
-// fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
-//     let neuro_mean: f64 = cell_grid
-//         .iter()
-//         .flatten()
-//         .map(|x| x.neurotransmission_concentration)
-//         .sum();
-
-//     neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
-// }
-
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<Position>, 
@@ -109,8 +99,10 @@ fn get_input_from_positions(
     return input_val;
 }
 
-// fn stdp_get_input_from_positions(
+// fn weighted_get_input_from_positions(
 //     cell_grid: &CellGrid, 
+//     adjacency_matrix: &AdjacencyMatrix,
+//     position: &Position,
 //     input_positions: &Vec<(usize, usize)>, 
 //     extracted_weights: &HashMap<(usize, usize), Vec<f64>>,
 //     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
@@ -135,7 +127,7 @@ fn get_input_from_positions(
 //                 input_cell.neurotransmission_concentration,
 //             );
             
-//             final_input * extracted_weights[(pos_x, pos_y)]
+//             final_input * adjacency_matrix.lookup_weight(&input_position, position)
 
 //         })
 //         .sum();
@@ -278,36 +270,74 @@ impl Output {
 }
 
 struct AdjacencyMatrix {
-    positions_to_index: HashMap<Position, usize>,
+    position_to_index: HashMap<Position, usize>,
+    index_to_position: HashMap<usize, Position>,
     matrix: Vec<Vec<Option<f64>>>,
 }
 
 impl AdjacencyMatrix {
     fn nodes_len(&self) -> usize {
-        self.positions_to_index.len()
+        self.position_to_index.len()
     }
 
     fn get_every_node(&self) -> Vec<Position> {
-        self.positions_to_index.keys().cloned().collect()
+        self.position_to_index.keys().cloned().collect()
     }
 
     fn add_vertex(&mut self, position: Position) {
         let index = self.nodes_len();
     
-        self.positions_to_index.insert(position, index);
+        self.position_to_index.insert(position, index);
+        self.index_to_position.insert(index, position);
 
-        self.matrix.push(vec![None; index + 1]);
+        self.matrix.push(vec![None; index]);
         for row in self.matrix.iter_mut() {
             row.push(None);
         }
     }
 
     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64> {
-        self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]]
+        self.matrix[self.position_to_index[pos1]][self.position_to_index[pos2]]
     }
 
     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>) {
-        self.matrix[self.positions_to_index[pos1]][self.positions_to_index[pos2]] = weight;
+        self.matrix[self.position_to_index[pos1]][self.position_to_index[pos2]] = weight;
+    }
+
+    // to be cached
+    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
+        let mut connections: Vec<Position> = Vec::new();
+        for i in self.position_to_index.keys() {
+            match self.lookup_weight(i, &pos) {
+                Some(_) => { connections.push(*i); },
+                None => {}
+            };
+        }
+
+        return connections;
+    }
+
+    // to be cached
+    // fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
+    //     let node = self.position_to_index[pos];
+    //     let out_going_connections = self.matrix[node]
+    //         .iter()
+    //         .enumerate()
+    //         .filter(|(_, &val)| val.is_some())
+    //         .map(|(n, _)| self.index_to_position[&n])
+    //         .collect::<Vec<Position>>();
+            
+    //     return out_going_connections;
+    // }
+}
+
+impl Default for AdjacencyMatrix {
+    fn default() -> Self {
+        AdjacencyMatrix { 
+            position_to_index: HashMap::new(), 
+            index_to_position: HashMap::new(), 
+            matrix: vec![vec![]],
+        }
     }
 }
 
@@ -400,8 +430,7 @@ fn run_simulation(
     }
 
     let mut adjacency_matrix = AdjacencyMatrix {
-        positions_to_index: HashMap::new(),
-        matrix: vec![vec![]],
+       ..AdjacencyMatrix::default()
     };
     
     for row in 0..num_rows {
@@ -410,11 +439,11 @@ fn run_simulation(
             let num_to_select = rng.gen_range(1..positions.len());
             let positions = randomly_select_positions(positions, num_to_select);
 
-            if !adjacency_matrix.positions_to_index.contains_key(&(row, col)) {
+            if !adjacency_matrix.position_to_index.contains_key(&(row, col)) {
                 adjacency_matrix.add_vertex((row, col))
             }
             for i in positions.iter() {
-                if !adjacency_matrix.positions_to_index.contains_key(i) {
+                if !adjacency_matrix.position_to_index.contains_key(i) {
                     adjacency_matrix.add_vertex(*i);
                 }
 
@@ -439,13 +468,7 @@ fn run_simulation(
                 for pos in adjacency_matrix.get_every_node() {
                     let (x, y) = pos;
 
-                    let mut input_positions: Vec<Position> = Vec::new();
-                    for i in adjacency_matrix.positions_to_index.keys() {
-                        match adjacency_matrix.lookup_weight(i, &pos) {
-                            Some(_) => { input_positions.push(*i); },
-                            None => {}
-                        };
-                    }
+                    let input_positions = adjacency_matrix.get_incoming_connections(&pos);
 
                     let input = get_input_from_positions(
                         &cell_grid, 
@@ -455,12 +478,13 @@ fn run_simulation(
                         averaged,
                     );
 
-                    // let input = stdp_get_input_from_positions(
+                    // let input = weighted_get_input_from_positions(
                     //     &cell_grid,
-                    //     input_positions,
-                    //     &weights[(x, y)],
+                    //     &adjacency_matrix,
+                    //     position,
+                    //     &input_positions,
                     //     input_calculation,
-                    //     bayesian,
+                    //     if_params,
                     //     averaged,
                     // );
                     
@@ -479,17 +503,35 @@ fn run_simulation(
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv_value;
 
+                    // let input_positions = adjacency_matrix.get_incoming_connections(&pos);
+
                     // if is_spiking_value {
                     //     cell_grid[x][y].last_firing_time = Some(timestep);
-                    //     for i in weights[(x, y)].keys() {
-                    //         let (x2, y2) = *i;
-                    //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
+                    //     for i in input_positions {
+                    //         let (x_in, y_in) = *i;
+                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
+                    //         adjacency_matrix.edit_weight(
+                    //             &(x_in, y_in), 
+                    //             &pos, 
+                    //             Some(current_weight + update_weight(&cell_grid[x_in][x_out], &cell_grid[x][y]))
+                    //         );
+                    //     }
+
+                    //     let out_going_connections = adjacency_matrix.get_outgoing_connections(pos);
+
+                    //     for i in out_going_connections {
+                    //         let (x_out, y_out) = *i;
+                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
+                    //         adjacency_matrix.edit_weight(
+                    //             &(x_in, y_in), 
+                    //             &pos, 
+                    //             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+                    //         );  
                     //     }
                     // } // need to also update neurons on receiving end of spiking neuron
                     // create hashmap of what neurons existing neurons point to and use that
                     // generate that hashmap alongside current adjancency list
                 }
-
                 // repeat until simulation is over
 
                 output_val.add(&cell_grid);
@@ -530,13 +572,7 @@ fn run_simulation(
                 for pos in adjacency_matrix.get_every_node() {
                     let (x, y) = pos;
 
-                    let mut input_positions: Vec<Position> = Vec::new();
-                    for i in adjacency_matrix.positions_to_index.keys() {
-                        match adjacency_matrix.lookup_weight(i, &pos) {
-                            Some(_) => { input_positions.push(*i); },
-                            None => {}
-                        };
-                    }
+                    let input_positions = adjacency_matrix.get_incoming_connections(&pos);
 
                     let input = get_input_from_positions(
                         &cell_grid, 
@@ -546,12 +582,13 @@ fn run_simulation(
                         averaged,
                     );
 
-                    // let input = stdp_get_input_from_positions(
+                    // let input = weighted_get_input_from_positions(
                     //     &cell_grid,
-                    //     input_positions,
-                    //     &weights[(x, y)],
+                    //     &adjacency_matrix,
+                    //     position,
+                    //     &input_positions,
                     //     input_calculation,
-                    //     bayesian,
+                    //     if_params,
                     //     averaged,
                     // );
 
@@ -572,9 +609,26 @@ fn run_simulation(
 
                     // if is_spiking_value {
                     //     cell_grid[x][y].last_firing_time = Some(timestep);
-                    //     for i in weights[(x, y)].keys() {
-                    //         let (x2, y2) = *i;
-                    //         weights[(x, y)][i] += update_weight(&cell_grid[x2][y2], &cell_grid[x][y]);
+                    //     for i in input_positions {
+                    //         let (x_in, y_in) = *i;
+                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
+                    //         adjacency_matrix.edit_weight(
+                    //             &(x_in, y_in), 
+                    //             &pos, 
+                    //             Some(current_weight + update_weight(&cell_grid[x_in][x_out], &cell_grid[x][y]))
+                    //         );
+                    //     }
+
+                    //     let out_going_connections = adjacency_matrix.get_outgoing_connections(pos);
+
+                    //     for i in out_going_connections {
+                    //         let (x_out, y_out) = *i;
+                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
+                    //         adjacency_matrix.edit_weight(
+                    //             &(x_in, y_in), 
+                    //             &pos, 
+                    //             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+                    //         );  
                     //     }
                     // } // need to also update neurons on receiving end of spiking neuron
                     // create hashmap of what neurons existing neurons point to and use that
