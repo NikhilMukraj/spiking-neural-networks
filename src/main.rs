@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap, 
     fs::{File, read_to_string}, 
-    io::{Write, Result, Error, ErrorKind}, 
+    io::{Write, BufWriter, Result, Error, ErrorKind}, 
     env,
 };
 use rand::{Rng, seq::SliceRandom};
@@ -120,12 +120,15 @@ fn get_input_from_positions(
 //                 PotentiationType::Inhibitory => 1.,
 //             };
 
-//             let final_input = input_calculation(
-//                 sign,
-//                 input_cell.current_voltage,
-//                 input_cell.receptor_density,
-//                 input_cell.neurotransmission_concentration,
-//             );
+//             // let final_input = input_calculation(
+//             //     sign,
+//             //     input_cell.current_voltage,
+//             //     input_cell.receptor_density,
+//             //     input_cell.neurotransmission_concentration,
+//             // );
+
+            // do not account for neurotransmission just yet
+            // let final_input = sign * current_voltage;
             
 //             final_input * adjacency_matrix.lookup_weight(&input_position, position)
 
@@ -208,7 +211,7 @@ impl Output {
         }
     }
 
-    fn write_to_file(&self, voltage_file: &mut File, neurotransmitter_file: &mut File) {
+    fn write_to_file(&self, voltage_file: &mut BufWriter<File>, neurotransmitter_file: &mut BufWriter<File>) {
         match &self {
             Output::Grid(grids) => {
                 for grid in grids {
@@ -1332,18 +1335,18 @@ fn main() -> Result<()> {
         let (mut voltage_file, mut neurotransmitter_file) = match output_value {
             Output::Grid(_) | Output::Averaged(_) => { 
                 (   
-                    File::create(format!("{}_voltage.txt", tag))
-                        .expect("Could not create file"),
-                    File::create(format!("{}_neurotransmitter.txt", tag))
-                        .expect("Could not create file")
+                    BufWriter::new(File::create(format!("{}_voltage.txt", tag))
+                        .expect("Could not create file")),
+                    BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
+                        .expect("Could not create file"))
                 )
             },
             Output::GridBinary(_) | Output::AveragedBinary(_) => { 
                 (   
-                    File::create(format!("{}_voltage.bin", tag))
-                        .expect("Could not create file"),
-                    File::create(format!("{}_neurotransmitter.bin", tag))
-                        .expect("Could not create file")
+                    BufWriter::new(File::create(format!("{}_voltage.bin", tag))
+                        .expect("Could not create file")),
+                    BufWriter::new(File::create(format!("{}_neurotransmitter.bin", tag))
+                        .expect("Could not create file"))
                 )
             },
         };
