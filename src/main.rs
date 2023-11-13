@@ -516,7 +516,7 @@ fn run_simulation(
                     //         adjacency_matrix.edit_weight(
                     //             &(x_in, y_in), 
                     //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x_in][x_out], &cell_grid[x][y]))
+                    //             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
                     //         );
                     //     }
 
@@ -618,7 +618,7 @@ fn run_simulation(
                     //         adjacency_matrix.edit_weight(
                     //             &(x_in, y_in), 
                     //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x_in][x_out], &cell_grid[x][y]))
+                    //             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
                     //         );
                     //     }
 
