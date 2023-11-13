@@ -1290,14 +1290,21 @@ fn main() -> Result<()> {
         };
         println!("tag: {}", tag);
 
+        let sim_params = get_parameters(&simulation_table)?;
+
+        let default_eq = match sim_params.if_type { // izhikevich currently untested with neurotransmitter
+            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
+            _ => String::from("sign * mp + 100 + rd * (nc^2 * 200)")
+        };
+
         let equation: String = parse_value_with_default(
             &simulation_table, 
             "input_equation", 
             parse_string, 
-            String::from("sign * mp + 100 + rd * (nc^2 * 200)")
+            default_eq
         )?;
         let equation: &str = equation.trim();
-        println!("equation: {}", equation);
+        println!("\ninput equation: {}", equation);
     
         let mut symbol_table = SymbolTable::new();
         let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
@@ -1315,8 +1322,6 @@ fn main() -> Result<()> {
     
             expr.value()
         };
-
-        let sim_params = get_parameters(&simulation_table)?;
 
         let output_value = run_simulation(
             sim_params.num_rows, 
