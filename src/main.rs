@@ -536,7 +536,7 @@ fn run_simulation(
                             &pos,
                             &input_positions,
                             input_calculation,
-                            Some(if_params),
+                            bayesian,
                             averaged,
                         )
                     } else {
@@ -661,7 +661,7 @@ fn run_simulation(
                             &pos,
                             &input_positions,
                             input_calculation,
-                            Some(if_params),
+                            bayesian,
                             averaged,
                         )
                     } else {
