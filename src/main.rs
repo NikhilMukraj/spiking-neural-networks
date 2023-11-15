@@ -278,6 +278,13 @@ struct AdjacencyMatrix {
     matrix: Vec<Vec<Option<f64>>>,
 }
 
+// trait GraphFunctionality {
+
+// }
+
+// impl GraphFunctionality for AdjacencyMatrix
+// impl GraphFunctionality for AdjacencyList
+
 impl AdjacencyMatrix {
     fn nodes_len(&self) -> usize {
         self.position_to_index.len()
