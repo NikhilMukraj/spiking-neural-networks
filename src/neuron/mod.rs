@@ -126,11 +126,16 @@ impl IzhikevichDefault for IFParameters {
     }
 }
 
+#[derive(Clone)]
 pub struct STDPParameters {
     pub a_plus: f64, // postitive stdp modifier 
     pub a_minus: f64, // negative stdp modifier 
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
+    pub weight_init: f64, // initial weight value
+    pub weight_std: f64, // weight deviation
+    pub weight_min: f64, // minimum weight value
+    pub weight_max: f64, // maximum weight value
 }
 
 impl Default for STDPParameters {
@@ -140,6 +145,10 @@ impl Default for STDPParameters {
             a_minus: 2., 
             tau_plus: 45., 
             tau_minus: 45., 
+            weight_init: 3.5,
+            weight_std: 1.0,
+            weight_min: 1.75,
+            weight_max: 5.25,
         }
     }
 }

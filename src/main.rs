@@ -6,6 +6,8 @@ use std::{
 };
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
+// use serde::{Serialize, Deserialize};
+use serde_json;
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod neuron;
@@ -99,60 +101,59 @@ fn get_input_from_positions(
     return input_val;
 }
 
-// fn weighted_get_input_from_positions(
-//     cell_grid: &CellGrid, 
-//     adjacency_matrix: &AdjacencyMatrix,
-//     position: &Position,
-//     input_positions: &Vec<(usize, usize)>, 
-//     extracted_weights: &HashMap<(usize, usize), Vec<f64>>,
-//     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
-//     if_params: Option<&IFParameters>,
-//     averaged: bool,
-// ) -> f64 {
-//     let mut input_val = input_positions
-//         .iter()
-//         .map(|input_position| {
-//             let (pos_x, pos_y) = input_position;
-//             let input_cell = &cell_grid[*pos_x][*pos_y];
+fn weighted_get_input_from_positions(
+    cell_grid: &CellGrid, 
+    adjacency_matrix: &AdjacencyMatrix,
+    position: &Position,
+    input_positions: &Vec<(usize, usize)>, 
+    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
+    if_params: Option<&IFParameters>,
+    averaged: bool,
+) -> f64 {
+    let mut input_val = input_positions
+        .iter()
+        .map(|input_position| {
+            let (pos_x, pos_y) = input_position;
+            let input_cell = &cell_grid[*pos_x][*pos_y];
             
-//             let sign = match input_cell.potentiation_type { 
-//                 PotentiationType::Excitatory => -1., 
-//                 PotentiationType::Inhibitory => 1.,
-//             };
+            let sign = match input_cell.potentiation_type { 
+                PotentiationType::Excitatory => -1., 
+                PotentiationType::Inhibitory => 1.,
+            };
 
-//             // let final_input = input_calculation(
-//             //     sign,
-//             //     input_cell.current_voltage,
-//             //     input_cell.receptor_density,
-//             //     input_cell.neurotransmission_concentration,
-//             // );
+            let final_input = input_calculation(
+                sign,
+                input_cell.current_voltage,
+                input_cell.receptor_density,
+                input_cell.neurotransmission_concentration,
+            );
 
             // do not account for neurotransmission just yet
             // let final_input = sign * current_voltage;
             
-//             final_input * adjacency_matrix.lookup_weight(&input_position, position)
+            final_input * adjacency_matrix.lookup_weight(&input_position, position).unwrap()
 
-//         })
-//         .sum();
+        })
+        .sum();
 
-//     match if_params {
-//         Some(params) => { 
-//             input_val *= limited_distr(
-//                 params.bayesian_mean, 
-//                 params.bayesian_std, 
-//                 params.bayesian_min, 
-//                 params.bayesian_max
-//             ); 
-//         },
-//         None => {},
-//     }
+    match if_params {
+        Some(params) => { 
+            input_val *= limited_distr(
+                params.bayesian_mean, 
+                params.bayesian_std, 
+                params.bayesian_min, 
+                params.bayesian_max
+            ); 
+        },
+        None => {},
+    }
 
-//     if averaged {
-//         input_val /= input_positions.len() as f64;
-//     }
+    if averaged {
+        input_val /= input_positions.len() as f64;
+    }
 
-//     return input_val;
-// }
+    return input_val;
+}
 
 fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
     let volt_mean: f64 = cell_grid
@@ -320,18 +321,31 @@ impl AdjacencyMatrix {
         return connections;
     }
 
-    // to be cached
-    // fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
-    //     let node = self.position_to_index[pos];
-    //     let out_going_connections = self.matrix[node]
-    //         .iter()
-    //         .enumerate()
-    //         .filter(|(_, &val)| val.is_some())
-    //         .map(|(n, _)| self.index_to_position[&n])
-    //         .collect::<Vec<Position>>();
-            
-    //     return out_going_connections;
+    // #[cache]
+    // fn cached_get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
+    //     let mut connections: Vec<Position> = Vec::new();
+    //     for i in self.position_to_index.keys() {
+    //         match self.lookup_weight(i, &pos) {
+    //             Some(_) => { connections.push(*i); },
+    //             None => {}
+    //         };
+    //     }
+
+    //     return connections;
     // }
+
+    // to be cached
+    fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
+        let node = self.position_to_index[pos];
+        let out_going_connections = self.matrix[node]
+            .iter()
+            .enumerate()
+            .filter(|(_, &val)| val.is_some())
+            .map(|(n, _)| self.index_to_position[&n])
+            .collect::<Vec<Position>>();
+            
+        return out_going_connections;
+    }
 }
 
 impl Default for AdjacencyMatrix {
@@ -344,6 +358,11 @@ impl Default for AdjacencyMatrix {
     }
 }
 
+// enum Graph {
+//     Matrix(AdjacencyMatrix),
+//     List(AdjacencyList),
+// }
+
 fn run_simulation(
     num_rows: usize, 
     num_cols: usize, 
@@ -353,10 +372,12 @@ fn run_simulation(
     averaged: bool,
     if_type: IFType,
     if_params: &IFParameters,
+    do_stdp: bool,
+    stdp_params: &STDPParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
-) -> Result<Output> {
+) -> Result<(Output, AdjacencyMatrix)> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
         let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
         return Err(Error::new(ErrorKind::InvalidInput, err_msg));
@@ -411,10 +432,10 @@ fn run_simulation(
                     chance_of_random_release: chance_of_random_release,
                     random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
                     w_value: if_params.w_init,
-                    a_plus: STDPParameters::default().a_plus,
-                    a_minus: STDPParameters::default().a_minus,
-                    tau_plus: STDPParameters::default().tau_plus,
-                    tau_minus: STDPParameters::default().tau_minus,
+                    a_plus: stdp_params.a_plus,
+                    a_minus: stdp_params.a_minus,
+                    tau_plus: stdp_params.tau_plus,
+                    tau_minus: stdp_params.tau_minus,
                     last_firing_time: None,
                 })
                 .collect::<Vec<Cell>>()
@@ -450,14 +471,25 @@ fn run_simulation(
                     adjacency_matrix.add_vertex(*i);
                 }
 
-                adjacency_matrix.edit_weight(i, &(row, col), Some(1.0))
+                if do_stdp {
+                    adjacency_matrix.edit_weight(i, &(row, col), Some(
+                        limited_distr(
+                        stdp_params.weight_init, 
+                        stdp_params.weight_std, 
+                        stdp_params.weight_min, 
+                        stdp_params.weight_max,
+                        )
+                    ));
+                } else {
+                    adjacency_matrix.edit_weight(i, &(row, col), Some(1.0));
+                }
             }
         }
     }
 
     match if_type {
         IFType::Basic => {
-            for _ in 0..iterations {
+            for timestep in 0..iterations {
                 let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
                     .iter()
                     .map(|key| (*key, (0.0, false)))
@@ -473,13 +505,13 @@ fn run_simulation(
 
                     let input_positions = adjacency_matrix.get_incoming_connections(&pos);
 
-                    let input = get_input_from_positions(
-                        &cell_grid, 
-                        &input_positions, 
-                        input_calculation, 
-                        bayesian,
-                        averaged,
-                    );
+                    // let input = get_input_from_positions(
+                    //     &cell_grid, 
+                    //     &input_positions, 
+                    //     input_calculation, 
+                    //     bayesian,
+                    //     averaged,
+                    // );
 
                     // let input = weighted_get_input_from_positions(
                     //     &cell_grid,
@@ -490,6 +522,26 @@ fn run_simulation(
                     //     if_params,
                     //     averaged,
                     // );
+
+                    let input = if do_stdp {
+                        weighted_get_input_from_positions(
+                            &cell_grid,
+                            &adjacency_matrix,
+                            &pos,
+                            &input_positions,
+                            input_calculation,
+                            Some(if_params),
+                            averaged,
+                        )
+                    } else {
+                        get_input_from_positions(
+                            &cell_grid, 
+                            &input_positions, 
+                            input_calculation, 
+                            bayesian,
+                            averaged,
+                        )
+                    };
                     
                     let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
 
@@ -506,32 +558,33 @@ fn run_simulation(
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv_value;
 
-                    // let input_positions = adjacency_matrix.get_incoming_connections(&pos);
 
-                    // if is_spiking_value {
-                    //     cell_grid[x][y].last_firing_time = Some(timestep);
-                    //     for i in input_positions {
-                    //         let (x_in, y_in) = *i;
-                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
-                    //         adjacency_matrix.edit_weight(
-                    //             &(x_in, y_in), 
-                    //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
-                    //         );
-                    //     }
+                    if do_stdp && is_spiking_value {
+                        cell_grid[x][y].last_firing_time = Some(timestep);
 
-                    //     let out_going_connections = adjacency_matrix.get_outgoing_connections(pos);
+                        let input_positions = adjacency_matrix.get_incoming_connections(&pos);
+                        for i in input_positions {
+                            let (x_in, y_in) = i;
+                            let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                            adjacency_matrix.edit_weight(
+                                &(x_in, y_in), 
+                                &pos, 
+                                Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+                            );
+                        }
 
-                    //     for i in out_going_connections {
-                    //         let (x_out, y_out) = *i;
-                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
-                    //         adjacency_matrix.edit_weight(
-                    //             &(x_in, y_in), 
-                    //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
-                    //         );  
-                    //     }
-                    // } // need to also update neurons on receiving end of spiking neuron
+                        let out_going_connections = adjacency_matrix.get_outgoing_connections(&pos);
+
+                        for i in out_going_connections {
+                            let (x_out, y_out) = i;
+                            let current_weight = adjacency_matrix.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+                            adjacency_matrix.edit_weight(
+                                &pos, 
+                                &(x_out, y_out), 
+                                Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+                            );  
+                        }
+                    } // need to also update neurons on receiving end of spiking neuron
                     // create hashmap of what neurons existing neurons point to and use that
                     // generate that hashmap alongside current adjancency list
                 }
@@ -561,7 +614,7 @@ fn run_simulation(
                 }
             };
 
-            for _ in 0..iterations {
+            for timestep in 0..iterations {
                 let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
                     .iter()
                     .map(|key| (*key, (0.0, false)))
@@ -577,13 +630,13 @@ fn run_simulation(
 
                     let input_positions = adjacency_matrix.get_incoming_connections(&pos);
 
-                    let input = get_input_from_positions(
-                        &cell_grid, 
-                        &input_positions, 
-                        input_calculation, 
-                        bayesian,
-                        averaged,
-                    );
+                    // let input = get_input_from_positions(
+                    //     &cell_grid, 
+                    //     &input_positions, 
+                    //     input_calculation, 
+                    //     bayesian,
+                    //     averaged,
+                    // );
 
                     // let input = weighted_get_input_from_positions(
                     //     &cell_grid,
@@ -594,6 +647,26 @@ fn run_simulation(
                     //     if_params,
                     //     averaged,
                     // );
+
+                    let input = if do_stdp {
+                        weighted_get_input_from_positions(
+                            &cell_grid,
+                            &adjacency_matrix,
+                            &pos,
+                            &input_positions,
+                            input_calculation,
+                            Some(if_params),
+                            averaged,
+                        )
+                    } else {
+                        get_input_from_positions(
+                            &cell_grid, 
+                            &input_positions, 
+                            input_calculation, 
+                            bayesian,
+                            averaged,
+                        )
+                    };
 
                     let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[x][y], if_params);
 
@@ -610,30 +683,32 @@ fn run_simulation(
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv;
 
-                    // if is_spiking_value {
-                    //     cell_grid[x][y].last_firing_time = Some(timestep);
-                    //     for i in input_positions {
-                    //         let (x_in, y_in) = *i;
-                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
-                    //         adjacency_matrix.edit_weight(
-                    //             &(x_in, y_in), 
-                    //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
-                    //         );
-                    //     }
+                    if do_stdp && is_spiking_value {
+                        cell_grid[x][y].last_firing_time = Some(timestep);
 
-                    //     let out_going_connections = adjacency_matrix.get_outgoing_connections(pos);
+                        let input_positions = adjacency_matrix.get_incoming_connections(&pos);
+                        for i in input_positions {
+                            let (x_in, y_in) = i;
+                            let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                            adjacency_matrix.edit_weight(
+                                &(x_in, y_in), 
+                                &pos, 
+                                Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+                            );
+                        }
 
-                    //     for i in out_going_connections {
-                    //         let (x_out, y_out) = *i;
-                    //         let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos);
-                    //         adjacency_matrix.edit_weight(
-                    //             &(x_in, y_in), 
-                    //             &pos, 
-                    //             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
-                    //         );  
-                    //     }
-                    // } // need to also update neurons on receiving end of spiking neuron
+                        let out_going_connections = adjacency_matrix.get_outgoing_connections(&pos);
+
+                        for i in out_going_connections {
+                            let (x_out, y_out) = i;
+                            let current_weight = adjacency_matrix.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+                            adjacency_matrix.edit_weight(
+                                &pos, 
+                                &(x_out, y_out), 
+                                Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+                            );  
+                        }
+                    } // need to also update neurons on receiving end of spiking neuron
                     // create hashmap of what neurons existing neurons point to and use that
                     // generate that hashmap alongside current adjancency list
                 }
@@ -643,7 +718,7 @@ fn run_simulation(
         }
     }
 
-    return Ok(output_val);
+    return Ok((output_val, adjacency_matrix));
 }
 
 fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
@@ -695,6 +770,8 @@ struct SimulationParameters<'a> {
     averaged: bool,
     if_params: IFParameters,
     if_type: IFType,
+    do_stdp: bool,
+    stdp_params: STDPParameters,
     default_cell_values: HashMap<&'a str, f64>,
 }
 
@@ -712,6 +789,74 @@ fn get_if_params(if_params: &mut IFParameters, table: &Value) -> Result<()> {
     if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
     if_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_max)?;
     if_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+
+    Ok(())
+}
+
+fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
+    stdp.a_plus = parse_value_with_default(
+        table, 
+        "a_plus", 
+        parse_f64, 
+        STDPParameters::default().a_plus
+    )?;
+    println!("a_plus: {}", stdp.a_plus);
+
+    stdp.a_minus = parse_value_with_default(
+        table, 
+        "a_minus", 
+        parse_f64, 
+        STDPParameters::default().a_minus
+    )?;
+    println!("a_minus: {}", stdp.a_minus);
+
+    stdp.tau_plus = parse_value_with_default(
+        table, 
+        "tau_plus", 
+        parse_f64, 
+        stdp.tau_plus
+    )?; 
+    println!("tau_plus: {}", stdp.tau_plus);
+
+    stdp.tau_minus = parse_value_with_default(
+        table, 
+        "tau_minus", 
+        parse_f64, 
+        stdp.tau_minus
+    )?; 
+    println!("tau_minus: {}", stdp.tau_minus);
+
+    stdp.weight_init = parse_value_with_default(
+        table, 
+        "weight_init", 
+        parse_f64, 
+        stdp.weight_init
+    )?;
+    println!("weight_init: {}", stdp.weight_init);
+
+    stdp.weight_std = parse_value_with_default(
+        table, 
+        "weight_std", 
+        parse_f64, 
+        stdp.weight_std
+    )?;
+    println!("weight_std: {}", stdp.weight_std);
+
+    stdp.weight_min = parse_value_with_default(
+        table, 
+        "weight_min", 
+        parse_f64, 
+        stdp.weight_min
+    )?;
+    println!("weight_min: {}", stdp.weight_min);
+
+    stdp.weight_max = parse_value_with_default(
+        table, 
+        "weight_max", 
+        parse_f64, 
+        stdp.weight_max
+    )?;
+    println!("weight_max: {}", stdp.weight_max);
 
     Ok(())
 }
@@ -742,6 +887,13 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
 
     let output_type: String = parse_value_with_default(table, "output_type", parse_string, String::from("averaged"))?;
     println!("output_type: {}", output_type);
+
+    let do_stdp: bool = parse_value_with_default(&table, "do_stdp", parse_bool, false)?;
+    println!("do_stdp: {}", do_stdp);
+
+    let mut stdp_params = STDPParameters::default();
+
+    get_stdp_params(&mut stdp_params, &table)?;
 
     let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
     default_cell_values.insert("neurotransmission_release", 1.);
@@ -835,9 +987,11 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
         averaged: averaged,
-        if_params,
+        if_params: if_params,
         if_type: if_type,
         default_cell_values: default_cell_values,
+        do_stdp: do_stdp,
+        stdp_params: stdp_params,
     });
 }
 
@@ -892,7 +1046,7 @@ fn objective(
         expr.value()
     };
 
-    let output_value = run_simulation(
+    let (output_value, _) = run_simulation(
         sim_params.num_rows, 
         sim_params.num_cols, 
         sim_params.iterations, 
@@ -901,6 +1055,8 @@ fn objective(
         sim_params.averaged,
         sim_params.if_type,
         &sim_params.if_params,
+        sim_params.do_stdp,
+        &sim_params.stdp_params,
         &sim_params.default_cell_values,
         &mut input_func,
         Output::Averaged(vec![]),
@@ -1027,7 +1183,6 @@ fn run_isolated_stdp_test(
     iterations: usize,
     n: usize,
     input_voltage: f64,
-    weight_init: f64,
     filename: &str,
 ) -> Result<()> {
     let mut if_params = match if_type {
@@ -1078,7 +1233,12 @@ fn run_isolated_stdp_test(
     let mut pre_fires: Vec<Option<usize>> = (0..n).map(|_| None).collect();
     let mut post_fires: Option<usize> = None;
     let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
-        |_| limited_distr(weight_init, 0.1, weight_init * 0.5, weight_init * 1.5)
+        |_| limited_distr(
+            stdp_params.weight_init, 
+            0.1, 
+            stdp_params.weight_init * 0.5, 
+            stdp_params.weight_init * 1.5
+        )
     ).collect();
     // let mut weights: Vec<f64> = (0..n)
     //     .map(|_| rand::thread_rng().gen_range(0.0..=2.0))
@@ -1323,7 +1483,7 @@ fn main() -> Result<()> {
             expr.value()
         };
 
-        let output_value = run_simulation(
+        let (output_value, adjacency_matrix) = run_simulation(
             sim_params.num_rows, 
             sim_params.num_cols, 
             sim_params.iterations, 
@@ -1332,6 +1492,8 @@ fn main() -> Result<()> {
             sim_params.averaged,
             sim_params.if_type,
             &sim_params.if_params,
+            sim_params.do_stdp,
+            &sim_params.stdp_params,
             &sim_params.default_cell_values,
             &mut input_func,
             output_type,
@@ -1357,6 +1519,16 @@ fn main() -> Result<()> {
         };
 
         output_value.write_to_file(&mut voltage_file, &mut neurotransmitter_file);
+
+        if sim_params.do_stdp {
+            let json_string = serde_json::to_string(&adjacency_matrix.index_to_position)
+                .expect("Failed to convert to JSON");
+
+            let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))
+                .expect("Could not create file"));
+
+            write!(json_file, "{}", json_string).expect("Coult not create to file");
+        }
 
         println!("Finished lattice simulation");
     } else if let Some(ga_table) = config.get("ga") {
@@ -1597,47 +1769,9 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let a_plus: f64 = parse_value_with_default(
-            stdp_table, 
-            "a_plus", 
-            parse_f64, 
-            STDPParameters::default().a_plus
-        )?;
-        println!("a_plus: {}", a_plus);
+        let mut stdp_params = STDPParameters::default();
 
-        let a_minus: f64 = parse_value_with_default(
-            stdp_table, 
-            "a_minus", 
-            parse_f64, 
-            STDPParameters::default().a_minus
-        )?;
-        println!("a_minus: {}", a_minus);
-
-        let tau_plus: f64 = parse_value_with_default(
-            stdp_table, 
-            "tau_plus", 
-            parse_f64, 
-            STDPParameters::default().tau_plus
-        )?; 
-        println!("tau_plus: {}", tau_plus);
-
-        let tau_minus: f64 = parse_value_with_default(
-            stdp_table, 
-            "tau_minus", 
-            parse_f64, 
-            STDPParameters::default().tau_minus
-        )?; 
-        println!("tau_minus: {}", tau_minus);
-
-        let weight_init: f64 = parse_value_with_default(stdp_table, "weight_init", parse_f64, 3.5)?;
-        println!("weight_init: {}", weight_init);
-
-        let stdp_params = STDPParameters {
-            a_minus: a_minus,
-            a_plus: a_plus,
-            tau_plus: tau_plus,
-            tau_minus: tau_minus,
-        };
+        get_stdp_params(&mut stdp_params, stdp_table)?;
 
         run_isolated_stdp_test(
             stdp_table,
@@ -1646,7 +1780,6 @@ fn main() -> Result<()> {
             iterations,
             n,
             input_voltage,
-            weight_init,
             &filename,
         )?;
 
