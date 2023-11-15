@@ -1527,7 +1527,7 @@ fn main() -> Result<()> {
 
             write!(json_file, "{}", json_string).expect("Coult not create to file");
 
-            let mut csv_file = BufWriter::new(File::create(format!("{}_positions.csv", tag))
+            let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))
                 .expect("Could not create file"));
 
             for row in adjacency_matrix.matrix {
