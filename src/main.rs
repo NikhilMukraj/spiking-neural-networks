@@ -227,7 +227,6 @@ impl Output {
                             .expect("Could not write to file");
                         writeln!(neurotransmitter_file)
                             .expect("Could not write to file");
-
                     }
                     writeln!(voltage_file, "-----")
                         .expect("Could not write to file"); 
@@ -1523,11 +1522,29 @@ fn main() -> Result<()> {
         if sim_params.do_stdp {
             let json_string = serde_json::to_string(&adjacency_matrix.index_to_position)
                 .expect("Failed to convert to JSON");
-
             let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))
                 .expect("Could not create file"));
 
             write!(json_file, "{}", json_string).expect("Coult not create to file");
+
+            let mut csv_file = BufWriter::new(File::create(format!("{}_positions.csv", tag))
+                .expect("Could not create file"));
+
+            for row in adjacency_matrix.matrix {
+                for (n, i) in row.iter().enumerate() {
+                    let item_to_write = match i {
+                        Some(value) => format!("{}", value),
+                        None => String::from("None"),
+                    };
+
+                    if n < row.len() - 1 {
+                        write!(csv_file, "{}, ", item_to_write).expect("Could not write to file");
+                    } else {
+                        write!(csv_file, "{}", item_to_write).expect("Could not write to file");
+                    }
+                }
+                writeln!(csv_file).expect("Could not write to file");
+            }
         }
 
         println!("Finished lattice simulation");
