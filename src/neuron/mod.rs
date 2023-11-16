@@ -1,6 +1,6 @@
 use std::{
     fs::File, 
-    io::{Result, Error, ErrorKind, Write}, 
+    io::{Result, Error, ErrorKind, Write, BufWriter}, 
 };
 use rand::Rng;
 use rand_distr::{Normal, Distribution};
@@ -362,8 +362,8 @@ impl Cell {
         iterations: usize, 
         filename: &str,
     ) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
         for _ in 0..iterations {
@@ -386,8 +386,8 @@ impl Cell {
         iterations: usize, 
         filename: &str,
     ) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -411,8 +411,8 @@ impl Cell {
         iterations: usize, 
         filename: &str,
     ) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -436,8 +436,8 @@ impl Cell {
         iterations: usize,
         filename: &str,
     ) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -461,8 +461,8 @@ impl Cell {
         iterations: usize,
         filename: &str,
     ) {
-        let mut file = File::create(filename)
-            .expect("Unable to create file");
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         
         for _ in 0..iterations {
