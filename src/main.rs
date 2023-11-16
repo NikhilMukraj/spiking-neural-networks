@@ -984,7 +984,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         (None, Some(total_time_value)) => { (total_time_value as f64 / if_params.dt) as usize },
         (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
     };
-    println!("iterations: {}\n", iterations);
+    println!("iterations: {}", iterations);
 
     return Ok(SimulationParameters {
         num_rows: num_rows, 
