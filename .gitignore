@@ -3,4 +3,5 @@
 /*.bin
 /single neuron tests
 /lattice simulations
+/stdp lattice
 /test_izhikevich_lattice.toml
