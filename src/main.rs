@@ -1545,7 +1545,7 @@ fn main() -> Result<()> {
                     };
 
                     if n < row.len() - 1 {
-                        write!(csv_file, "{}, ", item_to_write).expect("Could not write to file");
+                        write!(csv_file, "{},", item_to_write).expect("Could not write to file");
                     } else {
                         write!(csv_file, "{}", item_to_write).expect("Could not write to file");
                     }
