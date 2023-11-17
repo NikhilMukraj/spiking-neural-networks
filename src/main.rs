@@ -276,6 +276,7 @@ struct AdjacencyMatrix {
     position_to_index: HashMap<Position, usize>,
     index_to_position: HashMap<usize, Position>,
     matrix: Vec<Vec<Option<f64>>>,
+    history: Vec<Vec<Vec<Option<f64>>>>,
 }
 
 // trait GraphFunctionality {
@@ -360,6 +361,7 @@ impl Default for AdjacencyMatrix {
             position_to_index: HashMap::new(), 
             index_to_position: HashMap::new(), 
             matrix: vec![vec![]],
+            history: vec![vec![vec![]]],
         }
     }
 }
@@ -379,6 +381,7 @@ fn run_simulation(
     if_type: IFType,
     if_params: &IFParameters,
     do_stdp: bool,
+    write_weight_history: bool,
     stdp_params: &STDPParameters,
     default_cell_values: &HashMap<&str, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
@@ -493,6 +496,10 @@ fn run_simulation(
         }
     }
 
+    if do_stdp && write_weight_history {
+        adjacency_matrix.history.push(adjacency_matrix.matrix.clone());
+    }
+
     match if_type {
         IFType::Basic => {
             for timestep in 0..iterations {
@@ -597,6 +604,10 @@ fn run_simulation(
                 // repeat until simulation is over
 
                 output_val.add(&cell_grid);
+
+                if do_stdp && write_weight_history {
+                    adjacency_matrix.history.push(adjacency_matrix.matrix.clone());
+                }
             }
         },
         IFType::Adaptive | IFType::AdaptiveExponential | 
@@ -720,6 +731,10 @@ fn run_simulation(
                 }
 
                 output_val.add(&cell_grid);
+
+                if do_stdp && write_weight_history {
+                    adjacency_matrix.history.push(adjacency_matrix.matrix.clone());
+                }
             }
         }
     }
@@ -1062,6 +1077,7 @@ fn objective(
         sim_params.if_type,
         &sim_params.if_params,
         sim_params.do_stdp,
+        false,
         &sim_params.stdp_params,
         &sim_params.default_cell_values,
         &mut input_func,
@@ -1423,6 +1439,24 @@ fn run_isolated_stdp_test(
     Ok(())
 }
 
+fn csv_write<T: std::fmt::Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) {
+    for row in grid {
+        for (n, i) in row.iter().enumerate() {
+            let item_to_write = match i {
+                Some(value) => format!("{}", value),
+                None => String::from("None"),
+            };
+
+            if n < row.len() - 1 {
+                write!(csv_file, "{},", item_to_write).expect("Could not write to file");
+            } else {
+                write!(csv_file, "{}", item_to_write).expect("Could not write to file");
+            }
+        }
+        writeln!(csv_file).expect("Could not write to file");
+    }
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -1457,6 +1491,14 @@ fn main() -> Result<()> {
         println!("tag: {}", tag);
 
         let sim_params = get_parameters(&simulation_table)?;
+
+        let write_weight_history: bool = parse_value_with_default(
+            &simulation_table, 
+            "write_weight_history", 
+            parse_bool, 
+            false
+        )?;
+        println!("write_weight_history: {}", write_weight_history);
 
         let default_eq = match sim_params.if_type { // izhikevich currently untested with neurotransmitter
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
@@ -1499,6 +1541,7 @@ fn main() -> Result<()> {
             sim_params.if_type,
             &sim_params.if_params,
             sim_params.do_stdp,
+            write_weight_history,
             &sim_params.stdp_params,
             &sim_params.default_cell_values,
             &mut input_func,
@@ -1537,20 +1580,13 @@ fn main() -> Result<()> {
             let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))
                 .expect("Could not create file"));
 
-            for row in adjacency_matrix.matrix {
-                for (n, i) in row.iter().enumerate() {
-                    let item_to_write = match i {
-                        Some(value) => format!("{}", value),
-                        None => String::from("None"),
-                    };
-
-                    if n < row.len() - 1 {
-                        write!(csv_file, "{},", item_to_write).expect("Could not write to file");
-                    } else {
-                        write!(csv_file, "{}", item_to_write).expect("Could not write to file");
-                    }
+            if write_weight_history {
+                for grid in adjacency_matrix.history {
+                    csv_write(&mut csv_file, &grid);
+                    writeln!(csv_file, "-----").expect("Could not write to file");
                 }
-                writeln!(csv_file).expect("Could not write to file");
+            } else {
+                csv_write(&mut csv_file, &adjacency_matrix.matrix);
             }
         }
 
