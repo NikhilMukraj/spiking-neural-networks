@@ -273,7 +273,7 @@ impl Output {
 }
 
 trait GraphFunctionality {
-    fn add_vertex(&mut self, pos: Position);
+    fn initialize_connections(&mut self, endpoint: Position, connections: Vec<Position>, do_stdp: bool, stdp_params: &STDPParameters);
     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64>;
     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>);
     fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>;
@@ -300,9 +300,7 @@ impl AdjacencyMatrix {
     fn get_every_node(&self) -> Vec<Position> {
         self.position_to_index.keys().cloned().collect()
     }
-}
 
-impl GraphFunctionality for AdjacencyMatrix {
     fn add_vertex(&mut self, position: Position) {
         let index = self.nodes_len();
     
@@ -312,6 +310,38 @@ impl GraphFunctionality for AdjacencyMatrix {
         self.matrix.push(vec![None; index]);
         for row in self.matrix.iter_mut() {
             row.push(None);
+        }
+    }
+}
+
+impl GraphFunctionality for AdjacencyMatrix {
+    fn initialize_connections(
+        &mut self, 
+        endpoint: Position, 
+        connections: Vec<Position>, 
+        do_stdp: bool,
+        stdp_params: &STDPParameters,
+    ) {
+        if !self.position_to_index.contains_key(&endpoint) {
+            self.add_vertex(endpoint)
+        }
+        for i in connections.iter() {
+            if !self.position_to_index.contains_key(i) {
+                self.add_vertex(*i);
+            }
+
+            if do_stdp {
+                self.edit_weight(i, &endpoint, Some(
+                    limited_distr(
+                    stdp_params.weight_init, 
+                    stdp_params.weight_std, 
+                    stdp_params.weight_min, 
+                    stdp_params.weight_max,
+                    )
+                ));
+            } else {
+                self.edit_weight(i, &endpoint, Some(1.0));
+            }
         }
     }
 
@@ -375,9 +405,85 @@ impl Default for AdjacencyMatrix {
 }
 
 // struct AdjacencyList {
-//     incoming_connections: HashMap<Position, HashMap<Position, f64>>,
-//     outgoing_connections: HashMap<Position, Position>,
-//     history: Vec<HashMap<Position, HashMap<Position, f64>>>,
+//     incoming_connections: HashMap<Position, HashMap<Position, Option<f64>>>,
+//     outgoing_connections: HashMap<Position, Vec<Position>>,
+//     history: Vec<HashMap<Position, HashMap<Position, Option<f64>>>>,
+// }
+
+// impl GraphFunctionality for AdjacencyList {
+//     fn initialize_connections(
+//         &mut self, 
+//         endpoint: Position, 
+//         connections: Vec<Position>, 
+//         do_stdp: bool,
+//         stdp_params: &STDPParameters,
+//     ) {
+//         for i in connections.iter() {
+//             let weight = if do_stdp {
+//                 Some(
+//                     limited_distr(
+//                         stdp_params.weight_init, 
+//                         stdp_params.weight_std, 
+//                         stdp_params.weight_min, 
+//                         stdp_params.weight_max,
+//                     )
+//                 )
+//             } else {
+//                 Some(1.0)
+//             };
+
+//             // if !self.incoming_connections.contains_key(&endpoint) {
+//             //     self.incoming_connections.entry(endpoint)
+//             //         .or_insert_with(HashMap::new)
+//             //         .insert(*i, weight);
+//             // } else {
+//             //     if let Some(positions_and_weights) = self.incoming_connections.get_mut(&endpoint) {
+//             //         positions_and_weights.insert(*i, weight);
+//             //     }
+//             // }
+
+//             self.incoming_connections.entry(endpoint)
+//                 .or_insert_with(HashMap::new)
+//                 .insert(*i, weight);
+
+//             // if !self.outgoing_connections.contains_key(&i) {
+//             //     self.outgoing_connections.entry(*i)
+//             //         .or_insert_with(Vec::new)
+//             //         .push(endpoint);
+//             // } else {
+//             //     self.outgoing_connections.entry(*i)
+//             //         .push(endpoint);
+//             // }
+
+//             self.outgoing_connections.entry(*i)
+//                 .or_insert_with(Vec::new)
+//                 .push(endpoint);
+//         }
+//     }
+
+//     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64> {
+//         self.incoming_connections[pos1][pos2]
+//     }
+
+//     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>) {
+//         // self.incoming_connections[pos1][pos2] = weight;
+
+//         if let Some(positions_and_weights) = self.incoming_connections.get_mut(pos1) {
+//             positions_and_weights.insert(*pos2, weight);
+//         }
+//     }
+
+//     // to be cached
+//     // or point to reference
+//     fn get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
+//         self.incoming_connections[pos].keys().cloned().collect::<Vec<Position>>()
+//     }
+
+//     // to be cached
+//     // or point to reference
+//     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
+//         self.outgoing_connections[pos].clone()
+//     }
 // }
 
 // enum Graph {
@@ -486,27 +592,29 @@ fn run_simulation(
             let num_to_select = rng.gen_range(1..positions.len());
             let positions = randomly_select_positions(positions, num_to_select);
 
-            if !adjacency_matrix.position_to_index.contains_key(&(row, col)) {
-                adjacency_matrix.add_vertex((row, col))
-            }
-            for i in positions.iter() {
-                if !adjacency_matrix.position_to_index.contains_key(i) {
-                    adjacency_matrix.add_vertex(*i);
-                }
+            // if !adjacency_matrix.position_to_index.contains_key(&(row, col)) {
+            //     adjacency_matrix.add_vertex((row, col))
+            // }
+            // for i in positions.iter() {
+            //     if !adjacency_matrix.position_to_index.contains_key(i) {
+            //         adjacency_matrix.add_vertex(*i);
+            //     }
 
-                if do_stdp {
-                    adjacency_matrix.edit_weight(i, &(row, col), Some(
-                        limited_distr(
-                        stdp_params.weight_init, 
-                        stdp_params.weight_std, 
-                        stdp_params.weight_min, 
-                        stdp_params.weight_max,
-                        )
-                    ));
-                } else {
-                    adjacency_matrix.edit_weight(i, &(row, col), Some(1.0));
-                }
-            }
+            //     if do_stdp {
+            //         adjacency_matrix.edit_weight(i, &(row, col), Some(
+            //             limited_distr(
+            //             stdp_params.weight_init, 
+            //             stdp_params.weight_std, 
+            //             stdp_params.weight_min, 
+            //             stdp_params.weight_max,
+            //             )
+            //         ));
+            //     } else {
+            //         adjacency_matrix.edit_weight(i, &(row, col), Some(1.0));
+            //     }
+            // }
+
+            adjacency_matrix.initialize_connections((row, col), positions, do_stdp, stdp_params);
         }
     }
 
