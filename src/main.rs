@@ -272,16 +272,22 @@ impl Output {
     }
 }
 
+trait GraphFunctionality {
+    fn add_vertex(&mut self, pos: Position);
+    fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64>;
+    fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>);
+    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>;
+    fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
+    // fn write_current_weights
+    // fn write_history
+}
+
 struct AdjacencyMatrix {
     position_to_index: HashMap<Position, usize>,
     index_to_position: HashMap<usize, Position>,
     matrix: Vec<Vec<Option<f64>>>,
     history: Vec<Vec<Vec<Option<f64>>>>,
 }
-
-// trait GraphFunctionality {
-
-// }
 
 // impl GraphFunctionality for AdjacencyMatrix
 // impl GraphFunctionality for AdjacencyList
@@ -294,7 +300,9 @@ impl AdjacencyMatrix {
     fn get_every_node(&self) -> Vec<Position> {
         self.position_to_index.keys().cloned().collect()
     }
+}
 
+impl GraphFunctionality for AdjacencyMatrix {
     fn add_vertex(&mut self, position: Position) {
         let index = self.nodes_len();
     
@@ -365,6 +373,12 @@ impl Default for AdjacencyMatrix {
         }
     }
 }
+
+// struct AdjacencyList {
+//     incoming_connections: HashMap<Position, HashMap<Position, f64>>,
+//     outgoing_connections: HashMap<Position, Position>,
+//     history: Vec<HashMap<Position, HashMap<Position, f64>>>,
+// }
 
 // enum Graph {
 //     Matrix(AdjacencyMatrix),
