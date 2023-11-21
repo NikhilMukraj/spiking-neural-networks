@@ -274,7 +274,8 @@ impl Output {
 
 trait GraphFunctionality {
     fn initialize_connections(&mut self, postsynaptic: Position, connections: Vec<Position>, do_stdp: bool, stdp_params: &STDPParameters);
-    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; // pre and post
+    fn get_every_node(&self) -> Vec<Position>;
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; 
     fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>);
     fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>; 
     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
@@ -295,10 +296,6 @@ struct AdjacencyMatrix {
 impl AdjacencyMatrix {
     fn nodes_len(&self) -> usize {
         self.position_to_index.len()
-    }
-
-    fn get_every_node(&self) -> Vec<Position> {
-        self.position_to_index.keys().cloned().collect()
     }
 
     fn add_vertex(&mut self, position: Position) {
@@ -343,6 +340,10 @@ impl GraphFunctionality for AdjacencyMatrix {
                 self.edit_weight(i, &postsynaptic, Some(1.0));
             }
         }
+    }
+
+    fn get_every_node(&self) -> Vec<Position> {
+        self.position_to_index.keys().cloned().collect()
     }
 
     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
@@ -407,7 +408,7 @@ impl Default for AdjacencyMatrix {
 // struct AdjacencyList {
 //     incoming_connections: HashMap<Position, HashMap<Position, Option<f64>>>,
 //     outgoing_connections: HashMap<Position, Vec<Position>>,
-//     history: Vec<HashMap<Position, HashMap<Position, Option<f64>>>>,
+//     // history: Vec<HashMap<Position, HashMap<Position, Option<f64>>>>,
 // }
 
 // impl GraphFunctionality for AdjacencyList {
@@ -432,44 +433,38 @@ impl Default for AdjacencyMatrix {
 //                 Some(1.0)
 //             };
 
-//             // if !self.incoming_connections.contains_key(&postsynaptic) {
-//             //     self.incoming_connections.entry(postsynaptic)
-//             //         .or_insert_with(HashMap::new)
-//             //         .insert(*i, weight);
-//             // } else {
-//             //     if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
-//             //         positions_and_weights.insert(*i, weight);
-//             //     }
-//             // }
+//             if !self.incoming_connections.contains_key(&postsynaptic) {
+//                 self.incoming_connections.entry(postsynaptic)
+//                     .or_insert_with(HashMap::new)
+//                     .insert(*i, weight);
+//             } else {
+//                 if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
+//                     positions_and_weights.insert(*i, weight);
+//                 }
+//             }
 
-//             self.incoming_connections.entry(postsynaptic)
-//                 .or_insert_with(HashMap::new)
-//                 .insert(*i, weight);
-
-//             // if !self.outgoing_connections.contains_key(&i) {
-//             //     self.outgoing_connections.entry(*i)
-//             //         .or_insert_with(Vec::new)
-//             //         .push(postsynaptic);
-//             // } else {
-//             //     self.outgoing_connections.entry(*i)
-//             //         .push(postsynaptic);
-//             // }
-
-//             self.outgoing_connections.entry(*i)
-//                 .or_insert_with(Vec::new)
-//                 .push(postsynaptic);
+//             if let Some(vector) = self.outgoing_connections.get_mut(&i) {
+//                 vector.push(postsynaptic);
+//             } else {
+//                 self.outgoing_connections.insert(*i, vec![postsynaptic]);
+//             }
 //         }
 //     }
 
+//     fn get_every_node(&self) -> Vec<Position> {
+//         self.incoming_connections.keys().cloned().collect()
+//     }
+
 //     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
-//         self.incoming_connections[pos1][pos2]
+//         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
+//         self.incoming_connections[postsynaptic][presynaptic]
 //     }
 
 //     fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) {
 //         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
-//         if let Some(positions_and_weights) = self.incoming_connections.get_mut(presynaptic) {
-//             positions_and_weights.insert(*postsynaptic, weight);
+//         if let Some(positions_and_weights) = self.incoming_connections.get_mut(postsynaptic) {
+//             positions_and_weights.insert(*presynaptic, weight);
 //         }
 //     }
 
@@ -482,7 +477,18 @@ impl Default for AdjacencyMatrix {
 //     // to be cached
 //     // or point to reference
 //     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
-//         self.outgoing_connections[pos].clone()
+//         // self.outgoing_connections[pos].clone()
+//         self.outgoing_connections.get(pos).unwrap_or(&vec![]).clone()
+//     }
+// }
+
+// impl Default for AdjacencyList {
+//     fn default() -> Self {
+//         AdjacencyList { 
+//             incoming_connections: HashMap::new(), 
+//             outgoing_connections: HashMap::new(), 
+//             // history: vec![], 
+//         }
 //     }
 // }
 
@@ -592,28 +598,6 @@ fn run_simulation(
             let num_to_select = rng.gen_range(1..positions.len());
             let positions = randomly_select_positions(positions, num_to_select);
 
-            // if !adjacency_matrix.position_to_index.contains_key(&(row, col)) {
-            //     adjacency_matrix.add_vertex((row, col))
-            // }
-            // for i in positions.iter() {
-            //     if !adjacency_matrix.position_to_index.contains_key(i) {
-            //         adjacency_matrix.add_vertex(*i);
-            //     }
-
-            //     if do_stdp {
-            //         adjacency_matrix.edit_weight(i, &(row, col), Some(
-            //             limited_distr(
-            //             stdp_params.weight_init, 
-            //             stdp_params.weight_std, 
-            //             stdp_params.weight_min, 
-            //             stdp_params.weight_max,
-            //             )
-            //         ));
-            //     } else {
-            //         adjacency_matrix.edit_weight(i, &(row, col), Some(1.0));
-            //     }
-            // }
-
             adjacency_matrix.initialize_connections((row, col), positions, do_stdp, stdp_params);
         }
     }
@@ -693,7 +677,6 @@ fn run_simulation(
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += dv_value;
 
-
                     if do_stdp && is_spiking_value {
                         cell_grid[x][y].last_firing_time = Some(timestep);
 
@@ -701,6 +684,7 @@ fn run_simulation(
                         for i in input_positions {
                             let (x_in, y_in) = i;
                             let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                                                        
                             adjacency_matrix.edit_weight(
                                 &(x_in, y_in), 
                                 &pos, 
@@ -713,11 +697,12 @@ fn run_simulation(
                         for i in out_going_connections {
                             let (x_out, y_out) = i;
                             let current_weight = adjacency_matrix.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+
                             adjacency_matrix.edit_weight(
                                 &pos, 
                                 &(x_out, y_out), 
                                 Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
-                            );  
+                            ); 
                         }
                     } // need to also update neurons on receiving end of spiking neuron
                     // create hashmap of what neurons existing neurons point to and use that
@@ -754,6 +739,7 @@ fn run_simulation(
             };
 
             for timestep in 0..iterations {
+                println!("{}", timestep);
                 let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
                     .iter()
                     .map(|key| (*key, (0.0, false)))
@@ -823,17 +809,20 @@ fn run_simulation(
                     cell_grid[x][y].current_voltage += dv;
 
                     if do_stdp && is_spiking_value {
+                        println!("spiking");
                         cell_grid[x][y].last_firing_time = Some(timestep);
 
                         let input_positions = adjacency_matrix.get_incoming_connections(&pos);
                         for i in input_positions {
                             let (x_in, y_in) = i;
                             let current_weight = adjacency_matrix.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                                                        
                             adjacency_matrix.edit_weight(
                                 &(x_in, y_in), 
                                 &pos, 
                                 Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
                             );
+
                         }
 
                         let out_going_connections = adjacency_matrix.get_outgoing_connections(&pos);
@@ -841,6 +830,7 @@ fn run_simulation(
                         for i in out_going_connections {
                             let (x_out, y_out) = i;
                             let current_weight = adjacency_matrix.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+                            
                             adjacency_matrix.edit_weight(
                                 &pos, 
                                 &(x_out, y_out), 
