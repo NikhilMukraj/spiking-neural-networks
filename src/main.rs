@@ -273,10 +273,10 @@ impl Output {
 }
 
 trait GraphFunctionality {
-    fn initialize_connections(&mut self, endpoint: Position, connections: Vec<Position>, do_stdp: bool, stdp_params: &STDPParameters);
-    fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64>;
-    fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>);
-    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>;
+    fn initialize_connections(&mut self, postsynaptic: Position, connections: Vec<Position>, do_stdp: bool, stdp_params: &STDPParameters);
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; // pre and post
+    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>);
+    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>; 
     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
     // fn write_current_weights
     // fn write_history
@@ -317,13 +317,13 @@ impl AdjacencyMatrix {
 impl GraphFunctionality for AdjacencyMatrix {
     fn initialize_connections(
         &mut self, 
-        endpoint: Position, 
+        postsynaptic: Position, 
         connections: Vec<Position>, 
         do_stdp: bool,
         stdp_params: &STDPParameters,
     ) {
-        if !self.position_to_index.contains_key(&endpoint) {
-            self.add_vertex(endpoint)
+        if !self.position_to_index.contains_key(&postsynaptic) {
+            self.add_vertex(postsynaptic)
         }
         for i in connections.iter() {
             if !self.position_to_index.contains_key(i) {
@@ -331,7 +331,7 @@ impl GraphFunctionality for AdjacencyMatrix {
             }
 
             if do_stdp {
-                self.edit_weight(i, &endpoint, Some(
+                self.edit_weight(i, &postsynaptic, Some(
                     limited_distr(
                     stdp_params.weight_init, 
                     stdp_params.weight_std, 
@@ -340,17 +340,17 @@ impl GraphFunctionality for AdjacencyMatrix {
                     )
                 ));
             } else {
-                self.edit_weight(i, &endpoint, Some(1.0));
+                self.edit_weight(i, &postsynaptic, Some(1.0));
             }
         }
     }
 
-    fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64> {
-        self.matrix[self.position_to_index[pos1]][self.position_to_index[pos2]]
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
+        self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]]
     }
 
-    fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>) {
-        self.matrix[self.position_to_index[pos1]][self.position_to_index[pos2]] = weight;
+    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) {
+        self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]] = weight;
     }
 
     // to be cached
@@ -413,7 +413,7 @@ impl Default for AdjacencyMatrix {
 // impl GraphFunctionality for AdjacencyList {
 //     fn initialize_connections(
 //         &mut self, 
-//         endpoint: Position, 
+//         postsynaptic: Position, 
 //         connections: Vec<Position>, 
 //         do_stdp: bool,
 //         stdp_params: &STDPParameters,
@@ -432,44 +432,44 @@ impl Default for AdjacencyMatrix {
 //                 Some(1.0)
 //             };
 
-//             // if !self.incoming_connections.contains_key(&endpoint) {
-//             //     self.incoming_connections.entry(endpoint)
+//             // if !self.incoming_connections.contains_key(&postsynaptic) {
+//             //     self.incoming_connections.entry(postsynaptic)
 //             //         .or_insert_with(HashMap::new)
 //             //         .insert(*i, weight);
 //             // } else {
-//             //     if let Some(positions_and_weights) = self.incoming_connections.get_mut(&endpoint) {
+//             //     if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
 //             //         positions_and_weights.insert(*i, weight);
 //             //     }
 //             // }
 
-//             self.incoming_connections.entry(endpoint)
+//             self.incoming_connections.entry(postsynaptic)
 //                 .or_insert_with(HashMap::new)
 //                 .insert(*i, weight);
 
 //             // if !self.outgoing_connections.contains_key(&i) {
 //             //     self.outgoing_connections.entry(*i)
 //             //         .or_insert_with(Vec::new)
-//             //         .push(endpoint);
+//             //         .push(postsynaptic);
 //             // } else {
 //             //     self.outgoing_connections.entry(*i)
-//             //         .push(endpoint);
+//             //         .push(postsynaptic);
 //             // }
 
 //             self.outgoing_connections.entry(*i)
 //                 .or_insert_with(Vec::new)
-//                 .push(endpoint);
+//                 .push(postsynaptic);
 //         }
 //     }
 
-//     fn lookup_weight(&self, pos1: &Position, pos2: &Position) -> Option<f64> {
+//     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
 //         self.incoming_connections[pos1][pos2]
 //     }
 
-//     fn edit_weight(&mut self, pos1: &Position, pos2: &Position, weight: Option<f64>) {
-//         // self.incoming_connections[pos1][pos2] = weight;
+//     fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) {
+//         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
-//         if let Some(positions_and_weights) = self.incoming_connections.get_mut(pos1) {
-//             positions_and_weights.insert(*pos2, weight);
+//         if let Some(positions_and_weights) = self.incoming_connections.get_mut(presynaptic) {
+//             positions_and_weights.insert(*postsynaptic, weight);
 //         }
 //     }
 
@@ -1279,17 +1279,17 @@ fn write_row(
     ).expect("Cannot write to file");
 }
 
-fn update_weight(presynaptic_neuron: &Cell, post_synaptic_neuron: &Cell) -> f64 {
+fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     let mut delta_w: f64 = 0.;
 
-    match (presynaptic_neuron.last_firing_time, post_synaptic_neuron.last_firing_time) {
+    match (presynaptic_neuron.last_firing_time, postsynaptic_neuron.last_firing_time) {
         (Some(t_pre), Some(t_post)) => {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
             if t_pre < t_post {
-                delta_w = post_synaptic_neuron.a_plus * (-1. * (t_pre - t_post).abs() / post_synaptic_neuron.tau_plus).exp();
+                delta_w = postsynaptic_neuron.a_plus * (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.tau_plus).exp();
             } else if t_pre > t_post {
-                delta_w = -1. * post_synaptic_neuron.a_minus * (-1. * (t_post - t_pre).abs() / post_synaptic_neuron.tau_minus).exp();
+                delta_w = -1. * postsynaptic_neuron.a_minus * (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.tau_minus).exp();
             }
         },
         _ => {}
