@@ -591,6 +591,15 @@ fn run_simulation(
     let mut adjacency_matrix = AdjacencyMatrix {
        ..AdjacencyMatrix::default()
     };
+
+    // let graph = match graph_backend {
+    //     Graph::AdjacencyMatrix => AdjacencyMatrix {
+    //         ..AdjacencyMatrix::default()
+    //     },
+    //     Graph::AdjacencyList => AdjacencyList {
+    //         ..AdjacencyList::default()
+    //     }
+    // };
     
     for row in 0..num_rows {
         for col in 0..num_cols {
@@ -739,7 +748,6 @@ fn run_simulation(
             };
 
             for timestep in 0..iterations {
-                println!("{}", timestep);
                 let mut changes: HashMap<Position, (f64, bool)> = adjacency_matrix.get_every_node()
                     .iter()
                     .map(|key| (*key, (0.0, false)))
@@ -809,7 +817,6 @@ fn run_simulation(
                     cell_grid[x][y].current_voltage += dv;
 
                     if do_stdp && is_spiking_value {
-                        println!("spiking");
                         cell_grid[x][y].last_firing_time = Some(timestep);
 
                         let input_positions = adjacency_matrix.get_incoming_connections(&pos);
