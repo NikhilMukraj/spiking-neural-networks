@@ -10,16 +10,16 @@ use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod neuron;
-use neuron::{
+use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, limited_distr, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters
 };
 mod eeg;
-use eeg::{read_eeg_csv, get_power_density, power_density_comparison};
+use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
-use ga::{BitString, decode, genetic_algo};
+use crate::ga::{BitString, decode, genetic_algo};
 mod graph;
-use graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
+use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
 
 
 fn positions_within_square(
@@ -405,24 +405,6 @@ fn run_simulation(
 
                     let input_positions = graph.get_incoming_connections(&pos);
 
-                    // let input = get_input_from_positions(
-                    //     &cell_grid, 
-                    //     &input_positions, 
-                    //     input_calculation, 
-                    //     bayesian,
-                    //     averaged,
-                    // );
-
-                    // let input = weighted_get_input_from_positions(
-                    //     &cell_grid,
-                    //     &adjacency_matrix,
-                    //     position,
-                    //     &input_positions,
-                    //     input_calculation,
-                    //     if_params,
-                    //     averaged,
-                    // );
-
                     let input = if do_stdp {
                         weighted_get_input_from_positions(
                             &cell_grid,
@@ -534,24 +516,6 @@ fn run_simulation(
                     let (x, y) = pos;
 
                     let input_positions = graph.get_incoming_connections(&pos);
-
-                    // let input = get_input_from_positions(
-                    //     &cell_grid, 
-                    //     &input_positions, 
-                    //     input_calculation, 
-                    //     bayesian,
-                    //     averaged,
-                    // );
-
-                    // let input = weighted_get_input_from_positions(
-                    //     &cell_grid,
-                    //     &adjacency_matrix,
-                    //     position,
-                    //     &input_positions,
-                    //     input_calculation,
-                    //     if_params,
-                    //     averaged,
-                    // );
 
                     let input = if do_stdp {
                         weighted_get_input_from_positions(
