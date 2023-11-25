@@ -1139,12 +1139,29 @@ fn run_isolated_stdp_test(
             stdp_params.weight_init * 1.5
         )
     ).collect();
-    // let mut weights: Vec<f64> = (0..n)
-    //     .map(|_| rand::thread_rng().gen_range(0.0..=2.0))
-    //     .collect();
+
     let mut delta_ws: Vec<f64> = (0..n)
         .map(|_| 0.0)
         .collect();
+
+    // let mut symbol_table = SymbolTable::new();
+    // let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    // let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    // let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    // let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+    // let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
+
+    // let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+
+    // let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
+    //     expr.symbols().value_cell(sign_id).set(sign);
+    //     expr.symbols().value_cell(mp_id).set(mp);
+    //     expr.symbols().value_cell(rd_id).set(rd);
+    //     expr.symbols().value_cell(nc_id).set(nc);
+    //     expr.symbols().value_cell(weight_id).set(weight);
+
+    //     expr.value()
+    // };
 
     let mut file = File::create(&filename)
         .expect("Unable to create file");
@@ -1172,6 +1189,8 @@ fn run_isolated_stdp_test(
                     if is_spiking {
                         input_neuron.last_firing_time = Some(timestep);
                     }
+
+                    // input_neuron.determine_neurotransmitter_concentration(is_spiking_value);                    
                 }
                 
                 let (dv, is_spiking) = if if_params.bayesian_std != 0. {
@@ -1180,7 +1199,7 @@ fn run_isolated_stdp_test(
                             |i| 
                             limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
                             weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
-                        )
+                        ) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
                         .collect::<Vec<f64>>()
                         .iter()
                         .sum();
@@ -1188,13 +1207,15 @@ fn run_isolated_stdp_test(
                     postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 } else {
                     let input_voltage = (0..n)
-                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
+                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
                         .collect::<Vec<f64>>()
                         .iter()
                         .sum();
 
                     postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 };
+
+                // postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
@@ -1262,9 +1283,13 @@ fn run_isolated_stdp_test(
                     if is_spiking {
                         pre_fires[n] = Some(timestep);
                     }
+
+                    // input_neuron.determine_neurotransmitter_concentration(is_spiking_value);                    
                 }
 
                 let is_spiking = adaptive_apply_and_get_spike(&mut postsynaptic_neuron, &if_params);
+
+                // postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
                 
                 let dv = if if_params.bayesian_std != 0. {
                     let input_voltage = (0..n)
@@ -1272,7 +1297,7 @@ fn run_isolated_stdp_test(
                             |i| 
                             limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
                             weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
-                        )
+                        ) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
                         .collect::<Vec<f64>>()
                         .iter()
                         .sum();
@@ -1280,7 +1305,7 @@ fn run_isolated_stdp_test(
                     adaptive_dv(&mut postsynaptic_neuron, &if_params, input_voltage)
                 } else {
                     let input_voltage = (0..n)
-                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.))
+                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
                         .collect::<Vec<f64>>()
                         .iter()
                         .sum();
