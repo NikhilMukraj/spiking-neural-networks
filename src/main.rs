@@ -1392,14 +1392,6 @@ fn main() -> Result<()> {
 
         let sim_params = get_parameters(&simulation_table)?;
 
-        let write_weight_history: bool = parse_value_with_default(
-            &simulation_table, 
-            "write_weight_history", 
-            parse_bool, 
-            false
-        )?;
-        println!("write_weight_history: {}", write_weight_history);
-
         let default_eq = match sim_params.if_type { // izhikevich currently untested with neurotransmitter
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
             _ => String::from("sign * mp + 100 + rd * (nc^2 * 200)")

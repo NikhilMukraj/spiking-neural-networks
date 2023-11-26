@@ -285,11 +285,28 @@ impl GraphFunctionality for AdjacencyList {
     }
 
     fn write_history(&self, tag: &str) {
-        let history_json: HashMap<usize, HashMap<Position, HashMap<Position, Option<f64>>>> = (0..self.history.len())
-            .map(|n| (n, self.history[n].clone()))
-            .collect();
+        let mut history_json: HashMap<String, HashMap<String, HashMap<String, Option<f64>>>> = HashMap::new();
 
-        let json_string = serde_json::to_string(&history_json)
+        for (key, value) in self.history.iter().enumerate() {
+            // let wrapped_key = PositionWrapper(key);
+            let mut inner_map: HashMap<String, HashMap<String, Option<f64>>> = HashMap::new();
+
+            for (inner_key, inner_value) in value {
+                let wrapped_inner_key = format!("{}_{}", inner_key.0, inner_key.1);
+                let mut innermost_map: HashMap<String, Option<f64>> = HashMap::new();
+
+                for (innermost_key, innermost_value) in inner_value {
+                    let wrapped_innermost_key = format!("{}_{}", innermost_key.0, innermost_key.1);
+                    innermost_map.insert(wrapped_innermost_key, *innermost_value);
+                }
+
+                inner_map.insert(wrapped_inner_key, innermost_map);
+            }
+
+            history_json.insert(key.to_string(), inner_map);
+        }
+
+        let json_string = serde_json::to_string_pretty(&history_json)
                 .expect("Failed to convert to JSON");
         let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))
             .expect("Could not create file"));
