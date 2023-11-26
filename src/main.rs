@@ -1082,6 +1082,8 @@ fn run_isolated_stdp_test(
     iterations: usize,
     n: usize,
     input_voltage: f64,
+    excitatory_chance: f64,
+    input_equation: &str,
     filename: &str,
 ) -> Result<()> {
     let mut if_params = match if_type {
@@ -1101,6 +1103,25 @@ fn run_isolated_stdp_test(
     get_if_params(&mut if_params, &stdp_table)?;
 
     println!("{:#?}", if_params);
+
+    let mut symbol_table = SymbolTable::new();
+    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+    let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
+
+    let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
+
+    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
+        expr.symbols().value_cell(sign_id).set(sign);
+        expr.symbols().value_cell(mp_id).set(mp);
+        expr.symbols().value_cell(rd_id).set(rd);
+        expr.symbols().value_cell(nc_id).set(nc);
+        expr.symbols().value_cell(weight_id).set(weight);
+
+        expr.value()
+    };
 
     let mut postsynaptic_neuron = Cell { 
         current_voltage: if_params.v_init, 
@@ -1126,6 +1147,14 @@ fn run_isolated_stdp_test(
     let mut neurons: Vec<Cell> = (0..n).map(|_| postsynaptic_neuron.clone())
         .collect();
 
+    for i in neurons.iter_mut() {
+        if rand::thread_rng().gen_range(0.0..=1.0) < excitatory_chance {
+            i.potentiation_type = PotentiationType::Excitatory;
+        } else {
+            i.potentiation_type = PotentiationType::Inhibitory;
+        }
+    }
+
     let i: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
         .collect();
 
@@ -1143,39 +1172,6 @@ fn run_isolated_stdp_test(
     let mut delta_ws: Vec<f64> = (0..n)
         .map(|_| 0.0)
         .collect();
-
-    // let default_eq = match sim_params.if_type {
-    //     IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
-    //     _ => String::from("weight * (sign * mp + 100)")
-    // };
-
-    // let equation: String = parse_value_with_default(
-    //     &simulation_table, 
-    //     "input_equation", 
-    //     parse_string, 
-    //     default_eq
-    // )?;
-    // let equation: &str = equation.trim();
-    // println!("\ninput equation: {}", equation);
-
-    // let mut symbol_table = SymbolTable::new();
-    // let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-    // let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-    // let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-    // let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-    // let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
-
-    // let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
-
-    // let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
-    //     expr.symbols().value_cell(sign_id).set(sign);
-    //     expr.symbols().value_cell(mp_id).set(mp);
-    //     expr.symbols().value_cell(rd_id).set(rd);
-    //     expr.symbols().value_cell(nc_id).set(nc);
-    //     expr.symbols().value_cell(weight_id).set(weight);
-
-    //     expr.value()
-    // };
 
     let mut file = File::create(&filename)
         .expect("Unable to create file");
@@ -1204,32 +1200,38 @@ fn run_isolated_stdp_test(
                         input_neuron.last_firing_time = Some(timestep);
                     }
 
-                    // input_neuron.determine_neurotransmitter_concentration(is_spiking_value);                    
+                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
                 }
+
+                let input_voltage = (0..n)
+                    .map(
+                        |i| {
+                            let sign = match neurons[i].potentiation_type { 
+                                PotentiationType::Excitatory => -1., 
+                                PotentiationType::Inhibitory => 1.,
+                            };
+
+                            input_func(
+                                sign, // sign 
+                                neurons[i].current_voltage, 
+                                neurons[i].receptor_density,
+                                neurons[i].neurotransmission_concentration,
+                                weights[i]
+                            ) / (n as f64)
+                        }
+                    ) 
+                    .collect::<Vec<f64>>()
+                    .iter()
+                    .sum();
                 
                 let (dv, is_spiking) = if if_params.bayesian_std != 0. {
-                    let input_voltage = (0..n)
-                        .map(
-                            |i| 
-                            limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
-                            weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
-                        ) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
-                        .collect::<Vec<f64>>()
-                        .iter()
-                        .sum();
-
-                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
+                    let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
+                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * input_voltage)
                 } else {
-                    let input_voltage = (0..n)
-                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
-                        .collect::<Vec<f64>>()
-                        .iter()
-                        .sum();
-
                     postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
                 };
 
-                // postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
@@ -1712,6 +1714,23 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
+        let excitatory_chance: f64 = parse_value_with_default(&stdp_table, "excitatory_chance", parse_f64, 0.8)?;
+        println!("excitatory_chance: {}", excitatory_chance);
+
+        let default_eq = match if_type {
+            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
+            _ => String::from("weight * (sign * mp + 100)")
+        };
+
+        let equation: String = parse_value_with_default(
+            &stdp_table, 
+            "input_equation", 
+            parse_string, 
+            default_eq
+        )?;
+        let equation: &str = equation.trim();
+        println!("\ninput equation: {}", equation);
+
         let mut stdp_params = STDPParameters::default();
 
         get_stdp_params(&mut stdp_params, stdp_table)?;
@@ -1723,6 +1742,8 @@ fn main() -> Result<()> {
             iterations,
             n,
             input_voltage,
+            excitatory_chance,
+            &equation,
             &filename,
         )?;
 
