@@ -1203,7 +1203,7 @@ fn run_isolated_stdp_test(
                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
                 }
 
-                let input_voltage = (0..n)
+                let calculated_voltage: f64 = (0..n)
                     .map(
                         |i| {
                             let sign = match neurons[i].potentiation_type { 
@@ -1224,12 +1224,8 @@ fn run_isolated_stdp_test(
                     .iter()
                     .sum();
                 
-                let (dv, is_spiking) = if if_params.bayesian_std != 0. {
-                    let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
-                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * input_voltage)
-                } else {
-                    postsynaptic_neuron.get_dv_change_and_spike(&if_params, input_voltage)
-                };
+                let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
+                let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);
 
                 postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
@@ -1300,34 +1296,36 @@ fn run_isolated_stdp_test(
                         pre_fires[n] = Some(timestep);
                     }
 
-                    // input_neuron.determine_neurotransmitter_concentration(is_spiking_value);                    
+                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
                 }
 
                 let is_spiking = adaptive_apply_and_get_spike(&mut postsynaptic_neuron, &if_params);
 
-                // postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
-                
-                let dv = if if_params.bayesian_std != 0. {
-                    let input_voltage = (0..n)
-                        .map(
-                            |i| 
-                            limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.) *
-                            weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)
-                        ) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
-                        .collect::<Vec<f64>>()
-                        .iter()
-                        .sum();
+                postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
 
-                    adaptive_dv(&mut postsynaptic_neuron, &if_params, input_voltage)
-                } else {
-                    let input_voltage = (0..n)
-                        .map(|i| weights[i] * -1. * neurons[i].current_voltage / (n as f64 * 10.)) // (weights[i] * neurons[i].neurotransmitter_concentration + mp + 65) / 15
-                        .collect::<Vec<f64>>()
-                        .iter()
-                        .sum();
+                let calculated_voltage: f64 = (0..n)
+                    .map(
+                        |i| {
+                            let sign = match neurons[i].potentiation_type { 
+                                PotentiationType::Excitatory => -1., 
+                                PotentiationType::Inhibitory => 1.,
+                            };
 
-                    adaptive_dv(&mut postsynaptic_neuron, &if_params, input_voltage)
-                };
+                            input_func(
+                                sign, // sign 
+                                neurons[i].current_voltage, 
+                                neurons[i].receptor_density,
+                                neurons[i].neurotransmission_concentration,
+                                weights[i]
+                            ) / (n as f64)
+                        }
+                    ) 
+                    .collect::<Vec<f64>>()
+                    .iter()
+                    .sum();                  
+
+                let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
+                let dv = adaptive_dv(&mut postsynaptic_neuron, &if_params, noise_factor * calculated_voltage);
 
                 update_isolated_neuron_weights(
                     &mut neurons, 
@@ -1706,7 +1704,7 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let excitatory_chance: f64 = parse_value_with_default(&stdp_table, "excitatory_chance", parse_f64, 0.8)?;
+        let excitatory_chance: f64 = parse_value_with_default(&stdp_table, "excitatory_chance", parse_f64, 1.0)?;
         println!("excitatory_chance: {}", excitatory_chance);
 
         let default_eq = match if_type {
