@@ -1144,6 +1144,20 @@ fn run_isolated_stdp_test(
         .map(|_| 0.0)
         .collect();
 
+    // let default_eq = match sim_params.if_type {
+    //     IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
+    //     _ => String::from("weight * (sign * mp + 100)")
+    // };
+
+    // let equation: String = parse_value_with_default(
+    //     &simulation_table, 
+    //     "input_equation", 
+    //     parse_string, 
+    //     default_eq
+    // )?;
+    // let equation: &str = equation.trim();
+    // println!("\ninput equation: {}", equation);
+
     // let mut symbol_table = SymbolTable::new();
     // let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
     // let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
