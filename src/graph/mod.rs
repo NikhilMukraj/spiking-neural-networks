@@ -4,7 +4,10 @@ use std::{
     io::{Write, BufWriter, Result, Error, ErrorKind}, 
 };
 use serde_json;
-use crate::neuron::{STDPParameters, limited_distr};
+#[path = "../distribution/mod.rs"]
+mod distribution;
+use distribution::limited_distr;
+use crate::neuron::STDPParameters;
 
 
 pub type Position = (usize, usize);

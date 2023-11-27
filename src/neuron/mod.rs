@@ -3,7 +3,9 @@ use std::{
     io::{Result, Error, ErrorKind, Write, BufWriter}, 
 };
 use rand::Rng;
-use rand_distr::{Normal, Distribution};
+#[path = "../distribution/mod.rs"]
+mod distribution;
+use distribution::limited_distr;
 
 
 pub struct BayesianParameters {
@@ -213,17 +215,6 @@ pub struct Cell {
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
     pub last_firing_time: Option<usize>,
-}
-
-pub fn limited_distr(mean: f64, std_dev: f64, minimum: f64, maximum: f64) -> f64 {
-    if std_dev == 0.0 {
-        return mean;
-    }
-
-    let normal = Normal::new(mean, std_dev).unwrap();
-    let output: f64 = normal.sample(&mut rand::thread_rng());
-   
-    output.max(minimum).min(maximum)
 }
 
 impl Cell {

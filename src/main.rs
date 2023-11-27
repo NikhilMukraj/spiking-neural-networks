@@ -9,9 +9,12 @@ use toml::{from_str, Value};
 // use serde::{Serialize, Deserialize};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
+#[path = "distribution/mod.rs"]
+mod distribution;
+use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFParameters, IFType, PotentiationType, Cell, CellGrid, limited_distr, 
+    IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters
 };
 mod eeg;
