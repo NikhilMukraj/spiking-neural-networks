@@ -493,6 +493,21 @@ fn run_simulation(
                 }
             };
 
+            // abstract to function and use in stdp isolated tests
+            // let regaulr_adaptive_dw_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool
+            //     {neuron.apply_dw_change_and_get_spike(if_params)};
+            // let izhikevich_adaptive_dw_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool 
+            //     {neuron.izhikevich_apply_dw_and_get_spike(if_params)};
+            // let leaky_izhikevich_adaptive_dw_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool 
+            //     {neuron.izhikevich_apply_dw_and_get_spike(if_params)};
+
+            // let adaptive_apply_and_get_spike = match if_type {
+            //     IFType::Basic => unreachable!(), 
+            //     IFType::Adaptive | IFType::AdaptiveExponential => regaulr_adaptive_dw_and_get_spike,
+            //     IFType::Izhikevich => izhikevich_adaptive_dw_and_get_spike,
+            //     IFType::IzhikevichLeaky => leaky_izhikevich_adaptive_dw_and_get_spike,
+            // };
+
             let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
                 match if_type {
                     IFType::Basic => unreachable!(), 
@@ -502,6 +517,23 @@ fn run_simulation(
                     IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
                 }
             };
+
+            // let regular_adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64
+            //     {neuron.adaptive_get_dv_change(if_params, input_value)};
+            // let exp_adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 
+            //     {neuron.exp_adaptive_get_dv_change(if_params, input_value)};
+            // let izhikevich_adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 
+            //     {neuron.izhikevich_get_dv_change(if_params, input_value)};
+            // let leaky_izhikevich_adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 
+            //     {neuron.izhikevich_leaky_get_dv_change(if_params, input_value)};
+
+            // let adaptive_dv = match if_type {
+            //     IFType::Basic => unreachable!(), 
+            //     IFType::Adaptive => regular_adaptive_dv,
+            //     IFType::AdaptiveExponential => exp_adaptive_dv,
+            //     IFType::Izhikevich => izhikevich_adaptive_dv,
+            //     IFType::IzhikevichLeaky => leaky_izhikevich_adaptive_dv,
+            // };
 
             for timestep in 0..iterations {
                 let mut changes: HashMap<Position, (f64, bool)> = graph.get_every_node()
@@ -1214,7 +1246,7 @@ fn run_isolated_stdp_test(
                             };
 
                             input_func(
-                                sign, // sign 
+                                sign, 
                                 neurons[i].current_voltage, 
                                 neurons[i].receptor_density,
                                 neurons[i].neurotransmission_concentration,
@@ -1314,7 +1346,7 @@ fn run_isolated_stdp_test(
                             };
 
                             input_func(
-                                sign, // sign 
+                                sign, 
                                 neurons[i].current_voltage, 
                                 neurons[i].receptor_density,
                                 neurons[i].neurotransmission_concentration,
