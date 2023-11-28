@@ -310,7 +310,7 @@ impl GraphFunctionality for AdjacencyList {
         }
 
         let json_string = serde_json::to_string_pretty(&history_json)
-                .expect("Failed to convert to JSON");
+        .expect("Failed to convert to JSON");
         let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))
             .expect("Could not create file"));
 
