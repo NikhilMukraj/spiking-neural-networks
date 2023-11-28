@@ -6,7 +6,6 @@ use std::{
 };
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
-// use serde::{Serialize, Deserialize};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 #[path = "distribution/mod.rs"]
