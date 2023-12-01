@@ -783,6 +783,48 @@ fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
     Ok(())
 }
 
+fn get_default_cell_parameters(table: &Value) -> Result<HashMap<&str, f64>> {
+    let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
+    default_cell_values.insert("neurotransmission_release", 1.);
+    default_cell_values.insert("receptor_density", 1.);
+    default_cell_values.insert("chance_of_releasing", 0.5);
+    default_cell_values.insert("dissipation_rate", 0.1);
+    default_cell_values.insert("chance_of_random_release", 0.2);
+    default_cell_values.insert("random_release_concentration", 0.1);
+    default_cell_values.insert("excitatory_chance", 0.5);
+
+    default_cell_values.insert("neurotransmission_release_std", 0.);
+    default_cell_values.insert("receptor_density_std", 0.);
+    default_cell_values.insert("dissipation_rate_std", 0.);
+    default_cell_values.insert("random_release_concentration_std", 0.);
+
+    let updates: Vec<(&str, Result<f64>)> = default_cell_values
+        .iter()
+        .map(|(&key, &default_value)| {
+            let value_to_update = parse_value_with_default(
+                &table, key, parse_f64, default_value
+            );
+
+            (key, value_to_update)
+        })
+        .collect();
+
+    for (key, value_to_update) in updates {
+        let value_to_update = match value_to_update {
+            Ok(output_value) => output_value,
+            Err(e) => { 
+                let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
+                return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
+            }
+        };
+
+        default_cell_values.insert(key, value_to_update);
+        println!("{}: {}", key, value_to_update);
+    }
+
+    return Ok(default_cell_values);
+}
+
 fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
@@ -837,43 +879,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         write_history: write_history,
     };
 
-    let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
-    default_cell_values.insert("neurotransmission_release", 1.);
-    default_cell_values.insert("receptor_density", 1.);
-    default_cell_values.insert("chance_of_releasing", 0.5);
-    default_cell_values.insert("dissipation_rate", 0.1);
-    default_cell_values.insert("chance_of_random_release", 0.2);
-    default_cell_values.insert("random_release_concentration", 0.1);
-    default_cell_values.insert("excitatory_chance", 0.5);
-
-    default_cell_values.insert("neurotransmission_release_std", 0.);
-    default_cell_values.insert("receptor_density_std", 0.);
-    default_cell_values.insert("dissipation_rate_std", 0.);
-    default_cell_values.insert("random_release_concentration_std", 0.);
-
-    let updates: Vec<(&str, Result<f64>)> = default_cell_values
-        .iter()
-        .map(|(&key, &default_value)| {
-            let value_to_update = parse_value_with_default(
-                &table, key, parse_f64, default_value
-            );
-
-            (key, value_to_update)
-        })
-        .collect();
-
-    for (key, value_to_update) in updates {
-        let value_to_update = match value_to_update {
-            Ok(output_value) => output_value,
-            Err(e) => { 
-                let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
-                return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
-            }
-        };
-
-        default_cell_values.insert(key, value_to_update);
-        println!("{}: {}", key, value_to_update);
-    }
+    let default_cell_values: HashMap<&str, f64> = get_default_cell_parameters(&table)?;
 
     let scaling_type_default = match if_type {
         IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
@@ -1029,16 +1035,14 @@ fn objective(
 
 fn write_row(
     file: &mut File, 
-    neurons: &Vec<Cell>, 
-    neuron: &Cell, 
+    presynaptic_neurons: &Vec<Cell>, 
+    postsynaptic_neuron: &Cell, 
     weights: &Vec<f64>,
-    pre_fires: &Vec<Option<usize>>,
-    post_fires: &Option<usize>,
 ) {
     write!(
         file, 
         "{}, ", 
-        neurons.iter()
+        presynaptic_neurons.iter()
             .map(|i| i.current_voltage)
             .collect::<Vec<f64>>()
             .iter()
@@ -1046,7 +1050,20 @@ fn write_row(
             .collect::<Vec<String>>()
             .join(", ")
     ).expect("Cannot write to file");
-    write!(file, "{}, ", neuron.current_voltage)
+    write!(file, "{}, ", postsynaptic_neuron.current_voltage)
+        .expect("Cannot write to file");
+    write!(
+        file, 
+        "{}, ", 
+        presynaptic_neurons.iter()
+            .map(|i| i.neurotransmission_concentration)
+            .collect::<Vec<f64>>()
+            .iter()
+            .map(|&x| x.to_string())
+            .collect::<Vec<String>>()
+            .join(", ")
+    ).expect("Cannot write to file");
+    write!(file, "{}, ", postsynaptic_neuron.neurotransmission_concentration)
         .expect("Cannot write to file");
     write!(
         file, 
@@ -1059,9 +1076,9 @@ fn write_row(
     write!(
         file, 
         "{}, ", 
-        pre_fires.iter()
-            .map(|&x| {
-                match x {
+        presynaptic_neurons.iter()
+            .map(|x| {
+                match x.last_firing_time {
                     Some(value) => value.to_string(),
                     None => String::from("None"),
                 }
@@ -1072,7 +1089,7 @@ fn write_row(
     writeln!(
         file, 
         "{}", 
-        match post_fires {
+        match postsynaptic_neuron.last_firing_time {
             Some(value) => value.to_string(),
             None => String::from("None"),
         }
@@ -1098,7 +1115,7 @@ fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     return delta_w;
 }
 
-fn update_isolated_neuron_weights(
+fn update_isolated_presynaptic_neuron_weights(
     neurons: &mut Vec<Cell>,
     neuron: &Cell,
     weights: &mut Vec<f64>,
@@ -1127,7 +1144,7 @@ fn run_isolated_stdp_test(
     iterations: usize,
     n: usize,
     input_voltage: f64,
-    excitatory_chance: f64,
+    default_cell_values: &HashMap<&str, f64>,
     input_equation: &str,
     filename: &str,
 ) -> Result<()> {
@@ -1175,12 +1192,12 @@ fn run_isolated_stdp_test(
         integration_constant: 1.,
         potentiation_type: PotentiationType::Excitatory,
         neurotransmission_concentration: 0., 
-        neurotransmission_release: 0.,
-        receptor_density: 0.,
-        chance_of_releasing: 0., 
-        dissipation_rate: 0., 
-        chance_of_random_release: 0.,
-        random_release_concentration: 0.,
+        neurotransmission_release: *default_cell_values.get("neurotransmission_release").unwrap_or(&0.),
+        receptor_density: *default_cell_values.get("receptor_density").unwrap_or(&0.),
+        chance_of_releasing: *default_cell_values.get("chance_of_releasing").unwrap_or(&0.), 
+        dissipation_rate: *default_cell_values.get("dissipation_rate").unwrap_or(&0.), 
+        chance_of_random_release: *default_cell_values.get("chance_of_random_release").unwrap_or(&0.),
+        random_release_concentration: *default_cell_values.get("random_release_concentration").unwrap_or(&0.),
         w_value: if_params.w_init,
         a_plus: stdp_params.a_plus,
         a_minus: stdp_params.a_minus,
@@ -1193,18 +1210,17 @@ fn run_isolated_stdp_test(
         .collect();
 
     for i in neurons.iter_mut() {
-        if rand::thread_rng().gen_range(0.0..=1.0) < excitatory_chance {
+        if rand::thread_rng().gen_range(0.0..=1.0) < *default_cell_values.get("excitatory_chance").unwrap_or(&0.) {
             i.potentiation_type = PotentiationType::Excitatory;
         } else {
             i.potentiation_type = PotentiationType::Inhibitory;
         }
     }
 
-    let i: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
+    let input_voltages: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
         .collect();
 
     let mut pre_fires: Vec<Option<usize>> = (0..n).map(|_| None).collect();
-    let mut post_fires: Option<usize> = None;
     let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
         |_| limited_distr(
             stdp_params.weight_init, 
@@ -1221,28 +1237,28 @@ fn run_isolated_stdp_test(
     let mut file = File::create(&filename)
         .expect("Unable to create file");
 
-    write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
+    write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
 
     match if_type {
         IFType::Basic => {
             for timestep in 0..iterations {
                 let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
-                for (n, input_neuron) in neurons.iter_mut().enumerate() {
+                for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
                     let (dv, is_spiking) = if if_params.bayesian_std != 0. {
                         input_neuron.get_dv_change_and_spike(
                             &if_params, 
-                            i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
                         )
                     } else {
-                        input_neuron.get_dv_change_and_spike(&if_params, i[n])
+                        input_neuron.get_dv_change_and_spike(&if_params, input_voltages[n_neuron])
                     };
 
                     dvs.push(dv);
                     is_spikings.push(is_spiking);
 
                     if is_spiking {
-                        input_neuron.last_firing_time = Some(timestep);
+                        pre_fires[n_neuron] = Some(timestep);
                     }
 
                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
@@ -1274,7 +1290,7 @@ fn run_isolated_stdp_test(
 
                 postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
-                update_isolated_neuron_weights(
+                update_isolated_presynaptic_neuron_weights(
                     &mut neurons, 
                     &postsynaptic_neuron,
                     &mut weights, 
@@ -1288,13 +1304,13 @@ fn run_isolated_stdp_test(
 
                 if is_spiking {
                     postsynaptic_neuron.last_firing_time = Some(timestep);
-                    for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, &postsynaptic_neuron);
-                        weights[n] += delta_ws[n];
+                    for (n_neuron, i) in neurons.iter().enumerate() {
+                        delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+                        weights[n_neuron] += delta_ws[n_neuron];
                     }
                 }
 
-                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
+                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
             }
         }
         IFType::Adaptive | IFType::AdaptiveExponential | 
@@ -1321,24 +1337,24 @@ fn run_isolated_stdp_test(
             for timestep in 0..iterations {
                 let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
-                for (n, input_neuron) in neurons.iter_mut().enumerate() {
+                for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
                     let is_spiking = adaptive_apply_and_get_spike(input_neuron, &if_params);
 
                     let dv = if if_params.bayesian_std != 0. {
                         adaptive_dv(
                             input_neuron,
                             &if_params, 
-                            i[n] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
                         )
                     } else {
-                        adaptive_dv(input_neuron, &if_params, i[n])
+                        adaptive_dv(input_neuron, &if_params, input_voltages[n_neuron])
                     };
 
                     dvs.push(dv);
                     is_spikings.push(is_spiking);
 
                     if is_spiking {
-                        pre_fires[n] = Some(timestep);
+                        pre_fires[n_neuron] = Some(timestep);
                     }
 
                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
@@ -1372,7 +1388,7 @@ fn run_isolated_stdp_test(
                 let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
                 let dv = adaptive_dv(&mut postsynaptic_neuron, &if_params, noise_factor * calculated_voltage);
 
-                update_isolated_neuron_weights(
+                update_isolated_presynaptic_neuron_weights(
                     &mut neurons, 
                     &postsynaptic_neuron,
                     &mut weights, 
@@ -1385,14 +1401,14 @@ fn run_isolated_stdp_test(
                 postsynaptic_neuron.current_voltage += dv;
 
                 if is_spiking {
-                    post_fires = Some(timestep);
+                    postsynaptic_neuron.last_firing_time = Some(timestep);
                     for (n, i) in neurons.iter().enumerate() {
                         delta_ws[n] = update_weight(&i, &postsynaptic_neuron);
                         weights[n] += delta_ws[n];
                     }
                 }
 
-                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights, &pre_fires, &post_fires);
+                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
             }
         }
     };
@@ -1447,7 +1463,7 @@ fn main() -> Result<()> {
             default_eq
         )?;
         let equation: &str = equation.trim();
-        println!("\ninput equation: {}", equation);
+        println!("input equation: {}", equation);
     
         let mut symbol_table = SymbolTable::new();
         let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
@@ -1749,8 +1765,7 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let excitatory_chance: f64 = parse_value_with_default(&stdp_table, "excitatory_chance", parse_f64, 1.0)?;
-        println!("excitatory_chance: {}", excitatory_chance);
+        let default_cell_values: HashMap<&str, f64> = get_default_cell_parameters(&stdp_table)?;
 
         let default_eq = match if_type {
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
@@ -1777,7 +1792,7 @@ fn main() -> Result<()> {
             iterations,
             n,
             input_voltage,
-            excitatory_chance,
+            &default_cell_values,
             &equation,
             &filename,
         )?;
