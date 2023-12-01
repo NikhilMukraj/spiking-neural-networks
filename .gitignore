@@ -2,6 +2,7 @@
 /*.txt
 /*.bin
 /single neuron tests
+/stdp tests
 /lattice simulations
 /stdp lattice
 /test_izhikevich_lattice.toml
