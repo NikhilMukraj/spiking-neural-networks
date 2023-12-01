@@ -1,0 +1,11 @@
+[stdp_test]
+if_type = "izhikevich"
+iterations = 10000
+w_init = 2.0
+n = 1
+input_voltage = 30.0
+filename = "izhikevich_stdp_neuro.txt"
+a_plus = 2.0
+a_minus = 2.0
+bayesian_std = 0.3
+input_equation = "(sign * mp + 65) + weight * nc * 20"
