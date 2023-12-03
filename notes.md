@@ -15,3 +15,12 @@ should be inputtable by user and user should be able to decide which properties
 are modified and in what ways
 
 need to move some lif parameters into cell
+
+correlational neuromodulation of bursting without neurotransmission
+if high correlation
+    minimal change to weight
+if low correlation 
+    high change to weight
+
+if negative weight is negative if positive weight is positive
+    magnitude based on pearson's r
