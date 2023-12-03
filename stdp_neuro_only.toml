@@ -1,21 +1,22 @@
 [stdp_test]
 if_type = "izhikevich"
 iterations = 10000
-weight_init = 10.0
-weight_max = 20.0
-weight_min = 5.0
+weight_init = 1.0
+weight_max = 2.0
+weight_min = 0.0
 weight_std = 0.0
 n = 1
 input_voltage = 30.0
-filename = "stdp tests/izhikevich_stdp_neuro.txt"
+filename = "stdp tests/izhikevich_stdp_neuro_only.txt"
 a_plus = 1.0
 a_minus = 1.0
 tau_plus = 20.0
 tau_minus = 20.0
 bayesian_std = 0.3
 chance_of_releasing = 1.0
-dissipation_rate = 0.025
-input_equation = "weight * (sign * mp + 65)"
+dissipation_rate = 0.05
+# input_equation = "(sign * mp + 20) * nc * 10"
+input_equation = "weight * nc * 50"
 
 # might be easier to try correlational memory trace first
 # cannot associate singular spikes with voltages, but
