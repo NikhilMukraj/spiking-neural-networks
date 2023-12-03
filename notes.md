@@ -19,7 +19,7 @@ need to move some lif parameters into cell
 correlational neuromodulation of bursting without neurotransmission
 if high correlation
     minimal change to weight
-if low correlation 
+if low correlation
     high change to weight
 
 if negative weight is negative if positive weight is positive
