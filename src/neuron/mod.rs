@@ -36,9 +36,9 @@ pub struct IFParameters {
     pub e_l: f64,
     pub tref: f64,
     pub w_init: f64,
-    pub alpha: f64,
-    pub beta: f64,
-    pub d: f64,
+    pub alpha_init: f64,
+    pub beta_init: f64,
+    pub d_init: f64,
     pub dt: f64,
     pub exp_dt: f64,
     pub bayesian_mean: f64,
@@ -59,9 +59,9 @@ impl Default for IFParameters {
             e_l: -75., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
-            alpha: 6., // arbitrary a value
-            beta: 10., // arbitrary b value
-            d: 2., // arbitrary d value
+            alpha_init: 6., // arbitrary a value
+            beta_init: 10., // arbitrary b value
+            d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: BayesianParameters::default().mean, // center of norm distr
@@ -87,9 +87,9 @@ impl ScaledDefault for IFParameters {
             e_l: 0., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
-            alpha: 6., // arbitrary a value
-            beta: 10., // arbitrary b value
-            d: 2., // arbitrary d value
+            alpha_init: 6., // arbitrary a value
+            beta_init: 10., // arbitrary b value
+            d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: BayesianParameters::default().mean, // center of norm distr
@@ -115,9 +115,9 @@ impl IzhikevichDefault for IFParameters {
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 30., // initial w value
-            alpha: 0.02, // arbitrary a value
-            beta: 0.2, // arbitrary b value
-            d: 8.0, // arbitrary d value
+            alpha_init: 0.02, // arbitrary a value
+            beta_init: 0.2, // arbitrary b value
+            d_init: 8.0, // arbitrary d value
             dt: 0.5, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
             bayesian_mean: BayesianParameters::default().mean, // center of norm distr
@@ -215,6 +215,68 @@ pub struct Cell {
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
     pub last_firing_time: Option<usize>,
+    pub alpha: f64, // arbitrary value (controls speed in izhikevich)
+    pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
+    pub c: f64, // after spike reset value for voltage
+    pub d: f64, // after spike reset value for w
+}
+
+impl Default for Cell {
+    fn default() -> Self {
+        Cell {
+            current_voltage: IFParameters::default().v_init, 
+            refractory_count: 0.0,
+            leak_constant: -1.,
+            integration_constant: 1.,
+            potentiation_type: PotentiationType::Excitatory,
+            neurotransmission_concentration: 0., 
+            neurotransmission_release: 0.,
+            receptor_density: 0.,
+            chance_of_releasing: 0., 
+            dissipation_rate: 0., 
+            chance_of_random_release: 0.,
+            random_release_concentration: 0.,
+            w_value: IFParameters::default().w_init,
+            a_plus: STDPParameters::default().a_plus,
+            a_minus: STDPParameters::default().a_minus,
+            tau_plus: STDPParameters::default().tau_plus,
+            tau_minus: STDPParameters::default().tau_minus,
+            last_firing_time: None,
+            alpha: IFParameters::default().alpha_init,
+            beta: IFParameters::default().beta_init,
+            c: IFParameters::default().v_reset,
+            d: IFParameters::default().d_init,
+        }
+    }
+}
+
+impl IzhikevichDefault for Cell {
+    fn izhikevich_default() -> Self {
+        Cell {
+            current_voltage: IFParameters::izhikevich_default().v_init, 
+            refractory_count: 0.0,
+            leak_constant: -1.,
+            integration_constant: 1.,
+            potentiation_type: PotentiationType::Excitatory,
+            neurotransmission_concentration: 0., 
+            neurotransmission_release: 0.,
+            receptor_density: 0.,
+            chance_of_releasing: 0., 
+            dissipation_rate: 0., 
+            chance_of_random_release: 0.,
+            random_release_concentration: 0.,
+            w_value: IFParameters::izhikevich_default().w_init,
+            a_plus: STDPParameters::default().a_plus,
+            a_minus: STDPParameters::default().a_minus,
+            tau_plus: STDPParameters::default().tau_plus,
+            tau_minus: STDPParameters::default().tau_minus,
+            last_firing_time: None,
+            alpha: IFParameters::izhikevich_default().alpha_init,
+            beta: IFParameters::izhikevich_default().beta_init,
+            c: IFParameters::izhikevich_default().v_reset,
+            d: IFParameters::izhikevich_default().d_init,
+        }
+    }
 }
 
 impl Cell {
@@ -244,7 +306,7 @@ impl Cell {
     pub fn apply_dw_change_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         // dw = (self.a * (v[it]-self.V_L) - w[it]) * (self.dt/self.tau_m)
         let dw = (
-            lif.alpha * (self.current_voltage - lif.e_l) -
+            lif.alpha_init * (self.current_voltage - lif.e_l) -
             self.w_value
         ) * (lif.dt / lif.tau_m);
 
@@ -258,7 +320,7 @@ impl Cell {
         } else if self.current_voltage >= lif.v_th {
             is_spiking = !is_spiking;
             self.current_voltage = lif.v_reset;
-            self.w_value += lif.beta;
+            self.w_value += lif.beta_init;
             self.refractory_count = lif.tref / lif.dt
         }
 
@@ -288,7 +350,7 @@ impl Cell {
 
     pub fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         let dw = (
-            lif.alpha * (lif.beta * self.current_voltage - self.w_value)
+            self.alpha * (self.beta * self.current_voltage - self.w_value)
         ) * (lif.dt / lif.tau_m);
 
         self.w_value += dw;
@@ -297,8 +359,8 @@ impl Cell {
 
         if self.current_voltage >= lif.v_th {
             is_spiking = !is_spiking;
-            self.current_voltage = lif.v_reset;
-            self.w_value += lif.d;
+            self.current_voltage = self.c;
+            self.w_value += self.d;
         }
 
         return is_spiking;

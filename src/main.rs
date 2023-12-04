@@ -391,6 +391,10 @@ fn run_simulation(
                     tau_plus: stdp_params.tau_plus,
                     tau_minus: stdp_params.tau_minus,
                     last_firing_time: None,
+                    alpha: if_params.alpha_init,
+                    beta: if_params.beta_init,
+                    c: if_params.v_reset,
+                    d: if_params.d_init,
                 })
                 .collect::<Vec<Cell>>()
         })
@@ -702,10 +706,10 @@ fn get_if_params(if_params: &mut IFParameters, table: &Value) -> Result<()> {
     if_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, if_params.exp_dt)?;
     if_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, if_params.tau_m)?;
     if_params.tref = parse_value_with_default(table, "tref", parse_f64, if_params.tref)?;
-    if_params.alpha = parse_value_with_default(table, "alpha", parse_f64, if_params.alpha)?;
-    if_params.beta = parse_value_with_default(table, "beta", parse_f64, if_params.beta)?;
+    if_params.alpha_init = parse_value_with_default(table, "alpha_init", parse_f64, if_params.alpha_init)?;
+    if_params.beta_init = parse_value_with_default(table, "beta_init", parse_f64, if_params.beta_init)?;
     if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
-    if_params.d = parse_value_with_default(table, "d", parse_f64, if_params.d)?;
+    if_params.d_init = parse_value_with_default(table, "d_init", parse_f64, if_params.d_init)?;
     if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
     if_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
     if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
@@ -1185,26 +1189,57 @@ fn run_isolated_stdp_test(
         expr.value()
     };
 
-    let mut postsynaptic_neuron = Cell { 
-        current_voltage: if_params.v_init, 
-        refractory_count: 0.0,
-        leak_constant: -1.,
-        integration_constant: 1.,
-        potentiation_type: PotentiationType::Excitatory,
-        neurotransmission_concentration: 0., 
-        neurotransmission_release: *default_cell_values.get("neurotransmission_release").unwrap_or(&0.),
-        receptor_density: *default_cell_values.get("receptor_density").unwrap_or(&0.),
-        chance_of_releasing: *default_cell_values.get("chance_of_releasing").unwrap_or(&0.), 
-        dissipation_rate: *default_cell_values.get("dissipation_rate").unwrap_or(&0.), 
-        chance_of_random_release: *default_cell_values.get("chance_of_random_release").unwrap_or(&0.),
-        random_release_concentration: *default_cell_values.get("random_release_concentration").unwrap_or(&0.),
-        w_value: if_params.w_init,
-        a_plus: stdp_params.a_plus,
-        a_minus: stdp_params.a_minus,
-        tau_plus: stdp_params.tau_plus,
-        tau_minus: stdp_params.tau_minus,
-        last_firing_time: None,
+    let mut postsynaptic_neuron = match if_type {
+        IFType::Basic | IFType::Adaptive |
+        IFType::AdaptiveExponential => {
+            Cell {
+                ..Cell::default()
+            }
+        },
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            Cell {
+                ..Cell::izhikevich_default()
+            }
+        }
     };
+
+    // let mut postsynaptic_neuron = Cell { 
+    //     current_voltage: if_params.v_init, 
+    //     refractory_count: 0.0,
+    //     leak_constant: -1.,
+    //     integration_constant: 1.,
+    //     potentiation_type: PotentiationType::Excitatory,
+    //     neurotransmission_concentration: 0., 
+    //     neurotransmission_release: *default_cell_values.get("neurotransmission_release").unwrap_or(&0.),
+    //     receptor_density: *default_cell_values.get("receptor_density").unwrap_or(&0.),
+    //     chance_of_releasing: *default_cell_values.get("chance_of_releasing").unwrap_or(&0.), 
+    //     dissipation_rate: *default_cell_values.get("dissipation_rate").unwrap_or(&0.), 
+    //     chance_of_random_release: *default_cell_values.get("chance_of_random_release").unwrap_or(&0.),
+    //     random_release_concentration: *default_cell_values.get("random_release_concentration").unwrap_or(&0.),
+    //     w_value: if_params.w_init,
+    //     a_plus: stdp_params.a_plus,
+    //     a_minus: stdp_params.a_minus,
+    //     tau_plus: stdp_params.tau_plus,
+    //     tau_minus: stdp_params.tau_minus,
+    //     last_firing_time: None,
+    // };
+
+    postsynaptic_neuron.w_value = if_params.v_init;
+    postsynaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
+    postsynaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
+    postsynaptic_neuron.chance_of_releasing = *default_cell_values.get("chance_of_releasing").unwrap_or(&0.);
+    postsynaptic_neuron.dissipation_rate = *default_cell_values.get("dissipation_rate").unwrap_or(&0.);
+    postsynaptic_neuron.chance_of_random_release = *default_cell_values.get("chance_of_random_release").unwrap_or(&0.);
+    postsynaptic_neuron.random_release_concentration = *default_cell_values.get("random_release_concentration").unwrap_or(&0.);
+    postsynaptic_neuron.w_value = if_params.w_init;
+    postsynaptic_neuron.a_plus = stdp_params.a_plus;
+    postsynaptic_neuron.a_minus = stdp_params.a_minus;
+    postsynaptic_neuron.tau_plus = stdp_params.tau_plus;
+    postsynaptic_neuron.tau_minus = stdp_params.tau_minus;
+    postsynaptic_neuron.alpha = if_params.alpha_init;
+    postsynaptic_neuron.beta = if_params.beta_init;
+    postsynaptic_neuron.c = if_params.v_reset;
+    postsynaptic_neuron.d = if_params.d_init;
 
     let mut neurons: Vec<Cell> = (0..n).map(|_| postsynaptic_neuron.clone())
         .collect();
@@ -1709,6 +1744,10 @@ fn main() -> Result<()> {
             tau_plus: STDPParameters::default().tau_plus,
             tau_minus: STDPParameters::default().tau_minus,
             last_firing_time: None,
+            alpha: if_params.alpha_init,
+            beta: if_params.beta_init,
+            c: if_params.v_reset,
+            d: if_params.d_init,
         };
 
         match if_type {
