@@ -1,3 +1,6 @@
+use std::io::{Error, ErrorKind};
+
+
 fn mean(values: Vec<f64>) -> f64 {
     values.sum() / values.len()
 }
