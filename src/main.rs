@@ -1119,6 +1119,27 @@ fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     return delta_w;
 }
 
+// fn neuromodulate_by_correlation(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
+//     // tonic
+//     // dt = 0.5
+//     // a = 0.01
+//     // b = 0.25
+//     // w_init = 30.0
+//     // v_reset = -55.0
+//     // d = 8.0
+
+//     // bursting
+//     // dt = 0.5
+//     // a = 0.035
+//     // w_init = 10.0
+//     // v_reset = -50.0
+//     // d = 4.0
+
+//     // determine correlation between pre and post
+//     // if positive, move toward bursting, scale appropriately
+//     // if negative, move toward tonic, scale appropriately
+// }
+
 fn update_isolated_presynaptic_neuron_weights(
     neurons: &mut Vec<Cell>,
     neuron: &Cell,
