@@ -1203,27 +1203,6 @@ fn run_isolated_stdp_test(
         }
     };
 
-    // let mut postsynaptic_neuron = Cell { 
-    //     current_voltage: if_params.v_init, 
-    //     refractory_count: 0.0,
-    //     leak_constant: -1.,
-    //     integration_constant: 1.,
-    //     potentiation_type: PotentiationType::Excitatory,
-    //     neurotransmission_concentration: 0., 
-    //     neurotransmission_release: *default_cell_values.get("neurotransmission_release").unwrap_or(&0.),
-    //     receptor_density: *default_cell_values.get("receptor_density").unwrap_or(&0.),
-    //     chance_of_releasing: *default_cell_values.get("chance_of_releasing").unwrap_or(&0.), 
-    //     dissipation_rate: *default_cell_values.get("dissipation_rate").unwrap_or(&0.), 
-    //     chance_of_random_release: *default_cell_values.get("chance_of_random_release").unwrap_or(&0.),
-    //     random_release_concentration: *default_cell_values.get("random_release_concentration").unwrap_or(&0.),
-    //     w_value: if_params.w_init,
-    //     a_plus: stdp_params.a_plus,
-    //     a_minus: stdp_params.a_minus,
-    //     tau_plus: stdp_params.tau_plus,
-    //     tau_minus: stdp_params.tau_minus,
-    //     last_firing_time: None,
-    // };
-
     postsynaptic_neuron.w_value = if_params.v_init;
     postsynaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
     postsynaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
