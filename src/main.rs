@@ -1100,6 +1100,31 @@ fn write_row(
     ).expect("Cannot write to file");
 }
 
+// // https://github.com/Abtinmy/computational-neuroscience/blob/main/SNN/snn.py
+// // line 61
+// fn update_dopamine_decay(
+//     dopamine_decay: f64, 
+//     weight_change: f64,
+//     stdp_params: &STDPParameters, 
+//     if_params: &IFParameters,
+// ) -> f64 {
+//     // might need to multiply by delta dirac of difference in spike times
+//     (-dopamine_decay/stdp_params.tau_c + weight_change) * if_params.dt
+// }
+
+// fn update_doamine(
+//     reward: f64, 
+//     dopamine: f64, 
+//     spike_time_difference: f64,
+//     stdp_params: &STDPParameters, 
+//     if_params: &IFParameters
+// ) -> f64 {
+//     // might wanna multiply tau_d by spike time difference
+//     (-dopamine / (stdp_params.tau_d + reward)) * if_params.dt 
+// }
+
+// weight * dopamine
+
 fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     let mut delta_w: f64 = 0.;
 
