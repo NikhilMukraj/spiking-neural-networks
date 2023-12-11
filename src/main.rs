@@ -328,7 +328,7 @@ fn run_simulation(
     do_stdp: bool,
     graph_params: &GraphParameters,
     stdp_params: &STDPParameters,
-    default_cell_values: &HashMap<&str, f64>,
+    default_cell_values: &HashMap<String, f64>,
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
 ) -> Result<(Output, Box<dyn GraphFunctionality>)> {
@@ -686,7 +686,7 @@ fn parse_value_with_default<T>(
 }
 
 #[derive(Clone)]
-struct SimulationParameters<'a> {
+struct SimulationParameters {
     num_rows: usize, 
     num_cols: usize, 
     iterations: usize, 
@@ -698,23 +698,42 @@ struct SimulationParameters<'a> {
     do_stdp: bool,
     stdp_params: STDPParameters,
     graph_params: GraphParameters,
-    default_cell_values: HashMap<&'a str, f64>,
+    default_cell_values: HashMap<String, f64>,
 }
 
-fn get_if_params(if_params: &mut IFParameters, table: &Value) -> Result<()> {
-    if_params.dt = parse_value_with_default(table, "dt", parse_f64, if_params.dt)?;
-    if_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, if_params.exp_dt)?;
-    if_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, if_params.tau_m)?;
-    if_params.tref = parse_value_with_default(table, "tref", parse_f64, if_params.tref)?;
-    if_params.alpha_init = parse_value_with_default(table, "alpha_init", parse_f64, if_params.alpha_init)?;
-    if_params.beta_init = parse_value_with_default(table, "beta_init", parse_f64, if_params.beta_init)?;
-    if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
-    if_params.d_init = parse_value_with_default(table, "d_init", parse_f64, if_params.d_init)?;
-    if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
-    if_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
-    if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
-    if_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_max)?;
-    if_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Value) -> Result<()> {
+    match prefix {
+        Some(prefix_value) => {
+            if_params.dt = parse_value_with_default(table, &format!("{}_dt", prefix_value), parse_f64, if_params.dt)?;
+            if_params.exp_dt = parse_value_with_default(table, &format!("{}_exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
+            if_params.tau_m = parse_value_with_default(table, &format!("{}_tau_m", prefix_value), parse_f64, if_params.tau_m)?;
+            if_params.tref = parse_value_with_default(table, &format!("{}_tref", prefix_value), parse_f64, if_params.tref)?;
+            if_params.alpha_init = parse_value_with_default(table, &format!("{}_alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
+            if_params.beta_init = parse_value_with_default(table, &format!("{}_beta_init", prefix_value), parse_f64, if_params.beta_init)?;
+            if_params.v_reset = parse_value_with_default(table, &format!("{}_v_reset", prefix_value), parse_f64, if_params.v_reset)?; 
+            if_params.d_init = parse_value_with_default(table, &format!("{}_d_init", prefix_value), parse_f64, if_params.d_init)?;
+            if_params.w_init = parse_value_with_default(table, &format!("{}_w_init", prefix_value), parse_f64, if_params.w_init)?;
+            if_params.bayesian_mean = parse_value_with_default(table, &format!("{}_bayesian_mean", prefix_value), parse_f64, if_params.bayesian_mean)?;
+            if_params.bayesian_std = parse_value_with_default(table, &format!("{}_bayesian_std", prefix_value), parse_f64, if_params.bayesian_std)?;
+            if_params.bayesian_max = parse_value_with_default(table, &format!("{}_bayesian_max", prefix_value), parse_f64, if_params.bayesian_max)?;
+            if_params.bayesian_min = parse_value_with_default(table, &format!("{}_bayesian_min", prefix_value), parse_f64, if_params.bayesian_min)?;
+        }
+        None => {
+            if_params.dt = parse_value_with_default(table, "dt", parse_f64, if_params.dt)?;
+            if_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, if_params.exp_dt)?;
+            if_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, if_params.tau_m)?;
+            if_params.tref = parse_value_with_default(table, "tref", parse_f64, if_params.tref)?;
+            if_params.alpha_init = parse_value_with_default(table, "alpha_init", parse_f64, if_params.alpha_init)?;
+            if_params.beta_init = parse_value_with_default(table, "beta_init", parse_f64, if_params.beta_init)?;
+            if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
+            if_params.d_init = parse_value_with_default(table, "d_init", parse_f64, if_params.d_init)?;
+            if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
+            if_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
+            if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
+            if_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_max)?;
+            if_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+        }
+    }
 
     Ok(())
 }
@@ -787,29 +806,47 @@ fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
     Ok(())
 }
 
-fn get_default_cell_parameters(table: &Value) -> Result<HashMap<&str, f64>> {
-    let mut default_cell_values: HashMap<&str, f64> = HashMap::new();
-    default_cell_values.insert("neurotransmission_release", 1.);
-    default_cell_values.insert("receptor_density", 1.);
-    default_cell_values.insert("chance_of_releasing", 0.5);
-    default_cell_values.insert("dissipation_rate", 0.1);
-    default_cell_values.insert("chance_of_random_release", 0.2);
-    default_cell_values.insert("random_release_concentration", 0.1);
-    default_cell_values.insert("excitatory_chance", 0.5);
+fn get_default_cell_parameters(table: &Value, prefix: Option<&str>) -> Result<HashMap<String, f64>> {
+    let mut default_cell_values: HashMap<String, f64> = HashMap::new();
+    match prefix {
+        Some(prefix_value) => {
+            default_cell_values.insert(format!("{}_neurotransmission_release", prefix_value), 1.);
+            default_cell_values.insert(format!("{}_receptor_density", prefix_value), 1.);
+            default_cell_values.insert(format!("{}_chance_of_releasing", prefix_value), 0.5);
+            default_cell_values.insert(format!("{}_dissipation_rate", prefix_value), 0.1);
+            default_cell_values.insert(format!("{}_chance_of_random_release", prefix_value), 0.2);
+            default_cell_values.insert(format!("{}_random_release_concentration", prefix_value), 0.1);
+            default_cell_values.insert(format!("{}_excitatory_chance", prefix_value), 0.5);
 
-    default_cell_values.insert("neurotransmission_release_std", 0.);
-    default_cell_values.insert("receptor_density_std", 0.);
-    default_cell_values.insert("dissipation_rate_std", 0.);
-    default_cell_values.insert("random_release_concentration_std", 0.);
+            default_cell_values.insert(format!("{}_neurotransmission_release_std", prefix_value), 0.);
+            default_cell_values.insert(format!("{}_receptor_density_std", prefix_value), 0.);
+            default_cell_values.insert(format!("{}_dissipation_rate_std", prefix_value), 0.);
+            default_cell_values.insert(format!("{}_random_release_concentration_std", prefix_value), 0.);
+        },
+        None => {
+            default_cell_values.insert(String::from("neurotransmission_release"), 1.);
+            default_cell_values.insert(String::from("receptor_density"), 1.);
+            default_cell_values.insert(String::from("chance_of_releasing"), 0.5);
+            default_cell_values.insert(String::from("dissipation_rate"), 0.1);
+            default_cell_values.insert(String::from("chance_of_random_release"), 0.2);
+            default_cell_values.insert(String::from("random_release_concentration"), 0.1);
+            default_cell_values.insert(String::from("excitatory_chance"), 0.5);
 
-    let updates: Vec<(&str, Result<f64>)> = default_cell_values
+            default_cell_values.insert(String::from("neurotransmission_release_std"), 0.);
+            default_cell_values.insert(String::from("receptor_density_std"), 0.);
+            default_cell_values.insert(String::from("dissipation_rate_std"), 0.);
+            default_cell_values.insert(String::from("random_release_concentration_std"), 0.);
+        }
+    }
+
+    let updates: Vec<(String, Result<f64>)> = default_cell_values
         .iter()
-        .map(|(&key, &default_value)| {
+        .map(|(key, &default_value)| {
             let value_to_update = parse_value_with_default(
-                &table, key, parse_f64, default_value
+                &table, &key, parse_f64, default_value
             );
 
-            (key, value_to_update)
+            (String::from(key.clone()), value_to_update)
         })
         .collect();
 
@@ -822,8 +859,8 @@ fn get_default_cell_parameters(table: &Value) -> Result<HashMap<&str, f64>> {
             }
         };
 
-        default_cell_values.insert(key, value_to_update);
         println!("{}: {}", key, value_to_update);
+        default_cell_values.insert(key, value_to_update);
     }
 
     return Ok(default_cell_values);
@@ -883,7 +920,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         write_history: write_history,
     };
 
-    let default_cell_values: HashMap<&str, f64> = get_default_cell_parameters(&table)?;
+    let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&table, None)?;
 
     let scaling_type_default = match if_type {
         IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
@@ -904,7 +941,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
     };
 
-    get_if_params(&mut if_params, table)?;
+    get_if_params(&mut if_params, None, table)?;
     
     println!("{:#?}", if_params);
 
@@ -952,7 +989,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
 struct GASettings<'a> {
     equation: &'a str, 
     eeg: &'a Array1<f64>,
-    sim_params: SimulationParameters<'a>,
+    sim_params: SimulationParameters,
     power_density_dt: f64,
 }
 
@@ -1035,6 +1072,220 @@ fn objective(
     } else {
         return Ok(score);
     }
+}
+
+fn test_coupled_neurons(
+    if_type: IFType,
+    pre_if_params: &IFParameters, 
+    post_if_params: &IFParameters,
+    pre_potentiation_type: PotentiationType,
+    default_pre_values: &HashMap<String, f64>,
+    default_post_values: &HashMap<String, f64>,
+    iterations: usize,
+    input_voltage: f64,
+    input_equation: &str,
+    filename: &str,
+) {
+    let mut symbol_table = SymbolTable::new();
+    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+
+    let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
+
+    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
+        expr.symbols().value_cell(sign_id).set(sign);
+        expr.symbols().value_cell(mp_id).set(mp);
+        expr.symbols().value_cell(rd_id).set(rd);
+        expr.symbols().value_cell(nc_id).set(nc);
+
+        expr.value()
+    };
+
+    let mut pre_synaptic_neuron = Cell { 
+        current_voltage: pre_if_params.v_init, 
+        refractory_count: 0.0,
+        leak_constant: -1.,
+        integration_constant: 1.,
+        potentiation_type: pre_potentiation_type,
+        neurotransmission_concentration: 0., 
+        neurotransmission_release: *default_pre_values.get("pre_neurotransmission_release").unwrap(),
+        receptor_density: *default_pre_values.get("pre_receptor_density").unwrap(),
+        chance_of_releasing: *default_pre_values.get("pre_chance_of_releasing").unwrap(), 
+        dissipation_rate: *default_pre_values.get("pre_dissipation_rate").unwrap(), 
+        chance_of_random_release: *default_pre_values.get("pre_chance_of_random_release").unwrap(), 
+        random_release_concentration: *default_pre_values.get("pre_random_release_concentration").unwrap(),
+        w_value: pre_if_params.w_init,
+        a_plus: STDPParameters::default().a_plus,
+        a_minus: STDPParameters::default().a_minus,
+        tau_plus: STDPParameters::default().tau_plus,
+        tau_minus: STDPParameters::default().tau_minus,
+        last_firing_time: None,
+        alpha: pre_if_params.alpha_init,
+        beta: pre_if_params.beta_init,
+        c: pre_if_params.v_reset,
+        d: pre_if_params.d_init,
+    };
+
+    let mut post_synaptic_neuron = Cell { 
+        current_voltage: post_if_params.v_init, 
+        refractory_count: 0.0,
+        leak_constant: -1.,
+        integration_constant: 1.,
+        potentiation_type: PotentiationType::Excitatory,
+        neurotransmission_concentration: 0., 
+        neurotransmission_release: *default_post_values.get("post_neurotransmission_release").unwrap(),
+        receptor_density: *default_post_values.get("post_receptor_density").unwrap(),
+        chance_of_releasing: *default_post_values.get("post_chance_of_releasing").unwrap(), 
+        dissipation_rate: *default_post_values.get("post_dissipation_rate").unwrap(), 
+        chance_of_random_release: *default_post_values.get("post_chance_of_random_release").unwrap(),
+        random_release_concentration: *default_post_values.get("post_random_release_concentration").unwrap(),
+        w_value: post_if_params.w_init,
+        a_plus: STDPParameters::default().a_plus,
+        a_minus: STDPParameters::default().a_minus,
+        tau_plus: STDPParameters::default().tau_plus,
+        tau_minus: STDPParameters::default().tau_minus,
+        last_firing_time: None,
+        alpha: post_if_params.alpha_init,
+        beta: post_if_params.beta_init,
+        c: post_if_params.v_reset,
+        d: post_if_params.d_init,
+    };
+
+    let mut file = BufWriter::new(File::create(filename)
+        .expect("Unable to create file"));
+    writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");
+
+    let sign = match pre_synaptic_neuron.potentiation_type {
+        PotentiationType::Excitatory => -1., 
+        PotentiationType::Inhibitory => 1.,
+    };
+
+    let pre_mean_change = &pre_if_params.bayesian_mean != &BayesianParameters::default().mean;
+    let pre_std_change = &pre_if_params.bayesian_std != &BayesianParameters::default().std;
+    let pre_bayesian = if pre_mean_change || pre_std_change {
+        true
+    } else { 
+        false
+    };
+
+    let post_mean_change = &post_if_params.bayesian_mean != &BayesianParameters::default().mean;
+    let post_std_change = &post_if_params.bayesian_std != &BayesianParameters::default().std;
+    let post_bayesian = if post_mean_change || post_std_change {
+        true
+    } else { 
+        false
+    };
+
+    match if_type {
+        IFType::Basic => { 
+            for _ in 0..iterations {
+                let (pre_dv, pre_is_spiking) = if pre_bayesian {
+                    pre_synaptic_neuron.get_dv_change_and_spike(
+                        &pre_if_params, 
+                        input_voltage * limited_distr(pre_if_params.bayesian_mean, pre_if_params.bayesian_std, 0., 1.)
+                    )
+                } else {
+                    pre_synaptic_neuron.get_dv_change_and_spike(&pre_if_params, input_voltage)
+                };
+
+                pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
+        
+                let input = input_func(
+                    sign, 
+                    pre_synaptic_neuron.current_voltage, 
+                    post_synaptic_neuron.receptor_density,
+                    post_synaptic_neuron.neurotransmission_concentration,
+                );
+        
+                let (post_dv, post_is_spiking) = if post_bayesian {
+                    post_synaptic_neuron.get_dv_change_and_spike(
+                        &pre_if_params, 
+                        input * limited_distr(post_if_params.bayesian_mean, post_if_params.bayesian_std, 0., 1.)
+                    )
+                } else {
+                    post_synaptic_neuron.get_dv_change_and_spike(&post_if_params, input)
+                };
+
+                post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
+            
+                pre_synaptic_neuron.current_voltage += pre_dv;
+                post_synaptic_neuron.current_voltage += post_dv;
+        
+                writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");        
+           }
+        },
+        IFType::Adaptive | IFType::AdaptiveExponential |
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+                match if_type {
+                    IFType::Basic => unreachable!(),
+                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
+                    IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                }
+            };
+    
+            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+                match if_type {
+                    IFType::Basic => unreachable!(), 
+                    IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
+                    IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
+                }
+            };
+
+            for _ in 0..iterations {
+                let pre_is_spiking = adaptive_apply_and_get_spike(&mut pre_synaptic_neuron, &pre_if_params);
+                let pre_dv = if pre_bayesian {
+                    adaptive_dv(
+                        &mut pre_synaptic_neuron,
+                        &pre_if_params, 
+                        input_voltage * limited_distr(pre_if_params.bayesian_mean, pre_if_params.bayesian_std, 0., 1.)
+                    )
+                } else {
+                    adaptive_dv(
+                        &mut pre_synaptic_neuron,
+                        &pre_if_params, 
+                        input_voltage
+                    )
+                };
+
+                pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
+        
+                let input = input_func(
+                    sign, 
+                    pre_synaptic_neuron.current_voltage, 
+                    post_synaptic_neuron.receptor_density,
+                    post_synaptic_neuron.neurotransmission_concentration,
+                );
+
+                let post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
+                let post_dv = if post_bayesian {
+                    adaptive_dv(
+                        &mut post_synaptic_neuron,
+                        &post_if_params, 
+                        input * limited_distr(post_if_params.bayesian_mean, post_if_params.bayesian_std, 0., 1.)
+                    )
+                } else {
+                    adaptive_dv(
+                        &mut post_synaptic_neuron,
+                        &post_if_params, 
+                        input
+                    )
+                };
+
+                post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
+            
+                pre_synaptic_neuron.current_voltage += pre_dv;
+                post_synaptic_neuron.current_voltage += post_dv;
+        
+                writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");        
+           }
+        }
+    };
 }
 
 fn write_row(
@@ -1173,7 +1424,7 @@ fn run_isolated_stdp_test(
     iterations: usize,
     n: usize,
     input_voltage: f64,
-    default_cell_values: &HashMap<&str, f64>,
+    default_cell_values: &HashMap<String, f64>,
     input_equation: &str,
     filename: &str,
 ) -> Result<()> {
@@ -1191,7 +1442,7 @@ fn run_isolated_stdp_test(
         }
     };
 
-    get_if_params(&mut if_params, &stdp_table)?;
+    get_if_params(&mut if_params, None, &stdp_table)?;
 
     println!("{:#?}", if_params);
 
@@ -1490,7 +1741,7 @@ fn main() -> Result<()> {
 
         let sim_params = get_parameters(&simulation_table)?;
 
-        let default_eq = match sim_params.if_type { // izhikevich currently untested with neurotransmitter
+        let default_eq = match sim_params.if_type { 
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
             _ => String::from("sign * mp + 100 + rd * (nc^2 * 200)")
         };
@@ -1700,6 +1951,7 @@ fn main() -> Result<()> {
             IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
             _ => "regular",
         };
+
         let scaling_type: String = parse_value_with_default(
             single_neuron_test, 
             "scaling_type", 
@@ -1715,7 +1967,7 @@ fn main() -> Result<()> {
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
         };
 
-        get_if_params(&mut if_params, &single_neuron_test)?;
+        get_if_params(&mut if_params, None, &single_neuron_test)?;
 
         // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
 
@@ -1773,6 +2025,105 @@ fn main() -> Result<()> {
         };
 
         println!("\nFinished volt test");
+    } else if let Some(coupled_table) = config.get("coupled_test") {
+        let if_type: String = parse_value_with_default(
+            coupled_table, 
+            "if_type", 
+            parse_string, 
+            String::from("basic")
+        )?;
+        println!("if_type: {}", if_type);
+
+        let if_type = IFType::from_str(&if_type)?;
+
+        let iterations: usize = match coupled_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+    
+        let filename: String = match coupled_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+    
+        let input_voltage: f64 = match coupled_table.get("input_voltage") {
+            Some(value) => parse_f64(value, "input_voltage")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        };
+        println!("input_voltage: {}", input_voltage);
+
+        let default_eq = match if_type {
+            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
+            _ => String::from("sign * mp + 100")
+        };
+
+        let equation: String = parse_value_with_default(
+            &coupled_table, 
+            "input_equation", 
+            parse_string, 
+            default_eq
+        )?;
+        let equation: &str = equation.trim();
+        println!("\ninput equation: {}", equation);
+
+        let default_pre_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("pre"))?;
+        let default_post_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("post"))?;
+        
+        let scaling_type_default = match if_type {
+            IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
+            _ => "regular",
+        };
+        
+        let scaling_type: String = parse_value_with_default(
+            coupled_table, 
+            "scaling_type", 
+            parse_string, 
+            String::from(scaling_type_default)
+        )?;
+        println!("scaling_type: {}", scaling_type);
+
+        let mut pre_if_params = match scaling_type.as_str() {
+            "regular" => IFParameters { ..IFParameters::default() },
+            "scaled" => IFParameters { ..IFParameters::scaled_default() },
+            "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
+            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
+        };
+        
+        let mut post_if_params = pre_if_params.clone();
+
+        get_if_params(&mut pre_if_params, Some("pre"), coupled_table)?;
+        println!("pre if params: {:#?}", pre_if_params);
+        get_if_params(&mut post_if_params, Some("post"), coupled_table)?;
+        println!("post if params: {:#?}", post_if_params);
+
+        let pre_potentiation_type = parse_value_with_default(
+            coupled_table, 
+            "pre_potentiation_type", 
+            parse_string, 
+            String::from("excitatory")
+        )?;
+        let pre_potentiation_type = match pre_potentiation_type.to_ascii_lowercase().as_str() {
+            "excitatory" => PotentiationType::Excitatory,
+            "inhibitory" => PotentiationType::Inhibitory,
+            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
+        };     
+
+        test_coupled_neurons(
+            if_type,
+            &pre_if_params, 
+            &post_if_params,
+            pre_potentiation_type,
+            &default_pre_values,
+            &default_post_values,
+            iterations,
+            input_voltage,
+            equation,
+            &filename,
+        );   
+        
+        println!("Finished coupling test");
     } else if let Some(stdp_table) = config.get("stdp_test") {
         let if_type: String = parse_value_with_default(
             stdp_table, 
@@ -1808,7 +2159,7 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let default_cell_values: HashMap<&str, f64> = get_default_cell_parameters(&stdp_table)?;
+        let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&stdp_table, None)?;
 
         let default_eq = match if_type {
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
