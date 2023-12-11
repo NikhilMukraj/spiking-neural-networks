@@ -553,8 +553,7 @@ pub type CellGrid = Vec<Vec<Cell>>;
 //     }
 // }
 
-// // hodgkin huxley
-// struct ConductanceBasedCell {
+// struct HodgkinHuxleyCell {
 //     voltage: f64,
 //     dt: f64,
 //     cm: f64,
@@ -569,7 +568,7 @@ pub type CellGrid = Vec<Vec<Cell>>;
 //     h: Gate,
 // }
 
-// impl Default for ConductanceBasedCell {
+// impl Default for HodgkinHuxleyCell {
 //     fn default() -> Self {
 //         let default_gate = Gate {
 //             alpha: 0.,
@@ -596,7 +595,7 @@ pub type CellGrid = Vec<Vec<Cell>>;
 
 // // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
-// impl ConductanceBasedCell {
+// impl HodgkinHuxleyCell {
 //     fn update_gate_time_constants(&mut self, voltage: f64) {
 //         self.n.alpha = 0.01 * ((10. - voltage) / (((10. - voltage) / 10.)-1.).exp());
 //         self.n.beta = 0.125 * (-voltage / 80.).exp();
