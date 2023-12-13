@@ -534,102 +534,129 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
-// #[derive(Clone)]
-// struct Gate {
-//     alpha: f64,
-//     beta: f64,
-//     state: f64,
-// }
+#[derive(Clone)]
+pub struct Gate {
+    pub alpha: f64,
+    pub beta: f64,
+    pub state: f64,
+}
 
-// impl Gate {
-//     fn init_state(&mut self) {
-//         self.state = self.alpha / (self.alpha + self.beta);
-//     }
+impl Gate {
+    pub fn init_state(&mut self) {
+        self.state = self.alpha / (self.alpha + self.beta);
+    }
 
-//     fn update(&mut self, dt: f64) {
-//         let alpha_state: f64 = self.alpha * (1. - self.state);
-//         let beta_state: f64 = self.beta * self.state;
-//         self.state += dt * (alpha_state - beta_state);
-//     }
-// }
+    pub fn update(&mut self, dt: f64) {
+        let alpha_state: f64 = self.alpha * (1. - self.state);
+        let beta_state: f64 = self.beta * self.state;
+        self.state += dt * (alpha_state - beta_state);
+    }
+}
 
-// struct HodgkinHuxleyCell {
-//     voltage: f64,
-//     dt: f64,
-//     cm: f64,
-//     e_na: f64,
-//     e_k: f64,
-//     e_k_leak: f64,
-//     g_na: f64,
-//     g_k: f64,
-//     g_k_leak: f64,
-//     m: Gate,
-//     n: Gate,
-//     h: Gate,
-// }
+pub struct HodgkinHuxleyCell {
+    pub current_voltage: f64,
+    pub dt: f64,
+    pub cm: f64,
+    pub e_na: f64,
+    pub e_k: f64,
+    pub e_k_leak: f64,
+    pub g_na: f64,
+    pub g_k: f64,
+    pub g_k_leak: f64,
+    pub m: Gate,
+    pub n: Gate,
+    pub h: Gate,
+    pub bayesian_params: BayesianParameters,
+}
 
-// impl Default for HodgkinHuxleyCell {
-//     fn default() -> Self {
-//         let default_gate = Gate {
-//             alpha: 0.,
-//             beta: 0.,
-//             state: 0.,
-//         };
+impl Default for HodgkinHuxleyCell {
+    fn default() -> Self {
+        let default_gate = Gate {
+            alpha: 0.,
+            beta: 0.,
+            state: 0.,
+        };
 
-//         ConductanceBasedCell { 
-//             voltage: 0.,
-//             dt: 0.1,
-//             cm: 1., 
-//             e_na: 115., 
-//             e_k: -12., 
-//             e_k_leak: 10.6, 
-//             g_na: 120., 
-//             g_k: 36., 
-//             g_k_leak: 0.3, 
-//             m: default_gate.clone(), 
-//             n: default_gate.clone(), 
-//             h: default_gate,   
-//         }
-//     }
-// }
+        HodgkinHuxleyCell { 
+            current_voltage: 0.,
+            dt: 0.1,
+            cm: 1., 
+            e_na: 115., 
+            e_k: -12., 
+            e_k_leak: 10.6, 
+            g_na: 120., 
+            g_k: 36., 
+            g_k_leak: 0.3, 
+            m: default_gate.clone(), 
+            n: default_gate.clone(), 
+            h: default_gate,  
+            bayesian_params: BayesianParameters::default() 
+        }
+    }
+}
 
-// // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
-// // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
-// impl HodgkinHuxleyCell {
-//     fn update_gate_time_constants(&mut self, voltage: f64) {
-//         self.n.alpha = 0.01 * ((10. - voltage) / (((10. - voltage) / 10.)-1.).exp());
-//         self.n.beta = 0.125 * (-voltage / 80.).exp();
-//         self.m.alpha = 0.1 * ((25. - voltage) / ((25. - voltage) / 10.) - 1.).exp();
-//         self.m.beta = 4. * (-voltage / 18.).exp();
-//         self.h.alpha = 0.07 * (-voltage / 20.).exp();
-//         self.h.beta = 1. / (((30. - voltage) / 10.).exp() + 1.);
-//     }
+// https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
+// https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
+impl HodgkinHuxleyCell {
+    pub fn update_gate_time_constants(&mut self, voltage: f64) {
+        self.n.alpha = 0.01 * ((10. - voltage) / (((10. - voltage) / 10.)-1.).exp());
+        self.n.beta = 0.125 * (-voltage / 80.).exp();
+        self.m.alpha = 0.1 * ((25. - voltage) / ((25. - voltage) / 10.) - 1.).exp();
+        self.m.beta = 4. * (-voltage / 18.).exp();
+        self.h.alpha = 0.07 * (-voltage / 20.).exp();
+        self.h.beta = 1. / (((30. - voltage) / 10.).exp() + 1.);
+    }
 
-//     fn initialize_parameters(&mut self, starting_voltage: f64) {
-//         self.voltage = starting_voltage;
-//         self.update_gate_time_constants(starting_voltage);
-//         self.m.init_state();
-//         self.n.init_state();
-//         self.h.init_state();
-//     }
+    pub fn initialize_parameters(&mut self, starting_voltage: f64) {
+        self.current_voltage = starting_voltage;
+        self.update_gate_time_constants(starting_voltage);
+        self.m.init_state();
+        self.n.init_state();
+        self.h.init_state();
+    }
 
-//     fn update_cell_voltage(&mut self, input: f64) {
-//         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.voltage - self.e_na);
-//         let i_k = self.n.state.powf(4.) * self.g_k * (self.voltage - self.e_k);
-//         let i_k_leak = self.g_k_leak * (self.voltage - self.e_k_leak);
-//         let i_sum = input - i_na - i_k - i_k_leak;
-//         self.voltage += self.dt * i_sum / self.cm;
-//     }
+    pub fn update_cell_voltage(&mut self, input: f64) {
+        let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
+        let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
+        let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
+        let i_sum = input - i_na - i_k - i_k_leak;
+        self.current_voltage += self.dt * i_sum / self.cm;
+    }
 
-//     fn update_gate_states(&mut self) {
-//         self.m.update(self.dt);
-//         self.n.update(self.dt);
-//         self.h.update(self.dt);
-//     }
+    pub fn update_gate_states(&mut self) {
+        self.m.update(self.dt);
+        self.n.update(self.dt);
+        self.h.update(self.dt);
+    }
 
-//     fn iterate(&mut self, input: f64) {
-//         self.update_gate_time_constants(self.voltage);
-//         self.update_cell_voltage(input);
-//         self.update_gate_states();
-//     }
-// }
+    pub fn iterate(&mut self, input: f64) {
+        self.update_gate_time_constants(self.current_voltage);
+        self.update_cell_voltage(input);
+        self.update_gate_states();
+    }
+
+    pub fn run_static_input(&mut self, input: f64, bayesian: bool, iterations: usize, filename: &str) {
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
+        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+
+        self.initialize_parameters(self.current_voltage);
+        
+        for _ in 0..iterations {
+            if bayesian {
+                self.iterate(
+                    input * limited_distr(
+                        self.bayesian_params.mean, 
+                        self.bayesian_params.std, 
+                        self.bayesian_params.min, 
+                        self.bayesian_params.max,
+                    )
+                );
+            } else {
+                self.iterate(input);
+            }
+
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        }
+    }
+}

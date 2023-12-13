@@ -14,7 +14,8 @@ use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
-    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters
+    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
+    Gate, HodgkinHuxleyCell
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -802,6 +803,61 @@ fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
         stdp.weight_max
     )?;
     println!("weight_max: {}", stdp.weight_max);
+
+    Ok(())
+}
+
+fn get_bayesian_params(
+    bayesian_params: &mut BayesianParameters, 
+    table: &Value, 
+    prefix: Option<&str>
+) -> Result<()> {
+    let (mean_string, std_string, min_string, max_string) = match prefix {
+        Some(prefix_value) => (
+            format!("{}_bayesian_mean", prefix_value),
+            format!("{}_bayesian_std", prefix_value),
+            format!("{}_bayesian_min", prefix_value),
+            format!("{}_bayesian_max", prefix_value),
+        ),
+        None => (
+            String::from("bayesian_mean"),
+            String::from("bayesian_std"), 
+            String::from("bayesian_min"), 
+            String::from("bayesian_max"),
+        )
+    };
+
+    bayesian_params.mean = parse_value_with_default(
+        table, 
+        &mean_string, 
+        parse_f64, 
+        bayesian_params.mean
+    )?;
+    println!("{}: {}", mean_string, bayesian_params.mean);
+
+    bayesian_params.std = parse_value_with_default(
+        table, 
+        &std_string, 
+        parse_f64, 
+        bayesian_params.std
+    )?;
+    println!("{}: {}", std_string, bayesian_params.std);
+
+    bayesian_params.min = parse_value_with_default(
+        table, 
+        &min_string, 
+        parse_f64, 
+        bayesian_params.min
+    )?;
+    println!("{}: {}", min_string, bayesian_params.min);
+
+    bayesian_params.max = parse_value_with_default(
+        table, 
+        &max_string, 
+        parse_f64, 
+        bayesian_params.max
+    )?;
+    println!("{}: {}", max_string, bayesian_params.max);
 
     Ok(())
 }
@@ -2192,6 +2248,157 @@ fn main() -> Result<()> {
         )?;
 
         println!("\nFinished STDP test");
+    } else if let Some(hodgkin_huxley_table) = config.get("hodgkin_huxley") {
+        let iterations: usize = match hodgkin_huxley_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+    
+        let filename: String = match hodgkin_huxley_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+    
+        let input_voltage: f64 = match hodgkin_huxley_table.get("input_voltage") {
+            Some(value) => parse_f64(value, "input_voltage")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        };
+        println!("input_voltage: {}", input_voltage);
+
+        let v_init: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "v_init", 
+            parse_f64, 
+            0.
+        )?;
+        println!("v_init: {}", v_init);
+
+        let dt: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "dt", 
+            parse_f64, 
+            0.1
+        )?;
+        println!("dt: {}", dt);
+
+        let cm: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "cm", 
+            parse_f64, 
+            1.
+        )?;
+        println!("cm: {}", cm);
+
+        let e_na: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "e_na", 
+            parse_f64, 
+            115.
+        )?;
+        println!("e_na: {}", e_na);
+
+        let e_k: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "e_k", 
+            parse_f64, 
+            -12.
+        )?;
+        println!("e_k: {}", e_k);
+
+        let e_k_leak: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "e_k_leak", 
+            parse_f64, 
+            10.6
+        )?;
+        println!("e_k_leak: {}", e_k_leak);
+
+        let g_na: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "g_na", 
+            parse_f64, 
+            120.
+        )?;
+        println!("g_na: {}", g_na);
+
+        let g_k: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "g_k", 
+            parse_f64, 
+            36.
+        )?;
+        println!("g_k: {}", g_k);
+
+        let g_k_leak: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "g_k_leak", 
+            parse_f64, 
+            0.3
+        )?;
+        println!("g_k_leak: {}", g_k_leak);
+
+        let alpha_init: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "alpha_init", 
+            parse_f64, 
+            0.
+        )?;
+        println!("alpha_init: {}", alpha_init);
+
+        let beta_init: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "beta_init", 
+            parse_f64, 
+            0.
+        )?;
+        println!("beta_init: {}", beta_init);
+
+        let state_init: f64 = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "state_init", 
+            parse_f64, 
+            0.
+        )?;
+        println!("state_init: {}", state_init);
+
+        let mut bayesian_params = BayesianParameters::default();
+        get_bayesian_params(&mut bayesian_params, hodgkin_huxley_table, None)?;
+
+        let gate = Gate { 
+            alpha: alpha_init, 
+            beta: beta_init, 
+            state: state_init, 
+        };
+
+        let mut hodgkin_huxley = HodgkinHuxleyCell {
+            current_voltage: v_init,
+            dt: dt,
+            cm: cm,
+            e_na: e_na,
+            e_k: e_k,
+            e_k_leak: e_k_leak,
+            g_na: g_na,
+            g_k: g_k,
+            g_k_leak: g_k_leak,
+            m: gate.clone(),
+            n: gate.clone(),
+            h: gate,
+            bayesian_params: bayesian_params,
+        };
+
+        let mean_change = &hodgkin_huxley.bayesian_params.mean != &BayesianParameters::default().mean;
+        let std_change = &hodgkin_huxley.bayesian_params.std != &BayesianParameters::default().std;
+        let bayesian = if mean_change || std_change {
+            true
+        } else {
+            false
+        };
+
+        hodgkin_huxley.run_static_input(input_voltage, bayesian, iterations, &filename);
+
+        println!("\nFinished Hodgkin Huxley test");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
