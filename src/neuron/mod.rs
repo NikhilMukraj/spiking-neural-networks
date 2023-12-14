@@ -576,11 +576,12 @@ impl Default for HodgkinHuxleyCell {
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
+// voltage = current * resistance // input
 impl HodgkinHuxleyCell {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
-        self.n.alpha = 0.01 * ((10. - voltage) / (((10. - voltage) / 10.)-1.).exp());
+        self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp()-1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
-        self.m.alpha = 0.1 * ((25. - voltage) / ((25. - voltage) / 10.) - 1.).exp();
+        self.m.alpha = 0.1 * ((25. - voltage) / (((25. - voltage) / 10.).exp() - 1.));
         self.m.beta = 4. * (-voltage / 18.).exp();
         self.h.alpha = 0.07 * (-voltage / 20.).exp();
         self.h.beta = 1. / (((30. - voltage) / 10.).exp() + 1.);
@@ -594,11 +595,11 @@ impl HodgkinHuxleyCell {
         self.h.init_state();
     }
 
-    pub fn update_cell_voltage(&mut self, input: f64) {
+    pub fn update_cell_voltage(&mut self, input_current: f64) {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
-        let i_sum = input - i_na - i_k - i_k_leak;
+        let i_sum = input_current - i_na - i_k - i_k_leak;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
