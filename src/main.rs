@@ -2246,11 +2246,11 @@ fn main() -> Result<()> {
         };
         println!("filename: {}", filename);
     
-        let input_voltage: f64 = match hodgkin_huxley_table.get("input_voltage") {
-            Some(value) => parse_f64(value, "input_voltage")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        let input_current: f64 = match hodgkin_huxley_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
-        println!("input_voltage: {}", input_voltage);
+        println!("input_current: {}", input_current);
 
         let v_init: f64 = parse_value_with_default(
             &hodgkin_huxley_table, 
@@ -2381,7 +2381,7 @@ fn main() -> Result<()> {
             false
         };
 
-        hodgkin_huxley.run_static_input(input_voltage, bayesian, iterations, &filename);
+        hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename);
 
         println!("\nFinished Hodgkin Huxley test");
     } else {
