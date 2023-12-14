@@ -8,6 +8,7 @@ mod distribution;
 use distribution::limited_distr;
 
 
+#[derive(Debug, Clone)]
 pub struct BayesianParameters {
     pub mean: f64,
     pub std: f64,
@@ -41,10 +42,7 @@ pub struct IFParameters {
     pub d_init: f64,
     pub dt: f64,
     pub exp_dt: f64,
-    pub bayesian_mean: f64,
-    pub bayesian_std: f64,
-    pub bayesian_max: f64,
-    pub bayesian_min: f64,
+    pub bayesian_params: BayesianParameters,
     // total_time: f64,
 }
 
@@ -64,10 +62,7 @@ impl Default for IFParameters {
             d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
-            bayesian_std: BayesianParameters::default().std, // std of norm distr
-            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
+            bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
 }
@@ -92,10 +87,7 @@ impl ScaledDefault for IFParameters {
             d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
-            bayesian_std: BayesianParameters::default().std, // std of norm distr
-            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
+            bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
 }
@@ -120,10 +112,7 @@ impl IzhikevichDefault for IFParameters {
             d_init: 8.0, // arbitrary d value
             dt: 0.5, // simulation time step (ms)
             exp_dt: 1., // exponential time step (ms)
-            bayesian_mean: BayesianParameters::default().mean, // center of norm distr
-            bayesian_std: BayesianParameters::default().std, // std of norm distr
-            bayesian_max: BayesianParameters::default().max, // maximum cutoff for norm distr
-            bayesian_min: BayesianParameters::default().min, // minimum cutoff for norm distr
+            bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
 }
@@ -134,10 +123,7 @@ pub struct STDPParameters {
     pub a_minus: f64, // negative stdp modifier 
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
-    pub weight_init: f64, // initial weight value
-    pub weight_std: f64, // weight deviation
-    pub weight_min: f64, // minimum weight value
-    pub weight_max: f64, // maximum weight value
+    pub weight_bayesian_params: BayesianParameters, // weight initialization parameters
 }
 
 impl Default for STDPParameters {
@@ -147,10 +133,12 @@ impl Default for STDPParameters {
             a_minus: 2., 
             tau_plus: 45., 
             tau_minus: 45., 
-            weight_init: 3.5,
-            weight_std: 1.0,
-            weight_min: 1.75,
-            weight_max: 5.25,
+            weight_bayesian_params: BayesianParameters {
+                mean: 3.5,
+                std: 1.0,
+                min: 1.75,
+                max: 1.75,
+            },
         }
     }
 }
@@ -210,10 +198,7 @@ pub struct Cell {
     pub chance_of_random_release: f64, // likelyhood of neuron randomly releasing neurotransmitter
     pub random_release_concentration: f64, // how much neurotransmitter is randomly released
     pub w_value: f64, // adaptive value 
-    pub a_plus: f64, // postitive stdp modifier 
-    pub a_minus: f64, // negative stdp modifier 
-    pub tau_plus: f64, // postitive stdp decay modifier 
-    pub tau_minus: f64, // negative stdp decay modifier 
+    pub stdp_params: STDPParameters, // stdp parameters
     pub last_firing_time: Option<usize>,
     pub alpha: f64, // arbitrary value (controls speed in izhikevich)
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
@@ -237,10 +222,7 @@ impl Default for Cell {
             chance_of_random_release: 0.,
             random_release_concentration: 0.,
             w_value: IFParameters::default().w_init,
-            a_plus: STDPParameters::default().a_plus,
-            a_minus: STDPParameters::default().a_minus,
-            tau_plus: STDPParameters::default().tau_plus,
-            tau_minus: STDPParameters::default().tau_minus,
+            stdp_params: STDPParameters::default(),
             last_firing_time: None,
             alpha: IFParameters::default().alpha_init,
             beta: IFParameters::default().beta_init,
@@ -266,10 +248,7 @@ impl IzhikevichDefault for Cell {
             chance_of_random_release: 0.,
             random_release_concentration: 0.,
             w_value: IFParameters::izhikevich_default().w_init,
-            a_plus: STDPParameters::default().a_plus,
-            a_minus: STDPParameters::default().a_minus,
-            tau_plus: STDPParameters::default().tau_plus,
-            tau_minus: STDPParameters::default().tau_minus,
+            stdp_params: STDPParameters::default(),
             last_firing_time: None,
             alpha: IFParameters::izhikevich_default().alpha_init,
             beta: IFParameters::izhikevich_default().beta_init,
@@ -421,7 +400,7 @@ impl Cell {
 
         for _ in 0..iterations {
             let (dv, _is_spiking) = if bayesian {
-                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
             } else {
                 self.get_dv_change_and_spike(lif, i)
             };
@@ -446,7 +425,7 @@ impl Cell {
         for _ in 0..iterations {
             let _is_spiking = self.apply_dw_change_and_get_spike(lif);
             let dv = if bayesian {
-                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
             } else {
                 self.adaptive_get_dv_change(lif, i)
             };
@@ -471,7 +450,7 @@ impl Cell {
         for _ in 0..iterations {
             let _is_spiking = self.apply_dw_change_and_get_spike(lif);
             let dv = if bayesian {
-                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_mean, lif.bayesian_std, 0., 1.))
+                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
             } else {
                 self.exp_adaptive_get_dv_change(lif, i)
             };
@@ -496,7 +475,7 @@ impl Cell {
         for _ in 0..iterations {
             let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
             let dv = if bayesian {
-                self.izhikevich_get_dv_change(if_params, i * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.))
+                self.izhikevich_get_dv_change(if_params, i * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
             } else {
                 self.izhikevich_get_dv_change(if_params, i)
             };
@@ -521,7 +500,7 @@ impl Cell {
         for _ in 0..iterations {
             let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
             let dv = if bayesian {
-                self.izhikevich_leaky_get_dv_change(if_params, i * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.))
+                self.izhikevich_leaky_get_dv_change(if_params, i * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
             } else {
                 self.izhikevich_leaky_get_dv_change(if_params, i)
             };

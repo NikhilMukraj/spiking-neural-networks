@@ -87,10 +87,10 @@ fn get_input_from_positions(
     match if_params {
         Some(params) => { 
             input_val *= limited_distr(
-                params.bayesian_mean, 
-                params.bayesian_std, 
-                params.bayesian_min, 
-                params.bayesian_max
+                params.bayesian_params.mean, 
+                params.bayesian_params.std, 
+                params.bayesian_params.min, 
+                params.bayesian_params.max,
             ); 
         },
         None => {},
@@ -141,10 +141,10 @@ fn weighted_get_input_from_positions(
     match if_params {
         Some(params) => { 
             input_val *= limited_distr(
-                params.bayesian_mean, 
-                params.bayesian_std, 
-                params.bayesian_min, 
-                params.bayesian_max
+                params.bayesian_params.mean, 
+                params.bayesian_params.std, 
+                params.bayesian_params.min, 
+                params.bayesian_params.max,
             ); 
         },
         None => {},
@@ -362,8 +362,8 @@ fn run_simulation(
     let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
         .unwrap_or(&0.);
 
-    let mean_change = &if_params.bayesian_mean != &BayesianParameters::default().mean;
-    let std_change = &if_params.bayesian_std != &BayesianParameters::default().std;
+    let mean_change = &if_params.bayesian_params.mean != &BayesianParameters::default().mean;
+    let std_change = &if_params.bayesian_params.std != &BayesianParameters::default().std;
     let bayesian = if mean_change || std_change {
         Some(if_params)
     } else {
@@ -387,10 +387,7 @@ fn run_simulation(
                     chance_of_random_release: chance_of_random_release,
                     random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
                     w_value: if_params.w_init,
-                    a_plus: stdp_params.a_plus,
-                    a_minus: stdp_params.a_minus,
-                    tau_plus: stdp_params.tau_plus,
-                    tau_minus: stdp_params.tau_minus,
+                    stdp_params: stdp_params.clone(),
                     last_firing_time: None,
                     alpha: if_params.alpha_init,
                     beta: if_params.beta_init,
@@ -714,10 +711,10 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
             if_params.v_reset = parse_value_with_default(table, &format!("{}_v_reset", prefix_value), parse_f64, if_params.v_reset)?; 
             if_params.d_init = parse_value_with_default(table, &format!("{}_d_init", prefix_value), parse_f64, if_params.d_init)?;
             if_params.w_init = parse_value_with_default(table, &format!("{}_w_init", prefix_value), parse_f64, if_params.w_init)?;
-            if_params.bayesian_mean = parse_value_with_default(table, &format!("{}_bayesian_mean", prefix_value), parse_f64, if_params.bayesian_mean)?;
-            if_params.bayesian_std = parse_value_with_default(table, &format!("{}_bayesian_std", prefix_value), parse_f64, if_params.bayesian_std)?;
-            if_params.bayesian_max = parse_value_with_default(table, &format!("{}_bayesian_max", prefix_value), parse_f64, if_params.bayesian_max)?;
-            if_params.bayesian_min = parse_value_with_default(table, &format!("{}_bayesian_min", prefix_value), parse_f64, if_params.bayesian_min)?;
+            if_params.bayesian_params.mean = parse_value_with_default(table, &format!("{}_bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
+            if_params.bayesian_params.std = parse_value_with_default(table, &format!("{}_bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
+            if_params.bayesian_params.max = parse_value_with_default(table, &format!("{}_bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
+            if_params.bayesian_params.min = parse_value_with_default(table, &format!("{}_bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
         }
         None => {
             if_params.dt = parse_value_with_default(table, "dt", parse_f64, if_params.dt)?;
@@ -729,10 +726,10 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
             if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
             if_params.d_init = parse_value_with_default(table, "d_init", parse_f64, if_params.d_init)?;
             if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
-            if_params.bayesian_mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_mean)?;
-            if_params.bayesian_std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_std)?;
-            if_params.bayesian_max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_max)?;
-            if_params.bayesian_min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_min)?;
+            if_params.bayesian_params.mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_params.mean)?;
+            if_params.bayesian_params.std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_params.std)?;
+            if_params.bayesian_params.max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_params.max)?;
+            if_params.bayesian_params.min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_params.min)?;
         }
     }
 
@@ -772,37 +769,37 @@ fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
     )?; 
     println!("tau_minus: {}", stdp.tau_minus);
 
-    stdp.weight_init = parse_value_with_default(
+    stdp.weight_bayesian_params.mean = parse_value_with_default(
         table, 
         "weight_init", 
         parse_f64, 
-        stdp.weight_init
+        stdp.weight_bayesian_params.mean
     )?;
-    println!("weight_init: {}", stdp.weight_init);
+    println!("weight_init: {}", stdp.weight_bayesian_params.mean);
 
-    stdp.weight_std = parse_value_with_default(
+    stdp.weight_bayesian_params.std = parse_value_with_default(
         table, 
         "weight_std", 
         parse_f64, 
-        stdp.weight_std
+        stdp.weight_bayesian_params.std
     )?;
-    println!("weight_std: {}", stdp.weight_std);
+    println!("weight_std: {}", stdp.weight_bayesian_params.std);
 
-    stdp.weight_min = parse_value_with_default(
+    stdp.weight_bayesian_params.min = parse_value_with_default(
         table, 
         "weight_min", 
         parse_f64, 
-        stdp.weight_min
+        stdp.weight_bayesian_params.min
     )?;
-    println!("weight_min: {}", stdp.weight_min);
+    println!("weight_min: {}", stdp.weight_bayesian_params.min);
 
-    stdp.weight_max = parse_value_with_default(
+    stdp.weight_bayesian_params.max = parse_value_with_default(
         table, 
         "weight_max", 
         parse_f64, 
-        stdp.weight_max
+        stdp.weight_bayesian_params.max
     )?;
-    println!("weight_max: {}", stdp.weight_max);
+    println!("weight_max: {}", stdp.weight_bayesian_params.max);
 
     Ok(())
 }
@@ -1173,10 +1170,7 @@ fn test_coupled_neurons(
         chance_of_random_release: *default_pre_values.get("pre_chance_of_random_release").unwrap(), 
         random_release_concentration: *default_pre_values.get("pre_random_release_concentration").unwrap(),
         w_value: pre_if_params.w_init,
-        a_plus: STDPParameters::default().a_plus,
-        a_minus: STDPParameters::default().a_minus,
-        tau_plus: STDPParameters::default().tau_plus,
-        tau_minus: STDPParameters::default().tau_minus,
+        stdp_params: STDPParameters::default(),
         last_firing_time: None,
         alpha: pre_if_params.alpha_init,
         beta: pre_if_params.beta_init,
@@ -1198,10 +1192,7 @@ fn test_coupled_neurons(
         chance_of_random_release: *default_post_values.get("post_chance_of_random_release").unwrap(),
         random_release_concentration: *default_post_values.get("post_random_release_concentration").unwrap(),
         w_value: post_if_params.w_init,
-        a_plus: STDPParameters::default().a_plus,
-        a_minus: STDPParameters::default().a_minus,
-        tau_plus: STDPParameters::default().tau_plus,
-        tau_minus: STDPParameters::default().tau_minus,
+        stdp_params: STDPParameters::default(),
         last_firing_time: None,
         alpha: post_if_params.alpha_init,
         beta: post_if_params.beta_init,
@@ -1218,16 +1209,16 @@ fn test_coupled_neurons(
         PotentiationType::Inhibitory => 1.,
     };
 
-    let pre_mean_change = &pre_if_params.bayesian_mean != &BayesianParameters::default().mean;
-    let pre_std_change = &pre_if_params.bayesian_std != &BayesianParameters::default().std;
+    let pre_mean_change = &pre_if_params.bayesian_params.mean != &BayesianParameters::default().mean;
+    let pre_std_change = &pre_if_params.bayesian_params.std != &BayesianParameters::default().std;
     let pre_bayesian = if pre_mean_change || pre_std_change {
         true
     } else { 
         false
     };
 
-    let post_mean_change = &post_if_params.bayesian_mean != &BayesianParameters::default().mean;
-    let post_std_change = &post_if_params.bayesian_std != &BayesianParameters::default().std;
+    let post_mean_change = &post_if_params.bayesian_params.mean != &BayesianParameters::default().mean;
+    let post_std_change = &post_if_params.bayesian_params.std != &BayesianParameters::default().std;
     let post_bayesian = if post_mean_change || post_std_change {
         true
     } else { 
@@ -1240,7 +1231,7 @@ fn test_coupled_neurons(
                 let (pre_dv, pre_is_spiking) = if pre_bayesian {
                     pre_synaptic_neuron.get_dv_change_and_spike(
                         &pre_if_params, 
-                        input_voltage * limited_distr(pre_if_params.bayesian_mean, pre_if_params.bayesian_std, 0., 1.)
+                        input_voltage * limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     pre_synaptic_neuron.get_dv_change_and_spike(&pre_if_params, input_voltage)
@@ -1258,7 +1249,7 @@ fn test_coupled_neurons(
                 let (post_dv, post_is_spiking) = if post_bayesian {
                     post_synaptic_neuron.get_dv_change_and_spike(
                         &pre_if_params, 
-                        input * limited_distr(post_if_params.bayesian_mean, post_if_params.bayesian_std, 0., 1.)
+                        input * limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     post_synaptic_neuron.get_dv_change_and_spike(&post_if_params, input)
@@ -1299,7 +1290,7 @@ fn test_coupled_neurons(
                     adaptive_dv(
                         &mut pre_synaptic_neuron,
                         &pre_if_params, 
-                        input_voltage * limited_distr(pre_if_params.bayesian_mean, pre_if_params.bayesian_std, 0., 1.)
+                        input_voltage * limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     adaptive_dv(
@@ -1323,7 +1314,7 @@ fn test_coupled_neurons(
                     adaptive_dv(
                         &mut post_synaptic_neuron,
                         &post_if_params, 
-                        input * limited_distr(post_if_params.bayesian_mean, post_if_params.bayesian_std, 0., 1.)
+                        input * limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     adaptive_dv(
@@ -1440,9 +1431,9 @@ fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
             if t_pre < t_post {
-                delta_w = postsynaptic_neuron.a_plus * (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.tau_plus).exp();
+                delta_w = postsynaptic_neuron.stdp_params.a_plus * (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.stdp_params.tau_plus).exp();
             } else if t_pre > t_post {
-                delta_w = -1. * postsynaptic_neuron.a_minus * (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.tau_minus).exp();
+                delta_w = -1. * postsynaptic_neuron.stdp_params.a_minus * (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.stdp_params.tau_minus).exp();
             }
         },
         _ => {}
@@ -1543,10 +1534,7 @@ fn run_isolated_stdp_test(
     postsynaptic_neuron.chance_of_random_release = *default_cell_values.get("chance_of_random_release").unwrap_or(&0.);
     postsynaptic_neuron.random_release_concentration = *default_cell_values.get("random_release_concentration").unwrap_or(&0.);
     postsynaptic_neuron.w_value = if_params.w_init;
-    postsynaptic_neuron.a_plus = stdp_params.a_plus;
-    postsynaptic_neuron.a_minus = stdp_params.a_minus;
-    postsynaptic_neuron.tau_plus = stdp_params.tau_plus;
-    postsynaptic_neuron.tau_minus = stdp_params.tau_minus;
+    postsynaptic_neuron.stdp_params = stdp_params.clone();
     postsynaptic_neuron.alpha = if_params.alpha_init;
     postsynaptic_neuron.beta = if_params.beta_init;
     postsynaptic_neuron.c = if_params.v_reset;
@@ -1569,10 +1557,10 @@ fn run_isolated_stdp_test(
     let mut pre_fires: Vec<Option<usize>> = (0..n).map(|_| None).collect();
     let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
         |_| limited_distr(
-            stdp_params.weight_init, 
-            0.1, 
-            stdp_params.weight_init * 0.5, 
-            stdp_params.weight_init * 1.5
+            stdp_params.weight_bayesian_params.mean, 
+            stdp_params.weight_bayesian_params.std, 
+            stdp_params.weight_bayesian_params.min, 
+            stdp_params.weight_bayesian_params.max,
         )
     ).collect();
 
@@ -1591,10 +1579,10 @@ fn run_isolated_stdp_test(
                 let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
                 for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
-                    let (dv, is_spiking) = if if_params.bayesian_std != 0. {
+                    let (dv, is_spiking) = if if_params.bayesian_params.std != 0. {
                         input_neuron.get_dv_change_and_spike(
                             &if_params, 
-                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
                         )
                     } else {
                         input_neuron.get_dv_change_and_spike(&if_params, input_voltages[n_neuron])
@@ -1631,7 +1619,7 @@ fn run_isolated_stdp_test(
                     .iter()
                     .sum();
                 
-                let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
+                let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
                 let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);
 
                 postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
@@ -1686,11 +1674,11 @@ fn run_isolated_stdp_test(
                 for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
                     let is_spiking = adaptive_apply_and_get_spike(input_neuron, &if_params);
 
-                    let dv = if if_params.bayesian_std != 0. {
+                    let dv = if if_params.bayesian_params.std != 0. {
                         adaptive_dv(
                             input_neuron,
                             &if_params, 
-                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.)
+                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
                         )
                     } else {
                         adaptive_dv(input_neuron, &if_params, input_voltages[n_neuron])
@@ -1731,7 +1719,7 @@ fn run_isolated_stdp_test(
                     .iter()
                     .sum();                  
 
-                let noise_factor = limited_distr(if_params.bayesian_mean, if_params.bayesian_std, 0., 1.);
+                let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
                 let dv = adaptive_dv(&mut postsynaptic_neuron, &if_params, noise_factor * calculated_voltage);
 
                 update_isolated_presynaptic_neuron_weights(
@@ -2027,8 +2015,8 @@ fn main() -> Result<()> {
 
         // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
 
-        let mean_change = &if_params.bayesian_mean != &BayesianParameters::default().mean;
-        let std_change = &if_params.bayesian_std != &BayesianParameters::default().std;
+        let mean_change = &if_params.bayesian_params.mean != &BayesianParameters::default().mean;
+        let std_change = &if_params.bayesian_params.std != &BayesianParameters::default().std;
         let bayesian = if mean_change || std_change {
             true
         } else {
@@ -2051,10 +2039,7 @@ fn main() -> Result<()> {
             chance_of_random_release: 0.2,
             random_release_concentration: 0.1,
             w_value: if_params.w_init,
-            a_plus: STDPParameters::default().a_plus,
-            a_minus: STDPParameters::default().a_minus,
-            tau_plus: STDPParameters::default().tau_plus,
-            tau_minus: STDPParameters::default().tau_minus,
+            stdp_params: STDPParameters::default(),
             last_firing_time: None,
             alpha: if_params.alpha_init,
             beta: if_params.beta_init,
