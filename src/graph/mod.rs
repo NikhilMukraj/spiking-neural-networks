@@ -87,10 +87,10 @@ impl GraphFunctionality for AdjacencyMatrix {
             if do_stdp {
                 self.edit_weight(i, &postsynaptic, Some(
                     limited_distr(
-                        stdp_params.weight_init, 
-                        stdp_params.weight_std, 
-                        stdp_params.weight_min, 
-                        stdp_params.weight_max,
+                        stdp_params.weight_bayesian_params.mean, 
+                        stdp_params.weight_bayesian_params.std, 
+                        stdp_params.weight_bayesian_params.min, 
+                        stdp_params.weight_bayesian_params.max,
                     )
                 ));
             } else {
@@ -216,10 +216,10 @@ impl GraphFunctionality for AdjacencyList {
             let weight = if do_stdp {
                 Some(
                     limited_distr(
-                        stdp_params.weight_init, 
-                        stdp_params.weight_std, 
-                        stdp_params.weight_min, 
-                        stdp_params.weight_max,
+                        stdp_params.weight_bayesian_params.mean, 
+                        stdp_params.weight_bayesian_params.std, 
+                        stdp_params.weight_bayesian_params.min, 
+                        stdp_params.weight_bayesian_params.max,
                     )
                 )
             } else {
