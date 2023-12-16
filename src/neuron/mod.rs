@@ -574,24 +574,6 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
-// https://web.mit.edu/neuron_v7.4/nrntuthtml/tutorial/tutD.html
-// pub struct GateParameters {
-//     ions: f64,
-//     ions_k: f64,
-//     ions_k_leak: f64,
-//     alpha_update: Box<dyn Fn(f64) -> f64>,
-//     beta_update: Box<dyn Fn(f64) -> f64>,
-// }
-
-// pub struct ModifiableHodgkinHuxleyCell {
-//     pub current_voltage: f64,
-//     pub dt: f64,
-//     pub cm: f64,
-//     pub gates: Vec<(GateParameters, Gate)>,
-//     pub leak_gate: Gate,
-//     pub bayesian_params: BayesianParameters,
-// }
-
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
@@ -683,3 +665,126 @@ impl HodgkinHuxleyCell {
         }
     }
 }
+
+// https://web.mit.edu/neuron_v7.4/nrntuthtml/tutorial/tutD.html
+// pub struct GateParameters {
+//     ions: f64,
+//     ions_k: f64,
+//     ions_k_leak: f64,
+//     alpha_update: Box<dyn Fn(f64) -> f64>,
+//     beta_update: Box<dyn Fn(f64) -> f64>,
+//     i_x_function: Box<dyn Fn(&Vec<&Gate>, f64) -> f64>
+// }
+
+// pub struct ModifiableHodgkinHuxleyCell {
+//     pub current_voltage: f64,
+//     pub dt: f64,
+//     pub cm: f64,
+//     pub gates: Vec<(GateParameters, Gate)>,
+//     pub leak_gate: Gate,
+//     pub bayesian_params: BayesianParameters,
+// }
+
+// impl ModifiableHodgkinHuxleyCell {
+//     pub fn update_gate_time_constants(&mut self, voltage: f64) {
+//         for i in self.gates.iter_mut() {
+//             i.1.alpha = (i.0.alpha_update)(voltage);
+//             i.1.beta = (i.0.beta_update)(voltage);
+//         }
+//     }
+
+//     pub fn initialize_parameters(&mut self, starting_voltage: f64) {
+//         self.current_voltage = starting_voltage;
+//         self.update_gate_time_constants(starting_voltage);
+//         for i in self.gates.iter_mut() {
+//             i.1.init_state();
+//         }
+//     }
+
+//     pub fn update_cell_voltage(&mut self, input_current: f64) {
+//         let gates_alone: Vec<&Gate> = self.gates.iter() 
+//             .map(|(_, i)| i)
+//             .collect();
+//         let i_xs: f64 = self.gates.iter()
+//             .map(|(params_i, _)| (params_i.i_x_function)(&gates_alone, self.current_voltage))
+//             .collect::<Vec<f64>>()
+//             .iter()
+//             .sum();
+//         let i_sum = input_current - i_xs;
+//         self.current_voltage += self.dt * i_sum / self.cm;
+//     }
+
+//     pub fn update_gate_states(&mut self) {
+//         for i in self.gates.iter_mut() {
+//             i.1.update(self.dt);
+//         }
+//     }
+
+//     pub fn iterate(&mut self, input: f64) {
+//         self.update_gate_time_constants(self.current_voltage);
+//         self.update_cell_voltage(input);
+//         self.update_gate_states();
+//     }
+
+//     pub fn run_static_input(
+//         &mut self, 
+//         input: f64, 
+//         bayesian: bool, 
+//         iterations: usize, 
+//         filename: &str, 
+//         full: bool
+//     ) {
+//         let gates_len =  self.gates.len();
+
+//         let mut file = BufWriter::new(File::create(filename)
+//             .expect("Unable to create file"));
+//         if !full {
+//             writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+//         } else {
+//             write!(file, "{},", 
+//                 self.current_voltage, 
+//             ).expect("Unable to write to file");
+
+//             for (n, i) in self.gates.iter().enumerate() {
+//                 if n < gates_len - 1 {
+//                     write!(file, "{},", i.1.state).expect("Unable to write to file");
+//                 } else {
+//                     write!(file, "{}", i.1.state).expect("Unable to write to file");
+//                 }
+//             }
+//         }
+
+//         self.initialize_parameters(self.current_voltage);
+        
+//         for _ in 0..iterations {
+//             if bayesian {
+//                 self.iterate(
+//                     input * limited_distr(
+//                         self.bayesian_params.mean, 
+//                         self.bayesian_params.std, 
+//                         self.bayesian_params.min, 
+//                         self.bayesian_params.max,
+//                     )
+//                 );
+//             } else {
+//                 self.iterate(input);
+//             }
+
+//             if !full {
+//                 writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+//             } else {
+//                 write!(file, "{},", 
+//                     self.current_voltage, 
+//                 ).expect("Unable to write to file");
+
+//                 for (n, i) in self.gates.iter().enumerate() {
+//                     if n < gates_len - 1 {
+//                         write!(file, "{},", i.1.state).expect("Unable to write to file");
+//                     } else {
+//                         write!(file, "{}", i.1.state).expect("Unable to write to file");
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
