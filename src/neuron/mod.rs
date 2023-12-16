@@ -574,7 +574,8 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
-// pub struct GateParams {
+// https://web.mit.edu/neuron_v7.4/nrntuthtml/tutorial/tutD.html
+// pub struct GateParameters {
 //     ions: f64,
 //     ions_k: f64,
 //     ions_k_leak: f64,
@@ -585,7 +586,7 @@ impl Default for HodgkinHuxleyCell {
 //     pub current_voltage: f64,
 //     pub dt: f64,
 //     pub cm: f64,
-//     pub gates: Vec<(GateParams, Gate)>,
+//     pub gates: Vec<(GateParameters, Gate)>,
 //     pub leak_gate: Gate,
 //     pub bayesian_params: BayesianParameters,
 // }
