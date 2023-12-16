@@ -574,12 +574,28 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
+// pub struct GateParams {
+//     ions: f64,
+//     ions_k: f64,
+//     ions_k_leak: f64,
+//     update: Box<dyn Fn(Vec<f64>) -> f64>,
+// }
+
+// pub struct ModifiableHodgkinHuxleyCell {
+//     pub current_voltage: f64,
+//     pub dt: f64,
+//     pub cm: f64,
+//     pub gates: Vec<(GateParams, Gate)>,
+//     pub leak_gate: Gate,
+//     pub bayesian_params: BayesianParameters,
+// }
+
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
 impl HodgkinHuxleyCell {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
-        self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp()-1.);
+        self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
         self.m.alpha = 0.1 * ((25. - voltage) / (((25. - voltage) / 10.).exp() - 1.));
         self.m.beta = 4. * (-voltage / 18.).exp();
