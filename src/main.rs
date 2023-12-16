@@ -2252,6 +2252,13 @@ fn main() -> Result<()> {
         };
         println!("input_current: {}", input_current);
 
+        let full: bool = parse_value_with_default(
+            &hodgkin_huxley_table, 
+            "full", 
+            parse_bool, 
+            false
+        )?;
+
         let v_init: f64 = parse_value_with_default(
             &hodgkin_huxley_table, 
             "v_init", 
@@ -2381,7 +2388,7 @@ fn main() -> Result<()> {
             false
         };
 
-        hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename);
+        hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename, full);
 
         println!("\nFinished Hodgkin Huxley test");
     } else {

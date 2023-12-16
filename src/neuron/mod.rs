@@ -615,10 +615,26 @@ impl HodgkinHuxleyCell {
         self.update_gate_states();
     }
 
-    pub fn run_static_input(&mut self, input: f64, bayesian: bool, iterations: usize, filename: &str) {
+    pub fn run_static_input(
+        &mut self, 
+        input: f64, 
+        bayesian: bool, 
+        iterations: usize, 
+        filename: &str, 
+        full: bool
+    ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        if !full {
+            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+        } else {
+            writeln!(file, "{}, {}, {}, {}", 
+                self.current_voltage, 
+                self.m.state, 
+                self.n.state, 
+                self.h.state,
+            ).expect("Unable to write to file");
+        }
 
         self.initialize_parameters(self.current_voltage);
         
@@ -636,7 +652,16 @@ impl HodgkinHuxleyCell {
                 self.iterate(input);
             }
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+            if !full {
+                writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+            } else {
+                writeln!(file, "{}, {}, {}, {}", 
+                    self.current_voltage, 
+                    self.m.state, 
+                    self.n.state, 
+                    self.h.state,
+                ).expect("Unable to write to file");
+            }
         }
     }
 }
