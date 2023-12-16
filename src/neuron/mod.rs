@@ -579,7 +579,8 @@ impl Default for HodgkinHuxleyCell {
 //     ions: f64,
 //     ions_k: f64,
 //     ions_k_leak: f64,
-//     update: Box<dyn Fn(Vec<f64>) -> f64>,
+//     alpha_update: Box<dyn Fn(f64) -> f64>,
+//     beta_update: Box<dyn Fn(f64) -> f64>,
 // }
 
 // pub struct ModifiableHodgkinHuxleyCell {
