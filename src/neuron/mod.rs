@@ -706,7 +706,7 @@ impl HodgkinHuxleyCell {
 //             .map(|(_, i)| i)
 //             .collect();
 //         let i_xs: f64 = self.gates.iter()
-//             .map(|(params_i, _)| (params_i.i_x_function)(&gates_alone, self.current_voltage))
+//             .map(|(params_i, _)| -1 * (params_i.i_x_function)(&gates_alone, self.current_voltage))
 //             .collect::<Vec<f64>>()
 //             .iter()
 //             .sum();
