@@ -1,9 +1,9 @@
-/target
-/*.txt
-/*.bin
-/single neuron tests
-/stdp tests
-/coupled tests
-/lattice simulations
-/stdp lattice
-/test_izhikevich_lattice.toml
+/backend/target
+/backend/*.txt
+/backend/*.bin
+/backend/single neuron tests
+/backend/stdp tests
+/backend/coupled tests
+/backend/lattice simulations
+/backend/stdp lattice
+/backend/test_izhikevich_lattice.toml
