@@ -1,0 +1,14 @@
+[simulation]
+num_rows = 20
+num_cols = 20
+iterations = 2000
+# total_time = 200 # total_time is in ms
+dt = 0.1
+radius = 2
+# excitatory_chance = 0.8
+output_tag = "20x20"
+output_type = "averaged"
+if_type = "adaptive exponential"
+input_equation = """
+    sign * mp + 100. + rd * (nc^2 * 200.)
+"""

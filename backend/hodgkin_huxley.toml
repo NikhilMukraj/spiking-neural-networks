@@ -1,0 +1,9 @@
+[hodgkin_huxley]
+iterations = 10000
+filename = "hodgkin_huxley_test.txt"
+g_na = 100.0  # typically 120
+g_k = 5.0  # typically 36
+e_k = -35.0  # typically -12
+dt = 0.01
+input_current = 50.0
+# bayesian_std = 0.1

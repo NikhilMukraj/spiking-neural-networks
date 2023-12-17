@@ -1,0 +1,33 @@
+[lattice_simulation]
+num_rows = 20
+num_cols = 20
+# excitatory_chance = 0.8
+dt = 0.1
+# exp_dt = 0.01
+iterations = 10000
+radius = 2
+# total_time = 10
+tag = "eeg_sim"
+output_type = "averaged"
+# tau_m = 50.0
+if_type = "adaptive exponential"
+# input_equation = """
+#     (sign * mp + 80.35190615835778 + rd * (nc^2 * 121.21212121212122)) * 16.226783968719452
+# """ # maybe n^3
+# input_equation = "(sign * mp + 100 + rd * (-1 * sign * nc^2 * 100)) * 15" # maybe this instead
+random_volt_initialization = true
+
+# optimizable parameters:
+
+# fixed parameter equation restraints 
+# likely will have to compensate for dt being so small by scaling 
+# parameters by larger amounts
+
+# and maybe these probably not for now
+# tau_m
+# a
+# b
+# bayesian_std
+# tref
+# lif_type
+# excitatory_chance

@@ -1,0 +1,10 @@
+[single_neuron_test]
+if_type = "adaptive quadratic"
+input = 40.0
+dt = 0.5
+a = 0.01
+b = 0.25 
+v_reset = -55.0
+d = 8.0
+iterations = 4000
+filename = "aqif.txt"
