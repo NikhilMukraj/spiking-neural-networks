@@ -1,8 +1,11 @@
 use std::{
     fs::File, 
     io::{Result, Error, ErrorKind, Write, BufWriter}, 
+    collections::HashMap
 };
 use rand::Rng;
+use pyo3::prelude::*;
+use pyo3::types::PyDict;
 #[path = "../distribution/mod.rs"]
 mod distribution;
 use distribution::limited_distr;
@@ -512,6 +515,159 @@ impl Cell {
 }
 
 pub type CellGrid = Vec<Vec<Cell>>;
+
+trait IFCell {
+    fn iterate_and_return_spike(&mut self, i: f64) -> bool;
+    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>>;
+}
+
+// pub current_voltage: f64, // membrane potential
+// pub refractory_count: f64, // keeping track of refractory period
+// pub leak_constant: f64, // leak constant gene
+// pub integration_constant: f64, // integration constant gene
+// pub potentiation_type: PotentiationType,
+// pub neurotransmission_concentration: f64, // concentration of neurotransmitter in synapse
+// pub neurotransmission_release: f64, // concentration of neurotransmitter released at spiking
+// pub receptor_density: f64, // factor of how many receiving receptors for a given neurotransmitter
+// pub chance_of_releasing: f64, // chance cell can produce neurotransmitter
+// pub dissipation_rate: f64, // how quickly neurotransmitter concentration decreases
+// pub chance_of_random_release: f64, // likelyhood of neuron randomly releasing neurotransmitter
+// pub random_release_concentration: f64, // how much neurotransmitter is randomly released
+// pub w_value: f64, // adaptive value 
+// pub stdp_params: STDPParameters, // stdp parameters
+// pub last_firing_time: Option<usize>,
+// pub alpha: f64, // arbitrary value (controls speed in izhikevich)
+// pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
+// pub c: f64, // after spike reset value for voltage
+// pub d: f64, // after spike reset value for w
+
+// v_th: 30., // spike threshold (mV)
+// v_reset: -65., // reset potential (mV)
+// tau_m: 10., // membrane time constant (ms)
+// g_l: 10., // leak conductance (nS)
+// v_init: -65., // initial potential (mV)
+// e_l: -65., // leak reversal potential (mV)
+// tref: 10., // refractory time (ms), could rename to refract_time
+// w_init: 30., // initial w value
+// alpha_init: 0.02, // arbitrary a value
+// beta_init: 0.2, // arbitrary b value
+// d_init: 8.0, // arbitrary d value
+// dt: 0.5, // simulation time step (ms)
+// exp_dt: 1., // exponential time step (ms)
+
+fn default_cell_params_to_pydict(cell: &Cell, if_params: &IFParameters, py: Python<'_>) -> HashMap<String, Py<PyAny>> {
+    let mut params: HashMap<String, Py<PyAny>> = HashMap::new();
+
+    let is_excitatory = match cell.potentiation_type {
+        PotentiationType::Excitatory => true,
+        PotentiationType::Inhibitory => false,
+    };
+
+    params.insert(String::from("current_voltage"), cell.current_voltage.into_py(py));
+    params.insert(String::from("leak_constant"), cell.leak_constant.into_py(py));
+    params.insert(String::from("integration_constant"), cell.integration_constant.into_py(py));
+    params.insert(String::from("is_excitatory"), is_excitatory.into_py(py));
+    params.insert(String::from("neurotransmission_concentration"), cell.neurotransmission_concentration.into_py(py));
+    params.insert(String::from("neurotransmission_release"), cell.neurotransmission_release.into_py(py));
+    params.insert(String::from("receptor_density"), cell.receptor_density.into_py(py));
+    params.insert(String::from("chance_of_releasing"), cell.chance_of_releasing.into_py(py));
+    params.insert(String::from("dissipation_rate"), cell.dissipation_rate.into_py(py));
+    params.insert(String::from("chance_of_random_release"), cell.chance_of_random_release.into_py(py));
+    params.insert(String::from("random_release_concentration"), cell.random_release_concentration.into_py(py));
+
+    params.insert(String::from("v_th"), if_params.v_th.into_py(py));
+    params.insert(String::from("v_reset"), if_params.v_reset.into_py(py));
+    params.insert(String::from("tau_m"), if_params.tau_m.into_py(py));
+    params.insert(String::from("g_l"), if_params.g_l.into_py(py));
+    params.insert(String::from("v_init"), if_params.v_init.into_py(py));
+    params.insert(String::from("e_l"), if_params.e_l.into_py(py));
+    params.insert(String::from("dt"), if_params.dt.into_py(py));
+
+    params
+}
+
+pub fn convert_hashmap_to_pydict<'a, K, V>(hashmap: &HashMap<K, V>, py: Python<'_>) -> PyResult<Py<PyDict>>
+where
+    K: ToPyObject + Eq + std::hash::Hash,
+    V: ToPyObject,
+{
+    let pydict = PyDict::new(py);
+
+    for (key, value) in hashmap {
+        pydict.set_item(key, value)?;
+    }
+
+    return Ok(pydict.into())
+}
+
+#[pyclass]
+pub struct BasicIFCell {
+    cell_backend: Cell,
+    pub if_params: IFParameters,
+}
+
+#[pymethods]
+impl BasicIFCell {
+    fn get_dv_change_and_spike(&mut self, i: f64) -> (f64, bool) {
+        self.cell_backend.get_dv_change_and_spike(&self.if_params, i)
+    }
+}
+
+impl IFCell for BasicIFCell {
+    fn iterate_and_return_spike(&mut self, i: f64) -> bool {
+        let (dv, is_spiking) = self.get_dv_change_and_spike(i);
+        self.cell_backend.current_voltage += dv;
+
+        is_spiking
+    }
+
+    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let mut params = default_cell_params_to_pydict(&self.cell_backend, &self.if_params, py);
+
+        params.insert(String::from("tref"), self.if_params.tref.into_py(py));
+        params.insert(String::from("refractory_count"), self.cell_backend.refractory_count.into_py(py));
+
+        convert_hashmap_to_pydict(&params, py)
+    }
+}
+
+#[pyclass]
+pub struct AdaptiveIFCell {
+    cell_backend: Cell,
+    pub if_params: IFParameters,
+}
+
+#[pymethods]
+impl AdaptiveIFCell {
+    fn apply_dw_change_and_get_spike(&mut self) -> bool {
+        self.cell_backend.apply_dw_change_and_get_spike(&self.if_params)
+    }
+
+    fn get_adaptive_dv_change(&mut self, i: f64) -> f64 {
+        self.cell_backend.adaptive_get_dv_change(&self.if_params, i)
+    }
+}
+
+impl IFCell for AdaptiveIFCell {
+    fn iterate_and_return_spike(&mut self, i: f64) -> bool {
+        let is_spiking = self.apply_dw_change_and_get_spike();
+        let dv = self.get_adaptive_dv_change(i);
+        self.cell_backend.current_voltage += dv;
+
+        is_spiking
+    }
+
+    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+        let mut params = default_cell_params_to_pydict(&self.cell_backend, &self.if_params, py);
+
+        params.insert(String::from("w_init"), self.if_params.w_init.into_py(py));
+        params.insert(String::from("w_value"), self.cell_backend.w_value.into_py(py));
+        params.insert(String::from("tref"), self.if_params.tref.into_py(py));
+        params.insert(String::from("refractory_count"), self.cell_backend.refractory_count.into_py(py));
+
+        convert_hashmap_to_pydict(&params, py)
+    }
+}
 
 #[derive(Clone)]
 pub struct Gate {
