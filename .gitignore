@@ -7,3 +7,4 @@
 /backend/lattice simulations
 /backend/stdp lattice
 /backend/test_izhikevich_lattice.toml
+/interface/target
