@@ -13,8 +13,7 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFParameters, IFType, PotentiationType, Cell, CellGrid, 
-    BasicIFCell, AdaptiveIFCell,
+    IFParameters, IFType, PotentiationType, Cell, CellGrid,
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
     Gate, HodgkinHuxleyCell
 };
@@ -24,6 +23,8 @@ mod ga;
 use crate::ga::{BitString, decode, genetic_algo};
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
+mod py_interface;
+use crate::py_interface::IFCell;
 
 
 fn positions_within_square(
@@ -1381,8 +1382,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // m.add_function(wrap_pyfunction!(func, m)?)?;
 
-    m.add_class::<BasicIFCell>()?;
-    m.add_class::<AdaptiveIFCell>()?;
+    m.add_class::<IFCell>()?;
 
     Ok(())
 }
