@@ -516,11 +516,6 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
-trait IFCell {
-    fn iterate_and_return_spike(&mut self, i: f64) -> bool;
-    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>>;
-}
-
 // pub current_voltage: f64, // membrane potential
 // pub refractory_count: f64, // keeping track of refractory period
 // pub leak_constant: f64, // leak constant gene
@@ -603,25 +598,34 @@ where
 #[pyclass]
 pub struct BasicIFCell {
     cell_backend: Cell,
-    pub if_params: IFParameters,
+    if_params: IFParameters,
 }
 
 #[pymethods]
 impl BasicIFCell {
-    fn get_dv_change_and_spike(&mut self, i: f64) -> (f64, bool) {
+    #[new]
+    fn new() -> Self {
+        BasicIFCell { 
+            cell_backend: Cell::default(),
+            if_params: IFParameters::default(),
+        }
+    }
+
+    #[pyo3(signature = (i))]
+    pub fn get_dv_change_and_spike(&mut self, i: f64) -> (f64, bool) {
         self.cell_backend.get_dv_change_and_spike(&self.if_params, i)
     }
-}
 
-impl IFCell for BasicIFCell {
-    fn iterate_and_return_spike(&mut self, i: f64) -> bool {
+    #[pyo3(signature = (i))]
+    pub fn iterate_and_return_spike(&mut self, i: f64) -> bool {
         let (dv, is_spiking) = self.get_dv_change_and_spike(i);
         self.cell_backend.current_voltage += dv;
 
         is_spiking
     }
 
-    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    #[pyo3(signature = ())]
+    pub fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let mut params = default_cell_params_to_pydict(&self.cell_backend, &self.if_params, py);
 
         params.insert(String::from("tref"), self.if_params.tref.into_py(py));
@@ -639,17 +643,18 @@ pub struct AdaptiveIFCell {
 
 #[pymethods]
 impl AdaptiveIFCell {
-    fn apply_dw_change_and_get_spike(&mut self) -> bool {
+    #[pyo3(signature = ())]
+    pub fn apply_dw_change_and_get_spike(&mut self) -> bool {
         self.cell_backend.apply_dw_change_and_get_spike(&self.if_params)
     }
 
-    fn get_adaptive_dv_change(&mut self, i: f64) -> f64 {
+    #[pyo3(signature = (i))]
+    pub fn get_adaptive_dv_change(&mut self, i: f64) -> f64 {
         self.cell_backend.adaptive_get_dv_change(&self.if_params, i)
     }
-}
 
-impl IFCell for AdaptiveIFCell {
-    fn iterate_and_return_spike(&mut self, i: f64) -> bool {
+    #[pyo3(signature = (i))]
+    pub fn iterate_and_return_spike(&mut self, i: f64) -> bool {
         let is_spiking = self.apply_dw_change_and_get_spike();
         let dv = self.get_adaptive_dv_change(i);
         self.cell_backend.current_voltage += dv;
@@ -657,7 +662,8 @@ impl IFCell for AdaptiveIFCell {
         is_spiking
     }
 
-    fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
+    #[pyo3(signature = ())]
+    pub fn params(&self, py: Python<'_>) -> PyResult<Py<PyDict>> {
         let mut params = default_cell_params_to_pydict(&self.cell_backend, &self.if_params, py);
 
         params.insert(String::from("w_init"), self.if_params.w_init.into_py(py));

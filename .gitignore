@@ -9,3 +9,4 @@
 /backend/test_izhikevich_lattice.toml
 /interface/target
 /interface/.venv
+/interface/generate_methods.py
