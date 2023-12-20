@@ -1,1 +1,2 @@
 maturin==0.15.3
+patchelf==0.17.2.1
