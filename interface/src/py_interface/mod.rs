@@ -135,44 +135,87 @@ impl IFCell {
         self.cell_backend.determine_neurotransmitter_concentration(is_spiking);
     }
     
-    #[pyo3(signature = (param_name, new_value))]
-    pub fn change_param(&mut self, param_name: &str, new_value: f64) -> PyResult<()> {
-        match param_name {
-            "v_th" => { self.if_params.v_th = new_value; },
-            "v_reset" => { self.if_params.v_reset = new_value; },
-            "tau_m" => { self.if_params.tau_m = new_value; },
-            "g_l" => { self.if_params.g_l = new_value; },
-            "v_init" => { self.if_params.v_init = new_value; },
-            "e_l" => { self.if_params.e_l = new_value; },
-            "tref" => { self.if_params.tref = new_value; },
-            "w_init" => { self.if_params.w_init = new_value; },
-            "alpha_init" => { self.if_params.alpha_init = new_value; },
-            "beta_init" => { self.if_params.beta_init = new_value; },
-            "d_init" => { self.if_params.d_init = new_value; },
-            "dt" => { self.if_params.dt = new_value; },
-            "exp_dt" => { self.if_params.exp_dt = new_value; },
-            "current_voltage" => { self.cell_backend.current_voltage = new_value; },
-            "refractory_count" => { self.cell_backend.refractory_count = new_value; },
-            "leak_constant" => { self.cell_backend.leak_constant = new_value; },
-            "integration_constant" => { self.cell_backend.integration_constant = new_value; },
-            // "potentiation_type" => { self.cell_backend.potentiation_type = new_value; },
-            "neurotransmission_concentration" => { self.cell_backend.neurotransmission_concentration = new_value; },
-            "neurotransmission_release" => { self.cell_backend.neurotransmission_release = new_value; },
-            "receptor_density" => { self.cell_backend.receptor_density = new_value; },
-            "chance_of_releasing" => { self.cell_backend.chance_of_releasing = new_value; },
-            "dissipation_rate" => { self.cell_backend.dissipation_rate = new_value; },
-            "chance_of_random_release" => { self.cell_backend.chance_of_random_release = new_value; },
-            "random_release_concentration" => { self.cell_backend.random_release_concentration = new_value; },
-            "w_value" => { self.cell_backend.w_value = new_value; },
-            // "stdp_params" => { self.cell_backend.stdp_params = new_value; },
-            // "last_firing_time" => { self.cell_backend.last_firing_time = new_value; },
-            "alpha" => { self.cell_backend.alpha = new_value; },
-            "beta" => { self.cell_backend.beta = new_value; },
-            "c" => { self.cell_backend.c = new_value; },
-            "d" => { self.cell_backend.d = new_value; },
-            _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
-        };
+    #[pyo3(signature = (param_name, value=None))]
+    pub fn param(&mut self, param_name: &str, value: Option<f64>) -> PyResult<Option<f64>> {
+        match value {
+            Some(new_value) => {
+                match param_name {
+                    "v_th" => { self.if_params.v_th = new_value; },
+                    "v_reset" => { self.if_params.v_reset = new_value; },
+                    "tau_m" => { self.if_params.tau_m = new_value; },
+                    "g_l" => { self.if_params.g_l = new_value; },
+                    "v_init" => { self.if_params.v_init = new_value; },
+                    "e_l" => { self.if_params.e_l = new_value; },
+                    "tref" => { self.if_params.tref = new_value; },
+                    "w_init" => { self.if_params.w_init = new_value; },
+                    "alpha_init" => { self.if_params.alpha_init = new_value; },
+                    "beta_init" => { self.if_params.beta_init = new_value; },
+                    "d_init" => { self.if_params.d_init = new_value; },
+                    "dt" => { self.if_params.dt = new_value; },
+                    "exp_dt" => { self.if_params.exp_dt = new_value; },
+                    "current_voltage" => { self.cell_backend.current_voltage = new_value; },
+                    "refractory_count" => { self.cell_backend.refractory_count = new_value; },
+                    "leak_constant" => { self.cell_backend.leak_constant = new_value; },
+                    "integration_constant" => { self.cell_backend.integration_constant = new_value; },
+                    // "potentiation_type" => { self.cell_backend.potentiation_type = new_value; },
+                    "neurotransmission_concentration" => { self.cell_backend.neurotransmission_concentration = new_value; },
+                    "neurotransmission_release" => { self.cell_backend.neurotransmission_release = new_value; },
+                    "receptor_density" => { self.cell_backend.receptor_density = new_value; },
+                    "chance_of_releasing" => { self.cell_backend.chance_of_releasing = new_value; },
+                    "dissipation_rate" => { self.cell_backend.dissipation_rate = new_value; },
+                    "chance_of_random_release" => { self.cell_backend.chance_of_random_release = new_value; },
+                    "random_release_concentration" => { self.cell_backend.random_release_concentration = new_value; },
+                    "w_value" => { self.cell_backend.w_value = new_value; },
+                    // "stdp_params" => { self.cell_backend.stdp_params = new_value; },
+                    // "last_firing_time" => { self.cell_backend.last_firing_time = new_value; },
+                    "alpha" => { self.cell_backend.alpha = new_value; },
+                    "beta" => { self.cell_backend.beta = new_value; },
+                    "c" => { self.cell_backend.c = new_value; },
+                    "d" => { self.cell_backend.d = new_value; },
+                    _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
+                };
 
-        Ok(())
+                Ok(None)
+            },
+            None => {
+                let return_value = match param_name {
+                    "v_th" => self.if_params.v_th,
+                    "v_reset" => self.if_params.v_reset,
+                    "tau_m" => self.if_params.tau_m,
+                    "g_l" => self.if_params.g_l,
+                    "v_init" => self.if_params.v_init,
+                    "e_l" => self.if_params.e_l,
+                    "tref" => self.if_params.tref,
+                    "w_init" => self.if_params.w_init,
+                    "alpha_init" => self.if_params.alpha_init,
+                    "beta_init" => self.if_params.beta_init,
+                    "d_init" => self.if_params.d_init,
+                    "dt" => self.if_params.dt,
+                    "exp_dt" => self.if_params.exp_dt,
+                    "current_voltage" => self.cell_backend.current_voltage,
+                    "refractory_count" => self.cell_backend.refractory_count,
+                    "leak_constant" => self.cell_backend.leak_constant,
+                    "integration_constant" => self.cell_backend.integration_constant,
+                    // "potentiation_type" => self.cell_backend.potentiation_type,
+                    "neurotransmission_concentration" => self.cell_backend.neurotransmission_concentration,
+                    "neurotransmission_release" => self.cell_backend.neurotransmission_release,
+                    "receptor_density" => self.cell_backend.receptor_density,
+                    "chance_of_releasing" => self.cell_backend.chance_of_releasing,
+                    "dissipation_rate" => self.cell_backend.dissipation_rate,
+                    "chance_of_random_release" => self.cell_backend.chance_of_random_release,
+                    "random_release_concentration" => self.cell_backend.random_release_concentration,
+                    "w_value" => self.cell_backend.w_value,
+                    // "stdp_params" => self.cell_backend.stdp_params,
+                    // "last_firing_time" => self.cell_backend.last_firing_time,
+                    "alpha" => self.cell_backend.alpha,
+                    "beta" => self.cell_backend.beta,
+                    "c" => self.cell_backend.c,
+                    "d" => self.cell_backend.d,
+                    _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
+                };
+
+                Ok(Some(return_value))
+            }
+        }
     }
 }
