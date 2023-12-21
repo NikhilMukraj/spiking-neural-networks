@@ -1,7 +1,9 @@
-use std::io::{Result, Error, ErrorKind};
+// use std::io::{Result, Error, ErrorKind};
 use pyo3::prelude::*;
 use pyo3::exceptions::PyLookupError;
 use crate::neuron::{IFParameters, IFType, Cell};
+use crate::distribution::limited_distr;
+
 
 // pub current_voltage: f64, // membrane potential
 // pub refractory_count: f64, // keeping track of refractory period
@@ -90,39 +92,50 @@ impl IFCell {
         self.cell_backend.izhikevich_leaky_get_dv_change(&self.if_params, i)
     }
 
-    #[pyo3(signature = (i))]
-    pub fn iterate_and_return_spike(&mut self, i: f64) -> bool {
+    #[pyo3(signature = (i, bayesian=false))]
+    pub fn iterate_and_return_spike(&mut self, i: f64, bayesian: bool) -> bool {
+        let input_voltage = if bayesian {
+            i * limited_distr(
+                self.if_params.bayesian_params.mean, 
+                self.if_params.bayesian_params.std,
+                self.if_params.bayesian_params.min,
+                self.if_params.bayesian_params.max,
+            )
+        } else {
+            i
+        };
+
         match self.mode {
             IFType::Basic => {
-                let (dv, is_spiking) = self.get_dv_change_and_spike(i);
+                let (dv, is_spiking) = self.get_dv_change_and_spike(input_voltage);
                 self.cell_backend.current_voltage += dv;
 
                 is_spiking
             },
             IFType::Adaptive => {
                 let is_spiking = self.apply_dw_change_and_get_spike();
-                let dv = self.adaptive_get_dv_change(i);
+                let dv = self.adaptive_get_dv_change(input_voltage);
                 self.cell_backend.current_voltage += dv;
 
                 is_spiking
             },
             IFType::AdaptiveExponential => {
                 let is_spiking = self.apply_dw_change_and_get_spike();
-                let dv = self.exp_adaptive_get_dv_change(i);
+                let dv = self.exp_adaptive_get_dv_change(input_voltage);
                 self.cell_backend.current_voltage += dv;
 
                 is_spiking
             },
             IFType::Izhikevich => {
                 let is_spiking = self.izhikevich_apply_dw_and_get_spike();
-                let dv = self.izhikevich_get_dv_change(i);
+                let dv = self.izhikevich_get_dv_change(input_voltage);
                 self.cell_backend.current_voltage += dv;
 
                 is_spiking
             },
             IFType::IzhikevichLeaky => {
                 let is_spiking = self.izhikevich_apply_dw_and_get_spike();
-                let dv = self.izhikevich_leaky_get_dv_change(i);
+                let dv = self.izhikevich_leaky_get_dv_change(input_voltage);
                 self.cell_backend.current_voltage += dv;
 
                 is_spiking
@@ -133,6 +146,20 @@ impl IFCell {
     #[pyo3(signature = (is_spiking))]
     pub fn determine_neurotransmitter_concentration(&mut self, is_spiking: bool) {
         self.cell_backend.determine_neurotransmitter_concentration(is_spiking);
+    }
+
+    #[pyo3(signature = (i, iterations, bayesian=false))]
+    pub fn run_static_input(&mut self, i: f64, iterations: usize, bayesian: bool) -> (Vec<f64>, Vec<bool>) {
+        let mut voltages: Vec<f64> = vec![];
+        let mut is_spikings: Vec<bool> = vec![];
+
+        for _ in 0..iterations {
+            let is_spiking = self.iterate_and_return_spike(i, bayesian);
+            is_spikings.push(is_spiking);
+            voltages.push(self.cell_backend.current_voltage);
+        }
+
+        (voltages, is_spikings)
     }
     
     #[pyo3(signature = (param_name, value=None))]
@@ -172,6 +199,10 @@ impl IFCell {
                     "beta" => { self.cell_backend.beta = new_value; },
                     "c" => { self.cell_backend.c = new_value; },
                     "d" => { self.cell_backend.d = new_value; },
+                    "bayesian_mean" => { self.if_params.bayesian_params.mean = new_value; },
+                    "bayesian_std" => { self.if_params.bayesian_params.std = new_value; },
+                    "bayesian_min" => { self.if_params.bayesian_params.min = new_value; },
+                    "bayesian_max" => { self.if_params.bayesian_params.max = new_value; },
                     _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
                 };
 
@@ -211,6 +242,10 @@ impl IFCell {
                     "beta" => self.cell_backend.beta,
                     "c" => self.cell_backend.c,
                     "d" => self.cell_backend.d,
+                    "bayesian_mean" => self.if_params.bayesian_params.mean,
+                    "bayesian_std" => self.if_params.bayesian_params.std,
+                    "bayesian_min" => self.if_params.bayesian_params.min,
+                    "bayesian_max" => self.if_params.bayesian_params.max,
                     _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
                 };
 
