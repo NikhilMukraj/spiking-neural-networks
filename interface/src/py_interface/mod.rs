@@ -203,6 +203,14 @@ impl IFCell {
                     "bayesian_std" => { self.if_params.bayesian_params.std = new_value; },
                     "bayesian_min" => { self.if_params.bayesian_params.min = new_value; },
                     "bayesian_max" => { self.if_params.bayesian_params.max = new_value; },
+                    "a_plus" => { self.cell_backend.stdp_params.a_plus = new_value; },
+                    "a_minus" => { self.cell_backend.stdp_params.a_minus = new_value; },
+                    "tau_plus" => { self.cell_backend.stdp_params.tau_plus = new_value; },
+                    "tau_minus" => { self.cell_backend.stdp_params.tau_minus = new_value; },
+                    "stdp_weight_mean" => { self.cell_backend.stdp_params.weight_bayesian_params.mean = new_value; },
+                    "stdp_weight_std" => { self.cell_backend.stdp_params.weight_bayesian_params.std = new_value; },
+                    "stdp_weight_min" => { self.cell_backend.stdp_params.weight_bayesian_params.min = new_value; },
+                    "stdp_weight_max" => { self.cell_backend.stdp_params.weight_bayesian_params.max = new_value; },
                     _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
                 };
 
@@ -246,6 +254,14 @@ impl IFCell {
                     "bayesian_std" => self.if_params.bayesian_params.std,
                     "bayesian_min" => self.if_params.bayesian_params.min,
                     "bayesian_max" => self.if_params.bayesian_params.max,
+                    "a_plus" => self.cell_backend.stdp_params.a_plus,
+                    "a_minus" => self.cell_backend.stdp_params.a_minus,
+                    "tau_plus" => self.cell_backend.stdp_params.tau_plus,
+                    "tau_minus" => self.cell_backend.stdp_params.tau_minus,
+                    "stdp_weight_mean" => self.cell_backend.stdp_params.weight_bayesian_params.mean,
+                    "stdp_weight_std" => self.cell_backend.stdp_params.weight_bayesian_params.std,
+                    "stdp_weight_min" => self.cell_backend.stdp_params.weight_bayesian_params.min,
+                    "stdp_weight_max" => self.cell_backend.stdp_params.weight_bayesian_params.max,
                     _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
                 };
 
