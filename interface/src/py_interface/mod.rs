@@ -1,7 +1,7 @@
 // use std::io::{Result, Error, ErrorKind};
 use pyo3::prelude::*;
 use pyo3::exceptions::PyLookupError;
-use crate::neuron::{IFParameters, IFType, Cell};
+use crate::neuron::{IFParameters, IFType, Cell, PotentiationType};
 use crate::distribution::limited_distr;
 
 
@@ -40,10 +40,11 @@ use crate::distribution::limited_distr;
 // exp_dt: 1., // exponential time step (ms)
 
 #[pyclass]
+#[derive(Clone)]
 pub struct IFCell {
-    mode: IFType,
-    cell_backend: Cell,
-    if_params: IFParameters,
+    pub mode: IFType,
+    pub cell_backend: Cell,
+    pub if_params: IFParameters,
 }
 
 #[pymethods]
@@ -162,111 +163,119 @@ impl IFCell {
         (voltages, is_spikings)
     }
     
-    #[pyo3(signature = (param_name, value=None))]
-    pub fn param(&mut self, param_name: &str, value: Option<f64>) -> PyResult<Option<f64>> {
-        match value {
-            Some(new_value) => {
-                match param_name {
-                    "v_th" => { self.if_params.v_th = new_value; },
-                    "v_reset" => { self.if_params.v_reset = new_value; },
-                    "tau_m" => { self.if_params.tau_m = new_value; },
-                    "g_l" => { self.if_params.g_l = new_value; },
-                    "v_init" => { self.if_params.v_init = new_value; },
-                    "e_l" => { self.if_params.e_l = new_value; },
-                    "tref" => { self.if_params.tref = new_value; },
-                    "w_init" => { self.if_params.w_init = new_value; },
-                    "alpha_init" => { self.if_params.alpha_init = new_value; },
-                    "beta_init" => { self.if_params.beta_init = new_value; },
-                    "d_init" => { self.if_params.d_init = new_value; },
-                    "dt" => { self.if_params.dt = new_value; },
-                    "exp_dt" => { self.if_params.exp_dt = new_value; },
-                    "current_voltage" => { self.cell_backend.current_voltage = new_value; },
-                    "refractory_count" => { self.cell_backend.refractory_count = new_value; },
-                    "leak_constant" => { self.cell_backend.leak_constant = new_value; },
-                    "integration_constant" => { self.cell_backend.integration_constant = new_value; },
-                    // "potentiation_type" => { self.cell_backend.potentiation_type = new_value; },
-                    "neurotransmission_concentration" => { self.cell_backend.neurotransmission_concentration = new_value; },
-                    "neurotransmission_release" => { self.cell_backend.neurotransmission_release = new_value; },
-                    "receptor_density" => { self.cell_backend.receptor_density = new_value; },
-                    "chance_of_releasing" => { self.cell_backend.chance_of_releasing = new_value; },
-                    "dissipation_rate" => { self.cell_backend.dissipation_rate = new_value; },
-                    "chance_of_random_release" => { self.cell_backend.chance_of_random_release = new_value; },
-                    "random_release_concentration" => { self.cell_backend.random_release_concentration = new_value; },
-                    "w_value" => { self.cell_backend.w_value = new_value; },
-                    // "stdp_params" => { self.cell_backend.stdp_params = new_value; },
-                    // "last_firing_time" => { self.cell_backend.last_firing_time = new_value; },
-                    "alpha" => { self.cell_backend.alpha = new_value; },
-                    "beta" => { self.cell_backend.beta = new_value; },
-                    "c" => { self.cell_backend.c = new_value; },
-                    "d" => { self.cell_backend.d = new_value; },
-                    "bayesian_mean" => { self.if_params.bayesian_params.mean = new_value; },
-                    "bayesian_std" => { self.if_params.bayesian_params.std = new_value; },
-                    "bayesian_min" => { self.if_params.bayesian_params.min = new_value; },
-                    "bayesian_max" => { self.if_params.bayesian_params.max = new_value; },
-                    "a_plus" => { self.cell_backend.stdp_params.a_plus = new_value; },
-                    "a_minus" => { self.cell_backend.stdp_params.a_minus = new_value; },
-                    "tau_plus" => { self.cell_backend.stdp_params.tau_plus = new_value; },
-                    "tau_minus" => { self.cell_backend.stdp_params.tau_minus = new_value; },
-                    "stdp_weight_mean" => { self.cell_backend.stdp_params.weight_bayesian_params.mean = new_value; },
-                    "stdp_weight_std" => { self.cell_backend.stdp_params.weight_bayesian_params.std = new_value; },
-                    "stdp_weight_min" => { self.cell_backend.stdp_params.weight_bayesian_params.min = new_value; },
-                    "stdp_weight_max" => { self.cell_backend.stdp_params.weight_bayesian_params.max = new_value; },
-                    _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
-                };
-
-                Ok(None)
+    #[pyo3(signature = (param_name, value))]
+    pub fn change_param(&mut self, param_name: &str, value: &PyAny) -> PyResult<()> {
+        match param_name {
+            "v_th" => { self.if_params.v_th = value.extract::<f64>()?; },
+            "v_reset" => { self.if_params.v_reset = value.extract::<f64>()?; },
+            "tau_m" => { self.if_params.tau_m = value.extract::<f64>()?; },
+            "g_l" => { self.if_params.g_l = value.extract::<f64>()?; },
+            "v_init" => { self.if_params.v_init = value.extract::<f64>()?; },
+            "e_l" => { self.if_params.e_l = value.extract::<f64>()?; },
+            "tref" => { self.if_params.tref = value.extract::<f64>()?; },
+            "w_init" => { self.if_params.w_init = value.extract::<f64>()?; },
+            "alpha_init" => { self.if_params.alpha_init = value.extract::<f64>()?; },
+            "beta_init" => { self.if_params.beta_init = value.extract::<f64>()?; },
+            "d_init" => { self.if_params.d_init = value.extract::<f64>()?; },
+            "dt" => { self.if_params.dt = value.extract::<f64>()?; },
+            "exp_dt" => { self.if_params.exp_dt = value.extract::<f64>()?; },
+            "current_voltage" => { self.cell_backend.current_voltage = value.extract::<f64>()?; },
+            "refractory_count" => { self.cell_backend.refractory_count = value.extract::<f64>()?; },
+            "leak_constant" => { self.cell_backend.leak_constant = value.extract::<f64>()?; },
+            "integration_constant" => { self.cell_backend.integration_constant = value.extract::<f64>()?; },
+            "is_excitatory" => { 
+                self.cell_backend.potentiation_type = match value.extract::<bool>()? {
+                    true => PotentiationType::Excitatory,
+                    false => PotentiationType::Inhibitory,
+                }; 
             },
-            None => {
-                let return_value = match param_name {
-                    "v_th" => self.if_params.v_th,
-                    "v_reset" => self.if_params.v_reset,
-                    "tau_m" => self.if_params.tau_m,
-                    "g_l" => self.if_params.g_l,
-                    "v_init" => self.if_params.v_init,
-                    "e_l" => self.if_params.e_l,
-                    "tref" => self.if_params.tref,
-                    "w_init" => self.if_params.w_init,
-                    "alpha_init" => self.if_params.alpha_init,
-                    "beta_init" => self.if_params.beta_init,
-                    "d_init" => self.if_params.d_init,
-                    "dt" => self.if_params.dt,
-                    "exp_dt" => self.if_params.exp_dt,
-                    "current_voltage" => self.cell_backend.current_voltage,
-                    "refractory_count" => self.cell_backend.refractory_count,
-                    "leak_constant" => self.cell_backend.leak_constant,
-                    "integration_constant" => self.cell_backend.integration_constant,
-                    // "potentiation_type" => self.cell_backend.potentiation_type,
-                    "neurotransmission_concentration" => self.cell_backend.neurotransmission_concentration,
-                    "neurotransmission_release" => self.cell_backend.neurotransmission_release,
-                    "receptor_density" => self.cell_backend.receptor_density,
-                    "chance_of_releasing" => self.cell_backend.chance_of_releasing,
-                    "dissipation_rate" => self.cell_backend.dissipation_rate,
-                    "chance_of_random_release" => self.cell_backend.chance_of_random_release,
-                    "random_release_concentration" => self.cell_backend.random_release_concentration,
-                    "w_value" => self.cell_backend.w_value,
-                    // "stdp_params" => self.cell_backend.stdp_params,
-                    // "last_firing_time" => self.cell_backend.last_firing_time,
-                    "alpha" => self.cell_backend.alpha,
-                    "beta" => self.cell_backend.beta,
-                    "c" => self.cell_backend.c,
-                    "d" => self.cell_backend.d,
-                    "bayesian_mean" => self.if_params.bayesian_params.mean,
-                    "bayesian_std" => self.if_params.bayesian_params.std,
-                    "bayesian_min" => self.if_params.bayesian_params.min,
-                    "bayesian_max" => self.if_params.bayesian_params.max,
-                    "a_plus" => self.cell_backend.stdp_params.a_plus,
-                    "a_minus" => self.cell_backend.stdp_params.a_minus,
-                    "tau_plus" => self.cell_backend.stdp_params.tau_plus,
-                    "tau_minus" => self.cell_backend.stdp_params.tau_minus,
-                    "stdp_weight_mean" => self.cell_backend.stdp_params.weight_bayesian_params.mean,
-                    "stdp_weight_std" => self.cell_backend.stdp_params.weight_bayesian_params.std,
-                    "stdp_weight_min" => self.cell_backend.stdp_params.weight_bayesian_params.min,
-                    "stdp_weight_max" => self.cell_backend.stdp_params.weight_bayesian_params.max,
-                    _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
-                };
+            "neurotransmission_concentration" => { self.cell_backend.neurotransmission_concentration = value.extract::<f64>()?; },
+            "neurotransmission_release" => { self.cell_backend.neurotransmission_release = value.extract::<f64>()?; },
+            "receptor_density" => { self.cell_backend.receptor_density = value.extract::<f64>()?; },
+            "chance_of_releasing" => { self.cell_backend.chance_of_releasing = value.extract::<f64>()?; },
+            "dissipation_rate" => { self.cell_backend.dissipation_rate = value.extract::<f64>()?; },
+            "chance_of_random_release" => { self.cell_backend.chance_of_random_release = value.extract::<f64>()?; },
+            "random_release_concentration" => { self.cell_backend.random_release_concentration = value.extract::<f64>()?; },
+            "w_value" => { self.cell_backend.w_value = value.extract::<f64>()?; },
+            // "stdp_params" => { self.cell_backend.stdp_params = value.extract::<f64>()?; },
+            // "last_firing_time" => { self.cell_backend.last_firing_time = value.extract::<f64>()?; },
+            "alpha" => { self.cell_backend.alpha = value.extract::<f64>()?; },
+            "beta" => { self.cell_backend.beta = value.extract::<f64>()?; },
+            "c" => { self.cell_backend.c = value.extract::<f64>()?; },
+            "d" => { self.cell_backend.d = value.extract::<f64>()?; },
+            "bayesian_mean" => { self.if_params.bayesian_params.mean = value.extract::<f64>()?; },
+            "bayesian_std" => { self.if_params.bayesian_params.std = value.extract::<f64>()?; },
+            "bayesian_min" => { self.if_params.bayesian_params.min = value.extract::<f64>()?; },
+            "bayesian_max" => { self.if_params.bayesian_params.max = value.extract::<f64>()?; },
+            "a_plus" => { self.cell_backend.stdp_params.a_plus = value.extract::<f64>()?; },
+            "a_minus" => { self.cell_backend.stdp_params.a_minus = value.extract::<f64>()?; },
+            "tau_plus" => { self.cell_backend.stdp_params.tau_plus = value.extract::<f64>()?; },
+            "tau_minus" => { self.cell_backend.stdp_params.tau_minus = value.extract::<f64>()?; },
+            "stdp_weight_mean" => { self.cell_backend.stdp_params.weight_bayesian_params.mean = value.extract::<f64>()?; },
+            "stdp_weight_std" => { self.cell_backend.stdp_params.weight_bayesian_params.std = value.extract::<f64>()?; },
+            "stdp_weight_min" => { self.cell_backend.stdp_params.weight_bayesian_params.min = value.extract::<f64>()?; },
+            "stdp_weight_max" => { self.cell_backend.stdp_params.weight_bayesian_params.max = value.extract::<f64>()?; },
+            _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
+        };
 
-                Ok(Some(return_value))
-            }
-        }
+        Ok(())
+    }
+
+    #[pyo3(signature = (param_name))]
+    pub fn get_param(&mut self, py: Python, param_name: &str) -> PyResult<PyObject> {
+        let result = match param_name {
+            "v_th" => self.if_params.v_th.to_object(py),
+            "v_reset" => self.if_params.v_reset.to_object(py),
+            "tau_m" => self.if_params.tau_m.to_object(py),
+            "g_l" => self.if_params.g_l.to_object(py),
+            "v_init" => self.if_params.v_init.to_object(py),
+            "e_l" => self.if_params.e_l.to_object(py),
+            "tref" => self.if_params.tref.to_object(py),
+            "w_init" => self.if_params.w_init.to_object(py),
+            "alpha_init" => self.if_params.alpha_init.to_object(py),
+            "beta_init" => self.if_params.beta_init.to_object(py),
+            "d_init" => self.if_params.d_init.to_object(py),
+            "dt" => self.if_params.dt.to_object(py),
+            "exp_dt" => self.if_params.exp_dt.to_object(py),
+            "current_voltage" => self.cell_backend.current_voltage.to_object(py),
+            "refractory_count" => self.cell_backend.refractory_count.to_object(py),
+            "leak_constant" => self.cell_backend.leak_constant.to_object(py),
+            "integration_constant" => self.cell_backend.integration_constant.to_object(py),
+            "is_excitatory" => { 
+                match self.cell_backend.potentiation_type {
+                    PotentiationType::Excitatory => true,
+                    PotentiationType::Inhibitory => false,
+                }.to_object(py)
+            },
+            "neurotransmission_concentration" => self.cell_backend.neurotransmission_concentration.to_object(py),
+            "neurotransmission_release" => self.cell_backend.neurotransmission_release.to_object(py),
+            "receptor_density" => self.cell_backend.receptor_density.to_object(py),
+            "chance_of_releasing" => self.cell_backend.chance_of_releasing.to_object(py),
+            "dissipation_rate" => self.cell_backend.dissipation_rate.to_object(py),
+            "chance_of_random_release" => self.cell_backend.chance_of_random_release.to_object(py),
+            "random_release_concentration" => self.cell_backend.random_release_concentration.to_object(py),
+            "w_value" => self.cell_backend.w_value.to_object(py),
+            // "stdp_params" => self.cell_backend.stdp_params,
+            // "last_firing_time" => self.cell_backend.last_firing_time,
+            "alpha" => self.cell_backend.alpha.to_object(py),
+            "beta" => self.cell_backend.beta.to_object(py),
+            "c" => self.cell_backend.c.to_object(py),
+            "d" => self.cell_backend.d.to_object(py),
+            "bayesian_mean" => self.if_params.bayesian_params.mean.to_object(py),
+            "bayesian_std" => self.if_params.bayesian_params.std.to_object(py),
+            "bayesian_min" => self.if_params.bayesian_params.min.to_object(py),
+            "bayesian_max" => self.if_params.bayesian_params.max.to_object(py),
+            "a_plus" => self.cell_backend.stdp_params.a_plus.to_object(py),
+            "a_minus" => self.cell_backend.stdp_params.a_minus.to_object(py),
+            "tau_plus" => self.cell_backend.stdp_params.tau_plus.to_object(py),
+            "tau_minus" => self.cell_backend.stdp_params.tau_minus.to_object(py),
+            "stdp_weight_mean" => self.cell_backend.stdp_params.weight_bayesian_params.mean.to_object(py),
+            "stdp_weight_std" => self.cell_backend.stdp_params.weight_bayesian_params.std.to_object(py),
+            "stdp_weight_min" => self.cell_backend.stdp_params.weight_bayesian_params.min.to_object(py),
+            "stdp_weight_max" => self.cell_backend.stdp_params.weight_bayesian_params.max.to_object(py),
+            _ => { return Err(PyLookupError::new_err("Unknown paramter")) },
+        };
+
+        Ok(result)
     }
 }
