@@ -143,7 +143,7 @@ impl Default for STDPParameters {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum IFType {
     Basic,
     Adaptive,
