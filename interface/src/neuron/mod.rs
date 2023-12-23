@@ -3,6 +3,7 @@ use std::{
     io::{Result, Error, ErrorKind, Write, BufWriter}
 };
 use rand::Rng;
+use pyo3::pyclass;
 #[path = "../distribution/mod.rs"]
 mod distribution;
 use distribution::limited_distr;
@@ -143,6 +144,7 @@ impl Default for STDPParameters {
     }
 }
 
+#[pyclass]
 #[derive(Clone, Debug, PartialEq)]
 pub enum IFType {
     Basic,
