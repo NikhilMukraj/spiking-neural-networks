@@ -8,6 +8,7 @@ use rand::{Rng, seq::SliceRandom};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 use pyo3::prelude::*;
+use pyo3::exceptions::PyValueError;
 #[path = "distribution/mod.rs"]
 mod distribution;
 use crate::distribution::limited_distr;
@@ -754,16 +755,14 @@ fn objective(
 
 fn test_coupled_neurons(
     if_type: IFType,
-    pre_if_params: &IFParameters, 
+    pre_synaptic_neuron: &mut Cell, 
+    post_synaptic_neuron: &mut Cell,
+    pre_if_params: &IFParameters,
     post_if_params: &IFParameters,
-    pre_potentiation_type: PotentiationType,
-    default_pre_values: &HashMap<String, f64>,
-    default_post_values: &HashMap<String, f64>,
     iterations: usize,
     input_voltage: f64,
     input_equation: &str,
-    filename: &str,
-) {
+) -> Vec<(f64, f64)> {
     let mut symbol_table = SymbolTable::new();
     let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
     let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
@@ -781,53 +780,7 @@ fn test_coupled_neurons(
         expr.value()
     };
 
-    let mut pre_synaptic_neuron = Cell { 
-        current_voltage: pre_if_params.v_init, 
-        refractory_count: 0.0,
-        leak_constant: -1.,
-        integration_constant: 1.,
-        potentiation_type: pre_potentiation_type,
-        neurotransmission_concentration: 0., 
-        neurotransmission_release: *default_pre_values.get("pre_neurotransmission_release").unwrap(),
-        receptor_density: *default_pre_values.get("pre_receptor_density").unwrap(),
-        chance_of_releasing: *default_pre_values.get("pre_chance_of_releasing").unwrap(), 
-        dissipation_rate: *default_pre_values.get("pre_dissipation_rate").unwrap(), 
-        chance_of_random_release: *default_pre_values.get("pre_chance_of_random_release").unwrap(), 
-        random_release_concentration: *default_pre_values.get("pre_random_release_concentration").unwrap(),
-        w_value: pre_if_params.w_init,
-        stdp_params: STDPParameters::default(),
-        last_firing_time: None,
-        alpha: pre_if_params.alpha_init,
-        beta: pre_if_params.beta_init,
-        c: pre_if_params.v_reset,
-        d: pre_if_params.d_init,
-    };
-
-    let mut post_synaptic_neuron = Cell { 
-        current_voltage: post_if_params.v_init, 
-        refractory_count: 0.0,
-        leak_constant: -1.,
-        integration_constant: 1.,
-        potentiation_type: PotentiationType::Excitatory,
-        neurotransmission_concentration: 0., 
-        neurotransmission_release: *default_post_values.get("post_neurotransmission_release").unwrap(),
-        receptor_density: *default_post_values.get("post_receptor_density").unwrap(),
-        chance_of_releasing: *default_post_values.get("post_chance_of_releasing").unwrap(), 
-        dissipation_rate: *default_post_values.get("post_dissipation_rate").unwrap(), 
-        chance_of_random_release: *default_post_values.get("post_chance_of_random_release").unwrap(),
-        random_release_concentration: *default_post_values.get("post_random_release_concentration").unwrap(),
-        w_value: post_if_params.w_init,
-        stdp_params: STDPParameters::default(),
-        last_firing_time: None,
-        alpha: post_if_params.alpha_init,
-        beta: post_if_params.beta_init,
-        c: post_if_params.v_reset,
-        d: post_if_params.d_init,
-    };
-
-    let mut file = BufWriter::new(File::create(filename)
-        .expect("Unable to create file"));
-    writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");
+    let mut coupled_voltages: Vec<(f64, f64)> = Vec::new();
 
     let sign = match pre_synaptic_neuron.potentiation_type {
         PotentiationType::Excitatory => -1., 
@@ -885,7 +838,10 @@ fn test_coupled_neurons(
                 pre_synaptic_neuron.current_voltage += pre_dv;
                 post_synaptic_neuron.current_voltage += post_dv;
         
-                writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");        
+                coupled_voltages.push((
+                    pre_synaptic_neuron.current_voltage, 
+                    post_synaptic_neuron.current_voltage
+                ));        
            }
         },
         IFType::Adaptive | IFType::AdaptiveExponential |
@@ -910,17 +866,17 @@ fn test_coupled_neurons(
             };
 
             for _ in 0..iterations {
-                let pre_is_spiking = adaptive_apply_and_get_spike(&mut pre_synaptic_neuron, &pre_if_params);
+                let pre_is_spiking = adaptive_apply_and_get_spike(pre_synaptic_neuron, pre_if_params);
                 let pre_dv = if pre_bayesian {
                     adaptive_dv(
-                        &mut pre_synaptic_neuron,
-                        &pre_if_params, 
+                        pre_synaptic_neuron,
+                        pre_if_params, 
                         input_voltage * limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     adaptive_dv(
-                        &mut pre_synaptic_neuron,
-                        &pre_if_params, 
+                        pre_synaptic_neuron,
+                        pre_if_params, 
                         input_voltage
                     )
                 };
@@ -934,17 +890,17 @@ fn test_coupled_neurons(
                     post_synaptic_neuron.neurotransmission_concentration,
                 );
 
-                let post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
+                let post_is_spiking = adaptive_apply_and_get_spike(post_synaptic_neuron, post_if_params);
                 let post_dv = if post_bayesian {
                     adaptive_dv(
-                        &mut post_synaptic_neuron,
-                        &post_if_params, 
+                        post_synaptic_neuron,
+                        post_if_params, 
                         input * limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.)
                     )
                 } else {
                     adaptive_dv(
-                        &mut post_synaptic_neuron,
-                        &post_if_params, 
+                        post_synaptic_neuron,
+                        post_if_params, 
                         input
                     )
                 };
@@ -954,10 +910,42 @@ fn test_coupled_neurons(
                 pre_synaptic_neuron.current_voltage += pre_dv;
                 post_synaptic_neuron.current_voltage += post_dv;
         
-                writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");        
+                coupled_voltages.push((
+                    pre_synaptic_neuron.current_voltage, 
+                    post_synaptic_neuron.current_voltage
+                )); 
            }
         }
     };
+
+    coupled_voltages
+}
+
+#[pyfunction]
+#[pyo3(signature = (pre_synaptic_neuron, post_synaptic_neuron, iterations, input_voltage, input_equation))]
+pub fn test_coupled_if_cells(
+    pre_synaptic_neuron: &mut IFCell, 
+    post_synaptic_neuron: &mut IFCell,
+    iterations: usize,
+    input_voltage: f64,
+    input_equation: &str
+) -> PyResult<Vec<(f64, f64)>> {
+    if pre_synaptic_neuron.mode != post_synaptic_neuron.mode {
+        return Err(PyValueError::new_err("Both modes must be the same").into());
+    } 
+
+    let output = test_coupled_neurons(
+        post_synaptic_neuron.mode.clone(),
+        &mut pre_synaptic_neuron.cell_backend, 
+        &mut post_synaptic_neuron.cell_backend,
+        &pre_synaptic_neuron.if_params,
+        &post_synaptic_neuron.if_params,
+        iterations,
+        input_voltage,
+        input_equation,
+    );
+
+    Ok(output)
 }
 
 fn write_row(
@@ -1383,6 +1371,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_function(wrap_pyfunction!(func, m)?)?;
 
     m.add_class::<IFCell>()?;
+
+    m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
 
     Ok(())
 }
