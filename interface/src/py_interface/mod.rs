@@ -215,6 +215,12 @@ impl IFCell {
             "stdp_weight_std" => { self.cell_backend.stdp_params.weight_bayesian_params.std = value.extract::<f64>()?; },
             "stdp_weight_min" => { self.cell_backend.stdp_params.weight_bayesian_params.min = value.extract::<f64>()?; },
             "stdp_weight_max" => { self.cell_backend.stdp_params.weight_bayesian_params.max = value.extract::<f64>()?; },
+            "last_firing_time" => { 
+                match value.is_none() {
+                    false => { self.cell_backend.last_firing_time = None; },
+                    true => { self.cell_backend.last_firing_time = Some(value.extract::<usize>()?); }
+                }
+            }
             _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
         };
 
@@ -273,9 +279,20 @@ impl IFCell {
             "stdp_weight_std" => self.cell_backend.stdp_params.weight_bayesian_params.std.to_object(py),
             "stdp_weight_min" => self.cell_backend.stdp_params.weight_bayesian_params.min.to_object(py),
             "stdp_weight_max" => self.cell_backend.stdp_params.weight_bayesian_params.max.to_object(py),
+            "last_firing_time" => self.cell_backend.last_firing_time.to_object(py),
             _ => { return Err(PyLookupError::new_err("Unknown paramter")) },
         };
 
         Ok(result)
+    }
+
+    #[getter]
+    fn mode(&self) -> IFType {
+        self.mode.clone()
+    }
+
+    #[setter]
+    fn set_mode(&mut self, new_mode: IFType) {
+        self.mode = new_mode;
     }
 }
