@@ -1736,9 +1736,9 @@ fn run_isolated_stdp_test(
 
                 if is_spiking {
                     postsynaptic_neuron.last_firing_time = Some(timestep);
-                    for (n, i) in neurons.iter().enumerate() {
-                        delta_ws[n] = update_weight(&i, &postsynaptic_neuron);
-                        weights[n] += delta_ws[n];
+                    for (n_neuron, i) in neurons.iter().enumerate() {
+                        delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+                        weights[n_neuron] += delta_ws[n_neuron];
                     }
                 }
 
