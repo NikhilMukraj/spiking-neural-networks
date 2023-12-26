@@ -1,7 +1,7 @@
 // use std::io::{Result, Error, ErrorKind};
 use pyo3::prelude::*;
 use pyo3::exceptions::PyLookupError;
-use crate::neuron::{IFParameters, IFType, Cell, PotentiationType};
+use crate::neuron::{IFParameters, IFType, Cell, PotentiationType, HodgkinHuxleyCell};
 use crate::distribution::limited_distr;
 
 
@@ -294,5 +294,210 @@ impl IFCell {
     #[setter]
     fn set_mode(&mut self, new_mode: IFType) {
         self.mode = new_mode;
+    }
+}
+
+#[pyclass]
+#[derive(Clone)]
+pub struct HodgkinHuxleyModel {
+    pub cell_backend: HodgkinHuxleyCell,
+}
+
+#[pymethods]
+impl HodgkinHuxleyModel {
+    #[pyo3(signature = (i))]
+    fn iterate(&mut self, i: f64) {
+        self.cell_backend.iterate(i);
+    }
+
+    #[pyo3(signature = (i, iterations, bayesian=false))]
+    pub fn run_static_input(
+        &mut self, 
+        i: f64, 
+        iterations: usize, 
+        bayesian: bool
+    ) -> (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>) {
+        let mut voltages: Vec<f64> = vec![];
+        let mut m_states: Vec<f64> = vec![];
+        let mut n_states: Vec<f64> = vec![];
+        let mut h_states: Vec<f64> = vec![];
+
+        for _ in 0..iterations {
+            if bayesian {
+                self.iterate(
+                    i * limited_distr(
+                        self.cell_backend.bayesian_params.mean, 
+                        self.cell_backend.bayesian_params.std, 
+                        self.cell_backend.bayesian_params.min, 
+                        self.cell_backend.bayesian_params.max,
+                    )
+                );
+            } else {
+                self.iterate(i);
+            }
+
+            voltages.push(self.cell_backend.current_voltage);
+            m_states.push(self.cell_backend.m.state);
+            n_states.push(self.cell_backend.n.state);
+            h_states.push(self.cell_backend.h.state);
+        }
+
+        (voltages, m_states, n_states, h_states)
+    }
+
+    #[getter]
+    fn current_voltage(&self) -> f64 {
+        self.cell_backend.current_voltage
+    }
+
+    #[setter]
+    fn set_current_voltage(&mut self, new_current_voltage: f64) {
+        self.cell_backend.current_voltage = new_current_voltage;
+    }
+
+    #[getter]
+    fn dt(&self) -> f64 {
+        self.cell_backend.dt
+    }
+
+    #[setter]
+    fn set_dt(&mut self, new_dt: f64) {
+        self.cell_backend.dt = new_dt;
+    }
+
+    #[getter]
+    fn cm(&self) -> f64 {
+        self.cell_backend.cm
+    }
+
+    #[setter]
+    fn set_cm(&mut self, new_cm: f64) {
+        self.cell_backend.cm = new_cm;
+    }
+
+    #[getter]
+    fn e_na(&self) -> f64 {
+        self.cell_backend.e_na
+    }
+
+    #[setter]
+    fn set_e_na(&mut self, new_e_na: f64) {
+        self.cell_backend.e_na = new_e_na;
+    }
+
+    #[getter]
+    fn e_k(&self) -> f64 {
+        self.cell_backend.e_k
+    }
+
+    #[setter]
+    fn set_e_k(&mut self, new_e_k: f64) {
+        self.cell_backend.e_k = new_e_k;
+    }
+
+    #[getter]
+    fn e_k_leak(&self) -> f64 {
+        self.cell_backend.e_k_leak
+    }
+
+    #[setter]
+    fn set_e_k_leak(&mut self, new_e_k_leak: f64) {
+        self.cell_backend.e_k_leak = new_e_k_leak;
+    }
+
+    #[getter]
+    fn g_na(&self) -> f64 {
+        self.cell_backend.g_na
+    }
+
+    #[setter]
+    fn set_g_na(&mut self, new_g_na: f64) {
+        self.cell_backend.g_na = new_g_na;
+    }
+
+    #[getter]
+    fn g_k(&self) -> f64 {
+        self.cell_backend.g_k
+    }
+
+    #[setter]
+    fn set_g_k(&mut self, new_g_k: f64) {
+        self.cell_backend.g_k = new_g_k;
+    }
+
+    #[getter]
+    fn g_k_leak(&self) -> f64 {
+        self.cell_backend.g_k_leak
+    }
+
+    #[setter]
+    fn set_g_k_leak(&mut self, new_g_k_leak: f64) {
+        self.cell_backend.g_k_leak = new_g_k_leak;
+    }
+
+    #[pyo3(signature = (gate, gate_parameter))]
+    fn get_gates_params(&mut self, gate: &str, gate_parameter: &str) -> PyResult<f64> {
+        let result = match gate.to_ascii_lowercase().as_str() {
+            "m" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => self.cell_backend.m.alpha,
+                    "beta" => self.cell_backend.m.beta,
+                    "state" => self.cell_backend.m.state,
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            },
+            "n" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => self.cell_backend.n.alpha,
+                    "beta" => self.cell_backend.n.beta,
+                    "state" => self.cell_backend.n.state,
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            },
+            "h" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => self.cell_backend.h.alpha,
+                    "beta" => self.cell_backend.h.beta,
+                    "state" => self.cell_backend.h.state,
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            }
+            _ => { return Err(PyLookupError::new_err("Unknown gate")) }
+        };
+
+        Ok(result)
+    }
+
+    #[pyo3(signature = (gate, gate_parameter, new_value))]
+    fn set_gates_params(&mut self, gate: &str, gate_parameter: &str, new_value: f64) -> PyResult<()> {
+        match gate.to_ascii_lowercase().as_str() {
+            "m" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => { self.cell_backend.m.alpha = new_value; },
+                    "beta" => { self.cell_backend.m.beta = new_value; },
+                    "state" => { self.cell_backend.m.state = new_value; },
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            },
+            "n" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => { self.cell_backend.n.alpha = new_value; },
+                    "beta" => { self.cell_backend.n.beta = new_value; },
+                    "state" => { self.cell_backend.n.state = new_value; },
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            },
+            "h" => {
+                match gate_parameter.to_ascii_lowercase().as_str() {
+                    "alpha" => { self.cell_backend.h.alpha = new_value; },
+                    "beta" => { self.cell_backend.h.beta = new_value; },
+                    "state" => { self.cell_backend.h.state = new_value; },
+                    _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
+                }
+            }
+            _ => { return Err(PyLookupError::new_err("Unknown gate")) }
+        };
+
+        Ok(())
     }
 }
