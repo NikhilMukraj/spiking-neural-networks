@@ -25,7 +25,7 @@ use crate::ga::{BitString, decode, genetic_algo};
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
 mod py_interface;
-use crate::py_interface::IFCell;
+use crate::py_interface::{IFCell, HodgkinHuxleyModel};
 
 
 fn positions_within_square(
@@ -1397,6 +1397,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     m.add_class::<IFType>()?;
     m.add_class::<IFCell>()?;
+    m.add_class::<HodgkinHuxleyModel>()?;
 
     m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
 
