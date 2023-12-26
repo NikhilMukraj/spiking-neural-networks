@@ -534,6 +534,7 @@ impl Gate {
     }
 }
 
+#[derive(Clone)]
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
     pub dt: f64,
