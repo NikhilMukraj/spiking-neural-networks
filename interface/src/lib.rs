@@ -948,69 +948,6 @@ pub fn test_coupled_if_cells(
     Ok(output)
 }
 
-fn write_row(
-    file: &mut File, 
-    presynaptic_neurons: &Vec<Cell>, 
-    postsynaptic_neuron: &Cell, 
-    weights: &Vec<f64>,
-) {
-    write!(
-        file, 
-        "{}, ", 
-        presynaptic_neurons.iter()
-            .map(|i| i.current_voltage)
-            .collect::<Vec<f64>>()
-            .iter()
-            .map(|&x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ")
-    ).expect("Cannot write to file");
-    write!(file, "{}, ", postsynaptic_neuron.current_voltage)
-        .expect("Cannot write to file");
-    write!(
-        file, 
-        "{}, ", 
-        presynaptic_neurons.iter()
-            .map(|i| i.neurotransmission_concentration)
-            .collect::<Vec<f64>>()
-            .iter()
-            .map(|&x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ")
-    ).expect("Cannot write to file");
-    write!(file, "{}, ", postsynaptic_neuron.neurotransmission_concentration)
-        .expect("Cannot write to file");
-    write!(
-        file, 
-        "{}, ", 
-        weights.iter()
-            .map(|&x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ")
-    ).expect("Cannot write to file");
-    write!(
-        file, 
-        "{}, ", 
-        presynaptic_neurons.iter()
-            .map(|x| {
-                match x.last_firing_time {
-                    Some(value) => value.to_string(),
-                    None => String::from("None"),
-                }
-            })
-            .collect::<Vec<String>>()
-            .join(", ")
-    ).expect("Cannot write to file");
-    writeln!(
-        file, 
-        "{}", 
-        match postsynaptic_neuron.last_firing_time {
-            Some(value) => value.to_string(),
-            None => String::from("None"),
-        }
-    ).expect("Cannot write to file");
-}
-
 fn update_stdp_output(
     output_data: &mut Vec<Vec<f64>>,
     pre_synaptic_neurons: &Vec<Cell>, 
@@ -1094,299 +1031,299 @@ fn update_isolated_presynaptic_neuron_weights(
     }
 }
 
-// fn run_isolated_stdp_test(
-//     mut pre_synaptic_neurons: Vec<Cell>,
-//     pre_synaptic_if_params: Vec<&IFParameters>,
-//     mut post_synaptic_neuron: Cell,
-//     post_synaptic_if_params: &IFParameters,
-//     if_type: IFType,
-//     iterations: usize,
-//     input_voltages: Vec<f64>,
-//     input_equation: &str,
-// ) -> Vec<Vec<f64>> { 
-//     let mut symbol_table = SymbolTable::new();
-//     let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-//     let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-//     let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-//     let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-//     let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
+fn run_isolated_stdp_test(
+    mut pre_synaptic_neurons: Vec<Cell>,
+    pre_synaptic_if_params: Vec<&IFParameters>,
+    mut post_synaptic_neuron: Cell,
+    post_synaptic_if_params: &IFParameters,
+    if_type: IFType,
+    iterations: usize,
+    input_voltages: Vec<f64>,
+    input_equation: &str,
+) -> Vec<Vec<f64>> { 
+    let mut symbol_table = SymbolTable::new();
+    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
+    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
+    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
+    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
+    let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
 
-//     let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
+    let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
 
-//     let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
-//         expr.symbols().value_cell(sign_id).set(sign);
-//         expr.symbols().value_cell(mp_id).set(mp);
-//         expr.symbols().value_cell(rd_id).set(rd);
-//         expr.symbols().value_cell(nc_id).set(nc);
-//         expr.symbols().value_cell(weight_id).set(weight);
+    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
+        expr.symbols().value_cell(sign_id).set(sign);
+        expr.symbols().value_cell(mp_id).set(mp);
+        expr.symbols().value_cell(rd_id).set(rd);
+        expr.symbols().value_cell(nc_id).set(nc);
+        expr.symbols().value_cell(weight_id).set(weight);
 
-//         expr.value()
-//     };
+        expr.value()
+    };
 
-//     let mut pre_fires: Vec<Option<usize>> = (0..pre_synaptic_neurons.len()).map(|_| None).collect();
-//     let mut weights: Vec<f64> = (0..pre_synaptic_neurons.len()).map( // get weights from toml and set them higher
-//         |_| limited_distr(
-//             post_synaptic_neuron.stdp_params.weight_bayesian_params.mean, 
-//             post_synaptic_neuron.stdp_params.weight_bayesian_params.std, 
-//             post_synaptic_neuron.stdp_params.weight_bayesian_params.min, 
-//             post_synaptic_neuron.stdp_params.weight_bayesian_params.max,
-//         )
-//     ).collect();
+    let mut pre_fires: Vec<Option<usize>> = (0..pre_synaptic_neurons.len()).map(|_| None).collect();
+    let mut weights: Vec<f64> = (0..pre_synaptic_neurons.len()).map( // get weights from toml and set them higher
+        |_| limited_distr(
+            post_synaptic_neuron.stdp_params.weight_bayesian_params.mean, 
+            post_synaptic_neuron.stdp_params.weight_bayesian_params.std, 
+            post_synaptic_neuron.stdp_params.weight_bayesian_params.min, 
+            post_synaptic_neuron.stdp_params.weight_bayesian_params.max,
+        )
+    ).collect();
 
-//     let mut delta_ws: Vec<f64> = (0..pre_synaptic_neurons.len())
-//         .map(|_| 0.0)
-//         .collect();
+    let mut delta_ws: Vec<f64> = (0..pre_synaptic_neurons.len())
+        .map(|_| 0.0)
+        .collect();
 
-//     let mut output: Vec<Vec<f64>> = (0..pre_synaptic_neurons.len() * 2 + 1)
-//         .map(|_| vec![])
-//         .collect();
+    let mut output: Vec<Vec<f64>> = (0..pre_synaptic_neurons.len() * 2 + 1)
+        .map(|_| vec![])
+        .collect();
 
-//     match if_type {
-//         IFType::Basic => {
-//             for timestep in 0..iterations {
-//                 let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+    match if_type {
+        IFType::Basic => {
+            for timestep in 0..iterations {
+                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
-//                 for (n_neuron, input_neuron) in pre_synaptic_neurons.iter_mut().enumerate() {
-//                     let input_if_params = pre_synaptic_if_params[n_neuron];
-//                     let (dv, is_spiking) = if input_if_params.bayesian_params.std != 0. {
-//                         input_neuron.get_dv_change_and_spike(
-//                             &input_if_params, 
-//                             input_voltages[n_neuron] * limited_distr(
-//                                 input_if_params.bayesian_params.mean, 
-//                                 input_if_params.bayesian_params.std, 
-//                                 0., 
-//                                 1.
-//                             )
-//                         )
-//                     } else {
-//                         input_neuron.get_dv_change_and_spike(&input_if_params, input_voltages[n_neuron])
-//                     };
+                for (n_neuron, input_neuron) in pre_synaptic_neurons.iter_mut().enumerate() {
+                    let input_if_params = pre_synaptic_if_params[n_neuron];
+                    let (dv, is_spiking) = if input_if_params.bayesian_params.std != 0. {
+                        input_neuron.get_dv_change_and_spike(
+                            &input_if_params, 
+                            input_voltages[n_neuron] * limited_distr(
+                                input_if_params.bayesian_params.mean, 
+                                input_if_params.bayesian_params.std, 
+                                0., 
+                                1.
+                            )
+                        )
+                    } else {
+                        input_neuron.get_dv_change_and_spike(&input_if_params, input_voltages[n_neuron])
+                    };
 
-//                     dvs.push(dv);
-//                     is_spikings.push(is_spiking);
+                    dvs.push(dv);
+                    is_spikings.push(is_spiking);
 
-//                     if is_spiking {
-//                         pre_fires[n_neuron] = Some(timestep);
-//                     }
+                    if is_spiking {
+                        pre_fires[n_neuron] = Some(timestep);
+                    }
 
-//                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
-//                 }
+                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                }
 
-//                 let calculated_voltage: f64 = (0..pre_synaptic_neurons.len())
-//                     .map(
-//                         |i| {
-//                             let sign = match pre_synaptic_neurons[i].potentiation_type { 
-//                                 PotentiationType::Excitatory => -1., 
-//                                 PotentiationType::Inhibitory => 1.,
-//                             };
+                let calculated_voltage: f64 = (0..pre_synaptic_neurons.len())
+                    .map(
+                        |i| {
+                            let sign = match pre_synaptic_neurons[i].potentiation_type { 
+                                PotentiationType::Excitatory => -1., 
+                                PotentiationType::Inhibitory => 1.,
+                            };
 
-//                             input_func(
-//                                 sign, 
-//                                 pre_synaptic_neurons[i].current_voltage, 
-//                                 pre_synaptic_neurons[i].receptor_density,
-//                                 pre_synaptic_neurons[i].neurotransmission_concentration,
-//                                 weights[i]
-//                             ) / (pre_synaptic_neurons.len() as f64)
-//                         }
-//                     ) 
-//                     .collect::<Vec<f64>>()
-//                     .iter()
-//                     .sum();
+                            input_func(
+                                sign, 
+                                pre_synaptic_neurons[i].current_voltage, 
+                                pre_synaptic_neurons[i].receptor_density,
+                                pre_synaptic_neurons[i].neurotransmission_concentration,
+                                weights[i]
+                            ) / (pre_synaptic_neurons.len() as f64)
+                        }
+                    ) 
+                    .collect::<Vec<f64>>()
+                    .iter()
+                    .sum();
                 
-//                 let noise_factor = limited_distr(
-//                     post_synaptic_if_params.bayesian_params.mean, 
-//                     post_synaptic_if_params.bayesian_params.std, 
-//                     0., 
-//                     1.
-//                 );
-//                 let (dv, is_spiking) = post_synaptic_neuron.get_dv_change_and_spike(
-//                     &post_synaptic_if_params, noise_factor * calculated_voltage
-//                 );
+                let noise_factor = limited_distr(
+                    post_synaptic_if_params.bayesian_params.mean, 
+                    post_synaptic_if_params.bayesian_params.std, 
+                    0., 
+                    1.
+                );
+                let (dv, is_spiking) = post_synaptic_neuron.get_dv_change_and_spike(
+                    &post_synaptic_if_params, noise_factor * calculated_voltage
+                );
 
-//                 post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
-//                 update_isolated_presynaptic_neuron_weights(
-//                     &mut pre_synaptic_neurons, 
-//                     &post_synaptic_neuron,
-//                     &mut weights, 
-//                     &mut delta_ws, 
-//                     timestep, 
-//                     dvs, 
-//                     is_spikings,
-//                 );
+                update_isolated_presynaptic_neuron_weights(
+                    &mut pre_synaptic_neurons, 
+                    &post_synaptic_neuron,
+                    &mut weights, 
+                    &mut delta_ws, 
+                    timestep, 
+                    dvs, 
+                    is_spikings,
+                );
 
-//                 post_synaptic_neuron.current_voltage += dv;
+                post_synaptic_neuron.current_voltage += dv;
 
-//                 if is_spiking {
-//                     post_synaptic_neuron.last_firing_time = Some(timestep);
-//                     for (n, i) in pre_synaptic_neurons.iter().enumerate() {
-//                         delta_ws[n] = update_weight(&i, &post_synaptic_neuron);
-//                         weights[n] += delta_ws[n];
-//                     }
-//                 }
+                if is_spiking {
+                    post_synaptic_neuron.last_firing_time = Some(timestep);
+                    for (n, i) in pre_synaptic_neurons.iter().enumerate() {
+                        delta_ws[n] = update_weight(&i, &post_synaptic_neuron);
+                        weights[n] += delta_ws[n];
+                    }
+                }
 
-//                 update_stdp_output(
-//                     &mut output, 
-//                     &pre_synaptic_neurons, 
-//                     &post_synaptic_neuron, 
-//                     &weights
-//                 );
-//             }
-//         }
-//         IFType::Adaptive | IFType::AdaptiveExponential | 
-//         IFType::Izhikevich | IFType::IzhikevichLeaky => {
-//             let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
-//                 match if_type {
-//                     IFType::Basic => unreachable!(),
-//                     IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
-//                     IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
-//                     IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
-//                 }
-//             };
+                update_stdp_output(
+                    &mut output, 
+                    &pre_synaptic_neurons, 
+                    &post_synaptic_neuron, 
+                    &weights
+                );
+            }
+        }
+        IFType::Adaptive | IFType::AdaptiveExponential | 
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+                match if_type {
+                    IFType::Basic => unreachable!(),
+                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
+                    IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+                }
+            };
 
-//             let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
-//                 match if_type {
-//                     IFType::Basic => unreachable!(), 
-//                     IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
-//                     IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
-//                     IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
-//                     IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
-//                 }
-//             };
+            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+                match if_type {
+                    IFType::Basic => unreachable!(), 
+                    IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
+                    IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
+                    IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
+                    IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
+                }
+            };
 
-//             for timestep in 0..iterations {
-//                 let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+            for timestep in 0..iterations {
+                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
 
-//                 for (n_neuron, input_neuron) in pre_synaptic_neurons.iter_mut().enumerate() {
-//                     let input_if_params = pre_synaptic_if_params[n_neuron];
-//                     let is_spiking = adaptive_apply_and_get_spike(input_neuron, &input_if_params);
+                for (n_neuron, input_neuron) in pre_synaptic_neurons.iter_mut().enumerate() {
+                    let input_if_params = pre_synaptic_if_params[n_neuron];
+                    let is_spiking = adaptive_apply_and_get_spike(input_neuron, &input_if_params);
 
-//                     let dv = if input_if_params.bayesian_params.std != 0. {
-//                         adaptive_dv(
-//                             input_neuron,
-//                             &input_if_params, 
-//                             input_voltages[n_neuron] * limited_distr(
-//                                 input_if_params.bayesian_params.mean, 
-//                                 input_if_params.bayesian_params.std, 
-//                                 0., 
-//                                 1.
-//                             )
-//                         )
-//                     } else {
-//                         adaptive_dv(input_neuron, &input_if_params, input_voltages[n_neuron])
-//                     };
+                    let dv = if input_if_params.bayesian_params.std != 0. {
+                        adaptive_dv(
+                            input_neuron,
+                            &input_if_params, 
+                            input_voltages[n_neuron] * limited_distr(
+                                input_if_params.bayesian_params.mean, 
+                                input_if_params.bayesian_params.std, 
+                                0., 
+                                1.
+                            )
+                        )
+                    } else {
+                        adaptive_dv(input_neuron, &input_if_params, input_voltages[n_neuron])
+                    };
 
-//                     dvs.push(dv);
-//                     is_spikings.push(is_spiking);
+                    dvs.push(dv);
+                    is_spikings.push(is_spiking);
 
-//                     if is_spiking {
-//                         pre_fires[n_neuron] = Some(timestep);
-//                     }
+                    if is_spiking {
+                        pre_fires[n_neuron] = Some(timestep);
+                    }
 
-//                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
-//                 }
+                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                }
 
-//                 let is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_synaptic_if_params);
+                let is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_synaptic_if_params);
 
-//                 post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
+                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
 
-//                 let calculated_voltage: f64 = (0..pre_synaptic_neurons.len())
-//                     .map(
-//                         |i| {
-//                             let sign = match pre_synaptic_neurons[i].potentiation_type { 
-//                                 PotentiationType::Excitatory => -1., 
-//                                 PotentiationType::Inhibitory => 1.,
-//                             };
+                let calculated_voltage: f64 = (0..pre_synaptic_neurons.len())
+                    .map(
+                        |i| {
+                            let sign = match pre_synaptic_neurons[i].potentiation_type { 
+                                PotentiationType::Excitatory => -1., 
+                                PotentiationType::Inhibitory => 1.,
+                            };
 
-//                             input_func(
-//                                 sign, 
-//                                 pre_synaptic_neurons[i].current_voltage, 
-//                                 pre_synaptic_neurons[i].receptor_density,
-//                                 pre_synaptic_neurons[i].neurotransmission_concentration,
-//                                 weights[i]
-//                             ) / (pre_synaptic_neurons.len() as f64)
-//                         }
-//                     ) 
-//                     .collect::<Vec<f64>>()
-//                     .iter()
-//                     .sum();                  
+                            input_func(
+                                sign, 
+                                pre_synaptic_neurons[i].current_voltage, 
+                                pre_synaptic_neurons[i].receptor_density,
+                                pre_synaptic_neurons[i].neurotransmission_concentration,
+                                weights[i]
+                            ) / (pre_synaptic_neurons.len() as f64)
+                        }
+                    ) 
+                    .collect::<Vec<f64>>()
+                    .iter()
+                    .sum();                  
 
-//                 let noise_factor = limited_distr(
-//                     post_synaptic_if_params.bayesian_params.mean, 
-//                     post_synaptic_if_params.bayesian_params.std, 
-//                     0., 
-//                     1.
-//                 );
-//                 let dv = adaptive_dv(&mut post_synaptic_neuron, &post_synaptic_if_params, noise_factor * calculated_voltage);
+                let noise_factor = limited_distr(
+                    post_synaptic_if_params.bayesian_params.mean, 
+                    post_synaptic_if_params.bayesian_params.std, 
+                    0., 
+                    1.
+                );
+                let dv = adaptive_dv(&mut post_synaptic_neuron, &post_synaptic_if_params, noise_factor * calculated_voltage);
 
-//                 update_isolated_presynaptic_neuron_weights(
-//                     &mut pre_synaptic_neurons, 
-//                     &post_synaptic_neuron,
-//                     &mut weights, 
-//                     &mut delta_ws, 
-//                     timestep, 
-//                     dvs, 
-//                     is_spikings,
-//                 );
+                update_isolated_presynaptic_neuron_weights(
+                    &mut pre_synaptic_neurons, 
+                    &post_synaptic_neuron,
+                    &mut weights, 
+                    &mut delta_ws, 
+                    timestep, 
+                    dvs, 
+                    is_spikings,
+                );
 
-//                 post_synaptic_neuron.current_voltage += dv;
+                post_synaptic_neuron.current_voltage += dv;
 
-//                 if is_spiking {
-//                     post_synaptic_neuron.last_firing_time = Some(timestep);
-//                     for (n, i) in pre_synaptic_neurons.iter().enumerate() {
-//                         delta_ws[n] = update_weight(&i, &post_synaptic_neuron);
-//                         weights[n] += delta_ws[n];
-//                     }
-//                 }
+                if is_spiking {
+                    post_synaptic_neuron.last_firing_time = Some(timestep);
+                    for (n, i) in pre_synaptic_neurons.iter().enumerate() {
+                        delta_ws[n] = update_weight(&i, &post_synaptic_neuron);
+                        weights[n] += delta_ws[n];
+                    }
+                }
 
-//                 update_stdp_output(
-//                     &mut output, 
-//                     &pre_synaptic_neurons, 
-//                     &post_synaptic_neuron, 
-//                     &weights
-//                 );
-//             }
-//         }
-//     };
+                update_stdp_output(
+                    &mut output, 
+                    &pre_synaptic_neurons, 
+                    &post_synaptic_neuron, 
+                    &weights
+                );
+            }
+        }
+    };
 
-//     output
-// }
+    output
+}
 
-// // mut pre_synaptic_neurons: Vec<Cell>,
-// // pre_synaptic_if_params: Vec<&IFParameters>,
-// // mut post_synaptic_neuron: Cell,
-// // post_synaptic_if_params: &IFParameters,
-// // if_type: IFType,
-// // iterations: usize,
-// // input_voltages: Vec<f64>,
-// // input_equation: &str,
-// #[pyfunction]
-// #[pyo3(signature = (pre_synaptic_neurons, post_synaptic_neuron, iterations, input_voltages, input_equation))]
-// fn isolated_stdp_test(
-//     pre_synaptic_neurons: Vec<IFCell>, 
-//     post_synaptic_neuron: &IFCell,
-//     iterations: usize,
-//     input_voltages: Vec<f64>,
-//     input_equation: &str
-// ) -> PyResult<Vec<Vec<f64>>> {
-//     if pre_synaptic_neurons.iter().map(|i| i.mode.clone()).any(|i| i != post_synaptic_neuron.mode) {
-//         return Err(PyValueError::new_err("Both modes must be the same").into());
-//     }
+// mut pre_synaptic_neurons: Vec<Cell>,
+// pre_synaptic_if_params: Vec<&IFParameters>,
+// mut post_synaptic_neuron: Cell,
+// post_synaptic_if_params: &IFParameters,
+// if_type: IFType,
+// iterations: usize,
+// input_voltages: Vec<f64>,
+// input_equation: &str,
+#[pyfunction]
+#[pyo3(signature = (pre_synaptic_neurons_init, post_synaptic_neuron_init, iterations, input_voltages, input_equation))]
+fn isolated_stdp_test(
+    pre_synaptic_neurons_init: Vec<IFCell>, 
+    post_synaptic_neuron_init: &IFCell,
+    iterations: usize,
+    input_voltages: Vec<f64>,
+    input_equation: &str
+) -> PyResult<Vec<Vec<f64>>> {
+    if pre_synaptic_neurons_init.iter().map(|i| i.mode.clone()).any(|i| i != post_synaptic_neuron_init.mode) {
+        return Err(PyValueError::new_err("Both modes must be the same").into());
+    }
     
-//     // try directly inputting ifcell into stdp test so you dont have to clone
-//     let output = run_isolated_stdp_test(
-//         pre_synaptic_neurons.iter().map(|i| i.cell_backend.clone()).collect::<Vec<Cell>>(), 
-//         pre_synaptic_neurons.iter().map(|i| &i.if_params).collect::<Vec<&IFParameters>>(), 
-//         post_synaptic_neuron.cell_backend.clone(), 
-//         &post_synaptic_neuron.if_params, 
-//         post_synaptic_neuron.mode.clone(), 
-//         iterations, 
-//         input_voltages, 
-//         input_equation
-//     );
+    // try directly inputting ifcell into stdp test so you dont have to clone
+    let output = run_isolated_stdp_test(
+        pre_synaptic_neurons_init.iter().map(|i| i.cell_backend.clone()).collect::<Vec<Cell>>(), 
+        pre_synaptic_neurons_init.iter().map(|i| &i.if_params).collect::<Vec<&IFParameters>>(), 
+        post_synaptic_neuron_init.cell_backend.clone(), 
+        &post_synaptic_neuron_init.if_params, 
+        post_synaptic_neuron_init.mode.clone(), 
+        iterations, 
+        input_voltages, 
+        input_equation
+    );
     
-//     Ok(output)
-// }
+    Ok(output)
+}
 
 #[pymodule]
 #[pyo3(name = "lixirnet")]
