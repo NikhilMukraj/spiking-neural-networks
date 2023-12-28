@@ -2,19 +2,26 @@
 
 ## IF Cell Model
 
+### IF Mode
+
+### IF Parameters
+
 ### Basic
 
+- `get_dv_change_and_spike(i: float) -> (f64, bool)`: Returns the change in voltage and whether the neuron spikes when in `Basic` mode
+  - `i: float`: Input voltage
+
 ### Adaptive
+
+- `adaptive_get_dv_change(i: float) -> f64`: Returns the change in voltage in `Adaptive` mode
+  - `i: float`: Input voltage
+- `apply_dw_change_and_get_spike() -> bool`: Returns whether the neuron spikes when in `Adaptive` mode
 
 ### Adaptive Exponentational
 
 ### Izhikevich
 
 ### Izhikevich Leaky
-
-### IF Mode
-
-### IF Parameters
 
 ### IF Cell
 
