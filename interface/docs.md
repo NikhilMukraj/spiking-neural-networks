@@ -35,7 +35,7 @@
 - `bayesian_max: float=2.`: Maximum noise
 - `bayesian_min: float=0.`: Minimum noise
 
-### Other Parameters
+### Cell Parameters
 
 - `current_voltage: float`: Membrane potential
 - `refractory_count: float`: Keeps track of refractory period
