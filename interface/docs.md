@@ -109,6 +109,13 @@
 
 ### Test Coupled Neurons
 
+- `test_coupled_if_cells(pre_synaptic_neuron: IFCell, post_synaptic_neuron: IFCell, iterations: int, input_voltage: float, input_equation: str) -> list[(float, float)]` : Feeds the membrane potential of one neuron into the input of the next and returns the membrane potentials over time
+  - `pre_synaptic_neuron: IFCell` : An `IFCell` that is used as an input
+  - `post_synaptic_neuron: IFCell` : An `IFCell` that is used as an input
+  - `iterations: int` : Number of times to run model (must be positive)
+  - `input_voltage: float` : Input voltage
+  - `input_equation: str` : Textual representation of an equation that modifies the voltage input into the post synaptic neuron
+
 ### Test STDP
 
 ### Test Lattice
@@ -124,6 +131,7 @@
 - Iterate with neurotransmitter concentration consideration with IF Cell
 - Static input with neurotransmitter concentration consideration with IF Cell
 - Hodgkin Huxley interface
+- Hodgkin Huxley coupled test
 - Lattice interface
 - Testing for all class methods, with test file
 - Documentation for all of IF Cell
