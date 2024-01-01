@@ -135,10 +135,10 @@ impl Default for STDPParameters {
             tau_plus: 45., 
             tau_minus: 45., 
             weight_bayesian_params: BayesianParameters {
-                mean: 3.5,
-                std: 1.0,
+                mean: 1.75,
+                std: 0.0,
                 min: 1.75,
-                max: 1.75,
+                max: 5.25,
             },
         }
     }
