@@ -320,6 +320,156 @@ impl Output {
 //     return Ok((adaptive_apply_and_get_spike, adaptive_dv));
 // }
 
+type IFCellGrid = Vec<Vec<IFCell>>;
+
+#[pyfunction]
+#[pyo3(signature = (
+    num_rows,
+    num_cols,
+    if_mode,
+    dt,
+    v_init,
+    excitatory_chance=0.8,
+    neurotransmission_release=0.0,
+    neurotransmission_release_std=0.0,
+    receptor_density=0.0,
+    receptor_density_std=0.0,
+    chance_of_releasing=0.0, 
+    dissipation_rate=0.0, 
+    dissipation_rate_std=0.0, 
+    chance_of_random_release=0.0,
+    random_release_concentration=0.0,
+    random_release_concentration_std=0.0,
+    w_init=30.0,
+    alpha_init=0.02,
+    beta_init=0.2,
+    v_reset=-65.0,
+    d_init=8.0,
+    a_minus=2.0,
+    a_plus=2.0,
+    tau_minus=45.0,
+    tau_plus=45.0,
+    stdp_weight_init=1.75,
+    stdp_weight_std=0.0,
+    stdp_weight_max=1.75,
+    stdp_weight_min=5.25,
+))]
+fn create_cell_grid(
+    num_rows: usize,
+    num_cols: usize,
+    if_mode: IFType,
+    dt: f64,
+    v_init: f64,
+    excitatory_chance: f64,
+    neurotransmission_release: f64,
+    neurotransmission_release_std: f64,
+    receptor_density: f64,
+    receptor_density_std: f64,
+    chance_of_releasing: f64, 
+    dissipation_rate: f64, 
+    dissipation_rate_std: f64, 
+    chance_of_random_release: f64,
+    random_release_concentration: f64,
+    random_release_concentration_std: f64,
+    w_init: f64,
+    alpha_init: f64,
+    beta_init: f64,
+    v_reset: f64,
+    d_init: f64,
+    a_minus: f64,
+    a_plus: f64,
+    tau_minus: f64,
+    tau_plus: f64,
+    stdp_weight_init: f64,
+    stdp_weight_std: f64,
+    stdp_weight_max: f64,
+    stdp_weight_min: f64,
+) -> IFCellGrid {
+    let stdp_params = STDPParameters {
+        a_minus: a_minus,
+        a_plus: a_plus,
+        tau_minus: tau_minus,
+        tau_plus: tau_plus,
+        weight_bayesian_params: BayesianParameters {
+            mean: stdp_weight_init,
+            std: stdp_weight_std,
+            max: stdp_weight_max,
+            min: stdp_weight_min,
+        }
+    };
+
+    let cell_grid = (0..num_rows)
+        .map(|_| {
+            (0..num_cols)
+                .map(|_| Cell { 
+                    current_voltage: v_init, 
+                    refractory_count: 0.0,
+                    leak_constant: -1.,
+                    integration_constant: 1.,
+                    potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
+                    neurotransmission_concentration: 0., 
+                    neurotransmission_release: limited_distr(neurotransmission_release, neurotransmission_release_std, 0.0, 1.0),
+                    receptor_density: limited_distr(receptor_density, receptor_density_std, 0.0, 1.0),
+                    chance_of_releasing: chance_of_releasing, 
+                    dissipation_rate: limited_distr(dissipation_rate, dissipation_rate_std, 0.0, 1.0), 
+                    chance_of_random_release: chance_of_random_release,
+                    random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
+                    w_value: w_init,
+                    stdp_params: stdp_params.clone(),
+                    last_firing_time: None,
+                    alpha: alpha_init,
+                    beta: beta_init,
+                    c: v_reset,
+                    d: d_init,
+                })
+                .collect::<Vec<Cell>>()
+        })
+        .collect::<CellGrid>();
+
+    (0..num_rows)
+        .map(|x| {
+            (0..num_cols)
+                .map(|y| {
+                    match if_mode {
+                        IFType::Basic | IFType::Adaptive | IFType::AdaptiveExponential => {
+                            IFCell {
+                                mode: if_mode.clone(),
+                                cell_backend: cell_grid[x][y].clone(),
+                                if_params: IFParameters {
+                                    dt: dt,
+                                    v_init: v_init,
+                                    w_init: w_init,
+                                    alpha_init: alpha_init,
+                                    beta_init: beta_init,
+                                    v_reset: v_reset,
+                                    d_init: d_init,
+                                    ..Default::default()
+                                }
+                            }
+                        },
+                        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+                            IFCell {
+                                mode: if_mode.clone(),
+                                cell_backend: cell_grid[x][y].clone(),
+                                if_params: IFParameters {
+                                    dt: dt,
+                                    v_init: v_init,
+                                    w_init: w_init,
+                                    alpha_init: alpha_init,
+                                    beta_init: beta_init,
+                                    v_reset: v_reset,
+                                    d_init: d_init,
+                                    ..IzhikevichDefault::izhikevich_default()
+                                }
+                            }
+                        }
+                    }
+                })
+                .collect::<Vec<IFCell>>()
+        })
+        .collect::<IFCellGrid>()
+}
+
 fn run_simulation(
     num_rows: usize, 
     num_cols: usize, 
@@ -1337,6 +1487,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<HodgkinHuxleyModel>()?;
 
     m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
+    m.add_function(wrap_pyfunction!(create_cell_grid, m)?)?;
 
     Ok(())
 }
