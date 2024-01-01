@@ -118,6 +118,8 @@
 
 ### Test STDP
 
+### Create Cell Grid
+
 ### Test Lattice
 
 ## Hodgkin Huxley Model
