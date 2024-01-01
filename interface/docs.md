@@ -122,9 +122,25 @@
 
 ## Hodgkin Huxley Model
 
+### Parameters
+
+- `current_voltage: float` : Current membrane potential
+- `dt: float` : Simulation timestep (ms)
+- `cm: float` : Capacitance
+- `e_na: float` : Channel sodium
+- `e_k: float` : Channel potassium
+- `e_k_leak: float` : Channel potassium leak
+- `g_na: float` : Sodium conductance
+- `g_k: float` : Potassium conductance
+- `g_k_leak: float` : Potassium leak condutance
+- `bayesian_mean: float=1.`: Mean when applying noise
+- `bayesian_std: float=0.`: Standard deviation when applying noise
+- `bayesian_max: float=2.`: Maximum noise
+- `bayesian_min: float=0.`: Minimum noise
+
 ### Gates
 
-### Hodgkin Huxley
+### Hodgkin Huxley Methods
 
 ### Todo
 
