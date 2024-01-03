@@ -1449,7 +1449,7 @@ fn run_isolated_stdp_test(
 // input_equation: &str,
 #[pyfunction]
 #[pyo3(signature = (pre_synaptic_neurons_init, post_synaptic_neuron_init, iterations, input_voltages, input_equation))]
-fn isolated_stdp_test(
+fn test_isolated_stdp(
     pre_synaptic_neurons_init: Vec<IFCell>, 
     post_synaptic_neuron_init: &IFCell,
     iterations: usize,
@@ -1487,6 +1487,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<HodgkinHuxleyModel>()?;
 
     m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
+    m.add_function(wrap_pyfunction!(test_isolated_stdp, m)?)?;
     m.add_function(wrap_pyfunction!(create_cell_grid, m)?)?;
 
     Ok(())
