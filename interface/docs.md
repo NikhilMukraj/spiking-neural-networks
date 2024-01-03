@@ -111,12 +111,18 @@
 
 - `test_coupled_if_cells(pre_synaptic_neuron: IFCell, post_synaptic_neuron: IFCell, iterations: int, input_voltage: float, input_equation: str) -> list[(float, float)]` : Feeds the membrane potential of one neuron into the input of the next and returns the membrane potentials over time
   - `pre_synaptic_neuron: IFCell` : An `IFCell` that is used as an input
-  - `post_synaptic_neuron: IFCell` : An `IFCell` that is used as an input
+  - `post_synaptic_neuron: IFCell` : An `IFCell` that is fed into
   - `iterations: int` : Number of times to run model (must be positive)
   - `input_voltage: float` : Input voltage
   - `input_equation: str` : Textual representation of an equation that modifies the voltage input into the post synaptic neuron
 
 ### Test STDP
+
+- `test_isolated_stdp(pre_synaptic_neurons_init: list[IFCell], post_synaptic_neuron_init: IFCell, iterations: int, input_voltages: list[float], input_equation: string) -> list[list[float]]` : Runs STDP on a given set of neurons where the pre synaptic neurons are used as the input to the given post synaptic neuron
+  - `pre_synaptic_neurons_init: list[IFCell]` : A list of input `IFCell` instances
+  - `post_synaptic_neuron_init: IFCell` : An `IFCell` that the input neurons feed into
+  - `input_voltages: list[float]` : A list of voltages to input into the pre synaptic neurons
+  - `input_equation: string` : Textual representation of an equation that modifies the voltage input into the post synaptic neuron
 
 ### Create Cell Grid
 
