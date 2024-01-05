@@ -9,6 +9,7 @@ use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
+use pyo3::types::{PyDict, IntoPyDict};
 #[path = "distribution/mod.rs"]
 mod distribution;
 use crate::distribution::limited_distr;
@@ -468,6 +469,26 @@ fn create_cell_grid(
                 .collect::<Vec<IFCell>>()
         })
         .collect::<IFCellGrid>()
+}
+
+fn generate_graph_from_connections(
+    incoming_connections: PyDict,
+    outgoing_connections: PyDict,
+    py: Python
+) -> Result<AdjacencyList> {
+    let converted_incoming_connections: HashMap<Position, HashMap<Position, Option<f64>>> = 
+        incoming_connections.extract()?;
+
+    let converted_outgoing_connections: HashMap<Position, Vec<Position>> = 
+        outgoing_connections.extract()?;
+
+    Ok(
+        AdjacencyList {
+            incoming_connections: converted_incoming_connections,
+            outgoing_connections: converted_outgoing_connections,
+            history: vec![],
+        }
+    )
 }
 
 fn run_simulation(
