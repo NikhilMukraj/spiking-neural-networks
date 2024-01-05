@@ -491,6 +491,17 @@ fn generate_graph_from_connections(
     )
 }
 
+// maybe convert connections to matrix
+// fn generate_graph_from_matrix(
+   
+// ) -> Result<AdjacencyMatrix> {
+//     Ok(
+//         AdjacencyMatrix {
+
+//         }
+//     )
+// }
+
 fn run_simulation(
     num_rows: usize, 
     num_cols: usize, 
