@@ -1159,6 +1159,11 @@ fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     return delta_w;
 }
 
+#[pyfunction]
+fn get_weight_change_from_if_cells(pre_synaptic_neuron: &IFCell, post_synaptic_neuron_init: &IFCell) -> f64 {
+    update_weight(&pre_synaptic_neuron.cell_backend, &post_synaptic_neuron_init.cell_backend)
+}
+
 fn update_isolated_presynaptic_neuron_weights(
     neurons: &mut Vec<Cell>,
     neuron: &Cell,
@@ -1487,7 +1492,10 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<HodgkinHuxleyModel>()?;
 
     m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
+
+    m.add_function(wrap_pyfunction!(get_weight_change_from_if_cells, m)?)?;
     m.add_function(wrap_pyfunction!(test_isolated_stdp, m)?)?;
+
     m.add_function(wrap_pyfunction!(create_cell_grid, m)?)?;
 
     Ok(())
