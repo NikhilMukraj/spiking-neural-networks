@@ -114,15 +114,21 @@
   - `post_synaptic_neuron: IFCell` : An `IFCell` that is fed into
   - `iterations: int` : Number of times to run model (must be positive)
   - `input_voltage: float` : Input voltage
-  - `input_equation: str` : Textual representation of an equation that modifies the voltage input into the post synaptic neuron
+  - `input_equation: str` : Textual representation of an equation that modifies the voltage input into the postsynaptic neuron
+
+### STDP Weight Change
+
+- `get_weight_change_from_if_cells(pre_synaptic_neuron: IFCell, post_synaptic_neuron_init: IFCell) -> float` : Gets weight change based on the presynaptic and postsynaptic neurons' last firing time
+  - `pre_synaptic_neuron: IFCell` : A presynaptic `IFCell`
+  - `post_synaptic_neuron_init: IFCell` : A postsynaptic `IFCell`
 
 ### Test STDP
 
-- `test_isolated_stdp(pre_synaptic_neurons_init: list[IFCell], post_synaptic_neuron_init: IFCell, iterations: int, input_voltages: list[float], input_equation: string) -> list[list[float]]` : Runs STDP on a given set of neurons where the pre synaptic neurons are used as the input to the given post synaptic neuron
+- `test_isolated_stdp(pre_synaptic_neurons_init: list[IFCell], post_synaptic_neuron_init: IFCell, iterations: int, input_voltages: list[float], input_equation: string) -> list[list[float]]` : Runs STDP on a given set of neurons where the presynaptic neurons are used as the input to the given postsynaptic neuron
   - `pre_synaptic_neurons_init: list[IFCell]` : A list of input `IFCell` instances
   - `post_synaptic_neuron_init: IFCell` : An `IFCell` that the input neurons feed into
-  - `input_voltages: list[float]` : A list of voltages to input into the pre synaptic neurons
-  - `input_equation: string` : Textual representation of an equation that modifies the voltage input into the post synaptic neuron
+  - `input_voltages: list[float]` : A list of voltages to input into the presynaptic neurons
+  - `input_equation: string` : Textual representation of an equation that modifies the voltage input into the postsynaptic neuron
 
 ### Create Cell Grid
 
