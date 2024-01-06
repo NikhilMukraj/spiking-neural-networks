@@ -15,7 +15,9 @@
 - `Izhikevich Leaky`: A hybrid adaptive quadratic integrate and fire, or Izhikevich neuron with a leak
   - Modifies voltage and a recovery variable over time, voltage is changed with a quadratic function and takes into account leak, can be parameterized to model tonic and bursting firing modes
 
-### IF Parameters
+### Parameters
+
+#### IF Parameters
 
 - `v_th: float=-55.`: Spike threshold (mV)
 - `v_reset: float=-75.`: Reset potential (mV)
@@ -35,7 +37,7 @@
 - `bayesian_max: float=2.`: Maximum noise
 - `bayesian_min: float=0.`: Minimum noise
 
-### Cell Parameters
+#### Cell Parameters
 
 - `current_voltage: float`: Membrane potential
 - `refractory_count: float`: Keeps track of refractory period
@@ -93,7 +95,20 @@
   - `i: float`: Input voltage
 - `izhikevich_apply_dw_and_get_spike() -> bool`: Returns whether the neuron spikes when in `Izhikevich Leaky` mode
 
-### IF Cell
+## IF Cell Related Methods
+
+### IF Cell Get Parameter
+
+- `get_param(param_name: str)` : Returns the given parameter
+  - `param_name` : Name of parameter, [refer to these parameters](#parameters)
+
+### IF Cell Change Parameter
+
+- `change_param(param_name: str, value: Any)` : Changes the given parameter to the new value
+  - `param_name: str` : Name of parameter, [refer to these parameters](#parameters)
+  - `value` : Value to set parameter to
+
+### IF Cell Iterate
 
 - `iterate_and_return_spike(i: float, bayesian: bool) -> bool` : Runs one iteration of the model and returns whether it spikes
   - `i: float` : Input voltage
@@ -104,8 +119,6 @@
   - `bayesian: bool=false` : Whether to add noise from `if_params`
 - `determine_neurotransmitter_concentration(is_spiking: bool)` : Updates neurotransmitter concentration within synapse based on cellular parameters
   - `is_spiking: bool` : Whether the neuron is spiking
-
-## IF Cell Related Methods
 
 ### Test Coupled Neurons
 
@@ -202,7 +215,7 @@ create_cell_grid(
 
 ## Hodgkin Huxley Model
 
-### Parameters
+### Hodgkin Huxley Parameters
 
 - `current_voltage: float` : Current membrane potential
 - `dt: float` : Simulation timestep (ms)
