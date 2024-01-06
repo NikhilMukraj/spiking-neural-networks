@@ -231,7 +231,24 @@ create_cell_grid(
 - `bayesian_max: float=2.`: Maximum noise
 - `bayesian_min: float=0.`: Minimum noise
 
-### Gates
+### Gates Parameters
+
+- `state: float` : Arbitrary gate parameter
+- `alpha: float` : Arbitrary gate parameter
+- `beta: float` : Arbitrary gate parameter
+
+#### Gates Get Parameter
+
+- `get_gates_params(gate: str, gate_parameter: str)` : Gets the given gate parameter
+  - `gate: str` : Name of the gate, either `m`, `n`, or `h`
+  - `gate_parameter: str` : Name of gate parameter, [refer to these parameters](#gates-parameters)
+
+#### Gates Change Parameter
+
+- `change_gates_params(gate: str, gate_parameter: str, value: f64)` : Gets the given gate parameter
+  - `gate: str` : Name of the gate, either `m`, `n`, or `h`
+  - `gate_parameter: str` : Name of gate parameter, [refer to these parameters](#gates-parameters)
+  - `value: f64` : Value to change parameter to
 
 ### Hodgkin Huxley Methods
 
