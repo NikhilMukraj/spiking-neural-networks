@@ -468,30 +468,30 @@ impl HodgkinHuxleyModel {
         Ok(result)
     }
 
-    #[pyo3(signature = (gate, gate_parameter, new_value))]
-    fn set_gates_params(&mut self, gate: &str, gate_parameter: &str, new_value: f64) -> PyResult<()> {
+    #[pyo3(signature = (gate, gate_parameter, value))]
+    fn change_gates_params(&mut self, gate: &str, gate_parameter: &str, value: f64) -> PyResult<()> {
         match gate.to_ascii_lowercase().as_str() {
             "m" => {
                 match gate_parameter.to_ascii_lowercase().as_str() {
-                    "alpha" => { self.cell_backend.m.alpha = new_value; },
-                    "beta" => { self.cell_backend.m.beta = new_value; },
-                    "state" => { self.cell_backend.m.state = new_value; },
+                    "alpha" => { self.cell_backend.m.alpha = value; },
+                    "beta" => { self.cell_backend.m.beta = value; },
+                    "state" => { self.cell_backend.m.state = value; },
                     _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
                 }
             },
             "n" => {
                 match gate_parameter.to_ascii_lowercase().as_str() {
-                    "alpha" => { self.cell_backend.n.alpha = new_value; },
-                    "beta" => { self.cell_backend.n.beta = new_value; },
-                    "state" => { self.cell_backend.n.state = new_value; },
+                    "alpha" => { self.cell_backend.n.alpha = value; },
+                    "beta" => { self.cell_backend.n.beta = value; },
+                    "state" => { self.cell_backend.n.state = value; },
                     _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
                 }
             },
             "h" => {
                 match gate_parameter.to_ascii_lowercase().as_str() {
-                    "alpha" => { self.cell_backend.h.alpha = new_value; },
-                    "beta" => { self.cell_backend.h.beta = new_value; },
-                    "state" => { self.cell_backend.h.state = new_value; },
+                    "alpha" => { self.cell_backend.h.alpha = value; },
+                    "beta" => { self.cell_backend.h.beta = value; },
+                    "state" => { self.cell_backend.h.state = value; },
                     _ => { return Err(PyLookupError::new_err("Unknown gate paramter")) }
                 }
             }
