@@ -252,6 +252,18 @@ create_cell_grid(
 
 ### Hodgkin Huxley Methods
 
+#### Iterate
+
+- `iterate(i: float)` : Iterates given an input current
+  - `i: float` : Magnitude of current
+
+#### Run Static Input
+
+- `run_static_input(i: float, iterations: int, bayesian: bool)` : Runs the Hodgkin Huxley model for a set amount of iterations with a constant input
+  - `i: float` : Magnitude of current
+  - `iterations: int` : Number of times to run model (must be positive)
+  - `bayesian: bool=false` : Whether to add noise from `if_params`
+
 ### Todo
 
 - Iterate with neurotransmitter concentration consideration with IF Cell
