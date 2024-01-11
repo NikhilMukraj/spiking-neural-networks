@@ -1,3 +1,4 @@
+/.vscode
 /backend/target
 /backend/*.txt
 /backend/*.bin
