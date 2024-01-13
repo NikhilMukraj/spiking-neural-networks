@@ -10,6 +10,20 @@ struct IzhikevichNeuron {
     float v_th;
 };
 
+// __global__ void aggregate_inputs(float *voltage, float **adjcanecy_matrix, int n, float *inputs) {
+//     int index = blockIdx.x * blockDim.x + threadIdx.x;
+//     int stride = blockDim.x * gridDim.x;
+
+//     for (int i = index; i < n; i += stride) {
+//         for (int j = 0; j < n; j++) {
+//             if (adjcanecy_matrix[index][j] != 0) {
+//                 // could be modified to translate or scale voltage before input
+//                 inputs[index] += voltage[j] 
+//             }
+//         }
+//     }
+// }
+
 // try rewrite with struct
 __global__ void iterate(
     float *voltage,
@@ -23,7 +37,8 @@ __global__ void iterate(
     float *dt,
     float *tau_m,
     float *v_th,
-    int *is_spiking
+    int *is_spiking,
+    int n
 ) {
     int index = blockIdx.x * blockDim.x + threadIdx.x;
     int stride = blockDim.x * gridDim.x;
