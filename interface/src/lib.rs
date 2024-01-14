@@ -502,7 +502,7 @@ fn generate_graph_from_connections(
 //     )
 // }
 
-fn run_simulation(
+fn run_lattice_simulation(
     num_rows: usize, 
     num_cols: usize, 
     iterations: usize, 
@@ -829,6 +829,12 @@ fn run_simulation(
     return Ok((output_val, graph));
 }
 
+// #[pyfunction]
+// #[pyo3(signature(cell_grid, graph))]
+// fn run_simulation(cell_grid: IFCellGrid, graph: PyAny) -> Vec<Vec<f64>> {
+
+// }
+
 
 #[derive(Clone)]
 struct SimulationParameters {
@@ -897,7 +903,7 @@ fn objective(
         expr.value()
     };
 
-    let (output_value, _) = run_simulation(
+    let (output_value, _) = run_lattice_simulation(
         sim_params.num_rows, 
         sim_params.num_cols, 
         sim_params.iterations, 
