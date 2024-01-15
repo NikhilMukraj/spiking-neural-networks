@@ -829,10 +829,246 @@ fn run_lattice_simulation(
     return Ok((output_val, graph));
 }
 
-// #[pyfunction]
-// #[pyo3(signature(cell_grid, graph))]
-// fn run_simulation(cell_grid: IFCellGrid, graph: PyAny) -> Vec<Vec<f64>> {
+// #[pyclass]
+// struct LatticeOutput {
+//     output: Output
+// }
 
+// #[pymethods]
+// impl LatticeOutput {
+//     fn add(&mut self, cell_grid: &CellGrid) {
+//         output.add(cell_grid);
+//     }
+
+//     pub fn set_mode(&self, mode: &str) -> Result<()> {
+//         output.from_str(&str)?;
+
+//         Ok(())
+//     }
+// }
+
+// #[pyfunction]
+// #[pyo3(signature(if_cell_grid, graph, output_type, do_stdp=false))]
+// fn run_simulation(if_cell_grid: IFCellGrid, graph: PyAny, output_type: LatticeOutput, do_stdp: bool) -> (Vec<Vec<f64>>, PyAny) {
+    // let cell_grid = if_cell_grid.iter()
+        // .map(|row| {
+            // row.iter().map(|i| {
+            //     i.cell_backend.clone();
+            // }).collect::<Vec<Cell>>()
+        // })
+    
+    // if do_stdp && graph_params.write_history {
+    //     graph.update_history();
+    // }
+
+    // match if_type {
+    //     IFType::Basic => {
+    //         for timestep in 0..iterations {
+    //             let mut changes: HashMap<Position, (f64, bool)> = graph.get_every_node()
+    //                 .iter()
+    //                 .map(|key| (*key, (0.0, false)))
+    //                 .collect();          
+
+    //             // loop through every cell
+    //             // calculate the dv given the inputs
+    //             // write 
+    //             // end loop
+
+    //             for pos in graph.get_every_node() {
+    //                 let (x, y) = pos;
+
+    //                 let input_positions = graph.get_incoming_connections(&pos);
+
+    //                 let input = if do_stdp {
+    //                     weighted_get_input_from_positions(
+    //                         &cell_grid,
+    //                         &*graph,
+    //                         &pos,
+    //                         &input_positions,
+    //                         input_calculation,
+    //                         bayesian,
+    //                         averaged,
+    //                     )
+    //                 } else {
+    //                     get_input_from_positions(
+    //                         &cell_grid, 
+    //                         &input_positions, 
+    //                         input_calculation, 
+    //                         bayesian,
+    //                         averaged,
+    //                     )
+    //                 };
+                    
+    //                 let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
+
+    //                 changes.insert(pos, (dv, is_spiking));
+    //             }
+
+    //             // loop through every cell
+    //             // modify the voltage
+    //             // end loop
+
+    //             for (pos, (dv_value, is_spiking_value)) in changes {
+    //                 let (x, y) = pos;
+                    
+    //                 cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+    //                 cell_grid[x][y].current_voltage += dv_value;
+
+    //                 if do_stdp && is_spiking_value {
+    //                     cell_grid[x][y].last_firing_time = Some(timestep);
+
+    //                     let input_positions = graph.get_incoming_connections(&pos);
+    //                     for i in input_positions {
+    //                         let (x_in, y_in) = i;
+    //                         let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                                                        
+    //                         graph.edit_weight(
+    //                             &(x_in, y_in), 
+    //                             &pos, 
+    //                             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+    //                         );
+    //                     }
+
+    //                     let out_going_connections = graph.get_outgoing_connections(&pos);
+
+    //                     for i in out_going_connections {
+    //                         let (x_out, y_out) = i;
+    //                         let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+
+    //                         graph.edit_weight(
+    //                             &pos, 
+    //                             &(x_out, y_out), 
+    //                             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+    //                         ); 
+    //                     }
+    //                 } // need to also update neurons on receiving end of spiking neuron
+    //                 // create hashmap of what neurons existing neurons point to and use that
+    //                 // generate that hashmap alongside current adjancency list
+    //             }
+    //             // repeat until simulation is over
+
+    //             output_type.add(&cell_grid);
+
+    //             if do_stdp && graph_params.write_history {
+    //                 graph.update_history();
+    //             }
+    //         }
+    //     },
+    //     IFType::Adaptive | IFType::AdaptiveExponential | 
+    //     IFType::Izhikevich | IFType::IzhikevichLeaky => {
+    //         let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+    //             match if_type {
+    //                 IFType::Basic => unreachable!(),
+    //                 IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
+    //                 IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+    //                 IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
+    //             }
+    //         };
+
+    //         let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+    //             match if_type {
+    //                 IFType::Basic => unreachable!(), 
+    //                 IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
+    //                 IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value),
+    //                 IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value),
+    //                 IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value),
+    //             }
+    //         };
+
+    //         for timestep in 0..iterations {
+    //             let mut changes: HashMap<Position, (f64, bool)> = graph.get_every_node()
+    //                 .iter()
+    //                 .map(|key| (*key, (0.0, false)))
+    //                 .collect();
+
+    //             // loop through every cell
+    //             // calculate the dv given the inputs
+    //             // write 
+    //             // end loop
+
+    //             for pos in graph.get_every_node() {
+    //                 let (x, y) = pos;
+
+    //                 let input_positions = graph.get_incoming_connections(&pos);
+
+    //                 let input = if do_stdp {
+    //                     weighted_get_input_from_positions(
+    //                         &cell_grid,
+    //                         &*graph,
+    //                         &pos,
+    //                         &input_positions,
+    //                         input_calculation,
+    //                         bayesian,
+    //                         averaged,
+    //                     )
+    //                 } else {
+    //                     get_input_from_positions(
+    //                         &cell_grid, 
+    //                         &input_positions, 
+    //                         input_calculation, 
+    //                         bayesian,
+    //                         averaged,
+    //                     )
+    //                 };
+
+    //                 let is_spiking = adaptive_apply_and_get_spike(&mut cell_grid[x][y], if_params);
+
+    //                 changes.insert(pos, (input, is_spiking));
+    //             }
+
+    //             // find dv change and apply it
+    //             // find neurotransmitter change and apply it
+    //             for (pos, (input_value, is_spiking_value)) in changes {
+    //                 let (x, y) = pos;
+
+    //                 let dv = adaptive_dv(&mut cell_grid[x][y], if_params, input_value);
+
+    //                 cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+    //                 cell_grid[x][y].current_voltage += dv;
+
+    //                 if do_stdp && is_spiking_value {
+    //                     cell_grid[x][y].last_firing_time = Some(timestep);
+
+    //                     let input_positions = graph.get_incoming_connections(&pos);
+    //                     for i in input_positions {
+    //                         let (x_in, y_in) = i;
+    //                         let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                                                        
+    //                         graph.edit_weight(
+    //                             &(x_in, y_in), 
+    //                             &pos, 
+    //                             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+    //                         );
+
+    //                     }
+
+    //                     let out_going_connections = graph.get_outgoing_connections(&pos);
+
+    //                     for i in out_going_connections {
+    //                         let (x_out, y_out) = i;
+    //                         let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+                            
+    //                         graph.edit_weight(
+    //                             &pos, 
+    //                             &(x_out, y_out), 
+    //                             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+    //                         );  
+    //                     }
+    //                 } // need to also update neurons on receiving end of spiking neuron
+    //                 // create hashmap of what neurons existing neurons point to and use that
+    //                 // generate that hashmap alongside current adjancency list
+    //             }
+
+    //             output_type.add(&cell_grid);
+
+    //             if do_stdp && graph_params.write_history {
+    //                 graph.update_history();
+    //             }
+    //         }
+    //     }
+    // }
+
+    // return Ok((output_type, graph));
 // }
 
 
