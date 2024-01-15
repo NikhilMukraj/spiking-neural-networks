@@ -213,6 +213,8 @@ create_cell_grid(
 
 ### Test Lattice
 
+## Graph
+
 ## Hodgkin Huxley Model
 
 ### Hodgkin Huxley Parameters
@@ -266,6 +268,7 @@ create_cell_grid(
 
 ### Todo
 
+- Graphs in Python
 - Iterate with neurotransmitter concentration consideration with IF Cell
 - Static input with neurotransmitter concentration consideration with IF Cell
 - Hodgkin Huxley interface
