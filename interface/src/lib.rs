@@ -829,27 +829,11 @@ fn run_lattice_simulation(
     return Ok((output_val, graph));
 }
 
-// #[pyclass]
-// struct LatticeOutput {
-//     output: Output
-// }
-
-// #[pymethods]
-// impl LatticeOutput {
-//     fn add(&mut self, cell_grid: &CellGrid) {
-//         output.add(cell_grid);
-//     }
-
-//     pub fn set_mode(&self, mode: &str) -> Result<()> {
-//         output.from_str(&str)?;
-
-//         Ok(())
-//     }
-// }
-
 // #[pyfunction]
-// #[pyo3(signature(if_cell_grid, graph, output_type, do_stdp=false))]
-// fn run_simulation(if_cell_grid: IFCellGrid, graph: PyAny, output_type: LatticeOutput, do_stdp: bool) -> (Vec<Vec<f64>>, PyAny) {
+// #[pyo3(signature(if_cell_grid, graph, output_type="averaged", do_stdp=false))]
+// fn run_simulation(if_cell_grid: IFCellGrid, graph: PyAny, mode: &str, do_stdp: bool) -> Result<(Vec<Vec<f64>>, PyAny)> {
+    // let output_type = Output::from_str(mode)?;
+    
     // let cell_grid = if_cell_grid.iter()
         // .map(|row| {
             // row.iter().map(|i| {
