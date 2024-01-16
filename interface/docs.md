@@ -266,6 +266,8 @@ create_cell_grid(
   - `iterations: int` : Number of times to run model (must be positive)
   - `bayesian: bool=false` : Whether to add noise from `if_params`
 
+#### Run Hodgkin Huxley Coupled Test
+
 ### Todo
 
 - Graphs in Python
