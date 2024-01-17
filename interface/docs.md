@@ -215,6 +215,16 @@ create_cell_grid(
 
 ## Graph
 
+<!-- ### PyGraph -->
+
+<!-- ### Generate Graph From Connections
+
+- `generate_graph_from_connections(incoming_connections: dict, outgoing_connections: dict)` : Generates graph from adjacency lists in dictionary format
+  - `incoming_connections: dict` : An adjacency list that has each node within the dictionary relating it from presynaptic neurons to post synaptic neurons in the following format
+    - `{0 : [1], 1: [2, 3], 2: [0, 3], 3: [0]...}`
+  - `outgoing_connections: dict` : An adjacency list that has each node within the dictionary relating it in the other direction
+    - `{0 : [1], 1: [2, 3], 2: [0, 3], 3: [0]...}` -->
+
 ## Hodgkin Huxley Model
 
 ### Hodgkin Huxley Parameters
