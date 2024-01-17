@@ -471,24 +471,31 @@ fn create_cell_grid(
         .collect::<IFCellGrid>()
 }
 
+#[pyclass]
+struct PyGraph {
+    adjacency_list: AdjacencyList
+}
+
+#[pyfunction]
+#[pyo3(signature=(incoming_connections, outgoing_connections))]
 fn generate_graph_from_connections(
-    incoming_connections: PyDict,
-    outgoing_connections: PyDict,
+    incoming_connections: &PyDict,
+    outgoing_connections: &PyDict,
     py: Python
-) -> Result<AdjacencyList> {
+) -> Result<PyGraph> {
     let converted_incoming_connections: HashMap<Position, HashMap<Position, Option<f64>>> = 
         incoming_connections.extract()?;
 
     let converted_outgoing_connections: HashMap<Position, Vec<Position>> = 
         outgoing_connections.extract()?;
 
-    Ok(
-        AdjacencyList {
-            incoming_connections: converted_incoming_connections,
-            outgoing_connections: converted_outgoing_connections,
-            history: vec![],
-        }
-    )
+    let adjacency_list = AdjacencyList {
+        incoming_connections: converted_incoming_connections,
+        outgoing_connections: converted_outgoing_connections,
+        history: vec![],
+    };
+
+    Ok(PyGraph { adjacency_list: adjacency_list })
 }
 
 // maybe convert connections to matrix
@@ -1748,6 +1755,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<IFType>()?;
     m.add_class::<IFCell>()?;
     m.add_class::<HodgkinHuxleyModel>()?;
+    m.add_class::<PyGraph>()?;
 
     m.add_function(wrap_pyfunction!(test_coupled_if_cells, m)?)?;
 
@@ -1755,6 +1763,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(test_isolated_stdp, m)?)?;
 
     m.add_function(wrap_pyfunction!(create_cell_grid, m)?)?;
+    m.add_function(wrap_pyfunction!(generate_graph_from_connections, m)?)?;
 
     Ok(())
 }
