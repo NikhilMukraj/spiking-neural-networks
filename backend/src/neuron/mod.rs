@@ -574,6 +574,19 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
+// I NMDA = Gsyn(t) * (Vm - Esyn)
+// Gsyn(t) = G NMDA * gamma / (1 + mg_conc * (-alpha * Vm).exp() / beta) * ((-t / tau2).exp() - (-t / tau1).exp()) * H(t)
+// gamma = 1 / ((-tpk / tau2).exp() - (-tpk / tau1).exp())
+// tpk = (tau1 * tau2) / (tau2 - tau1) * ln(tau2 / tau1)
+// H(t) = heaviside
+// t is time
+// must find way to modify based on glutmate binding
+// channel activated only by glutamate binding
+// maybe multiply by a weighting of open receptors
+// should plot how it changes over time without any weighting
+
+// https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
+
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
