@@ -594,6 +594,10 @@ impl Default for HodgkinHuxleyCell {
 // I AMPA (or GABAa) = G AMPA (or GABAa) * (Vm - E AMPA (or GABAa))
 // can also be modified with r
 
+// ** IMPLEMENT TESTING FOR THIS **
+// ** IMPLEMENT MULTICOMPARTMENT MODEL BASED ON THIS **
+// REFER TO destexhe model of neuronal modeling
+
 // https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
