@@ -576,6 +576,7 @@ impl Default for HodgkinHuxleyCell {
 
 // I NMDA = Gsyn(t) * (Vm - Esyn)
 // Gsyn(t) = G NMDA * gamma / (1 + mg_conc * (-alpha * Vm).exp() / beta) * ((-t / tau2).exp() - (-t / tau1).exp()) * H(t)
+// Gsyn is basically just B(V)
 // gamma = 1 / ((-tpk / tau2).exp() - (-tpk / tau1).exp())
 // tpk = (tau1 * tau2) / (tau2 - tau1) * ln(tau2 / tau1)
 // H(t) = heaviside
@@ -584,6 +585,14 @@ impl Default for HodgkinHuxleyCell {
 // channel activated only by glutamate binding
 // maybe multiply by a weighting of open receptors
 // should plot how it changes over time without any weighting
+
+// percent of open receptors fraction is r, T is neurotrasnmitter concentration
+// could vary Tmax to vary amount of nt conc
+// dr/dt = alpha * T * (1 - r) - beta * r
+// T = Tmax / (1 + (-(Vpre - Vp) / Kp).exp())
+
+// I AMPA (or GABAa) = G AMPA (or GABAa) * (Vm - E AMPA (or GABAa))
+// can also be modified with r
 
 // https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
 
