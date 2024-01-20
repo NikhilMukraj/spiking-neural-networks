@@ -574,11 +574,78 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
+// fn heaviside(x: f64) -> f64 {
+//     if (x > 0) {
+//         1.
+//     } else {
+//         0.
+//     }
+// }
+
+// struct NMDA {
+//     g_nmda: f64,
+//     tau1: f64,
+//     tau2: f64,
+//     mg_conc: f64,
+//     alpha: f64,
+//     beta: f64,
+//     e_syn: f64,
+// }
+
+// impl NMDA {
+//     fn caulcate_tpk(&self) -> f64 {
+//         (self.tau1 * self.tau2) / (self.tau2 - self.tau1) * (self.tau2 / self.tau1).ln()
+//     }
+
+//     fn calculate_gamma(&self) -> f64 {
+//         let tpk = calculate_tpk();
+//         1. / ((-tpk / self.tau2).exp() - (-tpk / self.tau1).exp())
+//     }
+
+//     fn calculate_g_syn(&self, t: f64, voltage: f64) -> f64 {
+//         let gamma = self.calculate_gamma();
+//         let term1 =  gamma / (1 + self.mg_conc * (-self.alpha * voltage).exp() / self.beta);
+//         let term2 = ((-t / self.tau2).exp() - (-t / self.tau1).exp()) * heaviside(t);
+//         self.g_nmda * term1 * term2
+//     }
+// }
+
+// struct GeneralLigandGatedChannel {
+//     g: f64,
+//     reversal: f64,
+// }
+
+// impl GeneralLigandGatedChannel {
+//     fn calculate_g(&self, voltage: f64) -> f64 {
+//         self.g * (voltage - self.reversal)
+//     }
+// }
+
+// struct Neurotransmitter {
+//     t_max: f64,
+//     alpha: f64,
+//     beta: f64,
+//     t: f64,
+//     r: f64,
+//     v_p: f64,
+//     k_p: f64,
+// }
+
+// impl Neurotransmitter {
+//     fn apply_r_change(&mut self) -> f64 {
+//         r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
+//     }
+
+//     fn apply_t_change(&mut self, voltage: f64) -> f64 {
+//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
+//     }
+// }
+
 // I NMDA = Gsyn(t) * (Vm - Esyn)
 // Gsyn(t) = G NMDA * gamma / (1 + mg_conc * (-alpha * Vm).exp() / beta) * ((-t / tau2).exp() - (-t / tau1).exp()) * H(t)
 // Gsyn is basically just B(V)
 // gamma = 1 / ((-tpk / tau2).exp() - (-tpk / tau1).exp())
-// tpk = (tau1 * tau2) / (tau2 - tau1) * ln(tau2 / tau1)
+// tpk = (tau1 * tau2) / (tau2 - tau1) * (tau2 / tau1).ln()
 // H(t) = heaviside
 // t is time
 // must find way to modify based on glutmate binding
