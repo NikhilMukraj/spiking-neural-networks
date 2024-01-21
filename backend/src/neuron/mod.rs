@@ -731,6 +731,7 @@ impl HodgkinHuxleyCell {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
+        // r value should be r value of presynaptic neuron
         // let i_ligand_gates = self.ligand_gates
         //     .iter()
         //     .map(|i| i.calculate_g(self.current_voltage) * i.neurotransmitter.r)
