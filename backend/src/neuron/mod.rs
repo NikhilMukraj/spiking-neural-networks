@@ -583,7 +583,7 @@ impl Default for HodgkinHuxleyCell {
 // }
 
 // struct NMDA {
-//     g_nmda: f64,
+//     g_nmda: f64, // 1.0 nS
 //     tau1: f64,
 //     tau2: f64,
 //     mg_conc: f64,
@@ -608,11 +608,24 @@ impl Default for HodgkinHuxleyCell {
 //         let term2 = ((-t / self.tau2).exp() - (-t / self.tau1).exp()) * heaviside(t);
 //         self.g_nmda * term1 * term2
 //     }
+
+    // fn calculate_b(&self, voltage: f64) -> f64 {
+    //     1. / (1. + ((-0.062 * voltage).exp() * self.mg_conc / 3.57))
+    // }
 // }
 
 // struct GeneralLigandGatedChannel {
 //     g: f64,
 //     reversal: f64,
+// }
+
+// impl Default for GeneralLigandGatedChannel {
+//     fn default() -> Self {
+//         GeneralLigandGatedChannel {
+//             g: 1.0, // 1.0 nS
+//             reversal: 0. // 0.0 mV
+//         }
+//     }
 // }
 
 // impl GeneralLigandGatedChannel {
@@ -629,6 +642,29 @@ impl Default for HodgkinHuxleyCell {
 //     r: f64,
 //     v_p: f64,
 //     k_p: f64,
+// }
+
+// NMDA
+// alpha: 7.2 * 10^4 M^-1 * sec^-1, beta: 6.6 sec^-1
+
+// AMPA
+// alpha: 1.1 * 10^6 M^-1 * sec^-1, beta: 190 sec^-1
+
+// GABAa
+// alpha: 5 * 10^6 M^-1 * sec^-1, beta: 180 sec^-1, reversal: 80 mv
+
+// impl Default for Neurotransmitter {
+//     fn default() -> Self {
+//         Neurotransmitter {
+//             t_max: 1.,
+//             alpha: 1.,
+//             beta: 1.,
+//             t: 0.,
+//             r: 0,
+//             v_p: 2., // 2 mV
+//             k_p: 5., // 5 mV
+//         }
+//     }
 // }
 
 // impl Neurotransmitter {
