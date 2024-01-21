@@ -513,67 +513,6 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
-#[derive(Clone)]
-pub struct Gate {
-    pub alpha: f64,
-    pub beta: f64,
-    pub state: f64,
-}
-
-impl Gate {
-    pub fn init_state(&mut self) {
-        self.state = self.alpha / (self.alpha + self.beta);
-    }
-
-    pub fn update(&mut self, dt: f64) {
-        let alpha_state: f64 = self.alpha * (1. - self.state);
-        let beta_state: f64 = self.beta * self.state;
-        self.state += dt * (alpha_state - beta_state);
-    }
-}
-
-pub struct HodgkinHuxleyCell {
-    pub current_voltage: f64,
-    pub dt: f64,
-    pub cm: f64,
-    pub e_na: f64,
-    pub e_k: f64,
-    pub e_k_leak: f64,
-    pub g_na: f64,
-    pub g_k: f64,
-    pub g_k_leak: f64,
-    pub m: Gate,
-    pub n: Gate,
-    pub h: Gate,
-    pub bayesian_params: BayesianParameters,
-}
-
-impl Default for HodgkinHuxleyCell {
-    fn default() -> Self {
-        let default_gate = Gate {
-            alpha: 0.,
-            beta: 0.,
-            state: 0.,
-        };
-
-        HodgkinHuxleyCell { 
-            current_voltage: 0.,
-            dt: 0.1,
-            cm: 1., 
-            e_na: 115., 
-            e_k: -12., 
-            e_k_leak: 10.6, 
-            g_na: 120., 
-            g_k: 36., 
-            g_k_leak: 0.3, 
-            m: default_gate.clone(), 
-            n: default_gate.clone(), 
-            h: default_gate,  
-            bayesian_params: BayesianParameters::default() 
-        }
-    }
-}
-
 // fn heaviside(x: f64) -> f64 {
 //     if (x > 0) {
 //         1.
@@ -614,9 +553,34 @@ impl Default for HodgkinHuxleyCell {
     // }
 // }
 
+// impl Default for Neurotransmitter {
+//     fn default() -> Self {
+//         Neurotransmitter {
+//             t_max: 1.,
+//             alpha: 1.,
+//             beta: 1.,
+//             t: 0.,
+//             r: 0,
+//             v_p: 2., // 2 mV
+//             k_p: 5., // 5 mV
+//         }
+//     }
+// }
+
+// impl Neurotransmitter {
+//     fn apply_r_change(&mut self) {
+//         r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
+//     }
+
+//     fn apply_t_change(&mut self, voltage: f64) {
+//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
+//     }
+// }
+
 // struct GeneralLigandGatedChannel {
 //     g: f64,
 //     reversal: f64,
+    // neurotransmitter: Neurotransmitter,
 // }
 
 // impl Default for GeneralLigandGatedChannel {
@@ -624,6 +588,7 @@ impl Default for HodgkinHuxleyCell {
 //         GeneralLigandGatedChannel {
 //             g: 1.0, // 1.0 nS
 //             reversal: 0. // 0.0 mV
+            // neurotransmitter: Neurotransmitter::default(),
 //         }
 //     }
 // }
@@ -653,30 +618,6 @@ impl Default for HodgkinHuxleyCell {
 // GABAa
 // alpha: 5 * 10^6 M^-1 * sec^-1, beta: 180 sec^-1, reversal: 80 mv
 
-// impl Default for Neurotransmitter {
-//     fn default() -> Self {
-//         Neurotransmitter {
-//             t_max: 1.,
-//             alpha: 1.,
-//             beta: 1.,
-//             t: 0.,
-//             r: 0,
-//             v_p: 2., // 2 mV
-//             k_p: 5., // 5 mV
-//         }
-//     }
-// }
-
-// impl Neurotransmitter {
-//     fn apply_r_change(&mut self) -> f64 {
-//         r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
-//     }
-
-//     fn apply_t_change(&mut self, voltage: f64) -> f64 {
-//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
-//     }
-// }
-
 // I NMDA = Gsyn(t) * (Vm - Esyn)
 // Gsyn(t) = G NMDA * gamma / (1 + mg_conc * (-alpha * Vm).exp() / beta) * ((-t / tau2).exp() - (-t / tau1).exp()) * H(t)
 // Gsyn is basically just B(V)
@@ -703,6 +644,68 @@ impl Default for HodgkinHuxleyCell {
 
 // https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
 
+#[derive(Clone)]
+pub struct Gate {
+    pub alpha: f64,
+    pub beta: f64,
+    pub state: f64,
+}
+
+impl Gate {
+    pub fn init_state(&mut self) {
+        self.state = self.alpha / (self.alpha + self.beta);
+    }
+
+    pub fn update(&mut self, dt: f64) {
+        let alpha_state: f64 = self.alpha * (1. - self.state);
+        let beta_state: f64 = self.beta * self.state;
+        self.state += dt * (alpha_state - beta_state);
+    }
+}
+
+pub struct HodgkinHuxleyCell {
+    pub current_voltage: f64,
+    pub dt: f64,
+    pub cm: f64,
+    pub e_na: f64,
+    pub e_k: f64,
+    pub e_k_leak: f64,
+    pub g_na: f64,
+    pub g_k: f64,
+    pub g_k_leak: f64,
+    pub m: Gate,
+    pub n: Gate,
+    pub h: Gate,
+    // pub ligand_gates: &[GeneralLigandGatedChannel],
+    pub bayesian_params: BayesianParameters,
+}
+
+impl Default for HodgkinHuxleyCell {
+    fn default() -> Self {
+        let default_gate = Gate {
+            alpha: 0.,
+            beta: 0.,
+            state: 0.,
+        };
+
+        HodgkinHuxleyCell { 
+            current_voltage: 0.,
+            dt: 0.1,
+            cm: 1., 
+            e_na: 115., 
+            e_k: -12., 
+            e_k_leak: 10.6, 
+            g_na: 120., 
+            g_k: 36., 
+            g_k_leak: 0.3, 
+            m: default_gate.clone(), 
+            n: default_gate.clone(), 
+            h: default_gate,  
+            bayesian_params: BayesianParameters::default() 
+        }
+    }
+}
+
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
@@ -728,6 +731,17 @@ impl HodgkinHuxleyCell {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
+        // let i_ligand_gates = self.ligand_gates
+        //     .iter()
+        //     .map(|i| i.calculate_g(self.current_voltage) * i.neurotransmitter.r)
+        //     .collect::<Vec<f64>>()
+        //     .sum();
+        // self.ligand_gates
+        //     .iter()
+        //     .foreach(|i| {
+        //         i.neurotransmitter.apply_t_change();
+        //         i.neurotransmitter.apply_r_change();
+        //     });
         let i_sum = input_current - i_na - i_k - i_k_leak;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
