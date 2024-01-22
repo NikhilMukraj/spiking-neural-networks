@@ -553,61 +553,121 @@ pub type CellGrid = Vec<Vec<Cell>>;
     // }
 // }
 
-// impl Default for Neurotransmitter {
-//     fn default() -> Self {
-//         Neurotransmitter {
-//             t_max: 1.,
-//             alpha: 1.,
-//             beta: 1.,
-//             t: 0.,
-//             r: 0,
-//             v_p: 2., // 2 mV
-//             k_p: 5., // 5 mV
-//         }
-//     }
+// trait NMDADefault {
+//     fn nmda_default() -> Self;
 // }
 
-// impl Neurotransmitter {
-//     fn apply_r_change(&mut self) {
-//         r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
-//     }
+trait AMPADefault {
+    fn ampa_default() -> Self;
+}
 
-//     fn apply_t_change(&mut self, voltage: f64) {
-//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
-//     }
-// }
+trait GABAADefault {
+    fn gabaa_default() -> Self;
+}
 
-// struct GeneralLigandGatedChannel {
-//     g: f64,
-//     reversal: f64,
-    // neurotransmitter: Neurotransmitter,
-// }
+pub struct Neurotransmitter {
+    pub t_max: f64,
+    pub alpha: f64,
+    pub beta: f64,
+    pub t: f64,
+    pub r: f64,
+    pub v_p: f64,
+    pub k_p: f64,
+}
 
-// impl Default for GeneralLigandGatedChannel {
-//     fn default() -> Self {
-//         GeneralLigandGatedChannel {
-//             g: 1.0, // 1.0 nS
-//             reversal: 0. // 0.0 mV
-            // neurotransmitter: Neurotransmitter::default(),
-//         }
-//     }
-// }
+impl Default for Neurotransmitter {
+    fn default() -> Self {
+        Neurotransmitter {
+            t_max: 1.,
+            alpha: 1.,
+            beta: 1.,
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
 
-// impl GeneralLigandGatedChannel {
-//     fn calculate_g(&self, voltage: f64) -> f64 {
-//         self.g * (voltage - self.reversal)
-//     }
-// }
+impl AMPADefault for Neurotransmitter {
+    fn ampa_default() -> Self {
+        Neurotransmitter {
+            t_max: 1.,
+            alpha: 1.1 * 10.0_f64.powf(6.), // M^-1 * sec^-1
+            beta: 190., // sec^-1
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
 
-// struct Neurotransmitter {
-//     t_max: f64,
-//     alpha: f64,
-//     beta: f64,
-//     t: f64,
-//     r: f64,
-//     v_p: f64,
-//     k_p: f64,
-// }
+impl GABAADefault for Neurotransmitter {
+    fn gabaa_default() -> Self {
+        Neurotransmitter {
+            t_max: 1.,
+            alpha: 5. * 10.0_f64.powf(6.), // M^-1 * sec^-1
+            beta: 180., // sec^-1
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
+
+impl Neurotransmitter {
+    fn apply_r_change(&mut self) {
+        self.r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
+    }
+
+    fn apply_t_change(&mut self, voltage: f64) {
+        self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
+    }
+}
+
+pub struct GeneralLigandGatedChannel {
+    pub g: f64,
+    pub reversal: f64,
+    pub neurotransmitter: Neurotransmitter,
+}
+
+impl Default for GeneralLigandGatedChannel {
+    fn default() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 0., // 0.0 mV
+            neurotransmitter: Neurotransmitter::default(),
+        }
+    }
+}
+
+impl AMPADefault for GeneralLigandGatedChannel {
+    fn ampa_default() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 0., // 0.0 mV
+            neurotransmitter: Neurotransmitter::ampa_default(),
+        }
+    }
+}
+
+impl GABAADefault for GeneralLigandGatedChannel {
+    fn gabaa_default() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 80., // 0.0 mV
+            neurotransmitter: Neurotransmitter::gabaa_default(),
+        }
+    }
+}
+
+impl GeneralLigandGatedChannel {
+    fn calculate_g(&self, voltage: f64) -> f64 {
+        self.g * (voltage - self.reversal)
+    }
+}
 
 // NMDA
 // alpha: 7.2 * 10^4 M^-1 * sec^-1, beta: 6.6 sec^-1
@@ -663,7 +723,7 @@ impl Gate {
     }
 }
 
-pub struct HodgkinHuxleyCell {
+pub struct HodgkinHuxleyCell <'a> {
     pub current_voltage: f64,
     pub dt: f64,
     pub cm: f64,
@@ -676,11 +736,11 @@ pub struct HodgkinHuxleyCell {
     pub m: Gate,
     pub n: Gate,
     pub h: Gate,
-    // pub ligand_gates: &[GeneralLigandGatedChannel],
+    pub ligand_gates: &'a mut [GeneralLigandGatedChannel],
     pub bayesian_params: BayesianParameters,
 }
 
-impl Default for HodgkinHuxleyCell {
+impl<'a> Default for HodgkinHuxleyCell<'a> {
     fn default() -> Self {
         let default_gate = Gate {
             alpha: 0.,
@@ -701,6 +761,7 @@ impl Default for HodgkinHuxleyCell {
             m: default_gate.clone(), 
             n: default_gate.clone(), 
             h: default_gate,  
+            ligand_gates: &mut [],
             bayesian_params: BayesianParameters::default() 
         }
     }
@@ -709,7 +770,7 @@ impl Default for HodgkinHuxleyCell {
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
-impl HodgkinHuxleyCell {
+impl<'a> HodgkinHuxleyCell<'a> {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
@@ -731,23 +792,24 @@ impl HodgkinHuxleyCell {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
-        // let i_ligand_gates = self.ligand_gates
-        //     .iter()
-        //     .map(|i| i.calculate_g(self.current_voltage) * i.neurotransmitter.r)
-        //     .collect::<Vec<f64>>()
-        //     .sum();
-        let i_sum = input_current - i_na - i_k - i_k_leak;
+        let i_ligand_gates = self.ligand_gates
+            .iter()
+            .map(|i| i.calculate_g(self.current_voltage) * i.neurotransmitter.r)
+            .collect::<Vec<f64>>()
+            .iter()
+            .sum::<f64>();
+        let i_sum = input_current - i_na - i_k - i_k_leak + i_ligand_gates;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
-    // fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
-    //     self.ligand_gates
-    //         .iter()
-    //         .foreach(|i| {
-    //             i.neurotransmitter.apply_t_change();
-    //             i.neurotransmitter.apply_r_change(presynaptic_voltage);
-    //         });
-    // }
+    fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
+        self.ligand_gates
+            .iter_mut()
+            .for_each(|i| {
+                i.neurotransmitter.apply_t_change(presynaptic_voltage);
+                i.neurotransmitter.apply_r_change();
+            });
+    }
 
     pub fn update_gate_states(&mut self) {
         self.m.update(self.dt);
