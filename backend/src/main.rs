@@ -1750,6 +1750,144 @@ fn run_isolated_stdp_test(
     Ok(())
 }
 
+fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option<&str>) -> Result<HodgkinHuxleyCell<'a>> {
+    let prefix = match prefix {
+        Some(prefix_value) => format!("{}_", prefix_value),
+        None => String::from(""),
+    };
+
+    let v_init: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}v_init", prefix).as_str(), 
+        parse_f64, 
+        0.
+    )?;
+    println!("{}v_init: {}", prefix, v_init);
+
+    let dt: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}dt", prefix).as_str(), 
+        parse_f64, 
+        0.1
+    )?;
+    println!("{}dt: {}", prefix, dt);
+
+    let cm: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}cm", prefix).as_str(), 
+        parse_f64, 
+        1.
+    )?;
+    println!("{}cm: {}", prefix, cm);
+
+    let e_na: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}e_na", prefix).as_str(), 
+        parse_f64, 
+        115.
+    )?;
+    println!("{}e_na: {}", prefix, e_na);
+
+    let e_k: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}e_k", prefix).as_str(), 
+        parse_f64, 
+        -12.
+    )?;
+    println!("{}e_k: {}", prefix, e_k);
+
+    let e_k_leak: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}e_k_leak", prefix).as_str(), 
+        parse_f64, 
+        10.6
+    )?;
+    println!("{}e_k_leak: {}", prefix, e_k_leak);
+
+    let g_na: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}g_na", prefix).as_str(), 
+        parse_f64, 
+        120.
+    )?;
+    println!("{}g_na: {}", prefix, g_na);
+
+    let g_k: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}g_k", prefix).as_str(), 
+        parse_f64, 
+        36.
+    )?;
+    println!("{}g_k: {}", prefix, g_k);
+
+    let g_k_leak: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}g_k_leak", prefix).as_str(), 
+        parse_f64, 
+        0.3
+    )?;
+    println!("{}g_k_leak: {}", prefix, g_k_leak);
+
+    let alpha_init: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}alpha_init", prefix).as_str(), 
+        parse_f64, 
+        0.
+    )?;
+    println!("{}alpha_init: {}", prefix, alpha_init);
+
+    let beta_init: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}beta_init", prefix).as_str(), 
+        parse_f64, 
+        0.
+    )?;
+    println!("{}beta_init: {}", prefix, beta_init);
+
+    let state_init: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}state_init", prefix).as_str(), 
+        parse_f64, 
+        0.
+    )?;
+    println!("{}state_init: {}", prefix, state_init);
+
+    let mut bayesian_params = BayesianParameters::default();
+    get_bayesian_params(&mut bayesian_params, hodgkin_huxley_table, None)?;
+
+    let gate = Gate { 
+        alpha: alpha_init, 
+        beta: beta_init, 
+        state: state_init, 
+    };
+
+    Ok(
+        HodgkinHuxleyCell {
+            current_voltage: v_init,
+            dt: dt,
+            cm: cm,
+            e_na: e_na,
+            e_k: e_k,
+            e_k_leak: e_k_leak,
+            g_na: g_na,
+            g_k: g_k,
+            g_k_leak: g_k_leak,
+            m: gate.clone(),
+            n: gate.clone(),
+            h: gate,
+            ligand_gates: &mut [],
+            bayesian_params: bayesian_params,
+        }
+    )
+}
+
+// fn coupled_hodgkin_huxley<'a>(
+//     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
+//     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
+// ) -> Result<()> {
+//     Ok(())
+// }
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -2259,126 +2397,7 @@ fn main() -> Result<()> {
             false
         )?;
 
-        let v_init: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "v_init", 
-            parse_f64, 
-            0.
-        )?;
-        println!("v_init: {}", v_init);
-
-        let dt: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "dt", 
-            parse_f64, 
-            0.1
-        )?;
-        println!("dt: {}", dt);
-
-        let cm: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "cm", 
-            parse_f64, 
-            1.
-        )?;
-        println!("cm: {}", cm);
-
-        let e_na: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "e_na", 
-            parse_f64, 
-            115.
-        )?;
-        println!("e_na: {}", e_na);
-
-        let e_k: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "e_k", 
-            parse_f64, 
-            -12.
-        )?;
-        println!("e_k: {}", e_k);
-
-        let e_k_leak: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "e_k_leak", 
-            parse_f64, 
-            10.6
-        )?;
-        println!("e_k_leak: {}", e_k_leak);
-
-        let g_na: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "g_na", 
-            parse_f64, 
-            120.
-        )?;
-        println!("g_na: {}", g_na);
-
-        let g_k: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "g_k", 
-            parse_f64, 
-            36.
-        )?;
-        println!("g_k: {}", g_k);
-
-        let g_k_leak: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "g_k_leak", 
-            parse_f64, 
-            0.3
-        )?;
-        println!("g_k_leak: {}", g_k_leak);
-
-        let alpha_init: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "alpha_init", 
-            parse_f64, 
-            0.
-        )?;
-        println!("alpha_init: {}", alpha_init);
-
-        let beta_init: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "beta_init", 
-            parse_f64, 
-            0.
-        )?;
-        println!("beta_init: {}", beta_init);
-
-        let state_init: f64 = parse_value_with_default(
-            &hodgkin_huxley_table, 
-            "state_init", 
-            parse_f64, 
-            0.
-        )?;
-        println!("state_init: {}", state_init);
-
-        let mut bayesian_params = BayesianParameters::default();
-        get_bayesian_params(&mut bayesian_params, hodgkin_huxley_table, None)?;
-
-        let gate = Gate { 
-            alpha: alpha_init, 
-            beta: beta_init, 
-            state: state_init, 
-        };
-
-        let mut hodgkin_huxley = HodgkinHuxleyCell {
-            current_voltage: v_init,
-            dt: dt,
-            cm: cm,
-            e_na: e_na,
-            e_k: e_k,
-            e_k_leak: e_k_leak,
-            g_na: g_na,
-            g_k: g_k,
-            g_k_leak: g_k_leak,
-            m: gate.clone(),
-            n: gate.clone(),
-            h: gate,
-            bayesian_params: bayesian_params,
-        };
+        let mut hodgkin_huxley = get_hodgkin_huxley_params(hodgkin_huxley_table, None)?;
 
         let mean_change = &hodgkin_huxley.bayesian_params.mean != &BayesianParameters::default().mean;
         let std_change = &hodgkin_huxley.bayesian_params.std != &BayesianParameters::default().std;
