@@ -1764,6 +1764,14 @@ fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option
     )?;
     println!("{}v_init: {}", prefix, v_init);
 
+    let input_resistance: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}input_resistance", prefix).as_str(), 
+        parse_f64, 
+        0.
+    )?;
+    println!("{}input_resistance: {}", prefix, input_resistance);
+
     let dt: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
         format!("{}dt", prefix).as_str(), 
@@ -1864,6 +1872,7 @@ fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
+            input_resistance: input_resistance,
             dt: dt,
             cm: cm,
             e_na: e_na,
@@ -1881,12 +1890,78 @@ fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option
     )
 }
 
-// fn coupled_hodgkin_huxley<'a>(
-//     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
-//     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
-// ) -> Result<()> {
-//     Ok(())
-// }
+fn coupled_hodgkin_huxley<'a>(
+    presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
+    postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
+    input_voltage: f64,
+    iterations: usize,
+    filename: &str,
+    bayesian: bool,
+    full: bool,
+) -> Result<()> {
+    let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
+
+    presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
+    postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
+        
+    for _ in 0..iterations {
+        let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
+        if bayesian {
+            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
+
+            presynaptic_neuron.iterate(
+                input_voltage / presynaptic_neuron.input_resistance * limited_distr(
+                    presynaptic_neuron.bayesian_params.mean, 
+                    presynaptic_neuron.bayesian_params.std, 
+                    presynaptic_neuron.bayesian_params.min, 
+                    presynaptic_neuron.bayesian_params.max,
+                )
+            );
+
+            postsynaptic_neuron.iterate(
+                presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance * limited_distr(
+                    postsynaptic_neuron.bayesian_params.mean, 
+                    postsynaptic_neuron.bayesian_params.std, 
+                    postsynaptic_neuron.bayesian_params.min, 
+                    postsynaptic_neuron.bayesian_params.max,
+                )
+            );
+        } else {
+            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
+            presynaptic_neuron.iterate(input_voltage / presynaptic_neuron.input_resistance);
+            postsynaptic_neuron.iterate(presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance);
+        }
+
+        if !full {
+            writeln!(file, "{}, {}", 
+                presynaptic_neuron.current_voltage,
+                postsynaptic_neuron.current_voltage,
+            ).expect("Unable to write to file");
+        } else {
+            write!(file, "{}, {}, ", 
+                presynaptic_neuron.current_voltage, 
+                postsynaptic_neuron.current_voltage,
+            ).expect("Unable to write to file");
+
+            for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
+                if n - 1 < postsynaptic_neuron.ligand_gates.len() {
+                    write!(file, "{}, {}, ", 
+                        i.calculate_g(past_postsynaptic_voltage),
+                        i.neurotransmitter.r,
+                    )?;
+                } else {
+                    writeln!(file, "{}, {}", 
+                        i.calculate_g(past_postsynaptic_voltage),
+                        i.neurotransmitter.r,
+                    )?;
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -2396,6 +2471,7 @@ fn main() -> Result<()> {
             parse_bool, 
             false
         )?;
+        println!("full: {}", full);
 
         let mut hodgkin_huxley = get_hodgkin_huxley_params(hodgkin_huxley_table, None)?;
 
@@ -2408,6 +2484,55 @@ fn main() -> Result<()> {
         };
 
         hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename, full);
+
+        println!("\nFinished Hodgkin Huxley test");
+    } else if let Some(coupled_hodgkin_huxley_table) = config.get("coupled_hodgkin_huxley") {
+        let iterations: usize = match coupled_hodgkin_huxley_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+    
+        let filename: String = match coupled_hodgkin_huxley_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+    
+        let input_voltage: f64 = match coupled_hodgkin_huxley_table.get("input_voltage") {
+            Some(value) => parse_f64(value, "input_voltage")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        };
+        println!("input_voltage: {}", input_voltage);
+
+        let bayesian: bool = parse_value_with_default(
+            &coupled_hodgkin_huxley_table, 
+            "bayesian", 
+            parse_bool, 
+            false
+        )?;
+        println!("bayesian: {}", bayesian);
+
+        let full: bool = parse_value_with_default(
+            &coupled_hodgkin_huxley_table, 
+            "full", 
+            parse_bool, 
+            false
+        )?;
+        println!("full: {}", full);
+
+        let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre"))?;
+        let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post"))?;
+
+        coupled_hodgkin_huxley(
+            &mut presynaptic_neuron, 
+            &mut postsynaptic_neuron,
+            input_voltage,
+            iterations,
+            &filename,
+            bayesian,
+            full,
+        )?;
 
         println!("\nFinished Hodgkin Huxley test");
     } else {
