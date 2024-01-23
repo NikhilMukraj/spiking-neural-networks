@@ -664,7 +664,7 @@ impl GABAADefault for GeneralLigandGatedChannel {
 }
 
 impl GeneralLigandGatedChannel {
-    fn calculate_g(&self, voltage: f64) -> f64 {
+    pub fn calculate_g(&self, voltage: f64) -> f64 {
         self.g * (voltage - self.reversal)
     }
 }
@@ -725,6 +725,7 @@ impl Gate {
 
 pub struct HodgkinHuxleyCell <'a> {
     pub current_voltage: f64,
+    pub input_resistance: f64,
     pub dt: f64,
     pub cm: f64,
     pub e_na: f64,
@@ -750,6 +751,7 @@ impl<'a> Default for HodgkinHuxleyCell<'a> {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
+            input_resistance: 100.,
             dt: 0.1,
             cm: 1., 
             e_na: 115., 
@@ -802,7 +804,7 @@ impl<'a> HodgkinHuxleyCell<'a> {
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
-    fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
+    pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
         self.ligand_gates
             .iter_mut()
             .for_each(|i| {
