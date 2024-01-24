@@ -553,15 +553,15 @@ pub type CellGrid = Vec<Vec<Cell>>;
     // }
 // }
 
-// trait NMDADefault {
+// pub trait NMDADefault {
 //     fn nmda_default() -> Self;
 // }
 
-trait AMPADefault {
+pub trait AMPADefault {
     fn ampa_default() -> Self;
 }
 
-trait GABAADefault {
+pub trait GABAADefault {
     fn gabaa_default() -> Self;
 }
 
@@ -723,7 +723,7 @@ impl Gate {
     }
 }
 
-pub struct HodgkinHuxleyCell <'a> {
+pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
     pub input_resistance: f64,
     pub dt: f64,
@@ -737,11 +737,11 @@ pub struct HodgkinHuxleyCell <'a> {
     pub m: Gate,
     pub n: Gate,
     pub h: Gate,
-    pub ligand_gates: &'a mut [GeneralLigandGatedChannel],
+    pub ligand_gates: Vec<GeneralLigandGatedChannel>,
     pub bayesian_params: BayesianParameters,
 }
 
-impl<'a> Default for HodgkinHuxleyCell<'a> {
+impl Default for HodgkinHuxleyCell {
     fn default() -> Self {
         let default_gate = Gate {
             alpha: 0.,
@@ -763,7 +763,7 @@ impl<'a> Default for HodgkinHuxleyCell<'a> {
             m: default_gate.clone(), 
             n: default_gate.clone(), 
             h: default_gate,  
-            ligand_gates: &mut [],
+            ligand_gates: vec![],
             bayesian_params: BayesianParameters::default() 
         }
     }
@@ -772,7 +772,7 @@ impl<'a> Default for HodgkinHuxleyCell<'a> {
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 // https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
 // voltage = current * resistance // input
-impl<'a> HodgkinHuxleyCell<'a> {
+impl HodgkinHuxleyCell {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
