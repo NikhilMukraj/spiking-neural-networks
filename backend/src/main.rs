@@ -1,8 +1,5 @@
 use std::{
-    collections::HashMap, 
-    fs::{File, read_to_string}, 
-    io::{Write, BufWriter, Result, Error, ErrorKind}, 
-    env,
+    collections::HashMap, env, fs::{File, read_to_string}, io::{Write, BufWriter, Result, Error, ErrorKind}
 };
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
@@ -15,7 +12,7 @@ mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
-    Gate, HodgkinHuxleyCell
+    Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAADefault
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1750,7 +1747,7 @@ fn run_isolated_stdp_test(
     Ok(())
 }
 
-fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option<&str>) -> Result<HodgkinHuxleyCell<'a>> {
+fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>) -> Result<HodgkinHuxleyCell> {
     let prefix = match prefix {
         Some(prefix_value) => format!("{}_", prefix_value),
         None => String::from(""),
@@ -1869,10 +1866,34 @@ fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option
         state: state_init, 
     };
 
+    let ampa: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}AMPA", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let gabaa: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}GABAa", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let mut ligand_gates: Vec<GeneralLigandGatedChannel> = vec![];
+    if ampa {
+        ligand_gates.push(GeneralLigandGatedChannel::ampa_default());
+    }
+    if gabaa {
+        ligand_gates.push(GeneralLigandGatedChannel::gabaa_default());
+    }
+
+    println!("general ligand gated channels: {}", ligand_gates.len());
+        
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
-            input_resistance: input_resistance,
+            input_resistance,
             dt: dt,
             cm: cm,
             e_na: e_na,
@@ -1884,7 +1905,7 @@ fn get_hodgkin_huxley_params<'a>(hodgkin_huxley_table: &'a Value, prefix: Option
             m: gate.clone(),
             n: gate.clone(),
             h: gate,
-            ligand_gates: &mut [],
+            ligand_gates: ligand_gates,
             bayesian_params: bayesian_params,
         }
     )
