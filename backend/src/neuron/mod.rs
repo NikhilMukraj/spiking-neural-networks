@@ -553,6 +553,23 @@ pub type CellGrid = Vec<Vec<Cell>>;
     // }
 // }
 
+#[derive(Clone, Copy)]
+pub struct BV {
+    pub mg_conc: f64,
+}
+
+impl Default for BV {
+    fn default() -> Self {
+        BV { mg_conc: 1.5 } // mM
+    }
+}
+
+impl BV {
+    fn calculate_b(&self, voltage: f64) -> f64 {
+        1. / (1. + ((-0.062 * voltage).exp() * self.mg_conc / 3.57))
+    }
+}
+
 // pub trait NMDADefault {
 //     fn nmda_default() -> Self;
 // }
@@ -563,6 +580,10 @@ pub trait AMPADefault {
 
 pub trait GABAADefault {
     fn gabaa_default() -> Self;
+}
+
+pub trait NMDADefault {
+    fn nmda_default() -> Self;
 }
 
 pub struct Neurotransmitter {
@@ -617,6 +638,20 @@ impl GABAADefault for Neurotransmitter {
     }
 }
 
+impl NMDADefault for Neurotransmitter {
+    fn nmda_default() -> Self {
+        Neurotransmitter {
+            t_max: 1.,
+            alpha: 7.2 * 10.0_f64.powf(4.), // M^-1 * sec^-1
+            beta: 6.6, // sec^-1
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
+
 impl Neurotransmitter {
     fn apply_r_change(&mut self) {
         self.r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
@@ -627,10 +662,18 @@ impl Neurotransmitter {
     }
 }
 
+pub enum NeurotransmitterType {
+    AMPA,
+    GABAa,
+    NMDA(BV),
+    Basic,
+}
+
 pub struct GeneralLigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
     pub neurotransmitter: Neurotransmitter,
+    pub neurotransmitter_type: NeurotransmitterType,
 }
 
 impl Default for GeneralLigandGatedChannel {
@@ -639,6 +682,7 @@ impl Default for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::default(),
+            neurotransmitter_type: NeurotransmitterType::Basic,
         }
     }
 }
@@ -649,6 +693,7 @@ impl AMPADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::ampa_default(),
+            neurotransmitter_type: NeurotransmitterType::AMPA,
         }
     }
 }
@@ -659,13 +704,32 @@ impl GABAADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 80., // 0.0 mV
             neurotransmitter: Neurotransmitter::gabaa_default(),
+            neurotransmitter_type: NeurotransmitterType::GABAa,
+        }
+    }
+}
+
+impl NMDADefault for GeneralLigandGatedChannel {
+    fn nmda_default() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 0., // 0.0 mV
+            neurotransmitter: Neurotransmitter::nmda_default(),
+            neurotransmitter_type: NeurotransmitterType::NMDA(BV::default()),
         }
     }
 }
 
 impl GeneralLigandGatedChannel {
     pub fn calculate_g(&self, voltage: f64) -> f64 {
-        self.g * (voltage - self.reversal)
+        let modifier = match self.neurotransmitter_type {
+            NeurotransmitterType::AMPA => 1.0,
+            NeurotransmitterType::GABAa => 1.0,
+            NeurotransmitterType::NMDA(value) => value.calculate_b(voltage),
+            NeurotransmitterType::Basic => 1.0,
+        };
+
+        modifier * self.g * (voltage - self.reversal)
     }
 }
 
