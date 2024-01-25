@@ -12,7 +12,7 @@ mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
-    Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAADefault
+    Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAADefault, NMDADefault
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1880,12 +1880,29 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         false
     )?;
 
+    let nmda: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}NMDA", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
     let mut ligand_gates: Vec<GeneralLigandGatedChannel> = vec![];
     if ampa {
         ligand_gates.push(GeneralLigandGatedChannel::ampa_default());
     }
     if gabaa {
         ligand_gates.push(GeneralLigandGatedChannel::gabaa_default());
+    }
+    if nmda {
+        // let mg_conc: f64 = parse_value_with_default(
+        //     &hodgkin_huxley_table,
+        //     format!("{}mg_conc", prefix).as_str(), 
+        //     parse_f64, 
+        //     false
+        // )?;
+
+        ligand_gates.push(GeneralLigandGatedChannel::nmda_default());
     }
 
     println!("general ligand gated channels: {}", ligand_gates.len());
