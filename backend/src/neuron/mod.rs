@@ -731,6 +731,15 @@ impl GeneralLigandGatedChannel {
 
         modifier * self.g * (voltage - self.reversal)
     }
+
+    pub fn to_str(&self) -> &str {
+        match self.neurotransmitter_type {
+            NeurotransmitterType::AMPA => "AMPA",
+            NeurotransmitterType::GABAa => "GABAa",
+            NeurotransmitterType::NMDA(_) => "NMDA",
+            NeurotransmitterType::Basic => "Basic",
+        }
+    }
 }
 
 // NMDA
