@@ -1,0 +1,8 @@
+[coupled_hodgkin_huxley]
+post_AMPA = true
+post_GABAa = true
+# post_NMDA = true
+iterations = 10000
+filename = "coupled_hodgkin_huxley.csv"
+bayesian = false
+full = true
