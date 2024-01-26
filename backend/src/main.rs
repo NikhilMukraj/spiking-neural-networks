@@ -1942,6 +1942,19 @@ fn coupled_hodgkin_huxley<'a>(
 
     presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
     postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
+
+    writeln!(file, "pre_voltage, post_voltage").expect("Unable to write to file");
+    
+    if full {
+        for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
+            let name = i.to_str();
+            if n - 1 < postsynaptic_neuron.ligand_gates.len() {
+                write!(file, "g_{}, r_{}, ", name, name)?;
+            } else {
+                writeln!(file, "g_{}, r_{}", name, name)?;
+            }
+        }
+    }
         
     for _ in 0..iterations {
         let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
@@ -2559,8 +2572,8 @@ fn main() -> Result<()> {
         )?;
         println!("full: {}", full);
 
-        let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre"))?;
-        let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post"))?;
+        let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre_"))?;
+        let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post_"))?;
 
         coupled_hodgkin_huxley(
             &mut presynaptic_neuron, 
