@@ -1199,6 +1199,7 @@ fn test_coupled_neurons(
 
     let mut file = BufWriter::new(File::create(filename)
         .expect("Unable to create file"));
+    writeln!(file, "pre_voltage, post_voltage").expect("Unable to write to file");
     writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");
 
     let sign = match pre_synaptic_neuron.potentiation_type {
