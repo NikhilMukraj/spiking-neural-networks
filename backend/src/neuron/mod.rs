@@ -396,6 +396,7 @@ impl Cell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
+        writeln!(file, "voltage").expect("Unable to write to file");
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
         for _ in 0..iterations {
@@ -909,8 +910,10 @@ impl HodgkinHuxleyCell {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
         if !full {
+            writeln!(file, "voltage").expect("Unable to write to file");
             writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         } else {
+            writeln!(file, "voltage, m, n, h").expect("Unable to write to file");
             writeln!(file, "{}, {}, {}, {}", 
                 self.current_voltage, 
                 self.m.state, 
