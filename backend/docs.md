@@ -23,6 +23,11 @@
 
 ### Run Static Input
 
+- `if_type`: `String` - Type of integrate and fire neuron
+- `input` : `Float` - Input voltage to neuron
+- `iterations` : `String` - Amount of iterations to do
+- `filename` : `String` - What to name output file
+
 Example with non Izhikevich Type:
 
 ```toml
