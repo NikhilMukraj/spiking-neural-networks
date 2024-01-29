@@ -21,7 +21,15 @@
 
 ## TOML Methods
 
+### Get Parameters
+
+#### Get IF Parameters
+
+#### Get Hodgkin Huxley Parameters
+
 ### Run Static Input
+
+#### Static Input Integrate and Fire
 
 - `if_type`: `String` - Type of integrate and fire neuron
 - `input` : `Float` - Input voltage to neuron
@@ -53,8 +61,6 @@ d_init = 8.0
 iterations = 4000
 filename = "aqif.txt"
 ```
-
-#### Static Input Integrate and Fire
 
 #### Static Input Hodgkin Huxley
 
