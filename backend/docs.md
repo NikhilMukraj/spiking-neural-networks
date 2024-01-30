@@ -45,25 +45,25 @@
 
 #### Hodgkin Huxley Parameters
 
-- `current_voltage: float` : Current membrane potential
-- `dt: float` : Simulation timestep (ms)
-- `cm: float` : Capacitance
-- `e_na: float` : Channel sodium
-- `e_k: float` : Channel potassium
-- `e_k_leak: float` : Channel potassium leak
-- `g_na: float` : Sodium conductance
-- `g_k: float` : Potassium conductance
-- `g_k_leak: float` : Potassium leak condutance
-- `bayesian_mean: float=1.`: Mean when applying noise
-- `bayesian_std: float=0.`: Standard deviation when applying noise
-- `bayesian_max: float=2.`: Maximum noise
-- `bayesian_min: float=0.`: Minimum noise
+- `current_voltage: Float` : Current membrane potential
+- `dt: Float` : Simulation timestep (ms)
+- `cm: Float` : Capacitance
+- `e_na: Float` : Channel sodium
+- `e_k: Float` : Channel potassium
+- `e_k_leak: Float` : Channel potassium leak
+- `g_na: Float` : Sodium conductance
+- `g_k: Float` : Potassium conductance
+- `g_k_leak: Float` : Potassium leak condutance
+- `bayesian_mean: Float=1.`: Mean when applying noise
+- `bayesian_std: Float=0.`: Standard deviation when applying noise
+- `bayesian_max: Float=2.`: Maximum noise
+- `bayesian_min: Float=0.`: Minimum noise
 
 ### Gates Parameters
 
-- `state: float` : Arbitrary gate parameter
-- `alpha: float` : Arbitrary gate parameter
-- `beta: float` : Arbitrary gate parameter
+- `state: Float` : Arbitrary gate parameter
+- `alpha: Float` : Arbitrary gate parameter
+- `beta: Float` : Arbitrary gate parameter
 
 ### Ligand Gated Channels Parameters
 
