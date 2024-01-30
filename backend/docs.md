@@ -21,11 +21,51 @@
 
 ## TOML Methods
 
-### Get Parameters
+### Parameters
 
-#### Get IF Parameters
+#### IF Parameters
 
-#### Get Hodgkin Huxley Parameters
+- `v_th: Float=-55.`: Spike threshold (mV)
+- `v_reset: Float=-75.`: Reset potential (mV)
+- `tau_m: Float=10.`: Membrane time constant (ms)
+- `g_l: Float=10.`: Leak conductance (nS)
+- `v_init: Float=-75.`: Initial potential (mV)
+- `e_l: Float=-75.`: Leak reversal potential (mV)
+- `tref: Float=10.`: Refractory time (ms), could rename to refract_time
+- `w_init: Float=0.`: Initial w value
+- `alpha_init: Float=6.`: Arbitrary a value for `Izhikevich` mode
+- `beta_init: Float=10.`: Arbitrary b value for `Izhikevich` mode
+- `d_init: Float=2.`: Arbitrary d value for `Izhikevich` mode
+- `dt: Float=0.1`: Simulation timestep (ms)
+- `exp_dt: Float=1.`: Exponential time step (ms) for `Adaptive Exponenial` mode
+- `bayesian_mean: Float=1.`: Mean when applying noise
+- `bayesian_std: Float=0.`: Standard deviation when applying noise
+- `bayesian_max: Float=2.`: Maximum noise
+- `bayesian_min: Float=0.`: Minimum noise
+
+#### Hodgkin Huxley Parameters
+
+- `current_voltage: float` : Current membrane potential
+- `dt: float` : Simulation timestep (ms)
+- `cm: float` : Capacitance
+- `e_na: float` : Channel sodium
+- `e_k: float` : Channel potassium
+- `e_k_leak: float` : Channel potassium leak
+- `g_na: float` : Sodium conductance
+- `g_k: float` : Potassium conductance
+- `g_k_leak: float` : Potassium leak condutance
+- `bayesian_mean: float=1.`: Mean when applying noise
+- `bayesian_std: float=0.`: Standard deviation when applying noise
+- `bayesian_max: float=2.`: Maximum noise
+- `bayesian_min: float=0.`: Minimum noise
+
+### Gates Parameters
+
+- `state: float` : Arbitrary gate parameter
+- `alpha: float` : Arbitrary gate parameter
+- `beta: float` : Arbitrary gate parameter
+
+### Ligand Gated Channels Parameters
 
 ### Run Static Input
 
