@@ -45,15 +45,16 @@
 
 #### Hodgkin Huxley Parameters
 
-- `current_voltage: Float` : Current membrane potential
-- `dt: Float` : Simulation timestep (ms)
-- `cm: Float` : Capacitance
-- `e_na: Float` : Channel sodium
-- `e_k: Float` : Channel potassium
-- `e_k_leak: Float` : Channel potassium leak
-- `g_na: Float` : Sodium conductance
-- `g_k: Float` : Potassium conductance
-- `g_k_leak: Float` : Potassium leak condutance
+- `current_voltage: Float=0.` : Current membrane potential (mV)
+- `input_resistance: Float=1.` : Resistance value on input voltage
+- `dt: Float=0.1` : Simulation timestep (ms)
+- `cm: Float=1.` : Capacitance
+- `e_na: Float=115.` : Channel sodium
+- `e_k: Float=-12.` : Channel potassium
+- `e_k_leak: Float=10.6` : Channel potassium leak
+- `g_na: Float=120.` : Sodium conductance
+- `g_k: Float=36.` : Potassium conductance
+- `g_k_leak: Float=0.3` : Potassium leak condutance
 - `bayesian_mean: Float=1.`: Mean when applying noise
 - `bayesian_std: Float=0.`: Standard deviation when applying noise
 - `bayesian_max: Float=2.`: Maximum noise
@@ -61,9 +62,9 @@
 
 ### Gates Parameters
 
-- `state: Float` : Arbitrary gate parameter
-- `alpha: Float` : Arbitrary gate parameter
-- `beta: Float` : Arbitrary gate parameter
+- `state: Float=0.` : Arbitrary gate parameter
+- `alpha: Float=0.` : Arbitrary gate parameter
+- `beta: Float=0.` : Arbitrary gate parameter
 
 ### Ligand Gated Channels Parameters
 
