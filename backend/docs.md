@@ -33,9 +33,9 @@
 - `e_l: Float=-75.`: Leak reversal potential (mV)
 - `tref: Float=10.`: Refractory time (ms), could rename to refract_time
 - `w_init: Float=0.`: Initial w value
-- `alpha_init: Float=6.`: Arbitrary a value for `Izhikevich` mode
-- `beta_init: Float=10.`: Arbitrary b value for `Izhikevich` mode
-- `d_init: Float=2.`: Arbitrary d value for `Izhikevich` mode
+- `alpha_init: Float=6.`: Arbitrary $\alpha$ value for `Izhikevich` mode
+- `beta_init: Float=10.`: Arbitrary $\beta$ value for `Izhikevich` mode
+- `d_init: Float=2.`: After spike reset value for `w` in `Izhikevich` mode
 - `dt: Float=0.1`: Simulation timestep (ms)
 - `exp_dt: Float=1.`: Exponential time step (ms) for `Adaptive Exponenial` mode
 - `bayesian_mean: Float=1.`: Mean when applying noise
