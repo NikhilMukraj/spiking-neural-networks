@@ -26,6 +26,7 @@ struct IzhikevichNeuron {
 
 // try rewrite with struct
 __global__ void iterate(
+    float *input,
     float *voltage,
     float *w,
     float *dv,
@@ -34,7 +35,7 @@ __global__ void iterate(
     float *beta,
     float *c,
     float *d,
-    float *dt,
+    float dt,
     float *tau_m,
     float *v_th,
     int *is_spiking,
@@ -44,7 +45,7 @@ __global__ void iterate(
     int stride = blockDim.x * gridDim.x;
 
     for (int i = index; i < n; i += stride) {
-        step = dt[i] / tau_m[i]
+        step = dt / tau_m[i];
         dv[i] =  (
             0.04 * voltage[i] * voltage[i] + 5. * voltage[i] + 140. - w[i] + input[i]
         ) * step;
