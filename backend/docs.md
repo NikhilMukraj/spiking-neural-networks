@@ -72,10 +72,10 @@
 
 #### Static Input Integrate and Fire
 
-- `if_type`: `String` - Type of integrate and fire neuron
-- `input` : `Float` - Input voltage to neuron
-- `iterations` : `String` - Amount of iterations to do
-- `filename` : `String` - What to name output file
+- `if_type=String` : Type of integrate and fire neuron
+- `input=Float` : Input voltage to neuron
+- `iterations=String` : Amount of iterations to do
+- `filename=String` : What to name output file
 
 Example with non Izhikevich Type:
 
@@ -115,10 +115,40 @@ filename = "aqif.txt"
 
 ### Run Lattice Simulation
 
+Generates a lattice of randomly connected neurons that is simulated for a given amount of time steps
+
+- `output_type=String` : One of the following formats to dump the simulation data into
+  - `"Averaged Text"` : An average of all the voltages of each neuron per time step in plain text
+  - `"Grid Text"` : A matrix of  all the voltages of each neuron per time step in plain text
+  - `"Avergaed Binary"` : An average of all the voltages of each neuron per time step in binary format
+  - `"Avergaed Binary"` : A matrix of all the voltages of each neuron per time step in binary format
+- `tag=String` : What string to prefix the output files with
+- `input_equation=String` : What equation to use to modify input voltage into next neuron
+  - Defaults to `"(sign * mp + 65) / 15."` if `if_type` is `Izhikevich` or `Izhikevich Leaky`
+  - Defaults to `"sign * mp + 100 + rd * (nc^2 * 200)"` if `if_type` is not `Izhikevich` or `Izhikevich Leaky`
+  - Depends on the following variables:
+    - `sign` : Whether the neuron is excitatory (`-1.`) or inhibitory (`1.`)
+    - `mp` : Membrane potential voltage of the neuron
+    - `rd` : Receptor density of the neuron
+    - `nc` : Neurotransmitter concentration in synapse from input neuron
+- `num_rows=Integer` : How many rows in the lattice (must be >=1)
+- `num_cols=Integer` : How many rows in the lattice (must be >=1)
+- `radius=Integer` : How far to connect possible neurons to (radius of surrounding square, must be >=1)
+- `iterations=String` : Amount of iterations to do
+
 Example with non Izhikevich Type:
 
 ```toml
-# to be written
+[lattice_simulation]
+num_rows = 20
+num_cols = 20
+dt = 0.1
+iterations = 400
+radius = 2
+tag = "adaptive_exp"
+output_type = "grid"
+if_type = "adaptive exponential"
+random_volt_initialization = true
 ```
 
 Example with Izhikevich Type:
