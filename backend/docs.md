@@ -21,6 +21,12 @@
 
 ## TOML Methods
 
+Can be run with:
+
+```bash
+cargo run --release filename.toml
+```
+
 ### Parameters
 
 #### IF Parameters
@@ -68,21 +74,28 @@
 
 ### Ligand Gated Channels Parameters
 
+- `AMPA: Boolean=false` : Ligand gated channel fitted to AMPA channels
+- `GABAa: Boolean=false` : Ligand gated channel fitted to GABAa channels
+<!-- - `NMDA` -->
+- **todo create custom ligand gated channel from toml**
+
 ### Run Static Input
 
 #### Static Input Integrate and Fire
 
-- `if_type=String` : Type of integrate and fire neuron
-- `input=Float` : Input voltage to neuron
-- `iterations=String` : Amount of iterations to do
-- `filename=String` : What to name output file
+Runs a single neuron with a static voltage input
+
+- `if_type: String` : Type of integrate and fire neuron
+- `input_voltage: Float` : Input voltage to neuron
+- `iterations: String` : Amount of iterations to do
+- `filename: String` : What to name output file
 
 Example with non Izhikevich Type:
 
 ```toml
 [single_neuron_test]
 if_type = "adaptive"
-input = 300.0
+input_voltage = 300.0
 iterations = 4000
 bayesian_std = 0.2
 filename = "adaptive.txt"
@@ -93,7 +106,7 @@ Example with Izhikevich Type:
 ```toml
 [single_neuron_test]
 if_type = "adaptive quadratic"
-input = 40.0
+input_voltage = 40.0
 dt = 0.5
 alpha_init = 0.01
 beta_init = 0.25 
@@ -105,11 +118,82 @@ filename = "aqif.txt"
 
 #### Static Input Hodgkin Huxley
 
+Runs a single Hodgkin Huxley model with a static input
+
+- `iterations: Float` : Amount of iterations to do
+- `filename: String` : What to name output file
+- `input_current: Float` : Current to input into the model
+  - **todo convert this to voltage based on internal resistance**
+- `full: Boolean=false` : Whether to write state of gates to file along with voltage
+
+Example:
+
+```toml
+[hodgkin_huxley]
+iterations = 10000
+filename = "hodgkin_huxley_test.txt"
+g_na = 120.0
+g_k = 36.0
+e_k = -12.0
+dt = 0.01
+input_current = 50.0
+bayesian_std = 0.1
+```
+
 ### Run Coupled Test
 
 #### Coupled Integrate and Fire
 
+Runs two integrate and fire neurons, one presynaptic connected to a postsynaptic neuron for a given amount of iterations
+
+- Prefix any presynaptic neuron arguments with `pre_` and any postsynaptic neuron arguments with `post_` except for the `if_type` as both must be of the same type
+- `input_voltage: Float` : Input voltage to presynaptic neuron
+- `filename: String` : What to name output file
+- `input_equation: String` : What equation to use to modify input voltage into next neuron
+  - Defaults to `"(sign * mp + 65) / 15."` if `if_type` is `Izhikevich` or `Izhikevich Leaky`
+  - Defaults to `"sign * mp + 100 + rd * (nc^2 * 200)"` if `if_type` is not `Izhikevich` or `Izhikevich Leaky`
+
+Example:
+
+```toml
+[coupled_test]
+if_type = "izhikevich"
+iterations = 10000
+input_voltage = 25.0
+pre_dt = 0.5
+post_dt = 0.5
+pre_alpha_init = 0.01
+pre_beta_init = 0.25
+pre_w_init = 20.0
+pre_v_reset = -50.0
+pre_d_init = 2.0
+filename = "coupled tests/bursting_in_tonic_out.txt"
+input_equation = "sign * mp + 65"
+```
+
 #### Coupled Hodgkin Huxley
+
+Runs two Hodgkin Huxley neurons, one presynaptic connected to a postsynaptic neuron for a given amount of iterations
+
+- Prefix any presynaptic neuron arguments with `pre_` and any postsynaptic neuron arguments with `post_`
+- `input_voltage: Float` : Input voltage to presynaptic neuron neuron
+- `iterations: String` : Amount of iterations to do
+- `filename: String` : What to name output file
+- `bayesian: Boolean=false` : Whether or not to add noise to inputs
+- `full: Boolean=false` : Whether or not to write ligand gates states to file
+
+Example:
+
+```toml
+[coupled_hodgkin_huxley]
+post_AMPA = true
+post_GABAa = true
+# post_NMDA = true
+iterations = 10000
+filename = "coupled_hodgkin_huxley.csv"
+bayesian = false
+full = true
+```
 
 ### Run STDP Test
 
@@ -117,7 +201,7 @@ filename = "aqif.txt"
 
 Generates a lattice of randomly connected neurons that is simulated for a given amount of time steps
 
-- `output_type=String` : One of the following formats to dump the simulation data into
+- `output_type: String` : One of the following formats to dump the simulation data into
   - `"Averaged Text"` : An average of all the voltages of each neuron per time step in plain text
   - `"Grid Text"` : A matrix of  all the voltages of each neuron per time step in plain text
   - `"Avergaed Binary"` : An average of all the voltages of each neuron per time step in binary format
@@ -131,10 +215,10 @@ Generates a lattice of randomly connected neurons that is simulated for a given 
     - `mp` : Membrane potential voltage of the neuron
     - `rd` : Receptor density of the neuron
     - `nc` : Neurotransmitter concentration in synapse from input neuron
-- `num_rows=Integer` : How many rows in the lattice (must be >=1)
-- `num_cols=Integer` : How many rows in the lattice (must be >=1)
-- `radius=Integer` : How far to connect possible neurons to (radius of surrounding square, must be >=1)
-- `iterations=String` : Amount of iterations to do
+- `num_rows: Integer` : How many rows in the lattice (must be >=1)
+- `num_cols: Integer` : How many rows in the lattice (must be >=1)
+- `radius: Integer=1` : How far to connect possible neurons to (radius of surrounding square, must be >=1)
+- `iterations: String` : Amount of iterations to do
 
 Example with non Izhikevich Type:
 
@@ -172,4 +256,4 @@ input_equation = """
 """
 ```
 
-### Run Lattice Fit
+<!-- ### Run Lattice Genetic Algorithm Fit -->
