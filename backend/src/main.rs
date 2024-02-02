@@ -2240,11 +2240,11 @@ fn main() -> Result<()> {
         };
         println!("iterations: {}", iterations);
 
-        let input: f64 = match single_neuron_test.get("input") {
-            Some(value) => parse_f64(value, "input")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input' value not found")); },
+        let input_voltage: f64 = match single_neuron_test.get("input_voltage") {
+            Some(value) => parse_f64(value, "input_voltage")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
         };
-        println!("input: {}", input);  
+        println!("input_voltage: {}", input_voltage);  
         
         let if_type: String = parse_value_with_default(
             single_neuron_test, 
@@ -2314,19 +2314,19 @@ fn main() -> Result<()> {
 
         match if_type {
             IFType::Basic => { 
-                test_cell.run_static_input(&if_params, input, bayesian, iterations, filename); 
+                test_cell.run_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
             },
             IFType::Adaptive => { 
-                test_cell.run_adaptive_static_input(&if_params, input, bayesian, iterations, filename); 
+                test_cell.run_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
             },
             IFType::AdaptiveExponential => { 
-                test_cell.run_exp_adaptive_static_input(&if_params, input, bayesian, iterations, filename);
+                test_cell.run_exp_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, filename);
             },
             IFType::Izhikevich => { 
-                test_cell.run_izhikevich_static_input(&if_params, input, bayesian, iterations, filename); 
+                test_cell.run_izhikevich_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
             },
             IFType::IzhikevichLeaky => {
-                test_cell.run_izhikevich_leaky_static_input(&if_params, input, bayesian, iterations, filename);
+                test_cell.run_izhikevich_leaky_static_input(&if_params, input_voltage, bayesian, iterations, filename);
             },
         };
 
