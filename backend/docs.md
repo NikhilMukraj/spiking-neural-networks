@@ -44,6 +44,15 @@ cargo run --release filename.toml
 - `d_init: Float=2.`: After spike reset value for `w` in `Izhikevich` mode
 - `dt: Float=0.1`: Simulation timestep (ms)
 - `exp_dt: Float=1.`: Exponential time step (ms) for `Adaptive Exponenial` mode
+- `a_minus: float`: STDP parameter for scaling weight if postsynaptic neuron fires first
+- `a_plus: float`: STDP parameters for scaling weight if presynaptic neuron fires first
+- `tau_minus: float`: stdp parameters for decay if postsynaptic neuron fires first
+- `tau_plus: float`: stdp parameters for decay if presynaptic neuron fires first
+- `stdp_weight_mean: float=1.`: Mean when initializing weight
+- `stdp_weight_std: float=0.`: Standard deviation when initializing weight
+- `stdp_weight_max: float=2.`: Maximum when initializing weight
+- `stdp_weight_min: float=0.`: Minimum when initializing weight
+- `last_firing_time: Optional[int]`: Last time step that spike occurred
 - `bayesian_mean: Float=1.`: Mean when applying noise
 - `bayesian_std: Float=0.`: Standard deviation when applying noise
 - `bayesian_max: Float=2.`: Maximum noise
@@ -197,6 +206,41 @@ full = true
 
 ### Run STDP Test
 
+Iterates an isolated postsynaptic integrate and fire neuron with a set amount of presynaptic neurons undergoing STDP
+
+- `output_type: String` : One of the following formats to dump the simulation data into
+  - `"Averaged Text"` : An average of all the voltages of each neuron per time step in plain text
+  - `"Grid Text"` : A matrix of  all the voltages of each neuron per time step in plain text
+  - `"Avergaed Binary"` : An average of all the voltages of each neuron per time step in binary format
+  - `"Avergaed Binary"` : A matrix of all the voltages of each neuron per time step in binary format
+- `input_equation=String` : What equation to use to modify input voltage into next neuron
+  - Defaults to `"(sign * mp + 65) / 15."` if `if_type` is `Izhikevich` or `Izhikevich Leaky`
+  - Defaults to `"sign * mp + 100 + rd * (nc^2 * 200)"` if `if_type` is not `Izhikevich` or `Izhikevich Leaky`
+- `iterations: String` : Amount of iterations to do
+- `input_voltage: Float` : Input voltage to neuron
+- `n: Int` : Number of presynaptic input neurons (must be >=1)
+- `filename: String` : What to name output file
+- `if_type: String` : Type of integrate and fire neuron
+
+Example:
+
+```toml
+[stdp_test]
+if_type = "izhikevich"
+iterations = 10000
+stdp_weight_mean = 5.0
+n = 1
+input_voltage = 30.0
+filename = "izhikevich_stdp.txt"
+a_plus = 2.0
+a_minus = 2.0
+bayesian_std = 0.3
+```
+
+### Run R-STDP Test
+
+- **todo**
+
 ### Run Lattice Simulation
 
 Generates a lattice of randomly connected neurons that is simulated for a given amount of time steps
@@ -219,6 +263,7 @@ Generates a lattice of randomly connected neurons that is simulated for a given 
 - `num_cols: Integer` : How many rows in the lattice (must be >=1)
 - `radius: Integer=1` : How far to connect possible neurons to (radius of surrounding square, must be >=1)
 - `iterations: String` : Amount of iterations to do
+- `if_type: String` : Type of integrate and fire neuron
 
 Example with non Izhikevich Type:
 
