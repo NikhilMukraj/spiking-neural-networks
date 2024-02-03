@@ -2062,7 +2062,7 @@ fn main() -> Result<()> {
             default_eq
         )?;
         let equation: &str = equation.trim();
-        println!("input equation: {}", equation);
+        println!("input_equation: {}", equation);
     
         let mut symbol_table = SymbolTable::new();
         let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
