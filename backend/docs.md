@@ -1,4 +1,4 @@
-# Rust Documentation
+# Rust Backend Documentation
 
 ## Integrate and Fire Neuron
 
