@@ -240,6 +240,9 @@ bayesian_std = 0.3
 ### Run R-STDP Test
 
 - **todo**
+- Take time frame to apply reward as input
+- Calculate reward and dopamine to determine STDP changes
+- Run STDP with changes over time in same way isolated neurons were tested in STDP test
 
 ### Run Lattice Simulation
 
