@@ -85,7 +85,7 @@ cargo run --release filename.toml
 
 - `AMPA: Boolean=false` : Ligand gated channel fitted to AMPA channels
 - `GABAa: Boolean=false` : Ligand gated channel fitted to GABAa channels
-<!-- - `NMDA` -->
+- `NMDA: Boolean=false` : Ligand gated channel fitted to NMDA channel (based on voltage and magnesium concentration)
 - **todo create custom ligand gated channel from toml**
 
 ### Run Static Input
