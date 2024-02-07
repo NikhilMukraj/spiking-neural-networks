@@ -7,6 +7,7 @@
 /backend/coupled tests
 /backend/lattice simulations
 /backend/stdp lattice
+/backend/hodgkin huxley tests
 /backend/test_izhikevich_lattice.toml
 /interface/target
 /interface/.venv
