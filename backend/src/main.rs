@@ -1960,7 +1960,14 @@ fn coupled_hodgkin_huxley<'a>(
     for _ in 0..iterations {
         let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
         if bayesian {
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
+            let bayesian_factor = limited_distr(
+                postsynaptic_neuron.bayesian_params.mean, 
+                postsynaptic_neuron.bayesian_params.std, 
+                postsynaptic_neuron.bayesian_params.min, 
+                postsynaptic_neuron.bayesian_params.max,
+            );
+
+            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
 
             presynaptic_neuron.iterate(
                 input_voltage / presynaptic_neuron.input_resistance * limited_distr(
@@ -1972,12 +1979,7 @@ fn coupled_hodgkin_huxley<'a>(
             );
 
             postsynaptic_neuron.iterate(
-                presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance * limited_distr(
-                    postsynaptic_neuron.bayesian_params.mean, 
-                    postsynaptic_neuron.bayesian_params.std, 
-                    postsynaptic_neuron.bayesian_params.min, 
-                    postsynaptic_neuron.bayesian_params.max,
-                )
+                presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance * bayesian_factor
             );
         } else {
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
