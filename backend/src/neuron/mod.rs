@@ -840,7 +840,7 @@ impl Default for HodgkinHuxleyCell {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
-            input_resistance: 100.,
+            input_resistance: 1e7, // https://github.com/openworm/hodgkin_huxley_tutorial/blob/master/Tutorial/Source/HodgkinHuxley.py
             dt: 0.1,
             cm: 1., 
             e_na: 115., 
