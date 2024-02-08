@@ -721,6 +721,21 @@ impl NMDADefault for GeneralLigandGatedChannel {
     }
 }
 
+pub trait NMDAWithBV {
+    fn nmda_with_bv(bv: BV) -> Self;
+}
+
+impl NMDAWithBV for GeneralLigandGatedChannel {
+    fn nmda_with_bv(bv: BV) -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 0., // 0.0 mV
+            neurotransmitter: Neurotransmitter::nmda_default(),
+            neurotransmitter_type: NeurotransmitterType::NMDA(bv),
+        }
+    }
+}
+
 impl GeneralLigandGatedChannel {
     pub fn calculate_g(&self, voltage: f64) -> f64 {
         let modifier = match self.neurotransmitter_type {
