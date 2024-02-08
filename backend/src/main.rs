@@ -1766,7 +1766,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         &hodgkin_huxley_table, 
         format!("{}input_resistance", prefix).as_str(), 
         parse_f64, 
-        1.
+        1e7
     )?;
     println!("{}input_resistance: {}", prefix, input_resistance);
 
