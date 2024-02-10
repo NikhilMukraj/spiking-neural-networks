@@ -50,12 +50,15 @@ pub struct IFCell {
 #[pymethods]
 impl IFCell {
     #[new]
-    fn new() -> Self {
-        IFCell { 
-            mode: IFType::Basic,
-            cell_backend: Cell::default(),
-            if_params: IFParameters::default(),
-        }
+    #[pyo3(signature=(mode="basic"))]
+    fn new(mode: &str) -> PyResult<Self> {
+        Ok(
+            IFCell { 
+                mode: IFType::from_str(mode)?,
+                cell_backend: Cell::default(),
+                if_params: IFParameters::default(),
+            }
+        )
     }
 
     #[pyo3(signature = (i))]
