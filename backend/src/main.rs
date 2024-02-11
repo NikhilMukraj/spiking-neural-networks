@@ -1762,14 +1762,6 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}v_init: {}", prefix, v_init);
 
-    let input_resistance: f64 = parse_value_with_default(
-        &hodgkin_huxley_table, 
-        format!("{}input_resistance", prefix).as_str(), 
-        parse_f64, 
-        1e7
-    )?;
-    println!("{}input_resistance: {}", prefix, input_resistance);
-
     let dt: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
         format!("{}dt", prefix).as_str(), 
@@ -1911,7 +1903,6 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
-            input_resistance,
             dt: dt,
             cm: cm,
             e_na: e_na,
@@ -1927,6 +1918,13 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             bayesian_params: bayesian_params,
         }
     )
+}
+
+
+// current / capacitance * time = voltage
+// voltage / time * capacitance = current
+fn voltage_to_current(voltage: f64, presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
+    (voltage / presynaptic_neuron.dt) * presynaptic_neuron.cm
 }
 
 fn coupled_hodgkin_huxley<'a>(
@@ -1970,7 +1968,7 @@ fn coupled_hodgkin_huxley<'a>(
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
 
             presynaptic_neuron.iterate(
-                input_voltage / presynaptic_neuron.input_resistance * limited_distr(
+                input_voltage * limited_distr(
                     presynaptic_neuron.bayesian_params.mean, 
                     presynaptic_neuron.bayesian_params.std, 
                     presynaptic_neuron.bayesian_params.min, 
@@ -1979,12 +1977,12 @@ fn coupled_hodgkin_huxley<'a>(
             );
 
             postsynaptic_neuron.iterate(
-                presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance * bayesian_factor
+                voltage_to_current(presynaptic_neuron.current_voltage, &presynaptic_neuron) * bayesian_factor
             );
         } else {
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-            presynaptic_neuron.iterate(input_voltage / presynaptic_neuron.input_resistance);
-            postsynaptic_neuron.iterate(presynaptic_neuron.current_voltage / postsynaptic_neuron.input_resistance);
+            presynaptic_neuron.iterate(input_voltage);
+            postsynaptic_neuron.iterate(voltage_to_current(presynaptic_neuron.current_voltage, &presynaptic_neuron));
         }
 
         if !full {
