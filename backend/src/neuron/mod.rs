@@ -814,7 +814,6 @@ impl Gate {
 
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
-    pub input_resistance: f64,
     pub dt: f64,
     pub cm: f64,
     pub e_na: f64,
@@ -840,7 +839,6 @@ impl Default for HodgkinHuxleyCell {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
-            input_resistance: 1e7, // https://github.com/openworm/hodgkin_huxley_tutorial/blob/master/Tutorial/Source/HodgkinHuxley.py
             dt: 0.1,
             cm: 1., 
             e_na: 115., 
