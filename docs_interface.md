@@ -131,7 +131,7 @@
 
 ### STDP Weight Change
 
-- `get_weight_change_from_if_cells(pre_synaptic_neuron: IFCell, post_synaptic_neuron_init: IFCell) -> float` : Gets weight change based on the presynaptic and postsynaptic neurons' last firing time
+- `get_stdp_weight_change(pre_synaptic_neuron: IFCell, post_synaptic_neuron_init: IFCell) -> float` : Gets weight change based on the presynaptic and postsynaptic neurons' last firing time
   - `pre_synaptic_neuron: IFCell` : A presynaptic `IFCell`
   - `post_synaptic_neuron_init: IFCell` : A postsynaptic `IFCell`
 
