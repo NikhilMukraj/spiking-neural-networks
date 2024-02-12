@@ -1404,11 +1404,13 @@ fn write_row(
 //     stdp_params: &STDPParameters, 
 //     if_params: &IFParameters,
 // ) -> f64 {
-//     // might need to multiply by delta dirac of difference in spike times
-//     (-dopamine_decay/stdp_params.tau_c + weight_change) * if_params.dt
+//     // need to multiply weight change by delta dirac of current time - last spike time pre or post
+//     // pre or post is determined by same thing in update_weight, t_pre < t_post, => pre, else post
+//     // reward prediction error = t post - t pre / t post
+//     (-dopamine_decay / (stdp_params.tau_c - dopamine_decay) + weight_change) * if_params.dt
 // }
 
-// fn update_doamine(
+// fn update_dopamine(
 //     reward: f64, 
 //     dopamine: f64, 
 //     spike_time_difference: f64,
@@ -1416,10 +1418,10 @@ fn write_row(
 //     if_params: &IFParameters
 // ) -> f64 {
 //     // might wanna multiply tau_d by spike time difference
-//     (-dopamine / (stdp_params.tau_d + reward)) * if_params.dt 
+//     ((-dopamine / (stdp_params.tau_d - dopamine)) + reward) * if_params.dt 
 // }
 
-// weight * dopamine
+// weight change = weight * dopamine
 
 fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
     let mut delta_w: f64 = 0.;
