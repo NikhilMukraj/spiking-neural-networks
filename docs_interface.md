@@ -1,5 +1,13 @@
 # Documentation
 
+## Build
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -U pip maturin
+```
+
 ## IF Cell Model
 
 ### IF Mode
