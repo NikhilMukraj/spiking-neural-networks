@@ -602,7 +602,7 @@ impl HodgkinHuxleyCell {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
-        let i_sum = input_current - i_na - i_k - i_k_leak;
+        let i_sum = input_current - (i_na + i_k + i_k_leak);
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
