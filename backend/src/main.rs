@@ -1199,7 +1199,7 @@ fn test_coupled_neurons(
 
     let mut file = BufWriter::new(File::create(filename)
         .expect("Unable to create file"));
-    writeln!(file, "pre_voltage, post_voltage").expect("Unable to write to file");
+    writeln!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
     writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");
 
     let sign = match pre_synaptic_neuron.potentiation_type {
@@ -1923,10 +1923,10 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
 }
 
 
-// current / capacitance * time = voltage
-// voltage / time * capacitance = current
-fn voltage_to_current(voltage: f64, presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
-    (voltage / presynaptic_neuron.dt) * presynaptic_neuron.cm
+// current / capacitance * time = change in voltage
+// change in voltage / time * capacitance = current
+fn voltage_change_to_current(dv: f64, presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
+    (dv / presynaptic_neuron.dt) * presynaptic_neuron.cm
 }
 
 fn coupled_hodgkin_huxley<'a>(
@@ -1944,21 +1944,26 @@ fn coupled_hodgkin_huxley<'a>(
     presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
     postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
 
-    writeln!(file, "pre_voltage, post_voltage").expect("Unable to write to file");
+    write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
     
     if full {
         for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
             let name = i.to_str();
             if n - 1 < postsynaptic_neuron.ligand_gates.len() {
-                write!(file, "g_{}, r_{}, ", name, name)?;
+                write!(file, ",g_{},r_{}", name, name)?;
             } else {
-                writeln!(file, "g_{}, r_{}", name, name)?;
+                writeln!(file, ",g_{},r_{}", name, name)?;
             }
         }
+    } else {
+        write!(file, "\n").expect("Unable to write to file");
     }
+
+    let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
         
     for _ in 0..iterations {
         let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
+
         if bayesian {
             let bayesian_factor = limited_distr(
                 postsynaptic_neuron.bayesian_params.mean, 
@@ -1978,14 +1983,25 @@ fn coupled_hodgkin_huxley<'a>(
                 )
             );
 
+            let current = voltage_change_to_current(
+                presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+            );
+
             postsynaptic_neuron.iterate(
-                voltage_to_current(presynaptic_neuron.current_voltage, &presynaptic_neuron) * bayesian_factor
+                current * bayesian_factor
             );
         } else {
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
             presynaptic_neuron.iterate(input_voltage);
-            postsynaptic_neuron.iterate(voltage_to_current(presynaptic_neuron.current_voltage, &presynaptic_neuron));
+
+            let current = voltage_change_to_current(
+                presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+            );
+
+            postsynaptic_neuron.iterate(current);
         }
+
+        past_presynaptic_voltage = presynaptic_neuron.current_voltage;
 
         if !full {
             writeln!(file, "{}, {}", 
@@ -2575,8 +2591,8 @@ fn main() -> Result<()> {
         )?;
         println!("full: {}", full);
 
-        let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre_"))?;
-        let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post_"))?;
+        let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre"))?;
+        let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post"))?;
 
         coupled_hodgkin_huxley(
             &mut presynaptic_neuron, 
