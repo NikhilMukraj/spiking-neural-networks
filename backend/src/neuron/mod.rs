@@ -887,7 +887,7 @@ impl HodgkinHuxleyCell {
             .collect::<Vec<f64>>()
             .iter()
             .sum::<f64>();
-        let i_sum = input_current - i_na - i_k - i_k_leak + i_ligand_gates;
+        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
@@ -926,7 +926,7 @@ impl HodgkinHuxleyCell {
             writeln!(file, "voltage").expect("Unable to write to file");
             writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         } else {
-            writeln!(file, "voltage, m, n, h").expect("Unable to write to file");
+            writeln!(file, "voltage,m,n,h").expect("Unable to write to file");
             writeln!(file, "{}, {}, {}, {}", 
                 self.current_voltage, 
                 self.m.state, 
