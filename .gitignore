@@ -9,6 +9,8 @@
 /backend/stdp lattice
 /backend/hodgkin huxley tests
 /backend/test_izhikevich_lattice.toml
+/backend/hodgkin huxley tests/hodgkin_huxley_test.csv
+/backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
