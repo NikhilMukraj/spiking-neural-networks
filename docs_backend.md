@@ -83,6 +83,8 @@ cargo run --release filename.toml
 
 ### Ligand Gated Channels Parameters
 
+Note: all neurotransmitter kinetic equations default to `ms` as a time step unit
+
 - `AMPA: Boolean=false` : Ligand gated channel fitted to AMPA channels
 - `GABAa: Boolean=false` : Ligand gated channel fitted to GABAa channels
 - `NMDA: Boolean=false` : Ligand gated channel fitted to NMDA channel (based on voltage and magnesium concentration)
