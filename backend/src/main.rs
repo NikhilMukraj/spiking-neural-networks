@@ -1946,13 +1946,13 @@ fn coupled_hodgkin_huxley<'a>(
 
     write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
     
-    if full {
+    if full && postsynaptic_neuron.ligand_gates.len() != 0{
         for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
             let name = i.to_str();
             if n - 1 < postsynaptic_neuron.ligand_gates.len() {
-                write!(file, ",g_{},r_{}", name, name)?;
+                write!(file, ",g_{},r_{},T_{}", name, name, name)?;
             } else {
-                writeln!(file, ",g_{},r_{}", name, name)?;
+                writeln!(file, ",g_{},r_{},T_{}", name, name, name)?;
             }
         }
     } else {
@@ -2003,27 +2003,29 @@ fn coupled_hodgkin_huxley<'a>(
 
         past_presynaptic_voltage = presynaptic_neuron.current_voltage;
 
-        if !full {
+        if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
             writeln!(file, "{}, {}", 
                 presynaptic_neuron.current_voltage,
                 postsynaptic_neuron.current_voltage,
             ).expect("Unable to write to file");
         } else {
-            write!(file, "{}, {}, ", 
+            write!(file, "{}, {}", 
                 presynaptic_neuron.current_voltage, 
                 postsynaptic_neuron.current_voltage,
             ).expect("Unable to write to file");
 
             for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
                 if n - 1 < postsynaptic_neuron.ligand_gates.len() {
-                    write!(file, "{}, {}, ", 
+                    write!(file, ", {}, {}, {}", 
                         i.calculate_g(past_postsynaptic_voltage),
                         i.neurotransmitter.r,
+                        i.neurotransmitter.t,
                     )?;
                 } else {
-                    writeln!(file, "{}, {}", 
+                    writeln!(file, ", {}, {}, {}", 
                         i.calculate_g(past_postsynaptic_voltage),
                         i.neurotransmitter.r,
+                        i.neurotransmitter.t
                     )?;
                 }
             }
@@ -2604,7 +2606,7 @@ fn main() -> Result<()> {
             full,
         )?;
 
-        println!("\nFinished Hodgkin Huxley test");
+        println!("\nFinished coupled Hodgkin Huxley test");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
