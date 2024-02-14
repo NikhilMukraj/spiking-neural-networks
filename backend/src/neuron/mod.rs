@@ -615,8 +615,8 @@ impl AMPADefault for Neurotransmitter {
     fn ampa_default() -> Self {
         Neurotransmitter {
             t_max: 1.,
-            alpha: 1.1 * 10.0_f64.powf(6.), // M^-1 * sec^-1
-            beta: 190., // sec^-1
+            alpha: 1.1, // mM^-1 * ms^-1
+            beta: 0.19, // ms^-1
             t: 0.,
             r: 0.,
             v_p: 2., // 2 mV
@@ -629,8 +629,8 @@ impl GABAADefault for Neurotransmitter {
     fn gabaa_default() -> Self {
         Neurotransmitter {
             t_max: 1.,
-            alpha: 5. * 10.0_f64.powf(6.), // M^-1 * sec^-1
-            beta: 180., // sec^-1
+            alpha: 5., // mM^-1 * ms^-1
+            beta: 0.18, // ms^-1
             t: 0.,
             r: 0.,
             v_p: 2., // 2 mV
@@ -643,8 +643,8 @@ impl NMDADefault for Neurotransmitter {
     fn nmda_default() -> Self {
         Neurotransmitter {
             t_max: 1.,
-            alpha: 7.2 * 10.0_f64.powf(4.), // M^-1 * sec^-1
-            beta: 6.6, // sec^-1
+            alpha: 0.072, // mM^-1 * ms^-1
+            beta: 0.0066, // ms^-1
             t: 0.,
             r: 0.,
             v_p: 2., // 2 mV
@@ -654,8 +654,8 @@ impl NMDADefault for Neurotransmitter {
 }
 
 impl Neurotransmitter {
-    fn apply_r_change(&mut self) {
-        self.r += self.alpha * self.t * (1. - self.r) - self.beta * self.r;
+    fn apply_r_change(&mut self, dt: f64) {
+        self.r += (self.alpha * self.t * (1. - self.r) - self.beta * self.r) * dt;
     }
 
     fn apply_t_change(&mut self, voltage: f64) {
@@ -896,7 +896,7 @@ impl HodgkinHuxleyCell {
             .iter_mut()
             .for_each(|i| {
                 i.neurotransmitter.apply_t_change(presynaptic_voltage);
-                i.neurotransmitter.apply_r_change();
+                i.neurotransmitter.apply_r_change(self.dt);
             });
     }
 
