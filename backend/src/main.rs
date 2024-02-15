@@ -12,7 +12,8 @@ mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
-    Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAADefault, NMDAWithBV, BV
+    Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
+    GABAbDefault, NMDAWithBV, BV
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1875,6 +1876,13 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         false
     )?;
 
+    let gabab: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}GABAb", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
     let nmda: bool = parse_value_with_default(
         &hodgkin_huxley_table,
         format!("{}NMDA", prefix).as_str(), 
@@ -1888,6 +1896,9 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     }
     if gabaa {
         ligand_gates.push(GeneralLigandGatedChannel::gabaa_default());
+    }
+    if gabab {
+        ligand_gates.push(GeneralLigandGatedChannel::gabab_default());
     }
     if nmda {
         let mg_conc: f64 = parse_value_with_default(
@@ -1962,7 +1973,7 @@ fn coupled_hodgkin_huxley<'a>(
     let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
         
     for _ in 0..iterations {
-        let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
+        // let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
 
         if bayesian {
             let bayesian_factor = limited_distr(
@@ -2017,13 +2028,13 @@ fn coupled_hodgkin_huxley<'a>(
             for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
                 if n - 1 < postsynaptic_neuron.ligand_gates.len() {
                     write!(file, ", {}, {}, {}", 
-                        i.calculate_g(past_postsynaptic_voltage),
+                        i.current,
                         i.neurotransmitter.r,
                         i.neurotransmitter.t,
                     )?;
                 } else {
                     writeln!(file, ", {}, {}, {}", 
-                        i.calculate_g(past_postsynaptic_voltage),
+                        i.current,
                         i.neurotransmitter.r,
                         i.neurotransmitter.t
                     )?;
