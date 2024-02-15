@@ -571,16 +571,46 @@ impl BV {
     }
 }
 
-// pub trait NMDADefault {
-//     fn nmda_default() -> Self;
-// }
+pub struct GABAbDissociation {
+    g: f64,
+    n: f64,
+    kd: f64,
+    // k1: ,
+    // k2: ,
+    k3: f64,
+    k4: f64,
+}
+
+impl Default for GABAbDissociation {
+    fn default() -> Self {
+        GABAbDissociation {
+            g: 0.,
+            n: 4.,
+            kd: 100.,
+            // k1: ,
+            // k2: ,
+            k3: 0.098,
+            k4: 0.033, 
+        }
+    }
+}
+
+impl GABAbDissociation {
+    fn calculate_modifer(&mut self) -> f64 {
+        self.g.powf(self.n) / (self.g.powf(self.n) * self.kd)
+    }
+}
 
 pub trait AMPADefault {
     fn ampa_default() -> Self;
 }
 
-pub trait GABAADefault {
+pub trait GABAaDefault {
     fn gabaa_default() -> Self;
+}
+
+pub trait GABAbDefault {
+    fn gabab_default() -> Self;
 }
 
 pub trait NMDADefault {
@@ -625,12 +655,26 @@ impl AMPADefault for Neurotransmitter {
     }
 }
 
-impl GABAADefault for Neurotransmitter {
+impl GABAaDefault for Neurotransmitter {
     fn gabaa_default() -> Self {
         Neurotransmitter {
             t_max: 1.,
-            alpha: 5., // mM^-1 * ms^-1
+            alpha: 0.53, // mM^-1 * ms^-1
             beta: 0.18, // ms^-1
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
+
+impl GABAbDefault for Neurotransmitter {
+    fn gabab_default() -> Self {
+        Neurotransmitter {
+            t_max: 0.5,
+            alpha: 0.016, // mM^-1 * ms^-1
+            beta: 0.0047, // ms^-1
             t: 0.,
             r: 0.,
             v_p: 2., // 2 mV
@@ -666,6 +710,7 @@ impl Neurotransmitter {
 pub enum NeurotransmitterType {
     AMPA,
     GABAa,
+    GABAb(GABAbDissociation),
     NMDA(BV),
     Basic,
 }
@@ -675,6 +720,8 @@ pub struct GeneralLigandGatedChannel {
     pub reversal: f64,
     pub neurotransmitter: Neurotransmitter,
     pub neurotransmitter_type: NeurotransmitterType,
+    pub additional_modifier: f64,
+    pub current: f64,
 }
 
 impl Default for GeneralLigandGatedChannel {
@@ -684,6 +731,8 @@ impl Default for GeneralLigandGatedChannel {
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::default(),
             neurotransmitter_type: NeurotransmitterType::Basic,
+            additional_modifier: 0.,
+            current: 0.,
         }
     }
 }
@@ -695,17 +744,34 @@ impl AMPADefault for GeneralLigandGatedChannel {
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::ampa_default(),
             neurotransmitter_type: NeurotransmitterType::AMPA,
+            additional_modifier: 0.,
+            current: 0.,
         }
     }
 }
 
-impl GABAADefault for GeneralLigandGatedChannel {
+impl GABAaDefault for GeneralLigandGatedChannel {
     fn gabaa_default() -> Self {
         GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 80., // 0.0 mV
             neurotransmitter: Neurotransmitter::gabaa_default(),
             neurotransmitter_type: NeurotransmitterType::GABAa,
+            additional_modifier: 0.,
+            current: 0.,
+        }
+    }
+}
+
+impl GABAbDefault for GeneralLigandGatedChannel {
+    fn gabab_default() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 95., // 0.0 mV
+            neurotransmitter: Neurotransmitter::gabaa_default(),
+            neurotransmitter_type: NeurotransmitterType::GABAb(GABAbDissociation::default()),
+            additional_modifier: 0.,
+            current: 0.,
         }
     }
 }
@@ -717,6 +783,8 @@ impl NMDADefault for GeneralLigandGatedChannel {
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
             neurotransmitter_type: NeurotransmitterType::NMDA(BV::default()),
+            additional_modifier: 0.,
+            current: 0.,
         }
     }
 }
@@ -732,26 +800,35 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
             neurotransmitter_type: NeurotransmitterType::NMDA(bv),
+            additional_modifier: 0.,
+            current: 0.,
         }
     }
 }
 
 impl GeneralLigandGatedChannel {
-    pub fn calculate_g(&self, voltage: f64) -> f64 {
-        let modifier = match self.neurotransmitter_type {
+    pub fn calculate_g(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
+        let modifier = match &mut self.neurotransmitter_type {
             NeurotransmitterType::AMPA => 1.0,
             NeurotransmitterType::GABAa => 1.0,
+            NeurotransmitterType::GABAb(value) => {
+                self.additional_modifier += (value.k3 * r - value.k4 * self.additional_modifier) * dt;
+                value.calculate_modifer()
+            }, // G^N / (G^N + Kd)
             NeurotransmitterType::NMDA(value) => value.calculate_b(voltage),
             NeurotransmitterType::Basic => 1.0,
         };
+    
+        let current = modifier * self.g * (voltage - self.reversal);
 
-        modifier * self.g * (voltage - self.reversal)
+        current
     }
 
     pub fn to_str(&self) -> &str {
         match self.neurotransmitter_type {
             NeurotransmitterType::AMPA => "AMPA",
             NeurotransmitterType::GABAa => "GABAa",
+            NeurotransmitterType::GABAb(_) => "GABAb",
             NeurotransmitterType::NMDA(_) => "NMDA",
             NeurotransmitterType::Basic => "Basic",
         }
@@ -882,8 +959,8 @@ impl HodgkinHuxleyCell {
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
         let i_ligand_gates = self.ligand_gates
-            .iter()
-            .map(|i| i.calculate_g(self.current_voltage) * i.neurotransmitter.r)
+            .iter_mut()
+            .map(|i| i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt) * i.neurotransmitter.r)
             .collect::<Vec<f64>>()
             .iter()
             .sum::<f64>();
