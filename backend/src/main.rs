@@ -13,7 +13,7 @@ use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
-    GABAbDefault, NMDAWithBV, BV
+    GABAbDefault, GABAbDefault2, NMDAWithBV, BV
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1883,6 +1883,17 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         false
     )?;
 
+    let gabab_2: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}GABAb (secondary)", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    if gabab && gabab_2 {
+        return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
+    }
+
     let nmda: bool = parse_value_with_default(
         &hodgkin_huxley_table,
         format!("{}NMDA", prefix).as_str(), 
@@ -1899,6 +1910,9 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     }
     if gabab {
         ligand_gates.push(GeneralLigandGatedChannel::gabab_default());
+    }
+    if gabab_2 {
+        ligand_gates.push(GeneralLigandGatedChannel::gabab_default2())
     }
     if nmda {
         let mg_conc: f64 = parse_value_with_default(
