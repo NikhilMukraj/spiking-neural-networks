@@ -786,7 +786,20 @@ impl GABAbDefault for GeneralLigandGatedChannel {
         GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 95., // 0.0 mV
-            neurotransmitter: Neurotransmitter::gabaa_default(),
+            neurotransmitter: Neurotransmitter::gabab_default(),
+            neurotransmitter_type: NeurotransmitterType::GABAb(GABAbDissociation::default()),
+            additional_modifier: 0.,
+            current: 0.,
+        }
+    }
+}
+
+impl GABAbDefault2 for GeneralLigandGatedChannel {
+    fn gabab_default2() -> Self {
+        GeneralLigandGatedChannel {
+            g: 1.0, // 1.0 nS
+            reversal: 95., // 0.0 mV
+            neurotransmitter: Neurotransmitter::gabab_default2(),
             neurotransmitter_type: NeurotransmitterType::GABAb(GABAbDissociation::default()),
             additional_modifier: 0.,
             current: 0.,
