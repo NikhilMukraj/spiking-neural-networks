@@ -613,6 +613,10 @@ pub trait GABAbDefault {
     fn gabab_default() -> Self;
 }
 
+pub trait GABAbDefault2 {
+    fn gabab_default2() -> Self;
+}
+
 pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
@@ -675,6 +679,20 @@ impl GABAbDefault for Neurotransmitter {
             t_max: 0.5,
             alpha: 0.016, // mM^-1 * ms^-1
             beta: 0.0047, // ms^-1
+            t: 0.,
+            r: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
+        }
+    }
+}
+
+impl GABAbDefault2 for Neurotransmitter {
+    fn gabab_default2() -> Self {
+        Neurotransmitter {
+            t_max: 0.5,
+            alpha: 0.52, // mM^-1 * ms^-1 // k1
+            beta: 0.0013, // ms^-1 // k2
             t: 0.,
             r: 0.,
             v_p: 2., // 2 mV
@@ -934,8 +952,6 @@ impl Default for HodgkinHuxleyCell {
 }
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
-// https://github.com/openworm/hodgkin_huxley_tutorial/blob/71aaa509021d8c9c55dd7d3238eaaf7b5bd14893/Tutorial/Source/HodgkinHuxley.py#L4
-// voltage = current * resistance // input
 impl HodgkinHuxleyCell {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
