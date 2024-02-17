@@ -1,6 +1,7 @@
 [coupled_hodgkin_huxley]
 post_AMPA = true
 # post_GABAa = true
+# post_GABAb = true
 # post_NMDA = true
 pre_dt = 0.01
 post_dt = 0.01
