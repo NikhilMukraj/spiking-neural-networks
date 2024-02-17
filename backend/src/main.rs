@@ -1925,7 +1925,16 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         ligand_gates.push(GeneralLigandGatedChannel::nmda_with_bv(BV { mg_conc: mg_conc }));
     }
 
-    println!("general ligand gated channels: {}", ligand_gates.len());
+    if ligand_gates.len() != 0 {
+        println!("general ligand gated channels: {}", 
+            ligand_gates.iter()
+            .map(|i| i.to_str())
+            .collect::<Vec<&str>>()
+            .join(", ")
+        );
+    } else {
+        println!("general ligand gated channels: none")
+    }
         
     Ok(
         HodgkinHuxleyCell {
