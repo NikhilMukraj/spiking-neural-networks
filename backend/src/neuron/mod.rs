@@ -850,9 +850,9 @@ impl GeneralLigandGatedChannel {
             NeurotransmitterType::Basic => 1.0,
         };
     
-        let current = modifier * self.g * (voltage - self.reversal);
-
-        current
+        self.current = modifier * self.g * (voltage - self.reversal);
+        
+        self.current
     }
 
     pub fn to_str(&self) -> &str {
@@ -989,7 +989,9 @@ impl HodgkinHuxleyCell {
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
         let i_ligand_gates = self.ligand_gates
             .iter_mut()
-            .map(|i| i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt) * i.neurotransmitter.r)
+            .map(|i| 
+                i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt) * i.neurotransmitter.r
+            )
             .collect::<Vec<f64>>()
             .iter()
             .sum::<f64>();
