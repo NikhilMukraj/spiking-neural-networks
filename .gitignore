@@ -11,6 +11,8 @@
 /backend/test_izhikevich_lattice.toml
 /backend/hodgkin huxley tests/hodgkin_huxley_test.csv
 /backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
+/backend/results/*.csv
+/backend/results/*.ipynb
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
