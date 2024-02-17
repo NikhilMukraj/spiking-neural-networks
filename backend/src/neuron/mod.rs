@@ -663,7 +663,7 @@ impl GABAaDefault for Neurotransmitter {
     fn gabaa_default() -> Self {
         Neurotransmitter {
             t_max: 1.,
-            alpha: 0.53, // mM^-1 * ms^-1
+            alpha: 5.0, // mM^-1 * ms^-1
             beta: 0.18, // ms^-1
             t: 0.,
             r: 0.,
@@ -851,7 +851,7 @@ impl GeneralLigandGatedChannel {
         };
     
         self.current = modifier * self.g * (voltage - self.reversal);
-        
+
         self.current
     }
 
