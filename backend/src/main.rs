@@ -1981,23 +1981,17 @@ fn coupled_hodgkin_huxley<'a>(
     write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
     
     if full && postsynaptic_neuron.ligand_gates.len() != 0{
-        for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
+        for i in postsynaptic_neuron.ligand_gates.iter() {
             let name = i.to_str();
-            if n - 1 < postsynaptic_neuron.ligand_gates.len() {
-                write!(file, ",g_{},r_{},T_{}", name, name, name)?;
-            } else {
-                writeln!(file, ",g_{},r_{},T_{}", name, name, name)?;
-            }
+            write!(file, ",g_{},r_{},T_{}", name, name, name)?;
         }
-    } else {
-        write!(file, "\n").expect("Unable to write to file");
-    }
+    } 
+    
+    write!(file, "\n").expect("Unable to write to file");
 
     let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
         
     for _ in 0..iterations {
-        // let past_postsynaptic_voltage = postsynaptic_neuron.current_voltage;
-
         if bayesian {
             let bayesian_factor = limited_distr(
                 postsynaptic_neuron.bayesian_params.mean, 
@@ -2048,21 +2042,15 @@ fn coupled_hodgkin_huxley<'a>(
                 postsynaptic_neuron.current_voltage,
             ).expect("Unable to write to file");
 
-            for (n, i) in postsynaptic_neuron.ligand_gates.iter().enumerate() {
-                if n - 1 < postsynaptic_neuron.ligand_gates.len() {
-                    write!(file, ", {}, {}, {}", 
-                        i.current,
-                        i.neurotransmitter.r,
-                        i.neurotransmitter.t,
-                    )?;
-                } else {
-                    writeln!(file, ", {}, {}, {}", 
-                        i.current,
-                        i.neurotransmitter.r,
-                        i.neurotransmitter.t
-                    )?;
-                }
+            for i in postsynaptic_neuron.ligand_gates.iter() {
+                write!(file, ", {}, {}, {}", 
+                    i.current,
+                    i.neurotransmitter.r,
+                    i.neurotransmitter.t,
+                )?;
             }
+
+            write!(file, "\n")?;
         }
     }
 
