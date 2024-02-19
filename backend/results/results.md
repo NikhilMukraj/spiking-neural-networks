@@ -2,6 +2,8 @@
 
 ## Lattice
 
+![Lattice](lattice_images.gif)
+
 ## Hodgkin Huxley
 
 ![AMPA](ampa.png)
