@@ -13,6 +13,10 @@
 /backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
 /backend/results/*.csv
 /backend/results/*.ipynb
+/backend/results/gif_generation.py
+/backend/results/*.bin
+/backend/results/*.txt
+/backend/results/lattice_images/*
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
