@@ -1,11 +1,27 @@
-# notes
+# Spiking Neural Networks
 
-general spiking neural network system with various intergrate and fire models as well as hodgkin huxley models
-eeg processing with fourier transforms and power spectral density
+Generalized spiking neural network system with various intergrate and fire models as well as Hodgkin Huxley models,
+eeg processing with fourier transforms, and power spectral density calculations
 
-(see docs)
+## Docs
 
-## sources
+(see other `.md` fils)
+
+## Results
+
+### Lattice
+
+![Lattice](backend/results/lattice_images.gif)
+
+### Hodgkin Huxley
+
+![AMPA](backend/results/ampa.png)
+
+![GABAa](backend/results/gabaa.png)
+
+![NMDA](backend/results/nmda.png)
+
+## Sources
 
 - (todo)
 - izhikevich
