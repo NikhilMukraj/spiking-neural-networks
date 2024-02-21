@@ -19,6 +19,8 @@ eeg processing with fourier transforms, and power spectral density calculations
 
 ![GABAa](backend/results/gabaa.png)
 
+![GABAb](backend/results/gabab.png)
+
 ![NMDA](backend/results/nmda.png)
 
 ## Sources
