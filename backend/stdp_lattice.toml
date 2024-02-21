@@ -1,7 +1,7 @@
 [lattice_simulation]
-num_rows = 10
-num_cols = 10
-radius = 1
+num_rows = 20
+num_cols = 20
+radius = 2
 tag = "stdp_lattice"
 output_type = "grid"
 if_type = "izhikevich"
