@@ -893,6 +893,25 @@ impl GeneralLigandGatedChannel {
 
 // https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
 
+// https://www.nature.com/articles/356441a0.pdf : calcium currents paper
+// https://github.com/ModelDBRepository/151460/blob/master/CaT.mod // low threshold calcium current
+// https://modeldb.science/279?tab=1 // low threshold calcium current (thalamic)
+// https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod // high threshold calcium current (l type)
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
+// pub struct CalciumIonChannel {
+
+// }
+
+// multicomparment stuff, refer to dopamine modeling paper as well
+// https://github.com/antgon/msn-model/blob/main/msn/cell.py 
+// pub struct Soma {
+
+// }
+
+// pub struct Dendrite {
+
+// }
+
 #[derive(Clone)]
 pub struct Gate {
     pub alpha: f64,
