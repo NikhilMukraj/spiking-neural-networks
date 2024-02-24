@@ -898,8 +898,69 @@ impl GeneralLigandGatedChannel {
 // https://modeldb.science/279?tab=1 // low threshold calcium current (thalamic)
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod // high threshold calcium current (l type)
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
-// pub struct CalciumIonChannel {
 
+// l-type ca2+ channel, ca1.2
+// pub struct HighThresholdCalciumChannel {
+//     z: f64,
+//     f: f64,
+//     r: f64,
+//     temp: f64,
+//     ca_in: f64,
+//     ca_in_equilibrium: f64,
+//     ca_out: f64,
+//     permeability: f64,
+//     max_permeability: f64,
+//     d: f64,
+//     kt: f64,
+//     kd: f64,
+//     tr: f64,
+//     k: f64,
+//     p: f64,
+// }
+
+// impl Default for HighThresholdCalciumChannel {
+//     fn default() -> Self {
+//         HighThresholdCalciumChannel {
+//             z: 2.,
+//             f: 96489., // C/mol
+//             r: 8.31, // J/Kmol
+//             temp: 35., // degrees c
+//             ca_in: 0.001, // mM
+//             ca_in_equilibrium: 0.001, // mM
+//             ca_out: 5., // mM
+//             permeability: 0.,
+//             max_permeability: 5.36e-6,
+//             d: 0.1, // um
+//             kt: 1e-4, // mM / ms
+//             kd: 1e-4, // mM
+//             tr: 43., // ms
+//             k: 1000.,
+//             p: 0.02,
+//         }
+//     }
+// }
+
+// impl HighThresholdCalciumChannel {
+    // x and y here probably refer to 3 and 4
+//     fn update_permeability(&mut self, m_state: f64, n_state: f64, x: f64, y: f64) {
+//         self.permeability = self.max_permeability * m_state.powf(x) * n_state.powf(y);
+//     }
+
+//     fn update_ca_in(&mut self, ca_current: f64, dt: f64) {
+//         let term1 = self.k * (-ca_current / (2. * self.f * self.d));
+//         let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
+//         let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
+//         self.ca_in +=  (term1 + term2 + term3) * dt;
+//     }
+
+//     fn get_ca_current(&self, voltage: f64) -> f64 {
+//         let r_by_temp = self.r * self.temp;
+//         let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
+//         let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
+//         let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
+
+//         term1 * (term2 / term3)
+//     }
 // }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
