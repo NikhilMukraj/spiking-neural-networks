@@ -941,12 +941,13 @@ impl GeneralLigandGatedChannel {
 // }
 
 // impl HighThresholdCalciumChannel {
-    // x and y here probably refer to 3 and 4
-//     fn update_permeability(&mut self, m_state: f64, n_state: f64, x: f64, y: f64) {
-//         self.permeability = self.max_permeability * m_state.powf(x) * n_state.powf(y);
+//     // m^x * n^y
+//     // x and y here probably refer to 3 and 4
+//     fn update_permeability(&mut self, m_state: f64, n_state: f64) {
+//         self.permeability = self.max_permeability * m_state * n_state;
 //     }
 
-//     fn update_ca_in(&mut self, ca_current: f64, dt: f64) {
+//     fn update_ca_in(&mut self, dt: f64) {
 //         let term1 = self.k * (-ca_current / (2. * self.f * self.d));
 //         let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
 //         let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
@@ -961,6 +962,16 @@ impl GeneralLigandGatedChannel {
 
 //         term1 * (term2 / term3)
 //     }
+
+//     fn get_ca_current_and_update(&mut self, voltage: f64, m_state: f64, n_state: f64, dt: f64) -> f64 {
+//         self.update_permeability(m_state, n_state);
+//         self.update_ca_in(dt);
+//         get_ca_current(voltage)
+//     }
+// }
+
+// enum AdditionalGates {
+//     LTypeCa(HighThresholdCalciumChannel),
 // }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
@@ -1006,6 +1017,7 @@ pub struct HodgkinHuxleyCell {
     pub n: Gate,
     pub h: Gate,
     pub ligand_gates: Vec<GeneralLigandGatedChannel>,
+    // pub additional_gates: Vec<HighThresholdCalciumChannel>,
     pub bayesian_params: BayesianParameters,
 }
 
@@ -1059,6 +1071,7 @@ impl HodgkinHuxleyCell {
         let i_na = self.m.state.powf(3.) * self.g_na * self.h.state * (self.current_voltage - self.e_na);
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
+
         let i_ligand_gates = self.ligand_gates
             .iter_mut()
             .map(|i| 
@@ -1067,6 +1080,16 @@ impl HodgkinHuxleyCell {
             .collect::<Vec<f64>>()
             .iter()
             .sum::<f64>();
+
+        // let i_additional_gates = self.additional_gates
+        //     .iter_mut()
+        //     .map(|i| 
+        //         i.get_ca_current_and_update(self.voltage, self.m.state.powf(3.), self.n.state.powf(4.), self.dt)
+        //     ) // if other channels added impl get_current and update method that passes in the hodgkin huxley
+        //     .collect::<Vec<f64>>()
+        //     .iter()
+        //     .sum::<f64>();
+
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
