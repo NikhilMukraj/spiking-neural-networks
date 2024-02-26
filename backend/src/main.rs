@@ -58,6 +58,7 @@ fn get_input_from_positions(
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
+    current: Option<(f64, f64)>,
 ) -> f64 {
     let mut input_val = input_positions
         .iter()
@@ -70,12 +71,26 @@ fn get_input_from_positions(
                 PotentiationType::Inhibitory => 1.,
             };
 
-            let final_input = input_calculation(
-                sign,
-                input_cell.current_voltage,
-                input_cell.receptor_density,
-                input_cell.neurotransmission_concentration,
-            );
+            let final_input = match current {
+                Some(value) => {
+                    input_calculation(
+                        sign,
+                        voltage_change_to_current_integrate_and_fire(
+                            input_cell.last_dv, value.0, value.1
+                        ),
+                        input_cell.receptor_density,
+                        input_cell.neurotransmission_concentration,
+                    )
+                },
+                None => {
+                    input_calculation(
+                        sign,
+                        input_cell.current_voltage,
+                        input_cell.receptor_density,
+                        input_cell.neurotransmission_concentration,
+                    )
+                }
+            };
             
             final_input
 
@@ -109,6 +124,7 @@ fn weighted_get_input_from_positions(
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
+    current: Option<(f64, f64)>,
 ) -> f64 {
     let mut input_val = input_positions
         .iter()
@@ -121,12 +137,26 @@ fn weighted_get_input_from_positions(
                 PotentiationType::Inhibitory => 1.,
             };
 
-            let final_input = input_calculation(
-                sign,
-                input_cell.current_voltage,
-                input_cell.receptor_density,
-                input_cell.neurotransmission_concentration,
-            );
+            let final_input = match current {
+                Some(value) => {
+                    input_calculation(
+                        sign,
+                        voltage_change_to_current_integrate_and_fire(
+                            input_cell.last_dv, value.0, value.1
+                        ),
+                        input_cell.receptor_density,
+                        input_cell.neurotransmission_concentration,
+                    )
+                },
+                None => {
+                    input_calculation(
+                        sign,
+                        input_cell.current_voltage,
+                        input_cell.receptor_density,
+                        input_cell.neurotransmission_concentration,
+                    )
+                }
+            };
 
             // do not account for neurotransmission just yet
             // let final_input = sign * current_voltage;
@@ -325,6 +355,7 @@ fn run_simulation(
     if_type: IFType,
     if_params: &IFParameters,
     do_stdp: bool,
+    current: bool,
     graph_params: &GraphParameters,
     stdp_params: &STDPParameters,
     default_cell_values: &HashMap<String, f64>,
@@ -391,6 +422,7 @@ fn run_simulation(
                     beta: if_params.beta_init,
                     c: if_params.v_reset,
                     d: if_params.d_init,
+                    last_dv: 0.,
                 })
                 .collect::<Vec<Cell>>()
         })
@@ -428,6 +460,11 @@ fn run_simulation(
         }
     }
 
+    let current = match current {
+        true => Some((if_params.dt, if_params.tau_m)),
+        false => None
+    };
+
     if do_stdp && graph_params.write_history {
         graph.update_history();
     }
@@ -459,6 +496,7 @@ fn run_simulation(
                             input_calculation,
                             bayesian,
                             averaged,
+                            current,
                         )
                     } else {
                         get_input_from_positions(
@@ -467,6 +505,7 @@ fn run_simulation(
                             input_calculation, 
                             bayesian,
                             averaged,
+                            current,
                         )
                     };
                     
@@ -571,6 +610,7 @@ fn run_simulation(
                             input_calculation,
                             bayesian,
                             averaged,
+                            current,
                         )
                     } else {
                         get_input_from_positions(
@@ -579,6 +619,7 @@ fn run_simulation(
                             input_calculation, 
                             bayesian,
                             averaged,
+                            current,
                         )
                     };
 
@@ -692,6 +733,7 @@ struct SimulationParameters {
     if_params: IFParameters,
     if_type: IFType,
     do_stdp: bool,
+    current: bool,
     stdp_params: STDPParameters,
     graph_params: GraphParameters,
     default_cell_values: HashMap<String, f64>,
@@ -996,6 +1038,9 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     
     println!("{:#?}", if_params);
 
+    let current: bool = parse_value_with_default(table, "current", parse_bool, false)?;
+    println!("current: {}", current);
+
     // in ms
     let total_time: Option<usize> = match table.get("total_time") {
         Some(value) => {
@@ -1029,6 +1074,7 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         averaged: averaged,
         if_params: if_params,
         if_type: if_type,
+        current: current,
         do_stdp: do_stdp,
         stdp_params: stdp_params,
         graph_params: graph_params,
@@ -1097,6 +1143,7 @@ fn objective(
         sim_params.if_type,
         &sim_params.if_params,
         sim_params.do_stdp,
+        sim_params.current,
         &sim_params.graph_params,
         &sim_params.stdp_params,
         &sim_params.default_cell_values,
@@ -1174,6 +1221,7 @@ fn test_coupled_neurons(
         beta: pre_if_params.beta_init,
         c: pre_if_params.v_reset,
         d: pre_if_params.d_init,
+        last_dv: 0.,
     };
 
     let mut post_synaptic_neuron = Cell { 
@@ -1196,6 +1244,7 @@ fn test_coupled_neurons(
         beta: post_if_params.beta_init,
         c: post_if_params.v_reset,
         d: post_if_params.d_init,
+        last_dv: 0.,
     };
 
     let mut file = BufWriter::new(File::create(filename)
@@ -1963,6 +2012,10 @@ fn voltage_change_to_current(dv: f64, presynaptic_neuron: &HodgkinHuxleyCell) ->
     (dv / presynaptic_neuron.dt) * presynaptic_neuron.cm
 }
 
+fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -> f64 {
+    (dv / dt) * cm
+}
+
 fn coupled_hodgkin_huxley<'a>(
     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
@@ -2133,6 +2186,7 @@ fn main() -> Result<()> {
             sim_params.if_type,
             &sim_params.if_params,
             sim_params.do_stdp,
+            sim_params.current,
             &sim_params.graph_params,
             &sim_params.stdp_params,
             &sim_params.default_cell_values,
@@ -2352,6 +2406,7 @@ fn main() -> Result<()> {
             beta: if_params.beta_init,
             c: if_params.v_reset,
             d: if_params.d_init,
+            last_dv: 0.,
         };
 
         match if_type {
