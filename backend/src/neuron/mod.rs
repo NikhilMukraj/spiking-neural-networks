@@ -204,6 +204,7 @@ pub struct Cell {
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
+    pub last_dv: f64, // last change in voltage
 }
 
 impl Default for Cell {
@@ -228,6 +229,7 @@ impl Default for Cell {
             beta: IFParameters::default().beta_init,
             c: IFParameters::default().v_reset,
             d: IFParameters::default().d_init,
+            last_dv: 0.,
         }
     }
 }
@@ -254,6 +256,7 @@ impl IzhikevichDefault for Cell {
             beta: IFParameters::izhikevich_default().beta_init,
             c: IFParameters::izhikevich_default().v_reset,
             d: IFParameters::izhikevich_default().d_init,
+            last_dv: 0.,
         }
     }
 }
