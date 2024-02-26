@@ -52,6 +52,34 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
+fn input_with_current(
+    current: Option<(f64, f64)>, 
+    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
+    sign: f64, 
+    input_cell: &Cell
+) -> f64 {
+    match current {
+        Some(value) => {
+            input_calculation(
+                sign,
+                voltage_change_to_current_integrate_and_fire(
+                    input_cell.last_dv, value.0, value.1
+                ),
+                input_cell.receptor_density,
+                input_cell.neurotransmission_concentration,
+            )
+        },
+        None => {
+            input_calculation(
+                sign,
+                input_cell.current_voltage,
+                input_cell.receptor_density,
+                input_cell.neurotransmission_concentration,
+            )
+        }
+    }
+}
+
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<Position>, 
@@ -71,26 +99,7 @@ fn get_input_from_positions(
                 PotentiationType::Inhibitory => 1.,
             };
 
-            let final_input = match current {
-                Some(value) => {
-                    input_calculation(
-                        sign,
-                        voltage_change_to_current_integrate_and_fire(
-                            input_cell.last_dv, value.0, value.1
-                        ),
-                        input_cell.receptor_density,
-                        input_cell.neurotransmission_concentration,
-                    )
-                },
-                None => {
-                    input_calculation(
-                        sign,
-                        input_cell.current_voltage,
-                        input_cell.receptor_density,
-                        input_cell.neurotransmission_concentration,
-                    )
-                }
-            };
+            let final_input = input_with_current(current, input_calculation, sign, &input_cell);
             
             final_input
 
@@ -137,29 +146,7 @@ fn weighted_get_input_from_positions(
                 PotentiationType::Inhibitory => 1.,
             };
 
-            let final_input = match current {
-                Some(value) => {
-                    input_calculation(
-                        sign,
-                        voltage_change_to_current_integrate_and_fire(
-                            input_cell.last_dv, value.0, value.1
-                        ),
-                        input_cell.receptor_density,
-                        input_cell.neurotransmission_concentration,
-                    )
-                },
-                None => {
-                    input_calculation(
-                        sign,
-                        input_cell.current_voltage,
-                        input_cell.receptor_density,
-                        input_cell.neurotransmission_concentration,
-                    )
-                }
-            };
-
-            // do not account for neurotransmission just yet
-            // let final_input = sign * current_voltage;
+            let final_input = input_with_current(current, input_calculation, sign, &input_cell);
             
             final_input * graph.lookup_weight(&input_position, position).unwrap()
 
@@ -1181,6 +1168,7 @@ fn test_coupled_neurons(
     default_post_values: &HashMap<String, f64>,
     iterations: usize,
     input_voltage: f64,
+    current: bool,
     input_equation: &str,
     filename: &str,
 ) {
@@ -1247,6 +1235,11 @@ fn test_coupled_neurons(
         last_dv: 0.,
     };
 
+    let current = match current {
+        true => Some((post_if_params.dt, post_if_params.tau_m)),
+        false => None
+    };
+
     let mut file = BufWriter::new(File::create(filename)
         .expect("Unable to create file"));
     writeln!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
@@ -1287,12 +1280,7 @@ fn test_coupled_neurons(
 
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
-                let input = input_func(
-                    sign, 
-                    pre_synaptic_neuron.current_voltage, 
-                    post_synaptic_neuron.receptor_density,
-                    post_synaptic_neuron.neurotransmission_concentration,
-                );
+                let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
         
                 let (post_dv, post_is_spiking) = if post_bayesian {
                     post_synaptic_neuron.get_dv_change_and_spike(
@@ -1350,12 +1338,7 @@ fn test_coupled_neurons(
 
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
-                let input = input_func(
-                    sign, 
-                    pre_synaptic_neuron.current_voltage, 
-                    post_synaptic_neuron.receptor_density,
-                    post_synaptic_neuron.neurotransmission_concentration,
-                );
+                let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
 
                 let post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
                 let post_dv = if post_bayesian {
@@ -1522,6 +1505,7 @@ fn run_isolated_stdp_test(
     n: usize,
     input_voltage: f64,
     default_cell_values: &HashMap<String, f64>,
+    current: bool,
     input_equation: &str,
     filename: &str,
 ) -> Result<()> {
@@ -1548,18 +1532,21 @@ fn run_isolated_stdp_test(
     let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
     let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
     let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-    let weight_id = symbol_table.add_variable("weight", 0.).unwrap().unwrap();
 
     let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
 
-    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64, weight: f64| -> f64 {
+    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
         expr.symbols().value_cell(sign_id).set(sign);
         expr.symbols().value_cell(mp_id).set(mp);
         expr.symbols().value_cell(rd_id).set(rd);
         expr.symbols().value_cell(nc_id).set(nc);
-        expr.symbols().value_cell(weight_id).set(weight);
 
         expr.value()
+    };
+
+    let current = match current {
+        true => Some((if_params.dt, if_params.tau_m)),
+        false => None
     };
 
     let mut postsynaptic_neuron = match if_type {
@@ -1656,13 +1643,7 @@ fn run_isolated_stdp_test(
                                 PotentiationType::Inhibitory => 1.,
                             };
 
-                            input_func(
-                                sign, 
-                                neurons[i].current_voltage, 
-                                neurons[i].receptor_density,
-                                neurons[i].neurotransmission_concentration,
-                                weights[i]
-                            ) / (n as f64)
+                            weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]) / (n as f64)
                         }
                     ) 
                     .collect::<Vec<f64>>()
@@ -1756,13 +1737,7 @@ fn run_isolated_stdp_test(
                                 PotentiationType::Inhibitory => 1.,
                             };
 
-                            input_func(
-                                sign, 
-                                neurons[i].current_voltage, 
-                                neurons[i].receptor_density,
-                                neurons[i].neurotransmission_concentration,
-                                weights[i]
-                            ) / (n as f64)
+                            weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]) / (n as f64)
                         }
                     ) 
                     .collect::<Vec<f64>>()
@@ -2513,6 +2488,9 @@ fn main() -> Result<()> {
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
         };     
 
+        let current: bool = parse_value_with_default(coupled_table, "current", parse_bool, false)?;
+        println!("current: {}", current);
+
         test_coupled_neurons(
             if_type,
             &pre_if_params, 
@@ -2522,6 +2500,7 @@ fn main() -> Result<()> {
             &default_post_values,
             iterations,
             input_voltage,
+            current,
             equation,
             &filename,
         );   
@@ -2564,6 +2543,9 @@ fn main() -> Result<()> {
 
         let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&stdp_table, None)?;
 
+        let current: bool = parse_value_with_default(stdp_table, "current", parse_bool, false)?;
+        println!("current: {}", current);
+
         let default_eq = match if_type {
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
             _ => String::from("weight * (sign * mp + 100)")
@@ -2590,6 +2572,7 @@ fn main() -> Result<()> {
             n,
             input_voltage,
             &default_cell_values,
+            current,
             &equation,
             &filename,
         )?;
