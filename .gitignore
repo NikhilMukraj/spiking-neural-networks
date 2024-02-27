@@ -1,14 +1,14 @@
 /.vscode
 /backend/target
-/backend/*.txt
-/backend/*.bin
+/backend/output/*.txt
+/backend/output/*.bin
 /backend/single neuron tests
 /backend/stdp tests
 /backend/coupled tests
 /backend/lattice simulations
 /backend/stdp lattice
 /backend/hodgkin huxley tests
-/backend/test_izhikevich_lattice.toml
+/backend/args/test_izhikevich_lattice.toml
 /backend/hodgkin huxley tests/hodgkin_huxley_test.csv
 /backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
 /backend/results/*.csv
