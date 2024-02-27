@@ -1,0 +1,34 @@
+[ga]
+# maybe (sign * mp + x + rd * (nc^2 * y)) * 100 
+# change exp_dt with respect to dt (.001?)
+# start with small population and iterations for first testing
+
+# if modifying equation constants alone doesnt work move on to
+# modifying lif parameters like tau_m as well
+
+random_volt_initialization = true # may want to test with and without
+eeg_file = "EEG-1.csv"
+dt = 0.1
+# exp_dt = 0.001
+# total_time = 10
+iterations = 10000
+num_rows = 20
+num_cols = 20
+radius = 2
+bayesian_std = 0.2
+if_type = "adaptive exponential"
+input_equation = "(sign * mp + x + rd * (nc^2 * y)) * z"
+# input_equation = "(sign * mp + x + rd * (-1 * sign * nc^2 * y)) * z" # maybe this instead
+# if that works better try optimizing amount of excitatory neurons
+# might have to work on evolving input equation sooner
+
+n_pop = 100
+n_iter = 100
+r_cross = 0.9
+r_mut = 0.1 # (1.0 / n_bits)
+n_bits = 10
+bounds_min = 0.0
+bounds_max = 200.0
+
+# try with bayesian and see if that helps, then move to tau_m, maybe tref
+# then try evolving equation trees
