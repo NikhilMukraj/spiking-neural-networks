@@ -129,7 +129,7 @@ fn weighted_get_input_from_positions(
     cell_grid: &CellGrid, 
     graph: &dyn GraphFunctionality,
     position: &Position,
-    input_positions: &Vec<(usize, usize)>, 
+    input_positions: &Vec<Position>, 
     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
