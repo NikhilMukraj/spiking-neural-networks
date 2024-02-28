@@ -1,0 +1,9 @@
+[coupled_test]
+if_type = "izhikevich"
+iterations = 10000
+input_voltage = 25.0
+pre_dt = 0.5
+post_dt = 0.5
+current = true
+filename = "coupled tests/current_test.txt"
+input_equation = "-sign * mp"
