@@ -497,6 +497,7 @@ fn run_simulation(
                     };
                     
                     let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
+                    cell_grid[x][y].last_dv = dv;
 
                     changes.insert(pos, (dv, is_spiking));
                 }
@@ -623,6 +624,7 @@ fn run_simulation(
                     let dv = adaptive_dv(&mut cell_grid[x][y], if_params, input_value);
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
+                    cell_grid[x][y].last_dv = dv;
                     cell_grid[x][y].current_voltage += dv;
 
                     if do_stdp && is_spiking_value {
@@ -1278,6 +1280,8 @@ fn test_coupled_neurons(
                     pre_synaptic_neuron.get_dv_change_and_spike(&pre_if_params, input_voltage)
                 };
 
+                pre_synaptic_neuron.last_dv = pre_dv;
+
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
                 let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
@@ -1292,6 +1296,8 @@ fn test_coupled_neurons(
                 };
 
                 post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
+
+                post_synaptic_neuron.last_dv = post_dv;
             
                 pre_synaptic_neuron.current_voltage += pre_dv;
                 post_synaptic_neuron.current_voltage += post_dv;
@@ -1336,6 +1342,8 @@ fn test_coupled_neurons(
                     )
                 };
 
+                pre_synaptic_neuron.last_dv = pre_dv;
+
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
                 let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
@@ -1356,6 +1364,8 @@ fn test_coupled_neurons(
                 };
 
                 post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
+
+                post_synaptic_neuron.last_dv = post_dv;
             
                 pre_synaptic_neuron.current_voltage += pre_dv;
                 post_synaptic_neuron.current_voltage += post_dv;
@@ -1549,7 +1559,7 @@ fn run_isolated_stdp_test(
         false => None
     };
 
-    let mut postsynaptic_neuron = match if_type {
+    let mut post_synaptic_neuron = match if_type {
         IFType::Basic | IFType::Adaptive |
         IFType::AdaptiveExponential => {
             Cell {
@@ -1563,21 +1573,21 @@ fn run_isolated_stdp_test(
         }
     };
 
-    postsynaptic_neuron.w_value = if_params.v_init;
-    postsynaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
-    postsynaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
-    postsynaptic_neuron.chance_of_releasing = *default_cell_values.get("chance_of_releasing").unwrap_or(&0.);
-    postsynaptic_neuron.dissipation_rate = *default_cell_values.get("dissipation_rate").unwrap_or(&0.);
-    postsynaptic_neuron.chance_of_random_release = *default_cell_values.get("chance_of_random_release").unwrap_or(&0.);
-    postsynaptic_neuron.random_release_concentration = *default_cell_values.get("random_release_concentration").unwrap_or(&0.);
-    postsynaptic_neuron.w_value = if_params.w_init;
-    postsynaptic_neuron.stdp_params = stdp_params.clone();
-    postsynaptic_neuron.alpha = if_params.alpha_init;
-    postsynaptic_neuron.beta = if_params.beta_init;
-    postsynaptic_neuron.c = if_params.v_reset;
-    postsynaptic_neuron.d = if_params.d_init;
+    post_synaptic_neuron.w_value = if_params.v_init;
+    post_synaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
+    post_synaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
+    post_synaptic_neuron.chance_of_releasing = *default_cell_values.get("chance_of_releasing").unwrap_or(&0.);
+    post_synaptic_neuron.dissipation_rate = *default_cell_values.get("dissipation_rate").unwrap_or(&0.);
+    post_synaptic_neuron.chance_of_random_release = *default_cell_values.get("chance_of_random_release").unwrap_or(&0.);
+    post_synaptic_neuron.random_release_concentration = *default_cell_values.get("random_release_concentration").unwrap_or(&0.);
+    post_synaptic_neuron.w_value = if_params.w_init;
+    post_synaptic_neuron.stdp_params = stdp_params.clone();
+    post_synaptic_neuron.alpha = if_params.alpha_init;
+    post_synaptic_neuron.beta = if_params.beta_init;
+    post_synaptic_neuron.c = if_params.v_reset;
+    post_synaptic_neuron.d = if_params.d_init;
 
-    let mut neurons: Vec<Cell> = (0..n).map(|_| postsynaptic_neuron.clone())
+    let mut neurons: Vec<Cell> = (0..n).map(|_| post_synaptic_neuron.clone())
         .collect();
 
     for i in neurons.iter_mut() {
@@ -1608,7 +1618,7 @@ fn run_isolated_stdp_test(
     let mut file = File::create(&filename)
         .expect("Unable to create file");
 
-    write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
+    write_row(&mut file, &neurons, &post_synaptic_neuron, &weights);
 
     match if_type {
         IFType::Basic => {
@@ -1627,6 +1637,8 @@ fn run_isolated_stdp_test(
 
                     dvs.push(dv);
                     is_spikings.push(is_spiking);
+
+                    input_neuron.last_dv = dv;
 
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
@@ -1651,13 +1663,13 @@ fn run_isolated_stdp_test(
                     .sum();
                 
                 let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
-                let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);
+                let (dv, is_spiking) = post_synaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);
 
-                postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
 
                 update_isolated_presynaptic_neuron_weights(
                     &mut neurons, 
-                    &postsynaptic_neuron,
+                    &post_synaptic_neuron,
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
@@ -1665,17 +1677,19 @@ fn run_isolated_stdp_test(
                     is_spikings,
                 );
 
-                postsynaptic_neuron.current_voltage += dv;
+                post_synaptic_neuron.last_dv = dv;
+
+                post_synaptic_neuron.current_voltage += dv;
 
                 if is_spiking {
-                    postsynaptic_neuron.last_firing_time = Some(timestep);
+                    post_synaptic_neuron.last_firing_time = Some(timestep);
                     for (n_neuron, i) in neurons.iter().enumerate() {
-                        delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+                        delta_ws[n_neuron] = update_weight(&i, &post_synaptic_neuron);
                         weights[n_neuron] += delta_ws[n_neuron];
                     }
                 }
 
-                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
+                write_row(&mut file, &neurons, &post_synaptic_neuron, &weights);
             }
         }
         IFType::Adaptive | IFType::AdaptiveExponential | 
@@ -1718,6 +1732,8 @@ fn run_isolated_stdp_test(
                     dvs.push(dv);
                     is_spikings.push(is_spiking);
 
+                    input_neuron.last_dv = dv;
+
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
                     }
@@ -1725,9 +1741,9 @@ fn run_isolated_stdp_test(
                     input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
                 }
 
-                let is_spiking = adaptive_apply_and_get_spike(&mut postsynaptic_neuron, &if_params);
+                let is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &if_params);
 
-                postsynaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
+                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
 
                 let calculated_voltage: f64 = (0..n)
                     .map(
@@ -1745,11 +1761,11 @@ fn run_isolated_stdp_test(
                     .sum();                  
 
                 let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
-                let dv = adaptive_dv(&mut postsynaptic_neuron, &if_params, noise_factor * calculated_voltage);
+                let dv = adaptive_dv(&mut post_synaptic_neuron, &if_params, noise_factor * calculated_voltage);
 
                 update_isolated_presynaptic_neuron_weights(
                     &mut neurons, 
-                    &postsynaptic_neuron,
+                    &post_synaptic_neuron,
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
@@ -1757,17 +1773,19 @@ fn run_isolated_stdp_test(
                     is_spikings,
                 );
 
-                postsynaptic_neuron.current_voltage += dv;
+                post_synaptic_neuron.last_dv = dv;
+
+                post_synaptic_neuron.current_voltage += dv;
 
                 if is_spiking {
-                    postsynaptic_neuron.last_firing_time = Some(timestep);
+                    post_synaptic_neuron.last_firing_time = Some(timestep);
                     for (n_neuron, i) in neurons.iter().enumerate() {
-                        delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+                        delta_ws[n_neuron] = update_weight(&i, &post_synaptic_neuron);
                         weights[n_neuron] += delta_ws[n_neuron];
                     }
                 }
 
-                write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
+                write_row(&mut file, &neurons, &post_synaptic_neuron, &weights);
             }
         }
     };
