@@ -10,6 +10,10 @@ struct IzhikevichNeuron {
     float v_th;
 };
 
+float voltage_to_current(float dv, float dt, float cm) {
+    return (dv / dt) * cm;
+}
+
 // __global__ void aggregate_inputs(float *voltage, float **adjcanecy_matrix, int n, float *inputs) {
 //     int index = blockIdx.x * blockDim.x + threadIdx.x;
 //     int stride = blockDim.x * gridDim.x;
