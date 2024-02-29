@@ -1516,6 +1516,7 @@ fn run_isolated_stdp_test(
     input_voltage: f64,
     default_cell_values: &HashMap<String, f64>,
     current: bool,
+    averaged: bool,
     input_equation: &str,
     filename: &str,
 ) -> Result<()> {
@@ -1655,7 +1656,13 @@ fn run_isolated_stdp_test(
                                 PotentiationType::Inhibitory => 1.,
                             };
 
-                            weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]) / (n as f64)
+                            let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
+
+                            if averaged {
+                                output / (n as f64)
+                            } else {
+                                output
+                            }
                         }
                     ) 
                     .collect::<Vec<f64>>()
@@ -1753,7 +1760,13 @@ fn run_isolated_stdp_test(
                                 PotentiationType::Inhibitory => 1.,
                             };
 
-                            weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]) / (n as f64)
+                            let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
+
+                            if averaged {
+                                output / (n as f64)
+                            } else {
+                                output
+                            }
                         }
                     ) 
                     .collect::<Vec<f64>>()
@@ -2564,6 +2577,9 @@ fn main() -> Result<()> {
         let current: bool = parse_value_with_default(stdp_table, "current", parse_bool, false)?;
         println!("current: {}", current);
 
+        let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
+        println!("averaged: {}", averaged);
+
         let default_eq = match if_type {
             IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
             _ => String::from("weight * (sign * mp + 100)")
@@ -2591,6 +2607,7 @@ fn main() -> Result<()> {
             input_voltage,
             &default_cell_values,
             current,
+            averaged,
             &equation,
             &filename,
         )?;
