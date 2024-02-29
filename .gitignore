@@ -2,6 +2,7 @@
 /backend/target
 /backend/output/*.txt
 /backend/output/*.bin
+/backend/output/*.csv
 /backend/single neuron tests
 /backend/stdp tests
 /backend/coupled tests
