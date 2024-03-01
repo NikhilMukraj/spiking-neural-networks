@@ -966,15 +966,23 @@ impl GeneralLigandGatedChannel {
 //         term1 * (term2 / term3)
 //     }
 
-//     fn get_ca_current_and_update(&mut self, voltage: f64, m_state: f64, n_state: f64, dt: f64) -> f64 {
-//         self.update_permeability(m_state, n_state);
-//         self.update_ca_in(dt);
-//         get_ca_current(voltage)
+//     fn get_ca_current_and_update(&mut self, hodgkin_huxley: &HodgkinHuxleyCell) -> f64 {
+//         self.update_permeability(hodgkin_huxley.m.state, hodgkin_huxley.n.state);
+//         self.update_ca_in(hodgkin_huxley.dt);
+//         get_ca_current(hodgkin_huxley.current_voltage)
 //     }
 // }
 
 // enum AdditionalGates {
 //     LTypeCa(HighThresholdCalciumChannel),
+// }
+
+// impl AdditionalGates {
+//     fn get_current(&self, hodgkin_huxley: &HodgkinHuxleyCell) -> f64 {
+//         match &self {
+//             LTypeCa(channel) => get_ca_current_and_update(hodgkin_huxley),
+//         }
+//     }
 // }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
@@ -1020,7 +1028,7 @@ pub struct HodgkinHuxleyCell {
     pub n: Gate,
     pub h: Gate,
     pub ligand_gates: Vec<GeneralLigandGatedChannel>,
-    // pub additional_gates: Vec<HighThresholdCalciumChannel>,
+    // pub additional_gates: Vec<AdditionalGates>,
     pub bayesian_params: BayesianParameters,
 }
 
@@ -1087,7 +1095,7 @@ impl HodgkinHuxleyCell {
         // let i_additional_gates = self.additional_gates
         //     .iter_mut()
         //     .map(|i| 
-        //         i.get_ca_current_and_update(self.voltage, self.m.state.powf(3.), self.n.state.powf(4.), self.dt)
+        //         i.get_current(&self)
         //     ) // if other channels added impl get_current and update method that passes in the hodgkin huxley
         //     .collect::<Vec<f64>>()
         //     .iter()
