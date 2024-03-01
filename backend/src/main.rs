@@ -80,6 +80,13 @@ fn input_with_current(
     }
 }
 
+fn get_sign(cell: &Cell) -> f64 {
+    match cell.potentiation_type {
+        PotentiationType::Excitatory => -1.,
+        PotentiationType::Inhibitory => 1.,
+    }
+}
+
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<Position>, 
@@ -94,10 +101,7 @@ fn get_input_from_positions(
             let (pos_x, pos_y) = input_position;
             let input_cell = &cell_grid[*pos_x][*pos_y];
             
-            let sign = match input_cell.potentiation_type { 
-                PotentiationType::Excitatory => -1., 
-                PotentiationType::Inhibitory => 1.,
-            };
+            let sign = get_sign(&input_cell);
 
             let final_input = input_with_current(current, input_calculation, sign, &input_cell);
             
@@ -141,10 +145,7 @@ fn weighted_get_input_from_positions(
             let (pos_x, pos_y) = input_position;
             let input_cell = &cell_grid[*pos_x][*pos_y];
             
-            let sign = match input_cell.potentiation_type { 
-                PotentiationType::Excitatory => -1., 
-                PotentiationType::Inhibitory => 1.,
-            };
+            let sign = get_sign(&input_cell);
 
             let final_input = input_with_current(current, input_calculation, sign, &input_cell);
             
@@ -1247,10 +1248,7 @@ fn test_coupled_neurons(
     writeln!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
     writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");
 
-    let sign = match pre_synaptic_neuron.potentiation_type {
-        PotentiationType::Excitatory => -1., 
-        PotentiationType::Inhibitory => 1.,
-    };
+    let sign = get_sign(&pre_synaptic_neuron);
 
     let pre_mean_change = &pre_if_params.bayesian_params.mean != &BayesianParameters::default().mean;
     let pre_std_change = &pre_if_params.bayesian_params.std != &BayesianParameters::default().std;
@@ -1651,10 +1649,7 @@ fn run_isolated_stdp_test(
                 let calculated_voltage: f64 = (0..n)
                     .map(
                         |i| {
-                            let sign = match neurons[i].potentiation_type { 
-                                PotentiationType::Excitatory => -1., 
-                                PotentiationType::Inhibitory => 1.,
-                            };
+                            let sign = get_sign(&neurons[i]);
 
                             let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
 
@@ -1755,10 +1750,7 @@ fn run_isolated_stdp_test(
                 let calculated_voltage: f64 = (0..n)
                     .map(
                         |i| {
-                            let sign = match neurons[i].potentiation_type { 
-                                PotentiationType::Excitatory => -1., 
-                                PotentiationType::Inhibitory => 1.,
-                            };
+                            let sign = get_sign(&neurons[i]);
 
                             let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
 
