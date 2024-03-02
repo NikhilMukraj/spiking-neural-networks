@@ -1982,6 +1982,20 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     } else {
         println!("general ligand gated channels: none")
     }
+
+    // let mut additional_gates: Vec<AdditionalGates> = Vec::new();
+
+    // let ltype_calcium: bool = parse_value_with_default(
+    //     &hodgkin_huxley_table,
+    //     format!("{}ltype_calcium", prefix).as_str(), 
+    //     parse_bool, 
+    //     false
+    // )?;
+
+    // if ltype_calcium {
+    //     // maybe make calcium permeability editable
+    //     additonal_gates.push(AdditionalGates(LTypeCalcium::default));
+    // }
         
     Ok(
         HodgkinHuxleyCell {
@@ -1998,6 +2012,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             n: gate.clone(),
             h: gate,
             ligand_gates: ligand_gates,
+            // additional_gates: additional_gates,
             bayesian_params: bayesian_params,
         }
     )
