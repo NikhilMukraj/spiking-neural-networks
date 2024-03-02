@@ -904,6 +904,7 @@ impl GeneralLigandGatedChannel {
 
 // l-type ca2+ channel, ca1.2
 // pub struct HighThresholdCalciumChannel {
+//     current: 0.
 //     z: f64,
 //     f: f64,
 //     r: f64,
@@ -924,6 +925,7 @@ impl GeneralLigandGatedChannel {
 // impl Default for HighThresholdCalciumChannel {
 //     fn default() -> Self {
 //         HighThresholdCalciumChannel {
+//             current: 0.
 //             z: 2.,
 //             f: 96489., // C/mol
 //             r: 8.31, // J/Kmol
@@ -969,7 +971,9 @@ impl GeneralLigandGatedChannel {
 //     fn get_ca_current_and_update(&mut self, hodgkin_huxley: &HodgkinHuxleyCell) -> f64 {
 //         self.update_permeability(hodgkin_huxley.m.state, hodgkin_huxley.n.state);
 //         self.update_ca_in(hodgkin_huxley.dt);
-//         get_ca_current(hodgkin_huxley.current_voltage)
+//         let self.current = get_ca_current(hodgkin_huxley.current_voltage);
+//
+//         self.current
 //     }
 // }
 
@@ -983,6 +987,12 @@ impl GeneralLigandGatedChannel {
 //             LTypeCa(channel) => get_ca_current_and_update(hodgkin_huxley),
 //         }
 //     }
+// 
+    // fn to_str(&self) {
+    //     match &self {
+    //         LTypeCa(_) => "LTypeCa",
+    //     }
+    // }
 // }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
@@ -1054,6 +1064,7 @@ impl Default for HodgkinHuxleyCell {
             n: default_gate.clone(), 
             h: default_gate,  
             ligand_gates: vec![],
+        // additional_gates: vec![],
             bayesian_params: BayesianParameters::default() 
         }
     }
@@ -1147,6 +1158,30 @@ impl HodgkinHuxleyCell {
                 self.n.state, 
                 self.h.state,
             ).expect("Unable to write to file");
+
+            // write!(file, "voltage,m,n,h").expect("Unable to write to file");
+            // writeln!(
+            //     file, 
+            //     "{}",
+            //     self.additional_gates.iter()
+            //         .map(|&x| x.to_string())
+            //         .collect::<Vec<String>>()
+            //         .join(",")
+            // ).expect("Unable to write to file");
+            // write!(file, "{}, {}, {}, {}", 
+            //     self.current_voltage, 
+            //     self.m.state, 
+            //     self.n.state, 
+            //     self.h.state,
+            // ).expect("Unable to write to file");
+            // writeln!(
+            //     file, 
+            //     "{}",
+            //     self.additional_gates.iter()
+            //         .map(|&x| x.current.to_string())
+            //         .collect::<Vec<String>>()
+            //         .join(",")
+            // ).expect("Unable to write to file");
         }
 
         self.initialize_parameters(self.current_voltage);
@@ -1174,6 +1209,21 @@ impl HodgkinHuxleyCell {
                     self.n.state, 
                     self.h.state,
                 ).expect("Unable to write to file");
+
+                // write!(file, "{}, {}, {}, {}", 
+                //     self.current_voltage, 
+                //     self.m.state, 
+                //     self.n.state, 
+                //     self.h.state,
+                // ).expect("Unable to write to file");
+                // writeln!(
+                //     file, 
+                //     "{}",
+                //     self.additional_gates.iter()
+                //         .map(|&x| x.current.to_string())
+                //         .collect::<Vec<String>>()
+                //         .join(",")
+                // ).expect("Unable to write to file");
             }
         }
     }
