@@ -1,7 +1,16 @@
 # Spiking Neural Networks
 
 Generalized spiking neural network system with various intergrate and fire models as well as Hodgkin Huxley models,
-eeg processing with fourier transforms, and power spectral density calculations
+EEG processing with fourier transforms, and power spectral density calculations
+
+## Biological Neuron Models Broken Down
+
+- (todo...)
+- (explanation of integrate and fire)
+- (explanation of izhikevich)
+- (explaination of hodgkin huxley)
+- (explanation of ion channels)
+- (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich)
 
 ## Docs
 
