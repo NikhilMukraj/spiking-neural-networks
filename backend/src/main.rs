@@ -13,7 +13,7 @@ use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
-    GABAbDefault, GABAbDefault2, NMDAWithBV, BV
+    GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1983,19 +1983,19 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         println!("general ligand gated channels: none")
     }
 
-    // let mut additional_gates: Vec<AdditionalGates> = Vec::new();
+    let mut additional_gates: Vec<AdditionalGates> = Vec::new();
 
-    // let ltype_calcium: bool = parse_value_with_default(
-    //     &hodgkin_huxley_table,
-    //     format!("{}ltype_calcium", prefix).as_str(), 
-    //     parse_bool, 
-    //     false
-    // )?;
+    let ltype_calcium: bool = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}ltype_calcium", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-    // if ltype_calcium {
-    //     // maybe make calcium permeability editable
-    //     additonal_gates.push(AdditionalGates(LTypeCalcium::default));
-    // }
+    if ltype_calcium {
+        // maybe make calcium permeability editable
+        additional_gates.push(AdditionalGates::LTypeCa(HighThresholdCalciumChannel::default()));
+    }
         
     Ok(
         HodgkinHuxleyCell {
@@ -2012,7 +2012,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             n: gate.clone(),
             h: gate,
             ligand_gates: ligand_gates,
-            // additional_gates: additional_gates,
+            additional_gates: additional_gates,
             bayesian_params: bayesian_params,
         }
     )
