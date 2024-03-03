@@ -39,3 +39,4 @@ EEG processing with fourier transforms, and power spectral density calculations
 - destexhe
 - antipsychotics sim paper
 - dopamine model with hodgkin huxley
+- biological signal processing richard b wells
