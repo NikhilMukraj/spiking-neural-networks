@@ -903,97 +903,103 @@ impl GeneralLigandGatedChannel {
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
 // l-type ca2+ channel, ca1.2
-// pub struct HighThresholdCalciumChannel {
-//     current: 0.
-//     z: f64,
-//     f: f64,
-//     r: f64,
-//     temp: f64,
-//     ca_in: f64,
-//     ca_in_equilibrium: f64,
-//     ca_out: f64,
-//     permeability: f64,
-//     max_permeability: f64,
-//     d: f64,
-//     kt: f64,
-//     kd: f64,
-//     tr: f64,
-//     k: f64,
-//     p: f64,
-// }
+pub struct HighThresholdCalciumChannel {
+    current: f64,
+    z: f64,
+    f: f64,
+    r: f64,
+    temp: f64,
+    ca_in: f64,
+    ca_in_equilibrium: f64,
+    ca_out: f64,
+    permeability: f64,
+    max_permeability: f64,
+    d: f64,
+    kt: f64,
+    kd: f64,
+    tr: f64,
+    k: f64,
+    p: f64,
+}
 
-// impl Default for HighThresholdCalciumChannel {
-//     fn default() -> Self {
-//         HighThresholdCalciumChannel {
-//             current: 0.
-//             z: 2.,
-//             f: 96489., // C/mol
-//             r: 8.31, // J/Kmol
-//             temp: 35., // degrees c
-//             ca_in: 0.001, // mM
-//             ca_in_equilibrium: 0.001, // mM
-//             ca_out: 5., // mM
-//             permeability: 0.,
-//             max_permeability: 5.36e-6,
-//             d: 0.1, // um
-//             kt: 1e-4, // mM / ms
-//             kd: 1e-4, // mM
-//             tr: 43., // ms
-//             k: 1000.,
-//             p: 0.02,
-//         }
-//     }
-// }
+impl Default for HighThresholdCalciumChannel {
+    fn default() -> Self {
+        HighThresholdCalciumChannel {
+            current: 0.,
+            z: 2.,
+            f: 96489., // C/mol
+            r: 8.31, // J/Kmol
+            temp: 35., // degrees c
+            ca_in: 0.001, // mM
+            ca_in_equilibrium: 0.001, // mM
+            ca_out: 5., // mM
+            permeability: 0.,
+            max_permeability: 5.36e-6,
+            d: 0.1, // um
+            kt: 1e-4, // mM / ms
+            kd: 1e-4, // mM
+            tr: 43., // ms
+            k: 1000.,
+            p: 0.02,
+        }
+    }
+}
 
-// impl HighThresholdCalciumChannel {
-//     // m^x * n^y
-//     // x and y here probably refer to 3 and 4
-//     fn update_permeability(&mut self, m_state: f64, n_state: f64) {
-//         self.permeability = self.max_permeability * m_state * n_state;
-//     }
+impl HighThresholdCalciumChannel {
+    // m^x * n^y
+    // x and y here probably refer to 3 and 4
+    fn update_permeability(&mut self, m_state: f64, n_state: f64) {
+        self.permeability = self.max_permeability * m_state * n_state;
+    }
 
-//     fn update_ca_in(&mut self, dt: f64) {
-//         let term1 = self.k * (-ca_current / (2. * self.f * self.d));
-//         let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
-//         let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
-//         self.ca_in +=  (term1 + term2 + term3) * dt;
-//     }
+    fn update_ca_in(&mut self, dt: f64) {
+        let term1 = self.k * (-self.current / (2. * self.f * self.d));
+        let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
+        let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
+        self.ca_in +=  (term1 + term2 + term3) * dt;
+    }
 
-//     fn get_ca_current(&self, voltage: f64) -> f64 {
-//         let r_by_temp = self.r * self.temp;
-//         let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
-//         let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
-//         let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
+    fn get_ca_current(&self, voltage: f64) -> f64 {
+        let r_by_temp = self.r * self.temp;
+        let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
+        let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
+        let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
 
-//         term1 * (term2 / term3)
-//     }
+        term1 * (term2 / term3)
+    }
 
-//     fn get_ca_current_and_update(&mut self, hodgkin_huxley: &HodgkinHuxleyCell) -> f64 {
-//         self.update_permeability(hodgkin_huxley.m.state, hodgkin_huxley.n.state);
-//         self.update_ca_in(hodgkin_huxley.dt);
-//         let self.current = get_ca_current(hodgkin_huxley.current_voltage);
-//
-//         self.current
-//     }
-// }
+    fn get_ca_current_and_update(&mut self, m: f64, n: f64, dt: f64, voltage: f64) -> f64 {
+        self.update_permeability(m.powf(3.), n.powf(4.));
+        self.update_ca_in(dt);
+        self.current = self.get_ca_current(voltage);
 
-// enum AdditionalGates {
-//     LTypeCa(HighThresholdCalciumChannel),
-// }
+        self.current
+    }
+}
 
-// impl AdditionalGates {
-//     fn get_current(&self, hodgkin_huxley: &HodgkinHuxleyCell) -> f64 {
-//         match &self {
-//             LTypeCa(channel) => get_ca_current_and_update(hodgkin_huxley),
-//         }
-//     }
-// 
-    // fn to_str(&self) {
-    //     match &self {
-    //         LTypeCa(_) => "LTypeCa",
-    //     }
-    // }
-// }
+pub enum AdditionalGates {
+    LTypeCa(HighThresholdCalciumChannel),
+}
+
+impl AdditionalGates {
+    fn get_and_update_current(&mut self, m: f64, n: f64, dt: f64, voltage: f64) -> f64 {
+        match self {
+            AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(m, n, dt, voltage),
+        }
+    }
+
+    fn get_current(&self) -> f64 {
+        match &self {
+            AdditionalGates::LTypeCa(channel) => channel.current
+        }
+    }
+
+    fn to_str(&self) -> &str {
+        match &self {
+            AdditionalGates::LTypeCa(_) => "LTypeCa",
+        }
+    }
+}
 
 // multicomparment stuff, refer to dopamine modeling paper as well
 // https://github.com/antgon/msn-model/blob/main/msn/cell.py 
@@ -1038,7 +1044,7 @@ pub struct HodgkinHuxleyCell {
     pub n: Gate,
     pub h: Gate,
     pub ligand_gates: Vec<GeneralLigandGatedChannel>,
-    // pub additional_gates: Vec<AdditionalGates>,
+    pub additional_gates: Vec<AdditionalGates>,
     pub bayesian_params: BayesianParameters,
 }
 
@@ -1064,7 +1070,7 @@ impl Default for HodgkinHuxleyCell {
             n: default_gate.clone(), 
             h: default_gate,  
             ligand_gates: vec![],
-        // additional_gates: vec![],
+            additional_gates: vec![],
             bayesian_params: BayesianParameters::default() 
         }
     }
@@ -1103,16 +1109,16 @@ impl HodgkinHuxleyCell {
             .iter()
             .sum::<f64>();
 
-        // let i_additional_gates = self.additional_gates
-        //     .iter_mut()
-        //     .map(|i| 
-        //         i.get_current(&self)
-        //     ) // if other channels added impl get_current and update method that passes in the hodgkin huxley
-        //     .collect::<Vec<f64>>()
-        //     .iter()
-        //     .sum::<f64>();
+        let i_additional_gates = self.additional_gates
+            .iter_mut()
+            .map(|i| 
+                i.get_and_update_current(self.m.state, self.n.state, self.dt, self.current_voltage)
+            ) 
+            .collect::<Vec<f64>>()
+            .iter()
+            .sum::<f64>();
 
-        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates;
+        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
@@ -1151,37 +1157,37 @@ impl HodgkinHuxleyCell {
             writeln!(file, "voltage").expect("Unable to write to file");
             writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         } else {
-            writeln!(file, "voltage,m,n,h").expect("Unable to write to file");
-            writeln!(file, "{}, {}, {}, {}", 
-                self.current_voltage, 
-                self.m.state, 
-                self.n.state, 
-                self.h.state,
-            ).expect("Unable to write to file");
-
-            // write!(file, "voltage,m,n,h").expect("Unable to write to file");
-            // writeln!(
-            //     file, 
-            //     "{}",
-            //     self.additional_gates.iter()
-            //         .map(|&x| x.to_string())
-            //         .collect::<Vec<String>>()
-            //         .join(",")
-            // ).expect("Unable to write to file");
-            // write!(file, "{}, {}, {}, {}", 
+            // writeln!(file, "voltage,m,n,h").expect("Unable to write to file");
+            // writeln!(file, "{}, {}, {}, {}", 
             //     self.current_voltage, 
             //     self.m.state, 
             //     self.n.state, 
             //     self.h.state,
             // ).expect("Unable to write to file");
-            // writeln!(
-            //     file, 
-            //     "{}",
-            //     self.additional_gates.iter()
-            //         .map(|&x| x.current.to_string())
-            //         .collect::<Vec<String>>()
-            //         .join(",")
-            // ).expect("Unable to write to file");
+
+            write!(file, "voltage,m,n,h").expect("Unable to write to file");
+            writeln!(
+                file, 
+                "{}",
+                self.additional_gates.iter()
+                    .map(|x| x.to_str())
+                    .collect::<Vec<&str>>()
+                    .join(",")
+            ).expect("Unable to write to file");
+            write!(file, "{}, {}, {}, {}", 
+                self.current_voltage, 
+                self.m.state, 
+                self.n.state, 
+                self.h.state,
+            ).expect("Unable to write to file");
+            writeln!(
+                file, 
+                "{}",
+                self.additional_gates.iter()
+                    .map(|x| x.get_current().to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ).expect("Unable to write to file");
         }
 
         self.initialize_parameters(self.current_voltage);
@@ -1203,27 +1209,27 @@ impl HodgkinHuxleyCell {
             if !full {
                 writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
             } else {
-                writeln!(file, "{}, {}, {}, {}", 
-                    self.current_voltage, 
-                    self.m.state, 
-                    self.n.state, 
-                    self.h.state,
-                ).expect("Unable to write to file");
-
-                // write!(file, "{}, {}, {}, {}", 
+                // writeln!(file, "{}, {}, {}, {}", 
                 //     self.current_voltage, 
                 //     self.m.state, 
                 //     self.n.state, 
                 //     self.h.state,
                 // ).expect("Unable to write to file");
-                // writeln!(
-                //     file, 
-                //     "{}",
-                //     self.additional_gates.iter()
-                //         .map(|&x| x.current.to_string())
-                //         .collect::<Vec<String>>()
-                //         .join(",")
-                // ).expect("Unable to write to file");
+
+                write!(file, "{}, {}, {}, {}", 
+                    self.current_voltage, 
+                    self.m.state, 
+                    self.n.state, 
+                    self.h.state,
+                ).expect("Unable to write to file");
+                writeln!(
+                    file, 
+                    "{}",
+                    self.additional_gates.iter()
+                        .map(|x| x.get_current().to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
+                ).expect("Unable to write to file");
             }
         }
     }
