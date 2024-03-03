@@ -945,6 +945,9 @@ impl Default for HighThresholdCalciumChannel {
     }
 }
 
+// https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
+// text book descriptions
+
 impl HighThresholdCalciumChannel {
     // m^x * n^y
     // x and y here probably refer to 3 and 4
