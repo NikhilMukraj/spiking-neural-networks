@@ -982,6 +982,8 @@ impl HighThresholdCalciumChannel {
 
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
+    // OscillatingCa(OscillatingCalciumChannel),
+    // PotassiumRectifying(KRectifierChannel),
 }
 
 impl AdditionalGates {
