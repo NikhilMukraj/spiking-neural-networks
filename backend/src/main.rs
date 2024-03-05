@@ -453,9 +453,9 @@ fn run_simulation(
     match if_type {
         IFType::Basic => {
             for timestep in 0..iterations {
-                let mut changes: HashMap<Position, (f64, bool)> = graph.get_every_node()
+                let mut changes: HashMap<Position, bool> = graph.get_every_node()
                     .iter()
-                    .map(|key| (*key, (0.0, false)))
+                    .map(|key| (*key, false))
                     .collect();          
 
                 // loop through every cell
@@ -493,18 +493,18 @@ fn run_simulation(
                     let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
                     cell_grid[x][y].last_dv = dv;
 
-                    changes.insert(pos, (dv, is_spiking));
+                    changes.insert(pos, is_spiking);
                 }
 
                 // loop through every cell
                 // modify the voltage
                 // end loop
 
-                for (pos, (dv_value, is_spiking_value)) in changes {
+                for (pos, is_spiking_value) in changes {
                     let (x, y) = pos;
                     
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
-                    cell_grid[x][y].current_voltage += dv_value;
+                    cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
 
                     if do_stdp && is_spiking_value {
                         cell_grid[x][y].last_firing_time = Some(timestep);
@@ -619,7 +619,7 @@ fn run_simulation(
 
                     cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].last_dv = dv;
-                    cell_grid[x][y].current_voltage += dv;
+                    cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
 
                     if do_stdp && is_spiking_value {
                         cell_grid[x][y].last_firing_time = Some(timestep);
@@ -1482,11 +1482,10 @@ fn update_isolated_presynaptic_neuron_weights(
     weights: &mut Vec<f64>,
     delta_ws: &mut Vec<f64>,
     timestep: usize,
-    dvs: Vec<f64>,
     is_spikings: Vec<bool>,
 ) {
-    for (input_neuron, input_dv) in neurons.iter_mut().zip(dvs.iter()) {
-        input_neuron.current_voltage += *input_dv;
+    for input_neuron in neurons.iter_mut() {
+        input_neuron.current_voltage += input_neuron.last_dv;
     }
 
     for (n, i) in is_spikings.iter().enumerate() {
@@ -1615,7 +1614,7 @@ fn run_isolated_stdp_test(
     match if_type {
         IFType::Basic => {
             for timestep in 0..iterations {
-                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+                let mut is_spikings: Vec<bool> = Vec::new(); 
 
                 for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
                     let (dv, is_spiking) = if if_params.bayesian_params.std != 0. {
@@ -1627,7 +1626,6 @@ fn run_isolated_stdp_test(
                         input_neuron.get_dv_change_and_spike(&if_params, input_voltages[n_neuron])
                     };
 
-                    dvs.push(dv);
                     is_spikings.push(is_spiking);
 
                     input_neuron.last_dv = dv;
@@ -1668,7 +1666,6 @@ fn run_isolated_stdp_test(
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
-                    dvs, 
                     is_spikings,
                 );
 
@@ -1709,7 +1706,7 @@ fn run_isolated_stdp_test(
             };
 
             for timestep in 0..iterations {
-                let (mut dvs, mut is_spikings): (Vec<f64>, Vec<bool>) = (Vec::new(), Vec::new()); 
+                let mut is_spikings: Vec<bool> = Vec::new(); 
 
                 for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
                     let is_spiking = adaptive_apply_and_get_spike(input_neuron, &if_params);
@@ -1724,7 +1721,6 @@ fn run_isolated_stdp_test(
                         adaptive_dv(input_neuron, &if_params, input_voltages[n_neuron])
                     };
 
-                    dvs.push(dv);
                     is_spikings.push(is_spiking);
 
                     input_neuron.last_dv = dv;
@@ -1767,7 +1763,6 @@ fn run_isolated_stdp_test(
                     &mut weights, 
                     &mut delta_ws, 
                     timestep, 
-                    dvs, 
                     is_spikings,
                 );
 
