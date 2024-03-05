@@ -87,6 +87,20 @@ fn get_sign(cell: &Cell) -> f64 {
     }
 }
 
+fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) -> f64 {
+    match if_params {
+        Some(params) => { 
+            input_val * limited_distr(
+                params.bayesian_params.mean, 
+                params.bayesian_params.std, 
+                params.bayesian_params.min, 
+                params.bayesian_params.max,
+            ) 
+        },
+        None => input_val,
+    }
+}
+
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
     input_positions: &Vec<Position>, 
@@ -106,21 +120,10 @@ fn get_input_from_positions(
             let final_input = input_with_current(current, input_calculation, sign, &input_cell);
             
             final_input
-
         })
         .sum();
 
-    match if_params {
-        Some(params) => { 
-            input_val *= limited_distr(
-                params.bayesian_params.mean, 
-                params.bayesian_params.std, 
-                params.bayesian_params.min, 
-                params.bayesian_params.max,
-            ); 
-        },
-        None => {},
-    }
+    input_val = handle_bayesian_modifier(if_params, input_val);
 
     if averaged {
         input_val /= input_positions.len() as f64;
@@ -154,17 +157,7 @@ fn weighted_get_input_from_positions(
         })
         .sum();
 
-    match if_params {
-        Some(params) => { 
-            input_val *= limited_distr(
-                params.bayesian_params.mean, 
-                params.bayesian_params.std, 
-                params.bayesian_params.min, 
-                params.bayesian_params.max,
-            ); 
-        },
-        None => {},
-    }
+    input_val = handle_bayesian_modifier(if_params, input_val);
 
     if averaged {
         input_val /= input_positions.len() as f64;
