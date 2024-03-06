@@ -3,6 +3,6 @@ calcium = true
 dt = 0.01
 input_current = 50.0
 iterations = 10000
-filename = "calcium_test.csv"
+filename = "outut/calcium_test.csv"
 bayesian = false
 full = true
