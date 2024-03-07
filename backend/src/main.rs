@@ -1963,9 +1963,9 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     if ligand_gates.len() != 0 {
         println!("general ligand gated channels: {}", 
             ligand_gates.iter()
-            .map(|i| i.to_str())
-            .collect::<Vec<&str>>()
-            .join(", ")
+                .map(|i| i.to_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
         );
     } else {
         println!("general ligand gated channels: none")
@@ -1984,7 +1984,18 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         // maybe make calcium permeability editable
         additional_gates.push(AdditionalGates::LTypeCa(HighThresholdCalciumChannel::default()));
     }
-        
+
+    if additional_gates.len() != 0 {
+        println!("additional gated channels: {}", 
+            additional_gates.iter()
+                .map(|i| i.to_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+    } else {
+        println!("additional gated channels: none")
+    }
+    
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
