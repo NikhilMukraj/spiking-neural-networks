@@ -907,19 +907,24 @@ pub struct HighThresholdCalciumChannel {
     current: f64,
     z: f64,
     f: f64,
-    r: f64,
-    temp: f64,
-    ca_in: f64,
+    // r: f64,
+    // temp: f64,
+    // ca_in: f64,
     ca_in_equilibrium: f64,
     ca_out: f64,
-    permeability: f64,
+    // permeability: f64,
     max_permeability: f64,
-    d: f64,
-    kt: f64,
-    kd: f64,
-    tr: f64,
-    k: f64,
-    p: f64,
+    // d: f64,
+    // kt: f64,
+    // kd: f64,
+    // tr: f64,
+    // k: f64,
+    // p: f64,
+    v_th: f64,
+    s: f64,
+    m_ca: f64,
+    alpha: f64,
+    beta: f64, 
 }
 
 impl Default for HighThresholdCalciumChannel {
@@ -928,19 +933,24 @@ impl Default for HighThresholdCalciumChannel {
             current: 0.,
             z: 2.,
             f: 96489., // C/mol
-            r: 8.31, // J/Kmol
-            temp: 35., // degrees c
-            ca_in: 0.001, // mM
+            // r: 8.31, // J/Kmol
+            // temp: 35., // degrees c
+            // ca_in: 0.001, // mM
             ca_in_equilibrium: 0.001, // mM
             ca_out: 5., // mM
-            permeability: 0.,
+            // permeability: 0.,
             max_permeability: 5.36e-6,
-            d: 0.1, // um
-            kt: 1e-4, // mM / ms
-            kd: 1e-4, // mM
-            tr: 43., // ms
-            k: 1000.,
-            p: 0.02,
+            // d: 0.1, // um
+            // kt: 1e-4, // mM / ms
+            // kd: 1e-4, // mM
+            // tr: 43., // ms
+            // k: 1000.,
+            // p: 0.02,
+            v_th: (1000. * 35.) / (2. * (1_f64).exp()),
+            s: 1.,
+            m_ca: 0.,
+            alpha: 0.,
+            beta: 0.,
         }
     }
 }
@@ -951,29 +961,47 @@ impl Default for HighThresholdCalciumChannel {
 impl HighThresholdCalciumChannel {
     // m^x * n^y
     // x and y here probably refer to 3 and 4
-    fn update_permeability(&mut self, m_state: f64, n_state: f64) {
-        self.permeability = self.max_permeability * m_state * n_state;
-    }
+    // fn update_permeability(&mut self, m_state: f64, n_state: f64) {
+    //     self.permeability = self.max_permeability * m_state * n_state;
+    // }
 
-    fn update_ca_in(&mut self, dt: f64) {
-        let term1 = self.k * (-self.current / (2. * self.f * self.d));
-        let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
-        let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
-        self.ca_in +=  (term1 + term2 + term3) * dt;
+    // fn update_ca_in(&mut self, dt: f64) {
+    //     let term1 = self.k * (-self.current / (2. * self.f * self.d));
+    //     let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
+    //     let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
+    //     self.ca_in += (term1 + term2 + term3) * dt;
+    // }
+
+    // fn get_ca_current(&self, voltage: f64) -> f64 {
+    //     let r_by_temp = self.r * self.temp;
+    //     let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
+    //     let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
+    //     let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
+
+    //     term1 * (term2 / term3)
+    // }
+
+    fn update_m_ca(&mut self, voltage: f64) {
+        self.alpha += 1.6 / (1. + (-0.072 * (voltage - 5.)).exp());
+        self.beta += (0.02 * (voltage - 1.31)) / (((voltage - 1.31) / 5.36).exp() - 1.);
+        self.m_ca = self.alpha / (self.alpha + self.beta);
     }
 
     fn get_ca_current(&self, voltage: f64) -> f64 {
-        let r_by_temp = self.r * self.temp;
-        let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
-        let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
-        let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
+        let term1 = self.m_ca.powf(2.) * self.max_permeability * self.s;
+        let term2 = (self.z * self.f) / self.v_th;
+        let term3 = voltage * self.v_th;
+        let term4 = self.ca_in_equilibrium * term3.exp() - self.ca_out;
+        let term5 = term3 - 1.;
 
-        term1 * (term2 / term3)
+        term1 * term2 * (term4 / term5) * voltage
     }
 
-    fn get_ca_current_and_update(&mut self, m: f64, n: f64, dt: f64, voltage: f64) -> f64 {
-        self.update_permeability(m.powf(3.), n.powf(4.));
-        self.update_ca_in(dt);
+    fn get_ca_current_and_update(&mut self, voltage: f64) -> f64 {
+        // self.update_permeability(m.powf(3.), n.powf(4.));
+        // self.update_ca_in(dt);
+
+        self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
 
         self.current
@@ -987,19 +1015,19 @@ pub enum AdditionalGates {
 }
 
 impl AdditionalGates {
-    fn get_and_update_current(&mut self, m: f64, n: f64, dt: f64, voltage: f64) -> f64 {
+    pub fn get_and_update_current(&mut self, voltage: f64) -> f64 {
         match self {
-            AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(m, n, dt, voltage),
+            AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(voltage),
         }
     }
 
-    fn get_current(&self) -> f64 {
+    pub fn get_current(&self) -> f64 {
         match &self {
             AdditionalGates::LTypeCa(channel) => channel.current
         }
     }
 
-    fn to_str(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match &self {
             AdditionalGates::LTypeCa(_) => "LTypeCa",
         }
@@ -1117,7 +1145,7 @@ impl HodgkinHuxleyCell {
         let i_additional_gates = self.additional_gates
             .iter_mut()
             .map(|i| 
-                i.get_and_update_current(self.m.state, self.n.state, self.dt, self.current_voltage)
+                i.get_and_update_current(self.current_voltage)
             ) 
             .collect::<Vec<f64>>()
             .iter()
@@ -1173,7 +1201,7 @@ impl HodgkinHuxleyCell {
             write!(file, "voltage,m,n,h").expect("Unable to write to file");
             writeln!(
                 file, 
-                "{}",
+                ",{}",
                 self.additional_gates.iter()
                     .map(|x| x.to_str())
                     .collect::<Vec<&str>>()
@@ -1187,7 +1215,7 @@ impl HodgkinHuxleyCell {
             ).expect("Unable to write to file");
             writeln!(
                 file, 
-                "{}",
+                ", {}",
                 self.additional_gates.iter()
                     .map(|x| x.get_current().to_string())
                     .collect::<Vec<String>>()
@@ -1229,7 +1257,7 @@ impl HodgkinHuxleyCell {
                 ).expect("Unable to write to file");
                 writeln!(
                     file, 
-                    "{}",
+                    ", {}",
                     self.additional_gates.iter()
                         .map(|x| x.get_current().to_string())
                         .collect::<Vec<String>>()
