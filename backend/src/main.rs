@@ -1,5 +1,9 @@
 use std::{
-    collections::HashMap, env, fs::{File, read_to_string}, io::{Write, BufWriter, Result, Error, ErrorKind}
+    collections::HashMap, 
+    env, 
+    // f64::consts::PI, 
+    fs::{read_to_string, File}, 
+    io::{BufWriter, Error, ErrorKind, Result, Write}
 };
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
@@ -283,6 +287,26 @@ impl Output {
     }
 }
 
+// distance: 6.8 mm
+// conductivity: 0.251 S/m 
+// either convert dist to m, or conductivity to S/mm
+// should be inputtable from user as well
+// fn convert_to_eeg(cell_grid: CellGrid, distance: f64, conductivity: f64) -> f64 {
+//     let total_current: f64 = 0.;
+
+//     for row in cell_grid {
+//         for value in row {
+//             total_current += voltage_change_to_current_integrate_and_fire(
+//                 value.last_dv,
+//                 value.dt,
+//                 1.,
+//             );
+//         }
+//     }
+
+//     (1. / (4. * PI * connectivity * distance)) * total_current
+// }
+
 // type AdaptiveDwAndGetSpikeFunction = Box::<dyn Fn(&mut Cell, &IFParameters) -> bool>;
 // type AdaptiveDvFunction = Box<dyn Fn(&mut Cell, &IFParameters, f64) -> f64>;
 
@@ -442,7 +466,7 @@ fn run_simulation(
     }
 
     let current = match current {
-        true => Some((if_params.dt, if_params.tau_m)),
+        true => Some((if_params.dt, 1.)),
         false => None
     };
 
@@ -1232,7 +1256,7 @@ fn test_coupled_neurons(
     };
 
     let current = match current {
-        true => Some((post_if_params.dt, post_if_params.tau_m)),
+        true => Some((post_if_params.dt, 1.)),
         false => None
     };
 
@@ -1546,7 +1570,7 @@ fn run_isolated_stdp_test(
     };
 
     let current = match current {
-        true => Some((if_params.dt, if_params.tau_m)),
+        true => Some((if_params.dt, 1.)),
         false => None
     };
 
