@@ -1,6 +1,7 @@
 use std::{
     fs::File, 
     io::{Result, Error, ErrorKind, Write, BufWriter}, 
+    f64::consts::E,
 };
 use rand::Rng;
 #[path = "../distribution/mod.rs"]
@@ -946,7 +947,7 @@ impl Default for HighThresholdCalciumChannel {
             // tr: 43., // ms
             // k: 1000.,
             // p: 0.02,
-            v_th: (1000. * 35.) / (2. * (1_f64).exp()),
+            v_th: (1000. * 35.) / (2. * E),
             s: 1.,
             m_ca: 0.,
             alpha: 0.,
@@ -981,6 +982,9 @@ impl HighThresholdCalciumChannel {
     //     term1 * (term2 / term3)
     // }
 
+    // if still getting nans test each equation one by one
+    // graph different between what is written here and individual tests
+    // range is -65 mv to 30 mv
     fn update_m_ca(&mut self, voltage: f64) {
         self.alpha += 1.6 / (1. + (-0.072 * (voltage - 5.)).exp());
         self.beta += (0.02 * (voltage - 1.31)) / (((voltage - 1.31) / 5.36).exp() - 1.);
