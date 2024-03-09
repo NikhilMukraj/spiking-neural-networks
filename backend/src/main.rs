@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap, 
     env, 
-    // f64::consts::PI, 
+    f64::consts::PI, 
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
@@ -195,11 +195,39 @@ struct NeuroAndVolts {
     neurotransmitter: f64,
 }
 
+// distance: 6.8 mm
+// conductivity: 0.251 S/m 
+// either convert dist to m, or conductivity to S/mm
+// should be inputtable from user as well
+fn convert_to_eeg(cell_grid: &CellGrid, dt: f64, distance: f64, conductivity: f64) -> f64 {
+    let mut total_current: f64 = 0.;
+
+    for row in cell_grid {
+        for value in row {
+            total_current += voltage_change_to_current_integrate_and_fire(
+                value.last_dv,
+                dt,
+                1.,
+            );
+        }
+    }
+
+    (1. / (4. * PI * conductivity * distance)) * total_current
+}
+
+
+// refactor output to only contain necessary files
+// enum OutputFile {
+//     VoltageAndNeurotransmitter(BufWriter<File>, BufWriter<File>),
+//     EEG(BufWriter<File>),
+// } // attach these enums to the end of output enum
+
 enum Output {
     Grid(Vec<CellGrid>),
     GridBinary(Vec<CellGrid>),
     Averaged(Vec<NeuroAndVolts>),
     AveragedBinary(Vec<NeuroAndVolts>),
+    EEG(Vec<(f64, f64)>, f64, f64, f64),
 }
 
 impl Output {
@@ -213,16 +241,23 @@ impl Output {
                         neurotransmitter: get_neuro_avg(cell_grid),
                     }
                 );
+            },
+            Output::EEG(signals, dt, distance, conductivity) => {
+                signals.push((
+                    convert_to_eeg(cell_grid, *dt, *distance, *conductivity),
+                    get_neuro_avg(cell_grid),
+                ))
             }
         }
     }
 
-    fn from_str(string: &str) -> Result<Output> {
+    fn from_str(string: &str, dt: f64, distance: f64, conductivity: f64) -> Result<Output> {
         match string.to_ascii_lowercase().as_str() {
             "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
             "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid>::new())) },
             "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVolts>::new())) },
             "averaged binary" => { Ok(Output::AveragedBinary(Vec::<NeuroAndVolts>::new())) },
+            "eeg" => { Ok(Output::EEG(Vec::<(f64, f64)>::new(), dt, distance, conductivity)) }
             _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
         }
     }
@@ -282,30 +317,18 @@ impl Output {
                     voltage_file.write_all(&volt_mean_bytes).expect("Could not write to file"); 
                     neurotransmitter_file.write_all(&neuro_mean_bytes).expect("Could not write to file");
                 }
+            },
+            Output::EEG(signals, _, _, _) => {
+                for value in signals {
+                    writeln!(voltage_file, "{}", value.0)
+                        .expect("Could not write to file");
+                    writeln!(neurotransmitter_file, "{}", value.1)
+                        .expect("Could not write to file");
+                }
             }
         }
     }
 }
-
-// distance: 6.8 mm
-// conductivity: 0.251 S/m 
-// either convert dist to m, or conductivity to S/mm
-// should be inputtable from user as well
-// fn convert_to_eeg(cell_grid: CellGrid, distance: f64, conductivity: f64) -> f64 {
-//     let total_current: f64 = 0.;
-
-//     for row in cell_grid {
-//         for value in row {
-//             total_current += voltage_change_to_current_integrate_and_fire(
-//                 value.last_dv,
-//                 value.dt,
-//                 1.,
-//             );
-//         }
-//     }
-
-//     (1. / (4. * PI * connectivity * distance)) * total_current
-// }
 
 // type AdaptiveDwAndGetSpikeFunction = Box::<dyn Fn(&mut Cell, &IFParameters) -> bool>;
 // type AdaptiveDvFunction = Box<dyn Fn(&mut Cell, &IFParameters, f64) -> f64>;
@@ -2158,16 +2181,6 @@ fn main() -> Result<()> {
     let config: Value = from_str(&toml_content).expect("Cannot read config");
 
     if let Some(simulation_table) = config.get("lattice_simulation") {
-        let output_type: String = parse_value_with_default(
-            &simulation_table, 
-            "output_type", 
-            parse_string, 
-            String::from("averaged")
-        )?;
-        println!("output_type: {}", output_type);
-
-        let output_type = Output::from_str(&output_type)?;
-
         let tag: &str = match simulation_table.get("tag") {
             Some(value) => { 
                 match value.as_str() {
@@ -2212,6 +2225,37 @@ fn main() -> Result<()> {
             expr.value()
         };
 
+        let output_type: String = parse_value_with_default(
+            &simulation_table, 
+            "output_type", 
+            parse_string, 
+            String::from("averaged")
+        )?;
+        println!("output_type: {}", output_type);
+
+        let distance = parse_value_with_default(
+            &simulation_table, 
+            "eeg_distance", 
+            parse_f64, 
+            6.8,
+        )?;
+        println!("eeg_distance: {}", distance);
+
+        let conductivity = parse_value_with_default(
+            &simulation_table, 
+            "eeg_conductivity", 
+            parse_f64, 
+            251.,
+        )?;
+        println!("eeg_conductivity: {}", conductivity);
+
+        let output_type = Output::from_str(
+            &output_type, 
+            sim_params.if_params.dt, 
+            distance, 
+            conductivity
+        )?;
+
         let (output_value, output_graph) = run_simulation(
             sim_params.num_rows, 
             sim_params.num_cols, 
@@ -2247,6 +2291,14 @@ fn main() -> Result<()> {
                         .expect("Could not create file"))
                 )
             },
+            Output::EEG(_, _, _, _) => {
+                (   
+                    BufWriter::new(File::create(format!("{}_eeg.txt", tag))
+                        .expect("Could not create file")),
+                    BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
+                        .expect("Could not create file"))
+                )
+            }
         };
 
         output_value.write_to_file(&mut voltage_file, &mut neurotransmitter_file);
