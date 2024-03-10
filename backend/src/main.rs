@@ -215,12 +215,14 @@ fn convert_to_eeg(cell_grid: &CellGrid, dt: f64, distance: f64, conductivity: f6
     (1. / (4. * PI * conductivity * distance)) * total_current
 }
 
+fn create_voltage_and_neuro_files(tag: &str, extension: &str) -> (BufWriter<File>, BufWriter<File>) {
+    let voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, extension))
+        .expect("Could not create file"));
+    let neurotransmitter_file = BufWriter::new(File::create(format!("{}_neurotransmitter.{}", tag, extension))
+        .expect("Could not create file"));
 
-// refactor output to only contain necessary files
-// enum OutputFile {
-//     VoltageAndNeurotransmitter(BufWriter<File>, BufWriter<File>),
-//     EEG(BufWriter<File>),
-// } // attach these enums to the end of output enum
+    (voltage_file, neurotransmitter_file)
+}
 
 enum Output {
     Grid(Vec<CellGrid>),
@@ -262,9 +264,11 @@ impl Output {
         }
     }
 
-    fn write_to_file(&self, voltage_file: &mut BufWriter<File>, neurotransmitter_file: &mut BufWriter<File>) {
+    fn write_to_file(&self, tag: &str) {
         match &self {
             Output::Grid(grids) => {
+                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+
                 for grid in grids {
                     for row in grid {
                         for value in row {
@@ -285,6 +289,8 @@ impl Output {
                 }
             },
             Output::GridBinary(grids) => {
+                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
+
                 for grid in grids {
                     for row in grid {
                         for value in row {
@@ -302,6 +308,8 @@ impl Output {
                 }
             },
             Output::Averaged(averages) => {
+                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+
                 for neuro_and_volt in averages {
                     writeln!(voltage_file, "{}", neuro_and_volt.voltage)
                         .expect("Could not write to file");
@@ -310,6 +318,8 @@ impl Output {
                 } 
             },
             Output::AveragedBinary(averages) => {
+                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
+                
                 for neuro_and_volt in averages {
                     let volt_mean_bytes = neuro_and_volt.voltage.to_le_bytes();
                     let neuro_mean_bytes = neuro_and_volt.neurotransmitter.to_le_bytes();
@@ -319,10 +329,11 @@ impl Output {
                 }
             },
             Output::EEG(signals, _, _, _) => {
+                let mut eeg_file = BufWriter::new(File::create(format!("{}_eeg.tct", tag))
+                    .expect("Could not create file"));
+
                 for value in signals {
-                    writeln!(voltage_file, "{}", value.0)
-                        .expect("Could not write to file");
-                    writeln!(neurotransmitter_file, "{}", value.1)
+                    writeln!(eeg_file, "{}", value.0)
                         .expect("Could not write to file");
                 }
             }
@@ -2274,34 +2285,32 @@ fn main() -> Result<()> {
             output_type,
         )?;
 
-        let (mut voltage_file, mut neurotransmitter_file) = match output_value {
-            Output::Grid(_) | Output::Averaged(_) => { 
-                (   
-                    BufWriter::new(File::create(format!("{}_voltage.txt", tag))
-                        .expect("Could not create file")),
-                    BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
-                        .expect("Could not create file"))
-                )
-            },
-            Output::GridBinary(_) | Output::AveragedBinary(_) => { 
-                (   
-                    BufWriter::new(File::create(format!("{}_voltage.bin", tag))
-                        .expect("Could not create file")),
-                    BufWriter::new(File::create(format!("{}_neurotransmitter.bin", tag))
-                        .expect("Could not create file"))
-                )
-            },
-            Output::EEG(_, _, _, _) => {
-                (   
-                    BufWriter::new(File::create(format!("{}_eeg.txt", tag))
-                        .expect("Could not create file")),
-                    BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
-                        .expect("Could not create file"))
-                )
-            }
-        };
+        // let mut output_files = match output_value {
+        //     Output::Grid(_) | Output::Averaged(_) => { 
+        //         OutputFile::VoltageAndNeurotransmitter(   
+        //             BufWriter::new(File::create(format!("{}_voltage.txt", tag))
+        //                 .expect("Could not create file")),
+        //             BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
+        //                 .expect("Could not create file"))
+        //         )
+        //     },
+        //     Output::GridBinary(_) | Output::AveragedBinary(_) => { 
+        //         OutputFile::VoltageAndNeurotransmitter(   
+        //             BufWriter::new(File::create(format!("{}_voltage.bin", tag))
+        //                 .expect("Could not create file")),
+        //             BufWriter::new(File::create(format!("{}_neurotransmitter.bin", tag))
+        //                 .expect("Could not create file"))
+        //         )
+        //     },
+        //     Output::EEG(_, _, _, _) => {
+        //         OutputFile::EEG(   
+        //             BufWriter::new(File::create(format!("{}_eeg.txt", tag))
+        //                 .expect("Could not create file")),
+        //         )
+        //     }
+        // };
 
-        output_value.write_to_file(&mut voltage_file, &mut neurotransmitter_file);
+        output_value.write_to_file(tag);
 
         if sim_params.graph_params.write_history {
             output_graph.write_history(&tag);
