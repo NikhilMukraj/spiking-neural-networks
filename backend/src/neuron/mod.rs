@@ -947,7 +947,7 @@ impl Default for HighThresholdCalciumChannel {
             // tr: 43., // ms
             // k: 1000.,
             // p: 0.02,
-            v_th: (1000. * 35.) / (2. * E),
+            v_th: (10. * 35.) / (2. * E),
             s: 1.,
             m_ca: 0.,
             alpha: 0.,
@@ -994,7 +994,7 @@ impl HighThresholdCalciumChannel {
     fn get_ca_current(&self, voltage: f64) -> f64 {
         let term1 = self.m_ca.powf(2.) * self.max_permeability * self.s;
         let term2 = (self.z * self.f) / self.v_th;
-        let term3 = voltage * self.v_th;
+        let term3 = voltage / self.v_th;
         let term4 = self.ca_in_equilibrium * term3.exp() - self.ca_out;
         let term5 = term3 - 1.;
 
@@ -1007,6 +1007,12 @@ impl HighThresholdCalciumChannel {
 
         self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
+
+        println!("m: {}, v_th: {}, i_ca: {}", self.m_ca, self.v_th, self.current);
+
+        // if self.current.is_infinite() {
+        //     panic!();
+        // }
 
         self.current
     }
