@@ -947,7 +947,8 @@ impl Default for HighThresholdCalciumChannel {
             // tr: 43., // ms
             // k: 1000.,
             // p: 0.02,
-            v_th: (10. * 35.) / (2. * E),
+            // v_th: (10. * 35.) / (2. * E),
+            v_th: 25., // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
             s: 1.,
             m_ca: 0.,
             alpha: 0.,
@@ -1008,6 +1009,7 @@ impl HighThresholdCalciumChannel {
         self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
 
+        // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
         // println!("m: {}, v_th: {}, i_ca: {}", self.m_ca, self.v_th, self.current);
 
         // if self.current.is_infinite() {
