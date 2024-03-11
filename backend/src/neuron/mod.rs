@@ -1008,7 +1008,7 @@ impl HighThresholdCalciumChannel {
         self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
 
-        println!("m: {}, v_th: {}, i_ca: {}", self.m_ca, self.v_th, self.current);
+        // println!("m: {}, v_th: {}, i_ca: {}", self.m_ca, self.v_th, self.current);
 
         // if self.current.is_infinite() {
         //     panic!();
