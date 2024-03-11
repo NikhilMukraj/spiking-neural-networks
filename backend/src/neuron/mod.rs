@@ -1,7 +1,6 @@
 use std::{
     fs::File, 
     io::{Result, Error, ErrorKind, Write, BufWriter}, 
-    f64::consts::E,
 };
 use rand::Rng;
 #[path = "../distribution/mod.rs"]
