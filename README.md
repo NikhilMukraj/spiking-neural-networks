@@ -24,6 +24,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ### Hodgkin Huxley
 
+#### Neurotransmission
+
 ![AMPA](backend/results/ampa.png)
 
 ![GABAa](backend/results/gabaa.png)
@@ -31,6 +33,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 ![GABAb](backend/results/gabab.png)
 
 ![NMDA](backend/results/nmda.png)
+
+#### Additional Gates
+
+<!-- ![L-Type Calcium]() -->
 
 ## Sources
 
