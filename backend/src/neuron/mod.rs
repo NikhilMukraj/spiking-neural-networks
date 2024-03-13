@@ -1,6 +1,7 @@
 use std::{
     fs::File, 
     io::{Result, Error, ErrorKind, Write, BufWriter}, 
+    f64::consts::E,
 };
 use rand::Rng;
 #[path = "../distribution/mod.rs"]
@@ -946,8 +947,7 @@ impl Default for HighThresholdCalciumChannel {
             tr: 43., // ms
             k: 1000.,
             p: 0.02,
-            v_th: (9. * 297.) / (2. * 2.17),
-            // v_th: 25., // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
+            v_th: (9. * 297.) / (2. * E),
             s: 1.,
             m_ca: 0.,
             alpha: 0.,
@@ -955,9 +955,6 @@ impl Default for HighThresholdCalciumChannel {
         }
     }
 }
-
-// https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
-// text book descriptions
 
 impl HighThresholdCalciumChannel {
     // m^x * n^y
@@ -973,18 +970,6 @@ impl HighThresholdCalciumChannel {
         self.ca_in += (term1 + term2 + term3) * dt;
     }
 
-    // fn get_ca_current(&self, voltage: f64) -> f64 {
-    //     let r_by_temp = self.r * self.temp;
-    //     let term1 = self.permeability * self.z.powf(2.) * ((voltage * self.f.powf(2.)) / r_by_temp);
-    //     let term2 = self.ca_in - (self.ca_out * ((-self.z * self.f * voltage) / r_by_temp)).exp();
-    //     let term3 = 1. - ((-self.z * self.f * voltage) / r_by_temp).exp();
-
-    //     term1 * (term2 / term3)
-    // }
-
-    // if still getting nans test each equation one by one
-    // graph different between what is written here and individual tests
-    // range is -65 mv to 30 mv
     fn update_m_ca(&mut self, voltage: f64) {
         self.alpha += 1.6 / (1. + (-0.072 * (voltage - 5.)).exp());
         self.beta += (0.02 * (voltage - 1.31)) / (((voltage - 1.31) / 5.36).exp() - 1.);
@@ -1002,24 +987,15 @@ impl HighThresholdCalciumChannel {
     }
 
     fn get_ca_current_and_update(&mut self, voltage: f64, dt: f64) -> f64 {
-        // self.update_permeability(m.powf(3.), n.powf(4.));
-        // self.update_ca_in(dt);
-
         self.update_ca_in(dt);
         self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
-
-        // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
-        // println!("m: {}, v_th: {}, i_ca: {}", self.m_ca, self.v_th, self.current);
-
-        // if self.current.is_infinite() {
-        //     panic!();
-        // }
 
         self.current
     }
 }
 
+// can look at this
 // https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
