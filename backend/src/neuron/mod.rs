@@ -909,17 +909,17 @@ pub struct HighThresholdCalciumChannel {
     f: f64,
     // r: f64,
     // temp: f64,
-    // ca_in: f64,
+    ca_in: f64,
     ca_in_equilibrium: f64,
     ca_out: f64,
     // permeability: f64,
     max_permeability: f64,
-    // d: f64,
-    // kt: f64,
-    // kd: f64,
-    // tr: f64,
-    // k: f64,
-    // p: f64,
+    d: f64,
+    kt: f64,
+    kd: f64,
+    tr: f64,
+    k: f64,
+    p: f64,
     v_th: f64,
     s: f64,
     m_ca: f64,
@@ -935,19 +935,19 @@ impl Default for HighThresholdCalciumChannel {
             f: 96489., // C/mol
             // r: 8.31, // J/Kmol
             // temp: 35., // degrees c
-            // ca_in: 0.001, // mM
+            ca_in: 0.001, // mM
             ca_in_equilibrium: 0.001, // mM
             ca_out: 5., // mM
             // permeability: 0.,
             max_permeability: 5.36e-6,
-            // d: 0.1, // um
-            // kt: 1e-4, // mM / ms
-            // kd: 1e-4, // mM
-            // tr: 43., // ms
-            // k: 1000.,
-            // p: 0.02,
-            // v_th: (10. * 35.) / (2. * E),
-            v_th: 25., // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
+            d: 0.1, // um
+            kt: 1e-4, // mM / ms
+            kd: 1e-4, // mM
+            tr: 43., // ms
+            k: 1000.,
+            p: 0.02,
+            v_th: (9. * 297.) / (2. * 2.17),
+            // v_th: 25., // https://neurophysics.ucsd.edu/courses/physics_171/voltage%20scales.pdf
             s: 1.,
             m_ca: 0.,
             alpha: 0.,
@@ -966,12 +966,12 @@ impl HighThresholdCalciumChannel {
     //     self.permeability = self.max_permeability * m_state * n_state;
     // }
 
-    // fn update_ca_in(&mut self, dt: f64) {
-    //     let term1 = self.k * (-self.current / (2. * self.f * self.d));
-    //     let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
-    //     let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
-    //     self.ca_in += (term1 + term2 + term3) * dt;
-    // }
+    fn update_ca_in(&mut self, dt: f64) {
+        let term1 = self.k * (-self.current / (2. * self.f * self.d));
+        let term2 = self.p * ((self.kt * self.ca_in) / (self.ca_in + self.kd));
+        let term3 = (self.ca_in_equilibrium - self.ca_in) / self.tr;
+        self.ca_in += (term1 + term2 + term3) * dt;
+    }
 
     // fn get_ca_current(&self, voltage: f64) -> f64 {
     //     let r_by_temp = self.r * self.temp;
@@ -994,17 +994,18 @@ impl HighThresholdCalciumChannel {
     fn get_ca_current(&self, voltage: f64) -> f64 {
         let term1 = self.m_ca.powf(2.) * self.max_permeability * self.s;
         let term2 = (self.z * self.f) / self.v_th;
-        let term3 = voltage / self.v_th;
-        let term4 = self.ca_in_equilibrium * term3.exp() - self.ca_out;
+        let term3 = voltage / self.v_th.exp();
+        let term4 = self.ca_in_equilibrium * term3 - self.ca_out;
         let term5 = term3 - 1.;
 
         term1 * term2 * (term4 / term5) * voltage
     }
 
-    fn get_ca_current_and_update(&mut self, voltage: f64) -> f64 {
+    fn get_ca_current_and_update(&mut self, voltage: f64, dt: f64) -> f64 {
         // self.update_permeability(m.powf(3.), n.powf(4.));
         // self.update_ca_in(dt);
 
+        self.update_ca_in(dt);
         self.update_m_ca(voltage);
         self.current = self.get_ca_current(voltage);
 
@@ -1019,16 +1020,18 @@ impl HighThresholdCalciumChannel {
     }
 }
 
+// https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
+    // HVACa(), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
     // OscillatingCa(OscillatingCalciumChannel),
     // PotassiumRectifying(KRectifierChannel),
 }
 
 impl AdditionalGates {
-    pub fn get_and_update_current(&mut self, voltage: f64) -> f64 {
+    pub fn get_and_update_current(&mut self, voltage: f64, dt: f64) -> f64 {
         match self {
-            AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(voltage),
+            AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(voltage, dt),
         }
     }
 
@@ -1156,7 +1159,7 @@ impl HodgkinHuxleyCell {
         let i_additional_gates = self.additional_gates
             .iter_mut()
             .map(|i| 
-                i.get_and_update_current(self.current_voltage)
+                i.get_and_update_current(self.current_voltage, self.dt)
             ) 
             .collect::<Vec<f64>>()
             .iter()
