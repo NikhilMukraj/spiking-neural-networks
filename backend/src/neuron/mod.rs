@@ -995,11 +995,48 @@ impl HighThresholdCalciumChannel {
     }
 }
 
+// struct HightVoltageActivatedCalciumChannel {
+//     m: f64,
+//     m_a: f64,
+//     m_b: f64,
+//     h: f64,
+//     h_a: f64,
+//     h_b: f64,
+//     cao: f64,
+//     cai: f64,
+//     gca_bar: f64,
+// }
+
+// impl Default for HightVoltageActivatedCalciumChannel {
+//     fn default() -> Self {
+        
+//     }
+// }
+
+// // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
+// impl HightVoltageActivatedCalciumChannel {
+//     fn get_carev() {
+
+//     }
+
+//     fn update_m() {
+
+//     }
+
+//     fn update_h() {
+
+//     }
+
+//     fn get_ca_and_update_current() {
+
+//     }
+// }
+
 // can look at this
 // https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
-    // HVACa(), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
+    // HVACa(HightVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
     // OscillatingCa(OscillatingCalciumChannel),
     // PotassiumRectifying(KRectifierChannel),
 }
