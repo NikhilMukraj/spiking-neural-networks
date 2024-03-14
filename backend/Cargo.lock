@@ -24,23 +24,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "clean_if_model"
-version = "0.1.0"
-dependencies = [
- "csv",
- "exprtk_rs",
- "ndarray",
- "num-complex",
- "rand",
- "rand_distr",
- "rayon",
- "rustfft",
- "serde",
- "serde_json",
- "toml",
-]
-
-[[package]]
 name = "crossbeam-deque"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -421,6 +404,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "96426c9936fd7a0124915f9185ea1d20aa9445cc9821142f0a73bc9207a2e186"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "spiking_neural_networks"
+version = "0.2.0"
+dependencies = [
+ "csv",
+ "exprtk_rs",
+ "ndarray",
+ "num-complex",
+ "rand",
+ "rand_distr",
+ "rayon",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "toml",
 ]
 
 [[package]]
