@@ -1008,6 +1008,11 @@ impl HighThresholdCalciumChannel {
 // }
 
 // impl Default for HightVoltageActivatedCalciumChannel {
+    // let r = 8.314 // joules * kelvin ^ -1 * mol ^ -1 // universal gas constant
+    // let faraday = 96485 // coulombs per mole // faraday constant
+    // let ca_in = 0.00024 // mM
+    // let ca_out = 2. // mM
+    // let ca_rev = 1e3 * (r * (celsius + 273.15))/(2. * faraday) * (ca_in/ca_out).ln // nernst equation
 //     fn default() -> Self {
         
 //     }
