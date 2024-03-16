@@ -1024,12 +1024,14 @@ impl HighThresholdCalciumChannel {
 
 //     }
 
-//     fn update_m() {
-
+//     fn update_m(&mut self, voltage: f64) {
+        // m_a = 0.055 * (-27. - voltage) / (((-27. - voltage) / 3.8).exp() - 1.)
+        // m_b = 0.94 * ((-75. - voltage) / 17.).exp()
 //     }
 
-//     fn update_h() {
-
+//     fn update_h(&mut self, voltage: f64) {
+        // h_a = 0.000457 * ((-13. - voltage) / 50.).exp()
+        // h_b = 0.0065 / (((-15. - voltage) / 28.).exp() + 1.)
 //     }
 
 //     fn get_ca_and_update_current() {
