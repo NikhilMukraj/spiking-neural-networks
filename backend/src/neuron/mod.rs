@@ -995,75 +995,117 @@ impl HighThresholdCalciumChannel {
     }
 }
 
-// struct HightVoltageActivatedCalciumChannel {
-//     m: f64,
-//     m_a: f64,
-//     m_b: f64,
-//     h: f64,
-//     h_a: f64,
-//     h_b: f64,
-//     cao: f64,
-//     cai: f64,
-//     gca_bar: f64,
-// }
+pub struct HightVoltageActivatedCalciumChannel {
+    m: f64,
+    m_a: f64,
+    m_b: f64,
+    h: f64,
+    h_a: f64,
+    h_b: f64,
+    // ca_in: f64,
+    // ca_out: f64,
+    gca_bar: f64,
+    ca_rev: f64,
+    current: f64,
+}
 
-// impl Default for HightVoltageActivatedCalciumChannel {
-    // let r = 8.314 // joules * kelvin ^ -1 * mol ^ -1 // universal gas constant
-    // let faraday = 96485 // coulombs per mole // faraday constant
-    // let ca_in = 0.00024 // mM
-    // let ca_out = 2. // mM
-    // let ca_rev = 1e3 * (r * (celsius + 273.15))/(2. * faraday) * (ca_in/ca_out).ln // nernst equation
-//     fn default() -> Self {
-        
-//     }
-// }
+impl Default for HightVoltageActivatedCalciumChannel {
+    fn default() -> Self {
+        let r: f64 = 8.314; // joules * kelvin ^ -1 * mol ^ -1 // universal gas constant
+        let faraday: f64 = 96485.; // coulombs per mole // faraday constant
+        let celsius: f64 = 36.; // degrees c
+        let ca_in: f64 = 0.00024; // mM
+        let ca_out: f64 = 2.; // mM
+        let ca_rev: f64 = 1e3 * (r * (celsius + 273.15))/(2. * faraday) * (ca_in / ca_out).ln(); // nernst equation
+
+        HightVoltageActivatedCalciumChannel {
+            m: 0.,
+            m_a: 0.,
+            m_b: 0.,
+            h: 0.,
+            h_a: 0.,
+            h_b: 0.,
+            // ca_in: ca_in,
+            // ca_out: ca_out,
+            gca_bar: 1e-4,
+            ca_rev: ca_rev,
+            current: 0.,
+        }
+    }
+}
 
 // // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
-// impl HightVoltageActivatedCalciumChannel {
-//     fn get_carev() {
+impl HightVoltageActivatedCalciumChannel {
+    fn update_m(&mut self, voltage: f64) {
+        self.m_a = 0.055 * (-27. - voltage) / (((-27. - voltage) / 3.8).exp() - 1.);
+        self.m_b = 0.94 * ((-75. - voltage) / 17.).exp();
+    }
 
-//     }
+    fn update_h(&mut self, voltage: f64) {
+        self.h_a = 0.000457 * ((-13. - voltage) / 50.).exp();
+        self.h_b = 0.0065 / (((-15. - voltage) / 28.).exp() + 1.);
+    }
 
-//     fn update_m(&mut self, voltage: f64) {
-        // m_a = 0.055 * (-27. - voltage) / (((-27. - voltage) / 3.8).exp() - 1.)
-        // m_b = 0.94 * ((-75. - voltage) / 17.).exp()
-//     }
+    fn initialize_m_and_h(&mut self, voltage: f64) {
+        self.update_m(voltage);
+        self.update_h(voltage);
 
-//     fn update_h(&mut self, voltage: f64) {
-        // h_a = 0.000457 * ((-13. - voltage) / 50.).exp()
-        // h_b = 0.0065 / (((-15. - voltage) / 28.).exp() + 1.)
-//     }
+        self.m = self.m_a / (self.m_a + self.m_b);
+        self.h = self.h_a / (self.h_a + self.h_b);
+    } 
 
-//     fn get_ca_and_update_current() {
+    fn update_m_and_h_states(&mut self, voltage: f64) {
+        self.update_m(voltage);
+        self.update_h(voltage);
 
-//     }
-// }
+        self.m += self.m_a * (1. - self.m) - (self.m_b * self.m);
+        self.h += self.h_a * (1. - self.h) - (self.h_b * self.h);
+    }
+
+    fn get_ca_and_update_current(&mut self, voltage: f64) -> f64 {
+        self.update_m_and_h_states(voltage);
+
+        self.current = self.gca_bar * self.m.powf(2.) * self.h * (voltage - self.ca_rev);
+
+        self.current
+    }
+}
 
 // can look at this
 // https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
-    // HVACa(HightVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
+    HVACa(HightVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
     // OscillatingCa(OscillatingCalciumChannel),
     // PotassiumRectifying(KRectifierChannel),
 }
 
 impl AdditionalGates {
+    pub fn initialize(&mut self, voltage: f64) {
+        match self {
+            AdditionalGates::LTypeCa(_) => {},
+            AdditionalGates::HVACa(channel) => channel.initialize_m_and_h(voltage),
+        }
+    }
+
     pub fn get_and_update_current(&mut self, voltage: f64, dt: f64) -> f64 {
         match self {
             AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(voltage, dt),
+            AdditionalGates::HVACa(channel) => channel.get_ca_and_update_current(voltage),
         }
     }
 
     pub fn get_current(&self) -> f64 {
         match &self {
-            AdditionalGates::LTypeCa(channel) => channel.current
+            AdditionalGates::LTypeCa(channel) => channel.current,
+            AdditionalGates::HVACa(channel) => channel.current,
         }
     }
 
     pub fn to_str(&self) -> &str {
         match &self {
             AdditionalGates::LTypeCa(_) => "LTypeCa",
+            AdditionalGates::HVACa(_) => "HVA LTypeCa",
         }
     }
 }
@@ -1160,6 +1202,9 @@ impl HodgkinHuxleyCell {
         self.m.init_state();
         self.n.init_state();
         self.h.init_state();
+
+        self.additional_gates.iter_mut()
+            .for_each(|i| i.initialize(starting_voltage));
     }
 
     pub fn update_cell_voltage(&mut self, input_current: f64) {
