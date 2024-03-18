@@ -1,8 +1,8 @@
 [hodgkin_huxley]
-ltype_calcium = true
+hva_ltype_calcium = true
 dt = 0.01
 input_current = 50.0
 iterations = 10000
-filename = "output/calcium_test.csv"
+filename = "output/hva_ltype_calcium_test.csv"
 bayesian = false
 full = true
