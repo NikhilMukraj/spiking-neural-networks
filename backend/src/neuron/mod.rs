@@ -1034,7 +1034,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
     }
 }
 
-// // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
+// https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
 impl HightVoltageActivatedCalciumChannel {
     fn update_m(&mut self, voltage: f64) {
         self.m_a = 0.055 * (-27. - voltage) / (((-27. - voltage) / 3.8).exp() - 1.);
@@ -1112,6 +1112,7 @@ impl AdditionalGates {
 
 // multicomparment stuff, refer to dopamine modeling paper as well
 // https://github.com/antgon/msn-model/blob/main/msn/cell.py 
+// https://github.com/jrieke/NeuroSim
 // pub struct Soma {
 
 // }
