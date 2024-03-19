@@ -1016,7 +1016,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
         let celsius: f64 = 36.; // degrees c
         let ca_in: f64 = 0.00024; // mM
         let ca_out: f64 = 2.; // mM
-        let ca_rev: f64 = 1e3 * (r * (celsius + 273.15))/(2. * faraday) * (ca_in / ca_out).ln(); // nernst equation
+        let ca_rev: f64 = 1e3 * (r * (celsius + 273.15)) / (2. * faraday) * (ca_out / ca_in).ln(); // nernst equation
 
         HightVoltageActivatedCalciumChannel {
             m: 0.,
@@ -1113,6 +1113,8 @@ impl AdditionalGates {
 // multicomparment stuff, refer to dopamine modeling paper as well
 // https://github.com/antgon/msn-model/blob/main/msn/cell.py 
 // https://github.com/jrieke/NeuroSim
+// MULTICOMPARTMENT EXPLAINED
+// https://neuronaldynamics.epfl.ch/online/Ch3.S2.html
 // pub struct Soma {
 
 // }
