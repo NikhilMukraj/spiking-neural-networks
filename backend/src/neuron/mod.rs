@@ -1066,6 +1066,9 @@ impl HightVoltageActivatedCalciumChannel {
         self.update_m_and_h_states(voltage);
 
         self.current = self.gca_bar * self.m.powf(2.) * self.h * (voltage - self.ca_rev);
+        // if this isnt working gas constant might be wrong
+        // try to determine where it is reaching inf
+        // println!("m: {}, h: {}", self.m, self.h);
 
         self.current
     }
