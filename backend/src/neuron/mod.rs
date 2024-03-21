@@ -1016,7 +1016,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
         let celsius: f64 = 36.; // degrees c
         let ca_in: f64 = 0.00024; // mM
         let ca_out: f64 = 2.; // mM
-        let ca_rev: f64 = 1e3 * (r * (celsius + 273.15)) / (2. * faraday) * (ca_out / ca_in).ln(); // nernst equation
+        let ca_rev: f64 = 1e3 * ((r * (celsius + 273.15)) / (2. * faraday)) * (ca_out / ca_in).ln(); // nernst equation
 
         HightVoltageActivatedCalciumChannel {
             m: 0.,
@@ -1054,18 +1054,18 @@ impl HightVoltageActivatedCalciumChannel {
         self.h = self.h_a / (self.h_a + self.h_b);
     } 
 
-    fn update_m_and_h_states(&mut self, voltage: f64) {
+    fn update_m_and_h_states(&mut self, voltage: f64, dt: f64) {
         self.update_m(voltage);
         self.update_h(voltage);
 
-        self.m += self.m_a * (1. - self.m) - (self.m_b * self.m);
-        self.h += self.h_a * (1. - self.h) - (self.h_b * self.h);
+        self.m += (self.m_a * (1. - self.m) - (self.m_b * self.m)) * dt;
+        self.h += (self.h_a * (1. - self.h) - (self.h_b * self.h)) * dt;
     }
 
-    fn get_ca_and_update_current(&mut self, voltage: f64) -> f64 {
-        self.update_m_and_h_states(voltage);
-
+    fn get_ca_and_update_current(&mut self, voltage: f64, dt: f64) -> f64 {
+        self.update_m_and_h_states(voltage, dt);
         self.current = self.gca_bar * self.m.powf(2.) * self.h * (voltage - self.ca_rev);
+
         // if this isnt working gas constant might be wrong
         // try to determine where it is reaching inf
         // println!("m: {}, h: {}", self.m, self.h);
@@ -1094,7 +1094,7 @@ impl AdditionalGates {
     pub fn get_and_update_current(&mut self, voltage: f64, dt: f64) -> f64 {
         match self {
             AdditionalGates::LTypeCa(channel) => channel.get_ca_current_and_update(voltage, dt),
-            AdditionalGates::HVACa(channel) => channel.get_ca_and_update_current(voltage),
+            AdditionalGates::HVACa(channel) => channel.get_ca_and_update_current(voltage, dt),
         }
     }
 
