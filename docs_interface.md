@@ -292,6 +292,7 @@ create_cell_grid(
 - Iterate with neurotransmitter concentration consideration with IF Cell
 - Static input with neurotransmitter concentration consideration with IF Cell
 - Hodgkin Huxley interface
+  - Hodgkin Huxley additional gates (ligand and others)
 - Hodgkin Huxley coupled test
 - Lattice interface
 - Testing for all class methods, with test file
