@@ -1034,6 +1034,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
     }
 }
 
+// https://github.com/ModelDBRepository/121060/blob/master/chan_CaL12.mod
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
 impl HightVoltageActivatedCalciumChannel {
     fn update_m(&mut self, voltage: f64) {
