@@ -10,6 +10,8 @@ pip install -U pip maturin
 
 ## IF Cell Model
 
+`IFCell`
+
 ### IF Mode
 
 - `Basic`: An unmodified leaky integrate and fire
@@ -234,6 +236,8 @@ create_cell_grid(
     - `{0 : [1], 1: [2, 3], 2: [0, 3], 3: [0]...}` -->
 
 ## Hodgkin Huxley Model
+
+`HodgkinHuxleyModel`
 
 ### Hodgkin Huxley Parameters
 
