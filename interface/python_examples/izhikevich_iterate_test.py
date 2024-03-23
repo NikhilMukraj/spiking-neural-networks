@@ -1,6 +1,6 @@
 import lixirnet as ln
 import matplotlib.pyplot as plt
-import seabron as sns
+import seaborn as sns
 
 
 izhikevich_neuron = ln.IFCell('izhikevich')
@@ -13,7 +13,7 @@ for i in range(1000):
 
 spike_times = [(i, history['voltage'][n]) for n, i in enumerate(history['spike'])]
 
-sns.set_them(style='darkgrid')
+sns.set_theme(style='darkgrid')
 
 plt.plot(history['voltage'])
 plt.scatter(*zip(*spike_times))
