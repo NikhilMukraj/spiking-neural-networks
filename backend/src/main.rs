@@ -18,7 +18,7 @@ use crate::neuron::{
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
-    HightVoltageActivatedCalciumChannel
+    HighVoltageActivatedCalciumChannel
 };
 mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -2051,7 +2051,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         additional_gates.push(AdditionalGates::LTypeCa(HighThresholdCalciumChannel::default()));
     }
     if hva_ltype_calcium {
-        additional_gates.push(AdditionalGates::HVACa(HightVoltageActivatedCalciumChannel::default()))
+        additional_gates.push(AdditionalGates::HVACa(HighVoltageActivatedCalciumChannel::default()))
     }
 
     if additional_gates.len() != 0 {
