@@ -995,7 +995,7 @@ impl HighThresholdCalciumChannel {
     }
 }
 
-pub struct HightVoltageActivatedCalciumChannel {
+pub struct HighVoltageActivatedCalciumChannel {
     m: f64,
     m_a: f64,
     m_b: f64,
@@ -1009,7 +1009,7 @@ pub struct HightVoltageActivatedCalciumChannel {
     current: f64,
 }
 
-impl Default for HightVoltageActivatedCalciumChannel {
+impl Default for HighVoltageActivatedCalciumChannel {
     fn default() -> Self {
         let r: f64 = 8.314; // joules * kelvin ^ -1 * mol ^ -1 // universal gas constant
         let faraday: f64 = 96485.; // coulombs per mole // faraday constant
@@ -1018,7 +1018,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
         let ca_out: f64 = 2.; // mM
         let ca_rev: f64 = 1e3 * ((r * (celsius + 273.15)) / (2. * faraday)) * (ca_out / ca_in).ln(); // nernst equation
 
-        HightVoltageActivatedCalciumChannel {
+        HighVoltageActivatedCalciumChannel {
             m: 0.,
             m_a: 0.,
             m_b: 0.,
@@ -1036,7 +1036,7 @@ impl Default for HightVoltageActivatedCalciumChannel {
 
 // https://github.com/ModelDBRepository/121060/blob/master/chan_CaL12.mod
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
-impl HightVoltageActivatedCalciumChannel {
+impl HighVoltageActivatedCalciumChannel {
     fn update_m(&mut self, voltage: f64) {
         self.m_a = 0.055 * (-27. - voltage) / (((-27. - voltage) / 3.8).exp() - 1.);
         self.m_b = 0.94 * ((-75. - voltage) / 17.).exp();
@@ -1079,7 +1079,7 @@ impl HightVoltageActivatedCalciumChannel {
 // https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
-    HVACa(HightVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
+    HVACa(HighVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
     // OscillatingCa(OscillatingCalciumChannel),
     // PotassiumRectifying(KRectifierChannel),
 }
