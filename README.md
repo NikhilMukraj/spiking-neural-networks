@@ -12,6 +12,113 @@ EEG processing with fourier transforms, and power spectral density calculations
 - (explanation of ion channels)
 - (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich)
 
+## Todo
+
+### Backend
+
+- [x] Integrate and fire models
+  - [x] Basic
+  - [x] Adaptive
+  - [x] Adaptive Exponential
+  - [x] Izhikevich
+  - [x] Izhikevich Leaky Hybrid
+- [x] Static input test
+- [ ] STDP test
+  - [x] Single coupled neurons
+  - [x] Multiple coupled neurons
+  - [ ] Single coupled R-STDP
+  - [ ] Multiple coupled R-STDP
+  - [ ] Testing with weights summing to 1
+- [x] Lattice
+  - [x] Graph representation of lattice
+    - [x] Adjacency list
+    - [x] Adjacency matrix
+  - [ ] Generating GIFs from lattice
+    - [x] Naive approach
+    - [ ] Optimized GIF generation
+  - [x] Different potentiation types
+    - [x] Inhibitory
+    - [x] Excitatory
+  - [ ] Recording lattice over time
+    - [ ] Textual
+      - [x] Averaged
+      - [x] Grid
+      - [ ] EEG
+    - [x] Binary
+      - [x] Averaged
+      - [x] Grid
+  - [x] Lattice testing without STDP
+  - [x] Lattice testing with STDP
+  - [ ] Lattice with EEG evaluation
+    - [x] Analysis with Fourier transforms
+      - [x] Calculation of spectral analysis
+      - [x] Calculation of Earth moving distance
+- [ ] Hodgkin Huxley
+  - [x] Basic gating
+  - [ ] Neurotransmission
+    - [x] Systemized method for adding ionotropic neurotransmitters
+    - [x] AMPA
+    - [x] NMDA
+    - [ ] GABA
+      - [x] GABAa
+      - [ ] GABAb
+        - [x] GABAb primary
+        - [ ] GABAb secondary
+  - [ ] Additional gating
+    - [x] Systemized method for adding gates
+    - [ ] L-Type Calcium
+    - [ ] T-Type Calcium
+    - [ ] M-current
+  - [ ] Multicompartmental models
+    - [ ] Systemized method for adding compartments
+- [ ] TOML parsing
+  - [x] Integrate and fire parsing
+    - [x] Static input
+    - [x] STDP testing
+    - [x] Lattice
+  - [ ] Hodgkin Huxley
+    - [x] Static input
+    - [x] STDP testing
+    - [x] Built in neurotransmitters
+    - [ ] New neurotransmitter
+    - [x] Built in additional gates
+    - [ ] New gates
+- [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
+- [ ] Simulating modulation of other neurotransmitters on lattice
+- [ ] Simulation of working memory
+- [ ] Simulation of psychiatric illness
+- [ ] Simulation of virtual medications
+
+### Lixirnet
+
+- [x] Integrate and fire models
+  - [x] Basic
+  - [x] Adaptive
+  - [x] Adaptive Exponential
+  - [x] Izhikevich
+  - [x] Izhikevich Leaky Hybrid
+- [x] Static input test
+- [ ] STDP test
+  - [x] Regular STDP
+  - [ ] R-STDP
+- [ ] Lattice
+  - [ ] Graphs input
+    - [ ] Adjacency list
+    - [ ] Adjacency matrix
+- [ ] Hodgkin Huxley
+  - [x] Basic gating
+  - [ ] Neurotransmission
+  - [ ] Additional gating
+
+### CUDA
+
+- [ ] Parallel integrate and fire
+  - [ ] Parallel voltage update
+  - [ ] Parallel adaptive update
+  - [ ] Parallel input calculation
+- [ ] Parallel Hodgkin Huxley
+- [ ] Interfacing from Python
+
 ## Docs
 
 (see other `.md` fils)
