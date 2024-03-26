@@ -12,6 +12,13 @@ EEG processing with fourier transforms, and power spectral density calculations
 - (explanation of ion channels)
 - (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich)
 
+## Notes
+
+- To fit Izhikevich neuron to Hodgkin Huxley model, can either:
+  - Fit voltage changes in Izhikevich to voltage changes in Hodgkin Huxley
+  - Fit Izhikevich curve to Hodgkin Huxley
+    - Can either use a Fourier transform to compare or use mean squared error at each iteration
+
 ## Todo
 
 ### Backend
@@ -83,7 +90,9 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] New neurotransmitter
     - [x] Built in additional gates
     - [ ] New gates
-- [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
+- [ ] Izhikevich neurotransmission
+  - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
+  - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory
 - [ ] Simulation of psychiatric illness
