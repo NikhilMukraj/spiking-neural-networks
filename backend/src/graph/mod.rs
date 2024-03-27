@@ -204,6 +204,8 @@ pub struct AdjacencyList {
     pub history: Vec<HashMap<Position, HashMap<Position, Option<f64>>>>,
 }
 
+type KeyWeightPair = HashMap<String, Option<f64>>;
+
 impl GraphFunctionality for AdjacencyList {
     fn initialize_connections(
         &mut self, 
@@ -288,15 +290,15 @@ impl GraphFunctionality for AdjacencyList {
     }
 
     fn write_history(&self, tag: &str) {
-        let mut history_json: HashMap<String, HashMap<String, HashMap<String, Option<f64>>>> = HashMap::new();
+        let mut history_json: HashMap<String, HashMap<String, KeyWeightPair>> = HashMap::new();
 
         for (key, value) in self.history.iter().enumerate() {
             // let wrapped_key = PositionWrapper(key);
-            let mut inner_map: HashMap<String, HashMap<String, Option<f64>>> = HashMap::new();
+            let mut inner_map: HashMap<String, KeyWeightPair> = HashMap::new();
 
             for (inner_key, inner_value) in value {
                 let wrapped_inner_key = format!("{}_{}", inner_key.0, inner_key.1);
-                let mut innermost_map: HashMap<String, Option<f64>> = HashMap::new();
+                let mut innermost_map: KeyWeightPair = HashMap::new();
 
                 for (innermost_key, innermost_value) in inner_value {
                     let wrapped_innermost_key = format!("{}_{}", innermost_key.0, innermost_key.1);
