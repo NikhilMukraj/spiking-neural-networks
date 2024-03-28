@@ -97,6 +97,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] Simulation of working memory
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
+- [ ] R-STDP based classifier
+  - [ ] Simple encoding of input
+  - [ ] Modifying the bursting parameters to encode more information in input
+    - [ ] Potentially having weights directly calculated/modified from bursting parameters
 
 ### Lixirnet
 
