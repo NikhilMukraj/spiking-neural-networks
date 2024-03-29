@@ -76,7 +76,7 @@ pip install -U pip maturin
 - `c: float`: After spike reset value for voltage in `Izhikevich` mode
 - `d: float`: After spike reset value for `w` in `Izhikevich` mode
 
-### Basic
+<!-- ### Basic
 
 - `get_dv_change_and_spike(i: float) -> (float, bool)`: Returns the change in voltage and whether the neuron spikes when in `Basic` mode
   - `i: float`: Input voltage
@@ -103,7 +103,7 @@ pip install -U pip maturin
 
 - `izhikevich_leaky_get_dv_change(i: float) -> float`: Returns the change in voltage in `Izhikevich Leaky` mode
   - `i: float`: Input voltage
-- `izhikevich_apply_dw_and_get_spike() -> bool`: Returns whether the neuron spikes when in `Izhikevich Leaky` mode
+- `izhikevich_apply_dw_and_get_spike() -> bool`: Returns whether the neuron spikes when in `Izhikevich Leaky` mode -->
 
 ## IF Cell Related Methods
 
