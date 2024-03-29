@@ -61,38 +61,29 @@ impl IFCell {
         )
     }
 
-    #[pyo3(signature = (i))]
-    pub fn get_dv_change_and_spike(&mut self, i: f64) -> (f64, bool) {
+    fn get_dv_change_and_spike(&mut self, i: f64) -> (f64, bool) {
         self.cell_backend.get_dv_change_and_spike(&self.if_params, i)
     }
-
-    #[pyo3(signature = ())]
-    pub fn apply_dw_change_and_get_spike(&mut self) -> bool {
+    fn apply_dw_change_and_get_spike(&mut self) -> bool {
         self.cell_backend.apply_dw_change_and_get_spike(&self.if_params)
     }
 
-    #[pyo3(signature = (i))]
-    pub fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
+    fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         self.cell_backend.adaptive_get_dv_change(&self.if_params, i)
     }
 
-    #[pyo3(signature = (i))]
-    pub fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
+    fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         self.cell_backend.exp_adaptive_get_dv_change(&self.if_params, i)
     }
-
-    #[pyo3(signature = ())]
-    pub fn izhikevich_apply_dw_and_get_spike(&mut self) -> bool {
+    fn izhikevich_apply_dw_and_get_spike(&mut self) -> bool {
         self.cell_backend.izhikevich_apply_dw_and_get_spike(&self.if_params)
     }
 
-    #[pyo3(signature = (i))]
-    pub fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
+    fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
         self.cell_backend.izhikevich_get_dv_change(&self.if_params, i)
     }
 
-    #[pyo3(signature = (i))]
-    pub fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
+    fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
         self.cell_backend.izhikevich_leaky_get_dv_change(&self.if_params, i)
     }
 
