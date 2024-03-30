@@ -18,6 +18,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Fit voltage changes in Izhikevich to voltage changes in Hodgkin Huxley
   - Fit Izhikevich curve to Hodgkin Huxley
     - Can either use a Fourier transform to compare or use mean squared error at each iteration
+    - Or, compare the difference between spike times and the amplitude of the spike times
+      - Perform this for multiple static inputs, 0 to 100
+      - Or perform this with coupled neurons (might need to account for weights)
 
 ## Todo
 
