@@ -18,9 +18,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Fit voltage changes in Izhikevich to voltage changes in Hodgkin Huxley
   - Fit Izhikevich curve to Hodgkin Huxley
     - Can either use a Fourier transform to compare or use mean squared error at each iteration
-    - Or, compare the difference between spike times and the amplitude of the spike times
+    - Or, compare the difference between spike times and the amplitude of the spikes (spike time difference being post minus pre, could compare individual spike differences or average spike difference)
       - Perform this for multiple static inputs, 0 to 100
       - Or perform this with coupled neurons (might need to account for weights)
+      - Or both at the same time
 
 ## Todo
 
@@ -95,6 +96,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] New gates
 - [ ] Izhikevich neurotransmission
   - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
+    - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory
