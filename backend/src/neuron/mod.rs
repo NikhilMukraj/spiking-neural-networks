@@ -1192,6 +1192,33 @@ impl Default for HodgkinHuxleyCell {
     }
 }
 
+// find peaks of hodgkin huxley
+// result starts at index 1 of input list
+fn diff(x: &Vec<f64>) -> Vec<f64> {
+    (1..x.len()).map(|i| x[i] - x[i-1])
+        .collect()
+}
+
+fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
+    let first_diff: Vec<f64> = diff(&voltages);
+    let second_diff: Vec<f64> = diff(&first_diff);
+
+    let local_optima = first_diff.iter()
+        .filter(|i| **i <= tolerance)
+        .map(|i| *i)
+        .collect::<Vec<f64>>();
+
+    let local_maxima = local_optima.iter()
+        .map(|i| *i)
+        .enumerate()
+        .filter(|(n, _)| *n < first_diff.len() - 1 && second_diff[n+1] < 0.)
+        .collect::<Vec<(usize, f64)>>();
+
+    local_maxima.iter()
+        .map(|(n, _)| (n + 2))
+        .collect()
+}
+
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 impl HodgkinHuxleyCell {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
@@ -1338,73 +1365,47 @@ impl HodgkinHuxleyCell {
         }
     }
 
-    // pub fn peaks_test(
-    //     &mut self, 
-    //     input: f64, 
-    //     bayesian: bool, 
-    //     iterations: usize, 
-    //     filename: &str, 
-    // ) {
-    //     let mut file = BufWriter::new(File::create(filename)
-    //         .expect("Unable to create file"));
+    pub fn peaks_test(
+        &mut self, 
+        input: f64, 
+        bayesian: bool, 
+        iterations: usize, 
+        tolerance: f64,
+        filename: &str, 
+    ) {
+        let mut file = BufWriter::new(File::create(filename)
+            .expect("Unable to create file"));
         
-    //     let mut voltages: Vec<f64> = vec![self.current_voltage];
+        let mut voltages: Vec<f64> = vec![self.current_voltage];
 
-    //     for _ in 0..iterations {
-    //         if bayesian {
-    //             self.iterate(
-    //                 input * limited_distr(
-    //                     self.bayesian_params.mean, 
-    //                     self.bayesian_params.std, 
-    //                     self.bayesian_params.min, 
-    //                     self.bayesian_params.max,
-    //                 )
-    //             );
-    //         } else {
-    //             self.iterate(input);
-    //         }
+        for _ in 0..iterations {
+            if bayesian {
+                self.iterate(
+                    input * limited_distr(
+                        self.bayesian_params.mean, 
+                        self.bayesian_params.std, 
+                        self.bayesian_params.min, 
+                        self.bayesian_params.max,
+                    )
+                );
+            } else {
+                self.iterate(input);
+            }
 
-    //         voltages.push(self.current_voltage);
-    //     }
+            voltages.push(self.current_voltage);
+        }
 
-    //     let peaks = find_peaks(voltages);
+        let peaks = find_peaks(&voltages, tolerance);
 
-    //     writeln!(file, "voltages,peak").expect("Could not write to file");
-    //     for (n, i) in voltages.iter().enumerate() {
-    //         let is_peak: &str = if peaks[n+2][1] {
-    //             "true"
-    //         } else {
-    //             "false"
-    //         };
+        writeln!(file, "voltages,peak").expect("Could not write to file");
+        for (n, i) in voltages.iter().enumerate() {
+            let is_peak: &str = if peaks.contains(&(n+2)) {
+                "true"
+            } else {
+                "false"
+            };
 
-    //         writeln!(file, "{}, {}", i, is_peak);
-    //     }
-    // }
+            writeln!(file, "{}, {}", i, is_peak).expect("Could not write to file");
+        }
+    }
 }
-
-// find peaks of hodgkin huxley
-// result starts at index 1 of input list
-// fn diff(x: &Vec<f64>) -> Vec<f64> {
-//     (1..x.len()).map(|i| x[i] - x[i-1])
-//         .collect()
-// }
-
-// fn find_peaks(voltages: Vec<f64>, tolerance: f64) -> Vec<(usize, f64)> {
-//     let first_diff: Vec<f64> = diff(&voltages);
-//     let second_diff: Vec<f64> = diff(&first_diff);
-
-//     let local_optima = first_diff.iter()
-//         .filter(|i| **i <= tolerance)
-//         .map(|i| *i)
-//         .collect::<Vec<f64>>();
-
-//     let local_maxima = local_optima.iter()
-//         .map(|i| *i)
-//         .enumerate()
-//         .filter(|(n, _)| *n < first_diff.len() - 1 && second_diff[n+1] < 0.)
-//         .collect::<Vec<(usize, f64)>>();
-
-//     local_maxima.iter()
-//         .map(|(n, i)| (n + 2, *i))
-//         .collect()
-// }
