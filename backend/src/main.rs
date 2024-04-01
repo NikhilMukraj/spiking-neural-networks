@@ -2755,6 +2755,52 @@ fn main() -> Result<()> {
         hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename, full);
 
         println!("\nFinished Hodgkin Huxley test");
+    } else if let Some(hodgkin_huxley_peaks) = config.get("hodgkin_huxley_peaks") {
+        let iterations: usize = match hodgkin_huxley_peaks.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+    
+        let filename: String = match hodgkin_huxley_peaks.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+    
+        let input_current: f64 = match hodgkin_huxley_peaks.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+        };
+        println!("input_current: {}", input_current);
+
+        let tolerance: f64 = match hodgkin_huxley_peaks.get("tolerance") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'tolerance' value not found")); },
+        };
+        println!("tolerance: {}", tolerance);
+
+        let full: bool = parse_value_with_default(
+            &hodgkin_huxley_peaks, 
+            "full", 
+            parse_bool, 
+            false
+        )?;
+        println!("full: {}", full);
+
+        let mut hodgkin_huxley = get_hodgkin_huxley_params(hodgkin_huxley_peaks, None)?;
+
+        let mean_change = &hodgkin_huxley.bayesian_params.mean != &BayesianParameters::default().mean;
+        let std_change = &hodgkin_huxley.bayesian_params.std != &BayesianParameters::default().std;
+        let bayesian = if mean_change || std_change {
+            true
+        } else {
+            false
+        };
+
+        hodgkin_huxley.peaks_test(input_current, bayesian, iterations, tolerance, &filename);
+
+        println!("\nFinished Hodgkin Huxley test");
     } else if let Some(coupled_hodgkin_huxley_table) = config.get("coupled_hodgkin_huxley") {
         let iterations: usize = match coupled_hodgkin_huxley_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
