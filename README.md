@@ -99,7 +99,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
 - [ ] Simulating modulation of other neurotransmitters on lattice
-- [ ] Simulation of working memory
+- [ ] Simulation of working memory (refer to guanfacine working memory model)
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
 - [ ] R-STDP based classifier
