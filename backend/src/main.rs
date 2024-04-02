@@ -2800,7 +2800,7 @@ fn main() -> Result<()> {
 
         hodgkin_huxley.peaks_test(input_current, bayesian, iterations, tolerance, &filename);
 
-        println!("\nFinished Hodgkin Huxley test");
+        println!("\nFinished Hodgkin Huxley peaks test");
     } else if let Some(coupled_hodgkin_huxley_table) = config.get("coupled_hodgkin_huxley") {
         let iterations: usize = match coupled_hodgkin_huxley_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
