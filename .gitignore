@@ -3,6 +3,7 @@
 /backend/output/*.txt
 /backend/output/*.bin
 /backend/output/*.csv
+/backend/output/*.ipynb
 /backend/single neuron tests
 /backend/stdp tests
 /backend/coupled tests
