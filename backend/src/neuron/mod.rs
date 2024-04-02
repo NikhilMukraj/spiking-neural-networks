@@ -1204,19 +1204,38 @@ fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
     let second_diff: Vec<f64> = diff(&first_diff);
 
     let local_optima = first_diff.iter()
-        .filter(|i| **i <= tolerance)
-        .map(|i| *i)
-        .collect::<Vec<f64>>();
+        .enumerate()
+        .filter(|(_, i)| i.abs() <= tolerance)
+        .map(|(n, i)| (n, *i))
+        .collect::<Vec<(usize, f64)>>();
 
     let local_maxima = local_optima.iter()
-        .map(|i| *i)
-        .enumerate()
+        .map(|(n, i)| (*n, *i))
         .filter(|(n, _)| *n < first_diff.len() - 1 && second_diff[n+1] < 0.)
         .collect::<Vec<(usize, f64)>>();
 
-    local_maxima.iter()
+    let local_maxima: Vec<usize> = local_maxima.iter()
         .map(|(n, _)| (n + 2))
-        .collect()
+        .collect();
+
+    let mut peak_spans: Vec<Vec<usize>> = Vec::new();
+
+    let mut index: usize = 0;
+    for (n, i) in local_maxima.iter().enumerate() {
+        if n > 0 && local_maxima[n] - local_maxima[n-1] != 1 {
+            index += 1;
+        }
+
+        if peak_spans.len() - 1 != index {
+            peak_spans.push(Vec::new());
+        }
+
+        peak_spans[index].push(*i);
+    }
+
+    peak_spans.iter()
+        .map(|i| i[i.len() / 2])
+        .collect::<Vec<usize>>()
 }
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
@@ -1399,13 +1418,13 @@ impl HodgkinHuxleyCell {
 
         writeln!(file, "voltages,peak").expect("Could not write to file");
         for (n, i) in voltages.iter().enumerate() {
-            let is_peak: &str = if peaks.contains(&(n+2)) {
+            let is_peak: &str = if peaks.contains(&n) {
                 "true"
             } else {
                 "false"
             };
 
-            writeln!(file, "{}, {}", i, is_peak).expect("Could not write to file");
+            writeln!(file, "{},{}", i, is_peak).expect("Could not write to file");
         }
     }
 }
