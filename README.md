@@ -96,6 +96,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] New gates
 - [ ] Izhikevich neurotransmission
   - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
+    - [ ] Objective function
+      - [x] Finding spikes
+      - [ ] Comparing spikes
+      - [ ] Comparing static and coupled inputs
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
 - [ ] Simulating modulation of other neurotransmitters on lattice
