@@ -89,11 +89,11 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [x] Lattice
   - [ ] Hodgkin Huxley
     - [x] Static input
-    - [x] STDP testing
+    - [ ] STDP testing
     - [x] Built in neurotransmitters
-    - [ ] New neurotransmitter
+    - [ ] New neurotransmitter from TOML
     - [x] Built in additional gates
-    - [ ] New gates
+    - [ ] New gates from TOML
 - [ ] Izhikevich neurotransmission
   - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
     - [ ] Objective function
