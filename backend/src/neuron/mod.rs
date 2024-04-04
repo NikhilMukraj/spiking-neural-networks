@@ -1194,12 +1194,12 @@ impl Default for HodgkinHuxleyCell {
 
 // find peaks of hodgkin huxley
 // result starts at index 1 of input list
-fn diff(x: &Vec<f64>) -> Vec<f64> {
+pub fn diff(x: &Vec<f64>) -> Vec<f64> {
     (1..x.len()).map(|i| x[i] - x[i-1])
         .collect()
 }
 
-fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
+pub fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
     let first_diff: Vec<f64> = diff(&voltages);
     let second_diff: Vec<f64> = diff(&first_diff);
 
