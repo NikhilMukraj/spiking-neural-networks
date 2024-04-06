@@ -19,9 +19,13 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Fit Izhikevich curve to Hodgkin Huxley
     - Can either use a Fourier transform to compare or use mean squared error at each iteration
     - Or, compare the difference between spike times and the amplitude of the spikes (spike time difference being post minus pre, could compare individual spike differences or average spike difference)
+      - Write trait for iterate function so coupled neuron firing code can be shared between Hodgkin Huxley and Izhikevich neurons
+      - Cell might need a rename to IntegrateAndFireModel
       - Perform this for multiple static inputs, 0 to 100
       - Or perform this with coupled neurons (might need to account for weights)
       - Or both at the same time
+
+- **Need to rename all `input_voltage` to `input_current`**
 
 ## Todo
 
@@ -102,8 +106,13 @@ EEG processing with fourier transforms, and power spectral density calculations
       - [ ] Comparing static and coupled inputs
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
+  - [ ] Remove existing neurotranmission system and replace it with new one
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory (refer to guanfacine working memory model)
+  - [ ] Discrete state neuron (for testing)
+  - [ ] Discrete learning rules
+  - [ ] Hopfield network
+  - [ ] Liquid state machine
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
 - [ ] R-STDP based classifier
