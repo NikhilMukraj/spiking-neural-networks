@@ -42,7 +42,12 @@
 //     }
 // }
 
-// fn get_hodgkin_huxley_voltages(hodgkin_huxley_mode: &HodgkinHuxleyCell, bayesian: bool, tolerance: f64) -> ActionPotentialSummary {
+// fn get_hodgkin_huxley_voltages(
+    // hodgkin_huxley_mode: &HodgkinHuxleyCell, 
+    // input_current: f64, 
+    // bayesian: bool, 
+    // tolerance: f64
+// ) -> ActionPotentialSummary {
     // let mut presynaptic_neuron = settings.hodgkin_huxley_model.clone();
     // let mut postsynaptic_neuron = settings.hodgkin_huxley_model.clone();
 
@@ -61,7 +66,7 @@
     //         postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
 
     //         presynaptic_neuron.iterate(
-    //             input_voltage * limited_distr(
+    //             input_current * limited_distr(
     //                 presynaptic_neuron.bayesian_params.mean, 
     //                 presynaptic_neuron.bayesian_params.std, 
     //                 presynaptic_neuron.bayesian_params.min, 
@@ -78,7 +83,7 @@
     //         );
     //     } else {
     //         postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-    //         presynaptic_neuron.iterate(input_voltage);
+    //         presynaptic_neuron.iterate(input_current);
 
     //         let current = voltage_change_to_current(
     //             presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
