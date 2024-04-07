@@ -1428,3 +1428,21 @@ impl HodgkinHuxleyCell {
         }
     }
 }
+
+pub fn hodgkin_huxley_bayesian(hodgkin_huxley_model: &HodgkinHuxleyCell) -> f64 {
+    limited_distr(
+        hodgkin_huxley_model.bayesian_params.mean, 
+        hodgkin_huxley_model.bayesian_params.std, 
+        hodgkin_huxley_model.bayesian_params.min, 
+        hodgkin_huxley_model.bayesian_params.max,
+    )
+}
+
+pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
+    limited_distr(
+        if_params.bayesian_params.mean, 
+        if_params.bayesian_params.std, 
+        if_params.bayesian_params.min, 
+        if_params.bayesian_params.max,
+    )
+}
