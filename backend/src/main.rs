@@ -15,7 +15,8 @@ use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
-    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters,
+    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
+    hodgkin_huxley_bayesian, if_params_bayesian,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel
@@ -95,12 +96,7 @@ fn get_sign(cell: &Cell) -> f64 {
 fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) -> f64 {
     match if_params {
         Some(params) => { 
-            input_val * limited_distr(
-                params.bayesian_params.mean, 
-                params.bayesian_params.std, 
-                params.bayesian_params.min, 
-                params.bayesian_params.max,
-            ) 
+            input_val * if_params_bayesian(params)
         },
         None => input_val,
     }
@@ -2127,22 +2123,12 @@ fn coupled_hodgkin_huxley<'a>(
         
     for _ in 0..iterations {
         if bayesian {
-            let bayesian_factor = limited_distr(
-                postsynaptic_neuron.bayesian_params.mean, 
-                postsynaptic_neuron.bayesian_params.std, 
-                postsynaptic_neuron.bayesian_params.min, 
-                postsynaptic_neuron.bayesian_params.max,
-            );
+            let bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
 
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
 
             presynaptic_neuron.iterate(
-                input_voltage * limited_distr(
-                    presynaptic_neuron.bayesian_params.mean, 
-                    presynaptic_neuron.bayesian_params.std, 
-                    presynaptic_neuron.bayesian_params.min, 
-                    presynaptic_neuron.bayesian_params.max,
-                )
+                input_voltage * hodgkin_huxley_bayesian(&presynaptic_neuron)
             );
 
             let current = voltage_change_to_current(
