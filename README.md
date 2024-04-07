@@ -27,6 +27,12 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Need to rename all `input_voltage` to `input_current`**
 
+- Hopfield network
+  - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
+  - [Hopfield network tutorial](https://github.com/ImagineOrange/Hopfield-Network/blob/main/hopfield_MNIST.py)
+  - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
+- When done with Hopfield, move to liquid state machines
+
 ## Todo
 
 ### Backend
