@@ -1,6 +1,9 @@
 // #[path = "../neuron/mod.rs"]
 // mod neuron;
-// use crate::neuron::{Cell, HodgkinHuxleyCell, find_peaks, diff};
+// use crate::neuron::{
+//     Cell, HodgkinHuxleyCell, find_peaks, diff, 
+//     hodgkin_huxley_bayesian, if_params_bayesian 
+// };
 // #[path = "../ga/mod.rs"]
 // use crate::ga::{BitString, decode, genetic_algo};
 
@@ -56,22 +59,12 @@
 
     // for _ in 0..settings.iterations {
     //     if bayesian {
-    //         let bayesian_factor = limited_distr(
-    //             postsynaptic_neuron.bayesian_params.mean, 
-    //             postsynaptic_neuron.bayesian_params.std, 
-    //             postsynaptic_neuron.bayesian_params.min, 
-    //             postsynaptic_neuron.bayesian_params.max,
-    //         );
+    //         let bayesian_factor = hodgkin_huxley_bayesian(&post_synaptic_neuron);
 
     //         postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
 
     //         presynaptic_neuron.iterate(
-    //             input_current * limited_distr(
-    //                 presynaptic_neuron.bayesian_params.mean, 
-    //                 presynaptic_neuron.bayesian_params.std, 
-    //                 presynaptic_neuron.bayesian_params.min, 
-    //                 presynaptic_neuron.bayesian_params.max,
-    //             )
+    //             input_current * hodgkin_huxley(&presynaptic_neuron)
     //         );
 
     //         let current = voltage_change_to_current(
@@ -160,22 +153,10 @@
 
     // for _ in 0..settings.iterations {
     //     if bayesian {
-    //         let bayesian_factor = limited_distr(
-    //             postsynaptic_neuron.bayesian_params.mean, 
-    //             postsynaptic_neuron.bayesian_params.std, 
-    //             postsynaptic_neuron.bayesian_params.min, 
-    //             postsynaptic_neuron.bayesian_params.max,
-    //         );
-
-    //         postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
+    //         let bayesian_factor = if_params_bayesian(&if_params);
 
     //         presynaptic_neuron.iterate(
-    //             input_voltage * limited_distr(
-    //                 presynaptic_neuron.bayesian_params.mean, 
-    //                 presynaptic_neuron.bayesian_params.std, 
-    //                 presynaptic_neuron.bayesian_params.min, 
-    //                 presynaptic_neuron.bayesian_params.max,
-    //             )
+    //             input_voltage * if_params_bayesian(&if_params)
     //         );
 
     //         let current = voltage_change_to_current(
@@ -186,7 +167,6 @@
     //             current * bayesian_factor
     //         );
     //     } else {
-    //         postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
     //         presynaptic_neuron.iterate(input_voltage);
 
     //         let current = voltage_change_to_current(
