@@ -24,6 +24,11 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Perform this for multiple static inputs, 0 to 100
       - Or perform this with coupled neurons (might need to account for weights)
       - Or both at the same time
+- Can also implement version that either adds neurotransmitter current or adds the current to stimulus
+
+- Eventually remove old neurotransmitter system and replace it with new one
+- Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
+- Eventually remove input equation system
 
 - **Need to rename all `input_voltage` to `input_current`**
 
