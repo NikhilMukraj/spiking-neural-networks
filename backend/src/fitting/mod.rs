@@ -45,6 +45,16 @@
 //     }
 // }
 
+// fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f64 {
+//     let mut pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
+//     let mut post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
+
+//     let mut pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
+//     let mut post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
+
+//     pre_spike_amplitude + post_spike_amplitude + pre_spike_difference + post_spike_difference
+// }
+
 // fn get_hodgkin_huxley_voltages(
     // hodgkin_huxley_mode: &HodgkinHuxleyCell, 
     // input_current: f64, 
@@ -181,4 +191,6 @@
     // }
 
     // let summary = get_summary(&pre_voltages, &post_voltages, &pre_peaks, &post_peaks, tolerance);
+
+    // compare_summary(&summary, settings.action_potential_summary)
 // }
