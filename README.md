@@ -95,6 +95,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] L-Type Calcium
     - [ ] T-Type Calcium
     - [ ] M-current
+  - [ ] More complex neurotransmission equations (with delay time constants and such)
   - [ ] Multicompartmental models
     - [ ] Systemized method for adding compartments
 - [ ] TOML parsing
