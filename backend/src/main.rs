@@ -16,7 +16,8 @@ mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
-    hodgkin_huxley_bayesian, if_params_bayesian,
+    hodgkin_huxley_bayesian, if_params_bayesian, 
+    voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel
@@ -25,6 +26,11 @@ mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
 use crate::ga::{BitString, decode, genetic_algo};
+// mod fitting;
+// use crate::fitting::{
+//     ActionPotentialSummary, FittingSettings, 
+//     fitting_objective, get_hodgkin_huxley_voltages
+// };
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
 
@@ -2082,17 +2088,6 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )
 }
 
-
-// current / capacitance * time = change in voltage
-// change in voltage / time * capacitance = current
-fn voltage_change_to_current(dv: f64, presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
-    (dv / presynaptic_neuron.dt) * presynaptic_neuron.cm
-}
-
-fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -> f64 {
-    (dv / dt) * cm
-}
-
 fn coupled_hodgkin_huxley<'a>(
     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
@@ -2836,6 +2831,43 @@ fn main() -> Result<()> {
         )?;
 
         println!("\nFinished coupled Hodgkin Huxley test");
+    // } else if let Some(fit_neuron_models_table) = config.get("fit_neuron_models") {
+    //     let iterations: usize = match fit_neuron_models_table.get("iterations") {
+    //         Some(value) => parse_usize(value, "iterations")?,
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+    //     };
+    //     println!("iterations: {}", iterations);
+
+    //     let input_current: f64 = match fit_neuron_models_table.get("input_current") {
+    //         Some(value) => parse_f64(value, "input_current")?,
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+    //     };
+    //     println!("input_current: {}", input_voltage); 
+
+    //     let tolerance: f64 = match fit_neuron_models_table.get("tolerance") {
+    //         Some(value) => parse_f64(value, "tolerance")?,
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'tolerance' value not found")); },
+    //     };
+    //     println!("tolerance: {}", tolerance); 
+
+    //     let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
+    //     println!("bayesian: {}", bayesian); 
+
+    //     let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, None);
+
+    //     let mut if_params = IzhikevichDefault::izhikevich_default();
+    //     let izhikevich_model = get_if_params(&mut if_params, None, fit_neuron_models_table);
+
+    //     let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(hodgkin_huxley_model, input_current, bayesian, tolerance);
+    
+    //     let fitting_settings = FittingSettings {
+    //         hodgkin_huxley_model: hodgkin_huxley_model,
+    //         if_params: &if_params,
+    //         action_potential_summary: &hodgkin_huxley_summary,
+    //         iterations: iterations,
+    //         tolerance: tolerance,
+    //         bayesian: bayesian,
+    //     };
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
