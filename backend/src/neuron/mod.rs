@@ -1446,3 +1446,13 @@ pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
         if_params.bayesian_params.max,
     )
 }
+
+// current / capacitance * time = change in voltage
+// change in voltage / time * capacitance = current
+pub fn voltage_change_to_current(dv: f64, presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
+    (dv / presynaptic_neuron.dt) * presynaptic_neuron.cm
+}
+
+pub fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -> f64 {
+    (dv / dt) * cm
+}
