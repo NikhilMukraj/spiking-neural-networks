@@ -2070,6 +2070,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
+            last_dv: 0.,
             dt: dt,
             cm: cm,
             e_na: e_na,
@@ -2113,8 +2114,6 @@ fn coupled_hodgkin_huxley<'a>(
     } 
     
     write!(file, "\n").expect("Unable to write to file");
-
-    let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
         
     for _ in 0..iterations {
         if bayesian {
@@ -2127,7 +2126,7 @@ fn coupled_hodgkin_huxley<'a>(
             );
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+                presynaptic_neuron.last_dv, &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(
@@ -2138,13 +2137,11 @@ fn coupled_hodgkin_huxley<'a>(
             presynaptic_neuron.iterate(input_voltage);
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+                presynaptic_neuron.last_dv, &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(current);
         }
-
-        past_presynaptic_voltage = presynaptic_neuron.current_voltage;
 
         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
             writeln!(file, "{}, {}", 
@@ -2382,7 +2379,7 @@ fn main() -> Result<()> {
             .map(|_| vec![bounds_min, bounds_max])
             .collect();
 
-        println!("\nstarting genetic algorithm...");
+        println!("\nStarting genetic algorithm...");
         let (best_bitstring, best_score, _scores) = genetic_algo(
             objective, 
             &bounds, 
@@ -2395,15 +2392,15 @@ fn main() -> Result<()> {
             &settings,
         )?;
 
-        println!("best bitstring: {}", best_bitstring.string);
-        println!("best score: {}", best_score);
+        println!("Best bitstring: {}", best_bitstring.string);
+        println!("Best score: {}", best_score);
 
         let decoded = match decode(&best_bitstring, &bounds, n_bits) {
             Ok(decoded_value) => decoded_value,
             Err(e) => return Err(e),
         };
 
-        println!("decoded values: {:#?}", decoded);
+        println!("Decoded values: {:#?}", decoded);
 
         // option to run a simulation and return the eeg signals
         // option to write custom bounds
@@ -2842,7 +2839,7 @@ fn main() -> Result<()> {
     //         Some(value) => parse_f64(value, "input_current")?,
     //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
     //     };
-    //     println!("input_current: {}", input_voltage); 
+    //     println!("input_current: {}", input_current); 
 
     //     let tolerance: f64 = match fit_neuron_models_table.get("tolerance") {
     //         Some(value) => parse_f64(value, "tolerance")?,
@@ -2853,21 +2850,37 @@ fn main() -> Result<()> {
     //     let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
     //     println!("bayesian: {}", bayesian); 
 
-    //     let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, None);
+    //     let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, None)?;
 
     //     let mut if_params = IzhikevichDefault::izhikevich_default();
     //     let izhikevich_model = get_if_params(&mut if_params, None, fit_neuron_models_table);
 
-    //     let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(hodgkin_huxley_model, input_current, bayesian, tolerance);
+    //     let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+    //         &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance
+    //     );
     
     //     let fitting_settings = FittingSettings {
     //         hodgkin_huxley_model: hodgkin_huxley_model,
     //         if_params: &if_params,
     //         action_potential_summary: &hodgkin_huxley_summary,
+    //         input_current: input_current,
     //         iterations: iterations,
     //         tolerance: tolerance,
     //         bayesian: bayesian,
     //     };
+
+    //     println!("\nStarting genetic algorithm...");
+    //     let (best_bitstring, best_score, _scores) = genetic_algo(
+    //         fitting_objective, 
+    //         &bounds, 
+    //         n_bits, 
+    //         n_iter, 
+    //         n_pop, 
+    //         r_cross,
+    //         r_mut, 
+    //         k, 
+    //         &fitting_settings,
+    //     )?;
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
