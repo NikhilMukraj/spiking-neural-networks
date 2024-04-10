@@ -2,6 +2,9 @@
 //     collections::HashMap,
 //     io::Result,
 // };
+// #[path = "../distribution/mod.rs"]
+// mod distribution;
+// use crate::distribution::limited_distr;
 // #[path = "../neuron/mod.rs"]
 // mod neuron;
 // use crate::neuron::{
@@ -10,12 +13,12 @@
 //     voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
 // };
 // #[path = "../ga/mod.rs"]
-// use crate::ga::{BitString, decode, genetic_algo};
+// use crate::ga::{BitString, decode};
 
 
 // fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f64>) -> f64 {
 //     peaks.iter()
-//         .map(|n| voltages[n])
+//         .map(|n| voltages[*n])
 //         .sum::<f64>() / (peaks.len() as f64)
 // }
 
@@ -37,23 +40,25 @@
 //     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages);
 //     let average_post_spike: f64 = get_average_spike(&post_peaks, post_voltages);
 
-//     let average_pre_spike_difference: f64 = diff(pre_peaks) / (pre_peaks.len() as f64);
-//     let average_post_spike_difference: f64 = diff(post_peaks) / (post_peaks.len() as f64);
+//     let average_pre_spike_difference: f64 = diff(&pre_peaks).iter()
+//         .sum::<usize>() as f64 / (pre_peaks.len() as f64);
+//     let average_post_spike_difference: f64 = diff(&post_peaks).iter()
+//         .sum::<usize>() as f64 / (post_peaks.len() as f64);
 
-//     struct ActionPotentialSummary {
-//         average_pre_spike: f64,
-//         average_post_spike: f64,
-//         average_pre_spike_difference: f64,
-//         average_post_spike_difference: f64,
+//     ActionPotentialSummary {
+//         average_pre_spike_amplitude: average_pre_spike,
+//         average_post_spike_amplitude: average_post_spike,
+//         average_pre_spike_time_difference: average_pre_spike_difference,
+//         average_post_spike_time_difference: average_post_spike_difference,
 //     }
 // }
 
 // fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f64 {
-//     let mut pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
-//     let mut post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
+//     let pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
+//     let post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
 
-//     let mut pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
-//     let mut post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
+//     let pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
+//     let post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
 
 //     pre_spike_amplitude + post_spike_amplitude + pre_spike_difference + post_spike_difference
 // }
@@ -71,8 +76,6 @@
 //     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
 //     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
 
-//     let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
-
 //     for _ in 0..iterations {
 //         if bayesian {
 //             let bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
@@ -84,7 +87,7 @@
 //             );
 
 //             let current = voltage_change_to_current(
-//                 presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+//                 presynaptic_neuron.last_dv, &presynaptic_neuron
 //             );
 
 //             postsynaptic_neuron.iterate(
@@ -95,7 +98,7 @@
 //             presynaptic_neuron.iterate(input_current);
 
 //             let current = voltage_change_to_current(
-//                 presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
+//                 presynaptic_neuron.last_dv, &presynaptic_neuron
 //             );
 
 //             postsynaptic_neuron.iterate(current);
@@ -116,6 +119,25 @@
 //     pub iterations: usize,
 //     pub tolerance: f64,
 //     pub bayesian: bool,
+// }
+
+// fn bayesian_izhikevich_get_dv_change(
+//     izhikevich_neuron: &mut Cell, 
+//     if_params: &IFParameters, 
+//     input_current: f64,
+//     bayesian: bool
+// ) -> f64 {
+//     if bayesian {
+//         izhikevich_neuron.izhikevich_get_dv_change(
+//             &if_params, 
+//             input_current * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
+//         )
+//     } else {
+//         izhikevich_neuron.izhikevich_get_dv_change(
+//             &if_params, 
+//             input_current,
+//         )
+//     }
 // }
 
 // // bounds should be a, b, c, d, and v_th for now
@@ -166,42 +188,41 @@
 //         last_dv: 0.,
 //     };
 
-//     let mut postsynaptic_neuron = presynaptic_neuron.clone();
+//     let mut postynaptic_neuron = presynaptic_neuron.clone();
 
 //     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
-//     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
-
-//     let mut past_presynaptic_voltage = presynaptic_neuron.current_voltage;
+//     let mut post_voltages: Vec<f64> = vec![postynaptic_neuron.current_voltage];
 
 //     for _ in 0..settings.iterations {
-//         if settings.bayesian {
-//             let bayesian_factor = if_params_bayesian(&if_params);
+//         let _pre_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+//         let pre_dv = bayesian_izhikevich_get_dv_change(
+//             &mut presynaptic_neuron, 
+//             &if_params, 
+//             settings.input_current, 
+//             settings.bayesian,
+//         );
 
-//             presynaptic_neuron.iterate(
-//                 settings.input_current * if_params_bayesian(&if_params)
-//             );
+//         presynaptic_neuron.last_dv = pre_dv;
 
-//             let current = voltage_change_to_current(
-//                 presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
-//             );
+//         let postsynaptic_input = voltage_change_to_current_integrate_and_fire(
+//             presynaptic_neuron.last_dv, if_params.dt, 1.0
+//         );
 
-//             postsynaptic_neuron.iterate(
-//                 current * bayesian_factor
-//             );
-//         } else {
-//             presynaptic_neuron.iterate(settings.input_current);
+//         let _post_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+//         let post_dv = bayesian_izhikevich_get_dv_change(
+//             &mut postynaptic_neuron, 
+//             &if_params, 
+//             postsynaptic_input, 
+//             settings.bayesian,
+//         );
 
-//             let current = voltage_change_to_current(
-//                 presynaptic_neuron.current_voltage - past_presynaptic_voltage, &presynaptic_neuron
-//             );
-
-//             postsynaptic_neuron.iterate(current);
-//         }
-
-//         past_presynaptic_voltage = presynaptic_neuron.current_voltage;
+//         postynaptic_neuron.last_dv = post_dv;
+    
+//         presynaptic_neuron.current_voltage += pre_dv;
+//         postynaptic_neuron.current_voltage += post_dv;
 
 //         pre_voltages.push(presynaptic_neuron.current_voltage);
-//         post_voltages.push(postsynaptic_neuron.current_voltage);
+//         post_voltages.push(postynaptic_neuron.current_voltage);
 //     }
 
 //     let summary = get_summary(&pre_voltages, &post_voltages, settings.tolerance);
