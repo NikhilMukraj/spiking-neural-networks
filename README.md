@@ -31,6 +31,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Eventually remove input equation system
 
 - **Need to rename all `input_voltage` to `input_current`**
+- **Need to rename all post_synaptic and all pre_synaptic to postsynaptic and presynaptic**
 
 - Hopfield network
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
