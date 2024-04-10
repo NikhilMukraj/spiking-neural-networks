@@ -1,7 +1,8 @@
 use std::{
     f64::consts::E, 
     fs::File, 
-    io::{BufWriter, Error, ErrorKind, Result, Write}
+    io::{BufWriter, Error, ErrorKind, Result, Write},
+    ops::Sub,
 };
 use rand::Rng;
 #[path = "../distribution/mod.rs"]
@@ -575,6 +576,7 @@ impl BV {
     }
 }
 
+#[derive(Clone)]
 pub struct GABAbDissociation {
     g: f64,
     n: f64,
@@ -625,6 +627,7 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
+#[derive(Clone, Copy)]
 pub struct Neurotransmitter {
     pub t_max: f64,
     pub alpha: f64,
@@ -729,6 +732,7 @@ impl Neurotransmitter {
     }
 }
 
+#[derive(Clone)]
 pub enum NeurotransmitterType {
     AMPA,
     GABAa,
@@ -737,6 +741,7 @@ pub enum NeurotransmitterType {
     Basic,
 }
 
+#[derive(Clone)]
 pub struct GeneralLigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
@@ -904,6 +909,7 @@ impl GeneralLigandGatedChannel {
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
 // l-type ca2+ channel, ca1.2
+#[derive(Clone, Copy)]
 pub struct HighThresholdCalciumChannel {
     current: f64,
     z: f64,
@@ -995,6 +1001,7 @@ impl HighThresholdCalciumChannel {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct HighVoltageActivatedCalciumChannel {
     m: f64,
     m_a: f64,
@@ -1077,6 +1084,7 @@ impl HighVoltageActivatedCalciumChannel {
 
 // can look at this
 // https://github.com/JoErNanO/brianmodel/blob/master/brianmodel/neuron/ioniccurrent/ioniccurrentcal.py
+#[derive(Clone, Copy)]
 pub enum AdditionalGates {
     LTypeCa(HighThresholdCalciumChannel),
     HVACa(HighVoltageActivatedCalciumChannel), // https://neuronaldynamics.epfl.ch/online/Ch2.S3.html // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/8229187/
@@ -1127,7 +1135,7 @@ impl AdditionalGates {
 
 // }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Gate {
     pub alpha: f64,
     pub beta: f64,
@@ -1146,8 +1154,10 @@ impl Gate {
     }
 }
 
+#[derive(Clone)]
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
+    pub last_dv: f64,
     pub dt: f64,
     pub cm: f64,
     pub e_na: f64,
@@ -1174,6 +1184,7 @@ impl Default for HodgkinHuxleyCell {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
+            last_dv: 0.,
             dt: 0.1,
             cm: 1., 
             e_na: 115., 
@@ -1194,7 +1205,7 @@ impl Default for HodgkinHuxleyCell {
 
 // find peaks of hodgkin huxley
 // result starts at index 1 of input list
-pub fn diff(x: &Vec<f64>) -> Vec<f64> {
+pub fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
     (1..x.len()).map(|i| x[i] - x[i-1])
         .collect()
 }
@@ -1284,6 +1295,7 @@ impl HodgkinHuxleyCell {
             .sum::<f64>();
 
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
+        self.last_dv = i_sum;
         self.current_voltage += self.dt * i_sum / self.cm;
     }
 
