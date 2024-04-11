@@ -2849,6 +2849,27 @@ fn main() -> Result<()> {
 
     //     let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
     //     println!("bayesian: {}", bayesian); 
+        
+        // let bounds: Vec<Vec<f64>> = vec![
+            // vec![0, 1], vec![0, 10], vec![-200, 200], vec![0, 200], vec![-200, 200]
+        // ];
+
+        // let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
+        // println!("n_bits: {}", n_bits);
+
+        // let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
+        // println!("n_iter: {}", n_iter);
+
+        // let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
+        // println!("n_pop: {}", n_pop);
+
+        // let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.9)?;
+        // println!("r_cross: {}", r_cross);
+
+        // let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.1)?;
+        // println!("r_mut: {}", r_mut);
+
+        // let k: usize = 3;
 
     //     let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, None)?;
 
@@ -2865,7 +2886,6 @@ fn main() -> Result<()> {
     //         action_potential_summary: &hodgkin_huxley_summary,
     //         input_current: input_current,
     //         iterations: iterations,
-    //         tolerance: tolerance,
     //         bayesian: bayesian,
     //     };
 
