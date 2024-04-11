@@ -37,7 +37,16 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
   - [Hopfield network tutorial](https://github.com/ImagineOrange/Hopfield-Network/blob/main/hopfield_MNIST.py)
   - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
-- When done with Hopfield, move to liquid state machines
+- When done with Hopfield, move to the [cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
+  - Cue input is fed into working memory neurons
+    - Cue is -1 or 1
+  - Working memory neurons loop back into themselves with some bayesian noise
+  - Cue is removed and working memory output can be decoded
+    - Decoded by taking weighted sum of working memory neurons
+    - If below 0, then percieved cue is -1, if above 0, percieved cue is 1
+  - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
+- When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
+- When done modeling memory, attempt classifying with liquid state machines
 
 ## Todo
 
