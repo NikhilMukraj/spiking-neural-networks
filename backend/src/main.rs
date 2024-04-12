@@ -9,7 +9,6 @@ use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
-#[path = "distribution/mod.rs"]
 mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
@@ -26,11 +25,8 @@ mod eeg;
 use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
 use crate::ga::{BitString, decode, genetic_algo};
-// mod fitting;
-// use crate::fitting::{
-//     ActionPotentialSummary, FittingSettings, 
-//     fitting_objective, get_hodgkin_huxley_voltages
-// };
+mod fitting;
+use crate::fitting::{FittingSettings, fitting_objective, get_hodgkin_huxley_voltages};
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
 
@@ -2828,79 +2824,92 @@ fn main() -> Result<()> {
         )?;
 
         println!("\nFinished coupled Hodgkin Huxley test");
-    // } else if let Some(fit_neuron_models_table) = config.get("fit_neuron_models") {
-    //     let iterations: usize = match fit_neuron_models_table.get("iterations") {
-    //         Some(value) => parse_usize(value, "iterations")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
-    //     };
-    //     println!("iterations: {}", iterations);
+    } else if let Some(fit_neuron_models_table) = config.get("fit_neuron_models") {
+        let iterations: usize = match fit_neuron_models_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
 
-    //     let input_current: f64 = match fit_neuron_models_table.get("input_current") {
-    //         Some(value) => parse_f64(value, "input_current")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
-    //     };
-    //     println!("input_current: {}", input_current); 
+        let input_current: f64 = match fit_neuron_models_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+        };
+        println!("input_current: {}", input_current); 
 
-    //     let tolerance: f64 = match fit_neuron_models_table.get("tolerance") {
-    //         Some(value) => parse_f64(value, "tolerance")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'tolerance' value not found")); },
-    //     };
-    //     println!("tolerance: {}", tolerance); 
+        let tolerance: f64 = match fit_neuron_models_table.get("tolerance") {
+            Some(value) => parse_f64(value, "tolerance")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'tolerance' value not found")); },
+        };
+        println!("tolerance: {}", tolerance); 
 
-    //     let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
-    //     println!("bayesian: {}", bayesian); 
+        let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
+        println!("bayesian: {}", bayesian); 
         
-        // let bounds: Vec<Vec<f64>> = vec![
-            // vec![0, 1], vec![0, 10], vec![-200, 200], vec![0, 200], vec![-200, 200]
-        // ];
+        let bounds: Vec<Vec<f64>> = vec![
+            vec![0., 1.], vec![-200., 200.], vec![-200., 200.], vec![-200., 200.], vec![-200., 200.]
+        ];
 
-        // let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
-        // println!("n_bits: {}", n_bits);
+        let n_bits: usize = parse_value_with_default(&fit_neuron_models_table, "n_bits", parse_usize, 10)?;
+        println!("n_bits: {}", n_bits);
 
-        // let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
-        // println!("n_iter: {}", n_iter);
+        let n_iter: usize = parse_value_with_default(&fit_neuron_models_table, "n_iter", parse_usize, 100)?;
+        println!("n_iter: {}", n_iter);
 
-        // let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
-        // println!("n_pop: {}", n_pop);
+        let n_pop: usize = parse_value_with_default(&fit_neuron_models_table, "n_pop", parse_usize, 100)?;
+        println!("n_pop: {}", n_pop);
 
-        // let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.9)?;
-        // println!("r_cross: {}", r_cross);
+        let r_cross: f64 = parse_value_with_default(&fit_neuron_models_table, "r_cross", parse_f64, 0.9)?;
+        println!("r_cross: {}", r_cross);
 
-        // let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.1)?;
-        // println!("r_mut: {}", r_mut);
+        let r_mut: f64 = parse_value_with_default(&fit_neuron_models_table, "r_mut", parse_f64, 0.1)?;
+        println!("r_mut: {}", r_mut);
 
-        // let k: usize = 3;
+        let k: usize = 3;
 
-    //     let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, None)?;
+        let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, Some("reference"))?;
 
-    //     let mut if_params = IzhikevichDefault::izhikevich_default();
-    //     let izhikevich_model = get_if_params(&mut if_params, None, fit_neuron_models_table);
+        let mut if_params = IzhikevichDefault::izhikevich_default();
+        get_if_params(&mut if_params, None, fit_neuron_models_table)?;
 
-    //     let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
-    //         &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance
-    //     );
+        let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+            &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance
+        )?;
     
-    //     let fitting_settings = FittingSettings {
-    //         hodgkin_huxley_model: hodgkin_huxley_model,
-    //         if_params: &if_params,
-    //         action_potential_summary: &hodgkin_huxley_summary,
-    //         input_current: input_current,
-    //         iterations: iterations,
-    //         bayesian: bayesian,
-    //     };
+        let fitting_settings = FittingSettings {
+            hodgkin_huxley_model: hodgkin_huxley_model,
+            if_params: &if_params,
+            action_potential_summary: &hodgkin_huxley_summary,
+            input_current: input_current,
+            iterations: iterations,
+            bayesian: bayesian,
+        };
 
-    //     println!("\nStarting genetic algorithm...");
-    //     let (best_bitstring, best_score, _scores) = genetic_algo(
-    //         fitting_objective, 
-    //         &bounds, 
-    //         n_bits, 
-    //         n_iter, 
-    //         n_pop, 
-    //         r_cross,
-    //         r_mut, 
-    //         k, 
-    //         &fitting_settings,
-    //     )?;
+        let mut fitting_settings_map: HashMap<&str, FittingSettings> = HashMap::new();
+        fitting_settings_map.insert("settings", fitting_settings);
+
+        println!("\nStarting genetic algorithm...");
+        let (best_bitstring, best_score, _scores) = genetic_algo(
+            fitting_objective, 
+            &bounds, 
+            n_bits, 
+            n_iter, 
+            n_pop, 
+            r_cross,
+            r_mut, 
+            k, 
+            &fitting_settings_map,
+        )?;
+
+        println!("Best bitstring: {}", best_bitstring.string);
+        println!("Best score: {}", best_score);
+
+        let decoded = match decode(&best_bitstring, &bounds, n_bits) {
+            Ok(decoded_value) => decoded_value,
+            Err(e) => return Err(e),
+        };
+
+        println!("Decoded values (a, b, c, d, v_th): {:#?}", decoded);
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
