@@ -1,18 +1,13 @@
 use std::{
     collections::HashMap,
-    io::Result,
+    io::{Error, ErrorKind, Result},
 };
-#[path = "../distribution/mod.rs"]
-mod distribution;
 use crate::distribution::limited_distr;
-#[path = "../neuron/mod.rs"]
-mod neuron;
 use crate::neuron::{
     Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    find_peaks, diff, hodgkin_huxley_bayesian, if_params_bayesian,
+    find_peaks, diff, hodgkin_huxley_bayesian, // if_params_bayesian,
     voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
 };
-#[path = "../ga/mod.rs"]
 use crate::ga::{BitString, decode};
 
 
@@ -34,15 +29,31 @@ fn get_summary(
     post_voltages: &Vec<f64>, 
     pre_peaks: Option<&Vec<usize>>,
     post_peaks: Option<&Vec<usize>>,
-    tolerance: f64,
-) -> ActionPotentialSummary {
-    let pre_peaks = match pre_peaks {
-        Some(values) => values,
-        None => find_peaks(pre_voltages, tolerance),
+    tolerance: Option<f64>,
+) -> Result<ActionPotentialSummary> {
+    let pre_peaks = match (pre_peaks, tolerance) {
+        (Some(values), None) | (Some(values), Some(_)) => values.to_owned(),
+        (None, Some(tolerance)) => find_peaks(pre_voltages, tolerance),
+        (None, None) => { 
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, 
+                    "Peaks must be precalculated or provide a tolerance to calculate peaks"
+                )
+            );
+        },
     };
-    let post_peaks = match post_peaks {
-        Some(values) => values,
-        None => find_peaks(post_voltages, tolerance),
+    let post_peaks = match (post_peaks, tolerance) {
+        (Some(values), None) | (Some(values), Some(_)) => values.to_owned(),
+        (None, Some(tolerance)) => find_peaks(post_voltages, tolerance),
+        (None, None) => { 
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, 
+                    "Peaks must be precalculated or provide a tolerance to calculate peaks"
+                )
+            );
+        },
     };
 
     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages);
@@ -53,12 +64,14 @@ fn get_summary(
     let average_post_spike_difference: f64 = diff(&post_peaks).iter()
         .sum::<usize>() as f64 / (post_peaks.len() as f64);
 
-    ActionPotentialSummary {
-        average_pre_spike_amplitude: average_pre_spike,
-        average_post_spike_amplitude: average_post_spike,
-        average_pre_spike_time_difference: average_pre_spike_difference,
-        average_post_spike_time_difference: average_post_spike_difference,
-    }
+    Ok(
+        ActionPotentialSummary {
+            average_pre_spike_amplitude: average_pre_spike,
+            average_post_spike_amplitude: average_post_spike,
+            average_pre_spike_time_difference: average_pre_spike_difference,
+            average_post_spike_time_difference: average_post_spike_difference,
+        }
+    )
 }
 
 fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f64 {
@@ -77,7 +90,7 @@ pub fn get_hodgkin_huxley_voltages(
     iterations: usize,
     bayesian: bool, 
     tolerance: f64
-) -> ActionPotentialSummary {
+) -> Result<ActionPotentialSummary> {
     let mut presynaptic_neuron = hodgkin_huxley_model.clone();
     let mut postsynaptic_neuron = hodgkin_huxley_model.clone();
 
@@ -116,7 +129,7 @@ pub fn get_hodgkin_huxley_voltages(
         post_voltages.push(postsynaptic_neuron.current_voltage);
     }
 
-    get_summary(&pre_voltages, &post_voltages, None, None, tolerance)
+    Ok(get_summary(&pre_voltages, &post_voltages, None, None, Some(tolerance))?)
 }
 
 pub struct FittingSettings<'a> {
@@ -243,8 +256,8 @@ pub fn fitting_objective(
     }
 
     let summary = get_summary(
-        &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), settings.tolerance
-    );
+        &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), None
+    )?;
 
     Ok(compare_summary(&summary, settings.action_potential_summary))
 }
