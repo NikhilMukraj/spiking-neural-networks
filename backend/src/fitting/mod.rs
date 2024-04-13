@@ -5,18 +5,24 @@ use std::{
 use crate::distribution::limited_distr;
 use crate::neuron::{
     Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    find_peaks, diff, hodgkin_huxley_bayesian, // if_params_bayesian,
+    find_peaks, diff, hodgkin_huxley_bayesian,
     voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
 };
 use crate::ga::{BitString, decode};
 
 
 fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f64>) -> f64 {
-    peaks.iter()
+    let average = peaks.iter()
         .map(|n| voltages[*n])
-        .sum::<f64>() / (peaks.len() as f64)
+        .sum::<f64>() / (peaks.len() as f64);
+
+    match average {
+        x if x.is_nan() => f64::INFINITY,
+        _ => average,
+    }
 }
 
+#[derive(Debug)]
 pub struct ActionPotentialSummary {
     pub average_pre_spike_amplitude: f64,
     pub average_post_spike_amplitude: f64,
@@ -59,10 +65,17 @@ fn get_summary(
     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages);
     let average_post_spike: f64 = get_average_spike(&post_peaks, post_voltages);
 
-    let average_pre_spike_difference: f64 = diff(&pre_peaks).iter()
+    let mut average_pre_spike_difference: f64 = diff(&pre_peaks).iter()
         .sum::<usize>() as f64 / (pre_peaks.len() as f64);
-    let average_post_spike_difference: f64 = diff(&post_peaks).iter()
+    let mut average_post_spike_difference: f64 = diff(&post_peaks).iter()
         .sum::<usize>() as f64 / (post_peaks.len() as f64);
+
+    if average_pre_spike_difference.is_nan() {
+        average_pre_spike_difference = f64::INFINITY;
+    }
+    if average_post_spike_difference.is_nan() {
+        average_post_spike_difference = f64::INFINITY;
+    }
 
     Ok(
         ActionPotentialSummary {
@@ -81,7 +94,13 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
     let pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
     let post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
 
-    pre_spike_amplitude + post_spike_amplitude + pre_spike_difference + post_spike_difference
+    let output = pre_spike_amplitude + post_spike_amplitude + pre_spike_difference + post_spike_difference;
+
+    if output.is_nan() {
+        f64::INFINITY
+    } else {
+        output
+    }
 }
 
 pub fn get_hodgkin_huxley_voltages(
@@ -132,6 +151,7 @@ pub fn get_hodgkin_huxley_voltages(
     Ok(get_summary(&pre_voltages, &post_voltages, None, None, Some(tolerance))?)
 }
 
+#[derive(Clone)]
 pub struct FittingSettings<'a> {
     pub hodgkin_huxley_model: HodgkinHuxleyCell,
     pub if_params: &'a IFParameters,
@@ -158,6 +178,63 @@ fn bayesian_izhikevich_get_dv_change(
             input_current,
         )
     }
+}
+
+pub fn get_izhikevich_summary(
+    presynaptic_neuron: &mut Cell, 
+    postsynaptic_neuron: &mut Cell,
+    if_params: &IFParameters,
+    settings: &FittingSettings,
+) -> Result<ActionPotentialSummary> {
+    let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
+    let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
+
+    let mut pre_peaks: Vec<usize> = vec![];
+    let mut post_peaks: Vec<usize> = vec![];
+
+    for timestep in 0..settings.iterations {
+        let pre_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+        let pre_dv = bayesian_izhikevich_get_dv_change(
+            presynaptic_neuron, 
+            &if_params, 
+            settings.input_current, 
+            settings.bayesian,
+        );
+
+        if pre_spike {
+            pre_peaks.push(timestep);
+        }
+
+        presynaptic_neuron.last_dv = pre_dv;
+
+        let postsynaptic_input = voltage_change_to_current_integrate_and_fire(
+            presynaptic_neuron.last_dv, if_params.dt, 1.0
+        );
+
+        let post_spike = postsynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
+        let post_dv = bayesian_izhikevich_get_dv_change(
+            postsynaptic_neuron, 
+            &if_params, 
+            postsynaptic_input, 
+            settings.bayesian,
+        );
+
+        if post_spike {
+            post_peaks.push(timestep);
+        }
+
+        postsynaptic_neuron.last_dv = post_dv;
+    
+        presynaptic_neuron.current_voltage += pre_dv;
+        postsynaptic_neuron.current_voltage += post_dv;
+
+        pre_voltages.push(presynaptic_neuron.current_voltage);
+        post_voltages.push(postsynaptic_neuron.current_voltage);
+    }
+
+    get_summary(
+        &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), None
+    )
 }
 
 // bounds should be a, b, c, d, and v_th for now
@@ -191,12 +268,12 @@ pub fn fitting_objective(
         integration_constant: 1.,
         potentiation_type: PotentiationType::Excitatory,
         neurotransmission_concentration: 0., 
-        neurotransmission_release: 1.,
-        receptor_density: 1.,
-        chance_of_releasing: 0.5, 
-        dissipation_rate: 0.1, 
-        chance_of_random_release: 0.2,
-        random_release_concentration: 0.1,
+        neurotransmission_release: 0.,
+        receptor_density: 0.,
+        chance_of_releasing: 0., 
+        dissipation_rate: 0., 
+        chance_of_random_release: 0.,
+        random_release_concentration: 0.,
         w_value: if_params.w_init,
         stdp_params: STDPParameters::default(),
         last_firing_time: None,
@@ -207,56 +284,13 @@ pub fn fitting_objective(
         last_dv: 0.,
     };
 
-    let mut postynaptic_neuron = presynaptic_neuron.clone();
+    let mut postsynaptic_neuron = presynaptic_neuron.clone();
 
-    let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
-    let mut post_voltages: Vec<f64> = vec![postynaptic_neuron.current_voltage];
-
-    let mut pre_peaks: Vec<usize> = vec![];
-    let mut post_peaks: Vec<usize> = vec![];
-
-    for timestep in 0..settings.iterations {
-        let pre_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
-        let pre_dv = bayesian_izhikevich_get_dv_change(
-            &mut presynaptic_neuron, 
-            &if_params, 
-            settings.input_current, 
-            settings.bayesian,
-        );
-
-        if pre_spike {
-            pre_peaks.push(timestep);
-        }
-
-        presynaptic_neuron.last_dv = pre_dv;
-
-        let postsynaptic_input = voltage_change_to_current_integrate_and_fire(
-            presynaptic_neuron.last_dv, if_params.dt, 1.0
-        );
-
-        let post_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
-        let post_dv = bayesian_izhikevich_get_dv_change(
-            &mut postynaptic_neuron, 
-            &if_params, 
-            postsynaptic_input, 
-            settings.bayesian,
-        );
-
-        if post_spike {
-            post_peaks.push(timestep);
-        }
-
-        postynaptic_neuron.last_dv = post_dv;
-    
-        presynaptic_neuron.current_voltage += pre_dv;
-        postynaptic_neuron.current_voltage += post_dv;
-
-        pre_voltages.push(presynaptic_neuron.current_voltage);
-        post_voltages.push(postynaptic_neuron.current_voltage);
-    }
-
-    let summary = get_summary(
-        &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), None
+    let summary = get_izhikevich_summary(
+        &mut presynaptic_neuron, 
+        &mut postsynaptic_neuron, 
+        &if_params,
+        settings
     )?;
 
     Ok(compare_summary(&summary, settings.action_potential_summary))
