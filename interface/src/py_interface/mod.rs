@@ -215,7 +215,7 @@ impl IFCell {
                     true => { self.cell_backend.last_firing_time = Some(value.extract::<usize>()?); }
                 }
             }
-            _ => { return Err(PyLookupError::new_err("Unknown paramter")) }
+            _ => { return Err(PyLookupError::new_err("Unknown parameter")) }
         };
 
         Ok(())
@@ -274,7 +274,7 @@ impl IFCell {
             "stdp_weight_min" => self.cell_backend.stdp_params.weight_bayesian_params.min.to_object(py),
             "stdp_weight_max" => self.cell_backend.stdp_params.weight_bayesian_params.max.to_object(py),
             "last_firing_time" => self.cell_backend.last_firing_time.to_object(py),
-            _ => { return Err(PyLookupError::new_err("Unknown paramter")) },
+            _ => { return Err(PyLookupError::new_err("Unknown parameter")) },
         };
 
         Ok(result)
