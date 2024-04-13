@@ -26,7 +26,10 @@ use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
 use crate::ga::{BitString, decode, genetic_algo};
 mod fitting;
-use crate::fitting::{FittingSettings, fitting_objective, get_hodgkin_huxley_voltages};
+use crate::fitting::{
+    FittingSettings, fitting_objective, 
+    get_hodgkin_huxley_voltages, get_izhikevich_summary
+};
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
 
@@ -2401,14 +2404,9 @@ fn main() -> Result<()> {
         // option to run a simulation and return the eeg signals
         // option to write custom bounds
     } else if let Some(single_neuron_test) = config.get("single_neuron_test") {
-        let filename: &str = match single_neuron_test.get("filename") {
-            Some(value) => { 
-                match value.as_str() {
-                    Some(str_value) => str_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse filename")) },
-                }
-            },
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse filename")) },
+        let filename: String = match single_neuron_test.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
         };
         println!("filename: {}", filename);
 
@@ -2493,19 +2491,19 @@ fn main() -> Result<()> {
 
         match if_type {
             IFType::Basic => { 
-                test_cell.run_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
+                test_cell.run_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
             },
             IFType::Adaptive => { 
-                test_cell.run_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
+                test_cell.run_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
             },
             IFType::AdaptiveExponential => { 
-                test_cell.run_exp_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, filename);
+                test_cell.run_exp_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, &filename);
             },
             IFType::Izhikevich => { 
-                test_cell.run_izhikevich_static_input(&if_params, input_voltage, bayesian, iterations, filename); 
+                test_cell.run_izhikevich_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
             },
             IFType::IzhikevichLeaky => {
-                test_cell.run_izhikevich_leaky_static_input(&if_params, input_voltage, bayesian, iterations, filename);
+                test_cell.run_izhikevich_leaky_static_input(&if_params, input_voltage, bayesian, iterations, &filename);
             },
         };
 
@@ -2847,7 +2845,7 @@ fn main() -> Result<()> {
         println!("bayesian: {}", bayesian); 
         
         let bounds: Vec<Vec<f64>> = vec![
-            vec![0., 1.], vec![-200., 200.], vec![-200., 200.], vec![-200., 200.], vec![-200., 200.]
+            vec![0., 1.], vec![0., 1.], vec![-70., 0.], vec![0., 20.], vec![0., 200.]
         ];
 
         let n_bits: usize = parse_value_with_default(&fit_neuron_models_table, "n_bits", parse_usize, 10)?;
@@ -2868,9 +2866,23 @@ fn main() -> Result<()> {
         let k: usize = 3;
 
         let hodgkin_huxley_model = get_hodgkin_huxley_params(fit_neuron_models_table, Some("reference"))?;
+        let reference_dt = hodgkin_huxley_model.dt;
+
+        match fit_neuron_models_table.get("dt") {
+            Some(_) => {
+                return Err(
+                    Error::new(
+                        ErrorKind::InvalidInput, "Cannot have two 'dt' values, use only 'reference_dt'"
+                    )
+                );
+            },
+            None => {}
+        };
 
         let mut if_params = IzhikevichDefault::izhikevich_default();
         get_if_params(&mut if_params, None, fit_neuron_models_table)?;
+
+        if_params.dt = reference_dt;
 
         let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
             &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance
@@ -2886,7 +2898,7 @@ fn main() -> Result<()> {
         };
 
         let mut fitting_settings_map: HashMap<&str, FittingSettings> = HashMap::new();
-        fitting_settings_map.insert("settings", fitting_settings);
+        fitting_settings_map.insert("settings", fitting_settings.clone());
 
         println!("\nStarting genetic algorithm...");
         let (best_bitstring, best_score, _scores) = genetic_algo(
@@ -2910,6 +2922,60 @@ fn main() -> Result<()> {
         };
 
         println!("Decoded values (a, b, c, d, v_th): {:#?}", decoded);
+
+        println!("\nReference summary:\n{:#?}", hodgkin_huxley_summary);
+
+        let a: f64 = decoded[0];
+        let b: f64 = decoded[1];
+        let c: f64 = decoded[2];
+        let d: f64 = decoded[3];
+        let v_th: f64 = decoded[4];
+
+        let mut generated_if_params: IFParameters = IzhikevichDefault::izhikevich_default();
+        generated_if_params.dt = reference_dt;
+        generated_if_params.v_th = v_th;
+
+        let mut test_cell = Cell { 
+            current_voltage: if_params.v_init, 
+            refractory_count: 0.0,
+            leak_constant: -1.,
+            integration_constant: 1.,
+            potentiation_type: PotentiationType::Excitatory,
+            neurotransmission_concentration: 0., 
+            neurotransmission_release: 0.,
+            receptor_density: 0.,
+            chance_of_releasing: 0., 
+            dissipation_rate: 0., 
+            chance_of_random_release: 0.,
+            random_release_concentration: 0.,
+            w_value: if_params.w_init,
+            stdp_params: STDPParameters::default(),
+            last_firing_time: None,
+            alpha: a,
+            beta: b,
+            c: c,
+            d: d,
+            last_dv: 0.,
+        };
+
+        let izhikevich_summary = get_izhikevich_summary(
+            &mut test_cell.clone(), &mut test_cell.clone(), &generated_if_params, &fitting_settings
+        )?;
+
+        println!("Generated summary:\n{:#?}", izhikevich_summary);
+
+        match fit_neuron_models_table.get("filename") {
+            Some(value) => {
+                let parsed_filename = parse_string(value, "filename")?;
+
+                println!("Running static test, output at {}", parsed_filename);
+
+                test_cell.run_izhikevich_static_input(&if_params, input_current, bayesian, iterations, &parsed_filename);
+                
+                println!("Finished static test");
+            },
+            None => {},
+        };
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
