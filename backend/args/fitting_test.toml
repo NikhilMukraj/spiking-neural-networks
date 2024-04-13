@@ -1,0 +1,14 @@
+[fit_neuron_models]
+iterations = 10000
+input_current = 40.0
+
+reference_dt = 0.01
+
+n_bits = 16
+n_iter = 100
+n_pop = 100
+r_cross = 0.9
+r_mut = 0.1
+
+tolerance = 0.025
+# filename = "output/ga_izhikevich.csv"
