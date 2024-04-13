@@ -16,7 +16,7 @@ impl BitString {
     fn check(&self) -> Result<()> {
         for i in self.string.chars() {
             if i != '1' && i != '0' {
-                return Err(Error::new(ErrorKind::Other, "Non binary found"));
+                return Err(Error::new(ErrorKind::Other, format!("Non binary found: {}", self.string)));
             }
         }
 
@@ -107,7 +107,9 @@ pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> R
 
         let mut value = match i32::from_str_radix(substring, 2) {
             Ok(value_result) => value_result as f64,
-            Err(_e) => return Err(Error::new(ErrorKind::Other, "Non binary found")),
+            Err(_e) => return Err(
+                Error::new(ErrorKind::Other, format!("Non binary substring found or overflow: {}", substring))
+            ),
         };
         value = value * (bounds[i][1] - bounds[i][0]) / maximum + bounds[i][0];
 
