@@ -426,6 +426,7 @@ impl Cell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
+        writeln!(file, "voltage").expect("Unable to write to file");
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -451,6 +452,7 @@ impl Cell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
+        writeln!(file, "voltage").expect("Unable to write to file");
         writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -476,6 +478,7 @@ impl Cell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
+        writeln!(file, "voltage,w").expect("Unable to write to file");
         writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -501,6 +504,7 @@ impl Cell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
+        writeln!(file, "voltage,w").expect("Unable to write to file");
         writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         
         for _ in 0..iterations {
@@ -1222,7 +1226,7 @@ pub fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
 
     let local_maxima = local_optima.iter()
         .map(|(n, i)| (*n, *i))
-        .filter(|(n, _)| *n < first_diff.len() - 1 && second_diff[n+1] < 0.)
+        .filter(|(n, _)| *n < second_diff.len() - 1 && second_diff[n+1] < 0.)
         .collect::<Vec<(usize, f64)>>();
 
     let local_maxima: Vec<usize> = local_maxima.iter()
@@ -1295,8 +1299,8 @@ impl HodgkinHuxleyCell {
             .sum::<f64>();
 
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
-        self.last_dv = i_sum;
-        self.current_voltage += self.dt * i_sum / self.cm;
+        self.last_dv = self.dt * i_sum / self.cm;
+        self.current_voltage += self.last_dv;
     }
 
     pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
