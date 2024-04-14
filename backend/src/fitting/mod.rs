@@ -28,6 +28,8 @@ pub struct ActionPotentialSummary {
     pub average_post_spike_amplitude: f64,
     pub average_pre_spike_time_difference: f64,
     pub average_post_spike_time_difference: f64,
+    // pub num_pre_spikes: f64,
+    // pub num_post_spikes: f64,
 }
 
 fn get_summary(
@@ -87,6 +89,59 @@ fn get_summary(
     )
 }
 
+// struct SummaryScalingFactors {
+//     amplitude_scale: f64,
+//     time_difference_scale: f64,
+//     // num_peaks_scale: f64,
+// }
+
+// fn get_f64_max(x: &Vec<f64>) -> Option<&f64> {
+//     x.iter()
+//         .max_by(|a, b| a.total_cmp(b))
+// }
+
+// fn reference_scale(
+//     reference_summary: &ActionPotentialSummary, 
+// ) -> (ActionPotentialSummary, SummaryScalingFactors) {
+//     let amplitudes = vec![
+//         reference_summary.average_pre_spike_amplitude, reference_summary.average_post_spike_amplitude
+//     ];
+
+//     let time_differences = vec![
+//         reference_summary.average_pre_spike_time_difference, reference_summary.average_post_spike_time_difference
+//     ];
+
+//     let amplitude_scale = *get_f64_max(&amplitudes).unwrap();
+
+//     let time_difference_scale = *get_f64_max(&time_differences).unwrap();
+
+//     let scaled_reference = ActionPotentialSummary {
+//         average_post_spike_amplitude: reference_summary.average_pre_spike_amplitude / amplitude_scale,
+//         average_pre_spike_amplitude: reference_summary.average_post_spike_amplitude / amplitude_scale,
+//         average_pre_spike_time_difference: reference_summary.average_pre_spike_time_difference / time_difference_scale,
+//         average_post_spike_time_difference: reference_summary.average_post_spike_time_difference / time_difference_scale,
+//     };
+
+//     let scaling_factors = SummaryScalingFactors {
+//         amplitude_scale: amplitude_scale, 
+//         time_difference_scale: time_difference_scale,
+//     };
+
+//     (scaled_reference, scaling_factors)
+// }
+
+// fn scale_summary(
+//     summary: &ActionPotentialSummary, 
+//     scaling_factors: &SummaryScalingFactors
+// ) -> ActionPotentialSummary {
+//     ActionPotentialSummary {
+//         average_post_spike_amplitude: summary.average_pre_spike_amplitude / scaling_factors.amplitude_scale,
+//         average_pre_spike_amplitude: summary.average_post_spike_amplitude / scaling_factors.amplitude_scale,
+//         average_pre_spike_time_difference: summary.average_pre_spike_time_difference / scaling_factors.time_difference_scale,
+//         average_post_spike_time_difference: summary.average_post_spike_time_difference / scaling_factors.time_difference_scale,
+//     }
+// }
+
 fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f64 {
     let pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
     let post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
@@ -127,7 +182,7 @@ pub fn get_hodgkin_huxley_voltages(
             );
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.last_dv, &presynaptic_neuron
+                &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(
@@ -138,7 +193,7 @@ pub fn get_hodgkin_huxley_voltages(
             presynaptic_neuron.iterate(input_current);
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.last_dv, &presynaptic_neuron
+                &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(current);
@@ -156,6 +211,7 @@ pub struct FittingSettings<'a> {
     pub hodgkin_huxley_model: HodgkinHuxleyCell,
     pub if_params: &'a IFParameters,
     pub action_potential_summary: &'a ActionPotentialSummary,
+    // pub scaling_factors: &'a SummaryScalingFactors,
     pub input_current: f64,
     pub iterations: usize,
     pub bayesian: bool,
