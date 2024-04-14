@@ -2125,7 +2125,7 @@ fn coupled_hodgkin_huxley<'a>(
             );
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.last_dv, &presynaptic_neuron
+                &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(
@@ -2136,7 +2136,7 @@ fn coupled_hodgkin_huxley<'a>(
             presynaptic_neuron.iterate(input_voltage);
 
             let current = voltage_change_to_current(
-                presynaptic_neuron.last_dv, &presynaptic_neuron
+                &presynaptic_neuron
             );
 
             postsynaptic_neuron.iterate(current);
