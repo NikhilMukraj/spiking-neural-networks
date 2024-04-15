@@ -10,7 +10,7 @@ use toml::{from_str, Value};
 use exprtk_rs::{Expression, SymbolTable};
 use ndarray::Array1;
 mod distribution;
-use crate::distribution::limited_distr;
+use crate::{distribution::limited_distr, fitting::ActionPotentialSummary};
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
@@ -28,7 +28,8 @@ use crate::ga::{BitString, decode, genetic_algo};
 mod fitting;
 use crate::fitting::{
     FittingSettings, fitting_objective, 
-    get_hodgkin_huxley_voltages, get_izhikevich_summary
+    get_hodgkin_huxley_voltages, get_izhikevich_summary, get_reference_scale,
+    SummaryScalingDefaults, SummaryScalingFactors,
 };
 mod graph;
 use crate::graph::{Position, AdjacencyList, AdjacencyMatrix, Graph, GraphParameters, GraphFunctionality};
@@ -783,38 +784,25 @@ struct SimulationParameters {
 }
 
 fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Value) -> Result<()> {
-    match prefix {
-        Some(prefix_value) => {
-            if_params.dt = parse_value_with_default(table, &format!("{}_dt", prefix_value), parse_f64, if_params.dt)?;
-            if_params.exp_dt = parse_value_with_default(table, &format!("{}_exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
-            if_params.tau_m = parse_value_with_default(table, &format!("{}_tau_m", prefix_value), parse_f64, if_params.tau_m)?;
-            if_params.tref = parse_value_with_default(table, &format!("{}_tref", prefix_value), parse_f64, if_params.tref)?;
-            if_params.alpha_init = parse_value_with_default(table, &format!("{}_alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
-            if_params.beta_init = parse_value_with_default(table, &format!("{}_beta_init", prefix_value), parse_f64, if_params.beta_init)?;
-            if_params.v_reset = parse_value_with_default(table, &format!("{}_v_reset", prefix_value), parse_f64, if_params.v_reset)?; 
-            if_params.d_init = parse_value_with_default(table, &format!("{}_d_init", prefix_value), parse_f64, if_params.d_init)?;
-            if_params.w_init = parse_value_with_default(table, &format!("{}_w_init", prefix_value), parse_f64, if_params.w_init)?;
-            if_params.bayesian_params.mean = parse_value_with_default(table, &format!("{}_bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
-            if_params.bayesian_params.std = parse_value_with_default(table, &format!("{}_bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
-            if_params.bayesian_params.max = parse_value_with_default(table, &format!("{}_bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
-            if_params.bayesian_params.min = parse_value_with_default(table, &format!("{}_bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
-        }
-        None => {
-            if_params.dt = parse_value_with_default(table, "dt", parse_f64, if_params.dt)?;
-            if_params.exp_dt = parse_value_with_default(table, "exp_dt", parse_f64, if_params.exp_dt)?;
-            if_params.tau_m = parse_value_with_default(table, "tau_m", parse_f64, if_params.tau_m)?;
-            if_params.tref = parse_value_with_default(table, "tref", parse_f64, if_params.tref)?;
-            if_params.alpha_init = parse_value_with_default(table, "alpha_init", parse_f64, if_params.alpha_init)?;
-            if_params.beta_init = parse_value_with_default(table, "beta_init", parse_f64, if_params.beta_init)?;
-            if_params.v_reset = parse_value_with_default(table, "v_reset", parse_f64, if_params.v_reset)?; 
-            if_params.d_init = parse_value_with_default(table, "d_init", parse_f64, if_params.d_init)?;
-            if_params.w_init = parse_value_with_default(table, "w_init", parse_f64, if_params.w_init)?;
-            if_params.bayesian_params.mean = parse_value_with_default(table, "bayesian_mean", parse_f64, if_params.bayesian_params.mean)?;
-            if_params.bayesian_params.std = parse_value_with_default(table, "bayesian_std", parse_f64, if_params.bayesian_params.std)?;
-            if_params.bayesian_params.max = parse_value_with_default(table, "bayesian_max", parse_f64, if_params.bayesian_params.max)?;
-            if_params.bayesian_params.min = parse_value_with_default(table, "bayesian_min", parse_f64, if_params.bayesian_params.min)?;
-        }
-    }
+    let prefix_value = match prefix {
+        Some(value) => format!("{}_", value),
+        None => String::from(""),
+    };
+
+    if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
+    if_params.exp_dt = parse_value_with_default(table, &format!("{}exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
+    if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
+    if_params.tref = parse_value_with_default(table, &format!("{}tref", prefix_value), parse_f64, if_params.tref)?;
+    if_params.alpha_init = parse_value_with_default(table, &format!("{}alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
+    if_params.beta_init = parse_value_with_default(table, &format!("{}beta_init", prefix_value), parse_f64, if_params.beta_init)?;
+    if_params.v_reset = parse_value_with_default(table, &format!("{}v_reset", prefix_value), parse_f64, if_params.v_reset)?; 
+    if_params.d_init = parse_value_with_default(table, &format!("{}d_init", prefix_value), parse_f64, if_params.d_init)?;
+    if_params.w_init = parse_value_with_default(table, &format!("{}w_init", prefix_value), parse_f64, if_params.w_init)?;
+    if_params.v_init = parse_value_with_default(table, &format!("{}v_init", prefix_value), parse_f64, if_params.w_init)?;
+    if_params.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
+    if_params.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
+    if_params.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
+    if_params.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
 
     Ok(())
 }
@@ -2841,11 +2829,78 @@ fn main() -> Result<()> {
         };
         println!("tolerance: {}", tolerance); 
 
+        let spike_amplitude_default: f64 = match fit_neuron_models_table.get("spike_amplitude_default") {
+            Some(value) => parse_f64(value, "spike_amplitude_default")?,
+            None => 0.,
+        };
+        println!("spike_amplitude_default: {}", spike_amplitude_default); 
+
+        let amplitude_scale_default: f64 = match fit_neuron_models_table.get("amplitude_scale_default") {
+            Some(value) => parse_f64(value, "amplitude_scale_default")?,
+            None => 70.,
+        };
+        println!("amplitude_scale_default: {}", amplitude_scale_default); 
+
+        let time_difference_scale_default: f64 = match fit_neuron_models_table.get("time_difference_scale_default") {
+            Some(value) => parse_f64(value, "time_difference_scale_default")?,
+            None => 800.,
+        };
+        println!("time_difference_scale_default: {}", time_difference_scale_default); 
+
+        let num_peaks_scale_default: f64 = match fit_neuron_models_table.get("num_peaks_scale_default") {
+            Some(value) => parse_f64(value, "num_peaks_scale_default")?,
+            None => 10.,
+        };
+        println!("num_peaks_scale_default: {}", num_peaks_scale_default); 
+
+        let scaling_defaults = SummaryScalingDefaults {
+            default_amplitude_scale: amplitude_scale_default,
+            default_time_difference_scale: time_difference_scale_default,
+            default_num_peaks_scale: num_peaks_scale_default,
+        };
+
+        let do_scaling: bool = parse_value_with_default(fit_neuron_models_table, "do_scaling", parse_bool, false)?; 
+        println!("do_scaling: {}", do_scaling); 
+
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
+
+        let a_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "a_lower_bound", parse_f64, 0.)?;
+        println!("a_lower_bound: {}", a_lower_bound);
+
+        let a_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "a_upper_bound", parse_f64, 0.25)?;
+        println!("a_upper_bound: {}", a_upper_bound);
+
+        let b_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "b_lower_bound", parse_f64, 0.)?;
+        println!("b_lower_bound: {}", b_lower_bound);
+
+        let b_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "b_upper_bound", parse_f64, 10.)?;
+        println!("b_upper_bound: {}", b_upper_bound);
+
+        let c_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "c_lower_bound", parse_f64, -70.)?;
+        println!("c_lower_bound: {}", c_lower_bound);
+
+        let c_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "c_upper_bound", parse_f64, 0.)?;
+        println!("c_upper_bound: {}", c_upper_bound);
+
+        let d_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "d_lower_bound", parse_f64, 0.)?;
+        println!("d_lower_bound: {}", d_lower_bound);
+
+        let d_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "d_upper_bound", parse_f64, 10.)?;
+        println!("d_upper_bound: {}", d_upper_bound);
+
+        let v_th_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "v_th_lower_bound", parse_f64, 0.)?;
+        println!("v_th_lower_bound: {}", v_th_lower_bound);
+
+        let v_th_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "v_th_upper_bound", parse_f64, 200.)?;
+        println!("v_th_upper_bound: {}", v_th_upper_bound);
         
         let bounds: Vec<Vec<f64>> = vec![
-            vec![0., 1.], vec![0., 1.], vec![-70., 0.], vec![0., 20.], vec![0., 200.]
+            vec![a_lower_bound, a_upper_bound], 
+            vec![b_lower_bound, b_upper_bound], 
+            vec![c_lower_bound, c_upper_bound], 
+            vec![d_lower_bound, d_upper_bound], 
+            vec![v_th_lower_bound, v_th_upper_bound]
         ];
 
         let n_bits: usize = parse_value_with_default(&fit_neuron_models_table, "n_bits", parse_usize, 10)?;
@@ -2884,14 +2939,35 @@ fn main() -> Result<()> {
 
         if_params.dt = reference_dt;
 
-        let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
-            &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance
-        )?;
+        println!("{:#?}", if_params);
+
+        let (hodgkin_huxley_summary, scaling_factors): (ActionPotentialSummary, Option<SummaryScalingFactors>) = 
+        if do_scaling {
+            let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+                &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance, spike_amplitude_default
+            )?;
+
+            let (hodgkin_huxley_summary, scaling_factors) = get_reference_scale(
+                &hodgkin_huxley_summary, &scaling_defaults
+            );
+
+            (hodgkin_huxley_summary, Some(scaling_factors))
+        } else {
+            let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+                &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance, spike_amplitude_default
+            )?;
+
+            let scaling_factors = None;
+
+            (hodgkin_huxley_summary, scaling_factors)            
+        };
     
         let fitting_settings = FittingSettings {
             hodgkin_huxley_model: hodgkin_huxley_model,
             if_params: &if_params,
             action_potential_summary: &hodgkin_huxley_summary,
+            scaling_factors: scaling_factors,
+            spike_amplitude_default: spike_amplitude_default,
             input_current: input_current,
             iterations: iterations,
             bayesian: bayesian,
