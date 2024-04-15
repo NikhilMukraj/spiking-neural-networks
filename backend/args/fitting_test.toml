@@ -1,14 +1,19 @@
 [fit_neuron_models]
-iterations = 10000
+iterations = 20000
+# if number of spikes is not matching, increase timescale
 input_current = 40.0
+# eventually implement version to various input conditions
+# each input condition could be its own action potential summary
+do_scaling = true
 
 reference_dt = 0.01
+v_init = 0.0
 
 n_bits = 16
 n_iter = 100
-n_pop = 100
+n_pop = 400
 r_cross = 0.9
 r_mut = 0.1
 
 tolerance = 0.025
-# filename = "output/ga_izhikevich.csv"
+filename = "output/ga_izhikevich.csv"
