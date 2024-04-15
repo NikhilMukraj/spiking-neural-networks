@@ -24,6 +24,9 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Perform this for multiple static inputs, 0 to 100
       - Or perform this with coupled neurons (might need to account for weights)
       - Or both at the same time
+    - Fitting bursting Izhikevich to bursting Hodgkin Huxley
+      - Need way to detect bursts for Izhikevich fitting, probably something that has a burst tolerance (distance between spikes that differentiates either part of a burst group or the next set of bursts firing)
+      - Then comparing the distance between burst groups and the intervals of the burst groups
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
 - Eventually remove old neurotransmitter system and replace it with new one
@@ -44,6 +47,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Cue is removed and working memory output can be decoded
     - Decoded by taking weighted sum of working memory neurons
     - If below 0, then percieved cue is -1, if above 0, percieved cue is 1
+    - Or perceived cue could be above or below a given baseline, cue itself can be a fast (or excitatory) spike train or a slow (or potentially inhibitory) spike train, 0 is a baseline spike train speed (spike train just being a series of spikes)
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
 - When done modeling memory, attempt classifying with liquid state machines
@@ -63,6 +67,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Single coupled neurons
   - [x] Multiple coupled neurons
   - [ ] Single coupled R-STDP
+    - Note: input spike train is being inputted into input layers, depending on how strongly the output neurons are firing (and which neurons are spiking) reward is applied, this input is being inputted for specific duration *it is not instantaneous*
   - [ ] Multiple coupled R-STDP
   - [ ] Testing with weights summing to 1
 - [x] Lattice
@@ -125,7 +130,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] Objective function
       - [x] Finding spikes
       - [ ] Comparing spikes
-      - [ ] Comparing static and coupled inputs
+        - [ ] Amplitude of spikes, spike time differences, and number of spikes
+        - [ ] Scaling data properly
+      - [x] Comparing static and coupled inputs
+      - [ ] Comparing spikes under various input conditions
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
   - [ ] Remove existing neurotranmission system and replace it with new one
