@@ -28,7 +28,8 @@ use crate::ga::{BitString, decode, genetic_algo};
 mod fitting;
 use crate::fitting::{
     FittingSettings, fitting_objective, 
-    get_hodgkin_huxley_voltages, get_izhikevich_summary, get_reference_scale,
+    get_hodgkin_huxley_voltages, get_reference_scale, get_izhikevich_summary,
+    print_action_potential_summaries,
     SummaryScalingDefaults, SummaryScalingFactors,
 };
 mod graph;
@@ -2817,11 +2818,20 @@ fn main() -> Result<()> {
         };
         println!("iterations: {}", iterations);
 
-        let input_current: f64 = match fit_neuron_models_table.get("input_current") {
-            Some(value) => parse_f64(value, "input_current")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+        let input_current_lower_bound: f64 = match fit_neuron_models_table.get("input_current_lower_bound") {
+            Some(value) => parse_f64(value, "input_current_lower_bound")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current_lower_bound' value not found")); },
         };
-        println!("input_current: {}", input_current); 
+        println!("input_current_lower_bound: {}", input_current_lower_bound); 
+
+        let input_current_upper_bound: f64 = match fit_neuron_models_table.get("input_current_upper_bound") {
+            Some(value) => parse_f64(value, "input_current_lower_bound")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current_upper_bound' value not found")); },
+        };
+        println!("input_current_upper_bound: {}", input_current_upper_bound); 
+
+        let input_current_step: f64 = parse_value_with_default(&fit_neuron_models_table, "input_current_step", parse_f64, 5.)?;
+        println!("input_current_step: {}", input_current_step); 
 
         let tolerance: f64 = match fit_neuron_models_table.get("tolerance") {
             Some(value) => parse_f64(value, "tolerance")?,
@@ -2829,28 +2839,16 @@ fn main() -> Result<()> {
         };
         println!("tolerance: {}", tolerance); 
 
-        let spike_amplitude_default: f64 = match fit_neuron_models_table.get("spike_amplitude_default") {
-            Some(value) => parse_f64(value, "spike_amplitude_default")?,
-            None => 0.,
-        };
+        let spike_amplitude_default: f64 = parse_value_with_default(&fit_neuron_models_table, "spike_amplitude_default", parse_f64, 0.)?;
         println!("spike_amplitude_default: {}", spike_amplitude_default); 
 
-        let amplitude_scale_default: f64 = match fit_neuron_models_table.get("amplitude_scale_default") {
-            Some(value) => parse_f64(value, "amplitude_scale_default")?,
-            None => 70.,
-        };
+        let amplitude_scale_default: f64 = parse_value_with_default(&fit_neuron_models_table, "amplitude_scale_default", parse_f64, 70.)?;
         println!("amplitude_scale_default: {}", amplitude_scale_default); 
 
-        let time_difference_scale_default: f64 = match fit_neuron_models_table.get("time_difference_scale_default") {
-            Some(value) => parse_f64(value, "time_difference_scale_default")?,
-            None => 800.,
-        };
+        let time_difference_scale_default: f64 = parse_value_with_default(&fit_neuron_models_table, "time_difference_scale_default", parse_f64, 800.)?;
         println!("time_difference_scale_default: {}", time_difference_scale_default); 
 
-        let num_peaks_scale_default: f64 = match fit_neuron_models_table.get("num_peaks_scale_default") {
-            Some(value) => parse_f64(value, "num_peaks_scale_default")?,
-            None => 10.,
-        };
+        let num_peaks_scale_default: f64 = parse_value_with_default(&fit_neuron_models_table, "num_peaks_scale_default", parse_f64, 10.)?;
         println!("num_peaks_scale_default: {}", num_peaks_scale_default); 
 
         let scaling_defaults = SummaryScalingDefaults {
@@ -2941,34 +2939,53 @@ fn main() -> Result<()> {
 
         println!("{:#?}", if_params);
 
-        let (hodgkin_huxley_summary, scaling_factors): (ActionPotentialSummary, Option<SummaryScalingFactors>) = 
-        if do_scaling {
-            let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
-                &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance, spike_amplitude_default
-            )?;
+        let num_steps = ((input_current_upper_bound - input_current_lower_bound) / input_current_step)
+            .ceil() as usize + 1;
+        let input_currents_vector: Vec<f64> = (0..num_steps)
+            .map(|i| input_current_lower_bound + i as f64 * input_current_step)
+            .collect();
+        let input_currents: &[f64] = input_currents_vector.as_slice();
 
-            let (hodgkin_huxley_summary, scaling_factors) = get_reference_scale(
-                &hodgkin_huxley_summary, &scaling_defaults
-            );
+        let (hodgkin_huxley_summaries, scaling_factors) = if do_scaling {
+            let mut hodgkin_huxley_summaries: Vec<ActionPotentialSummary> = vec![];
+            let mut scaling_factors_vector: Vec<Option<SummaryScalingFactors>> = vec![];
 
-            (hodgkin_huxley_summary, Some(scaling_factors))
+            for current in input_currents.iter() {
+                let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+                    &hodgkin_huxley_model, *current, iterations, bayesian, tolerance, spike_amplitude_default
+                )?;
+
+                let (hodgkin_huxley_summary, scaling_factors) = get_reference_scale(
+                    &hodgkin_huxley_summary, &scaling_defaults
+                );
+
+                hodgkin_huxley_summaries.push(hodgkin_huxley_summary);
+                scaling_factors_vector.push(Some(scaling_factors));
+            }
+
+            (hodgkin_huxley_summaries, scaling_factors_vector)
         } else {
-            let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
-                &hodgkin_huxley_model, input_current, iterations, bayesian, tolerance, spike_amplitude_default
-            )?;
+            let mut hodgkin_huxley_summaries: Vec<ActionPotentialSummary> = vec![];
+            let scaling_factors_vector: Vec<Option<SummaryScalingFactors>> = vec![None; input_currents.len()];
 
-            let scaling_factors = None;
+            for current in input_currents.iter() {
+                let hodgkin_huxley_summary = get_hodgkin_huxley_voltages(
+                    &hodgkin_huxley_model, *current, iterations, bayesian, tolerance, spike_amplitude_default
+                )?;
 
-            (hodgkin_huxley_summary, scaling_factors)            
+                hodgkin_huxley_summaries.push(hodgkin_huxley_summary);
+            }
+
+            (hodgkin_huxley_summaries, scaling_factors_vector)            
         };
     
         let fitting_settings = FittingSettings {
             hodgkin_huxley_model: hodgkin_huxley_model,
             if_params: &if_params,
-            action_potential_summary: &hodgkin_huxley_summary,
-            scaling_factors: scaling_factors,
+            action_potential_summary: &hodgkin_huxley_summaries.as_slice(),
+            scaling_factors: &scaling_factors.as_slice(),
             spike_amplitude_default: spike_amplitude_default,
-            input_current: input_current,
+            input_currents: input_currents,
             iterations: iterations,
             bayesian: bayesian,
         };
@@ -2999,7 +3016,8 @@ fn main() -> Result<()> {
 
         println!("Decoded values (a, b, c, d, v_th): {:#?}", decoded);
 
-        println!("\nReference summary:\n{:#?}", hodgkin_huxley_summary);
+        println!("\nReference summaries:");
+        print_action_potential_summaries(&hodgkin_huxley_summaries);
 
         let a: f64 = decoded[0];
         let b: f64 = decoded[1];
@@ -3011,7 +3029,7 @@ fn main() -> Result<()> {
         generated_if_params.dt = reference_dt;
         generated_if_params.v_th = v_th;
 
-        let mut test_cell = Cell { 
+        let test_cell = Cell { 
             current_voltage: if_params.v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -3034,24 +3052,44 @@ fn main() -> Result<()> {
             last_dv: 0.,
         };
 
-        let izhikevich_summary = get_izhikevich_summary(
-            &mut test_cell.clone(), &mut test_cell.clone(), &generated_if_params, &fitting_settings
-        )?;
+        let summaries_results = (0..fitting_settings.input_currents.len())
+            .map(|i| {
+                get_izhikevich_summary(
+                    &mut test_cell.clone(), 
+                    &mut test_cell.clone(), 
+                    &if_params,
+                    &fitting_settings,
+                    i
+                )
+            })
+            .collect::<Vec<Result<ActionPotentialSummary>>>();
 
-        println!("Generated summary:\n{:#?}", izhikevich_summary);
+        for result in summaries_results.iter() {
+            if let Err(_) = result {
+                return Err(Error::new(ErrorKind::InvalidData, "Summary calculation could not be completed"));
+            }
+        }
 
-        match fit_neuron_models_table.get("filename") {
-            Some(value) => {
-                let parsed_filename = parse_string(value, "filename")?;
+        let generated_summaries = summaries_results.into_iter().map(|res| res.unwrap())
+            .collect::<Vec<ActionPotentialSummary>>();
 
-                println!("Running static test, output at {}", parsed_filename);
+        println!("\nGenerated summaries:");
+        print_action_potential_summaries(&generated_summaries);
 
-                test_cell.run_izhikevich_static_input(&if_params, input_current, bayesian, iterations, &parsed_filename);
+        // match fit_neuron_models_table.get("filename") {
+        //     Some(value) => {
+        //         let parsed_filename = parse_string(value, "filename")?;
+
+        //         println!("Running static test, output at {}", parsed_filename);
+
+        //         test_cell.clone().run_izhikevich_static_input(&if_params, input_currents[0], bayesian, iterations, &parsed_filename);
                 
-                println!("Finished static test");
-            },
-            None => {},
-        };
+        //         println!("Finished static test");
+        //     },
+        //     None => {},
+        // };
+
+        println!("Finished fitting");
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
