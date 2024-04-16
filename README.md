@@ -127,13 +127,14 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] New gates from TOML
 - [ ] Izhikevich neurotransmission
   - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
-    - [ ] Objective function
+    - [x] Objective function
       - [x] Finding spikes
-      - [ ] Comparing spikes
-        - [ ] Amplitude of spikes, spike time differences, and number of spikes
-        - [ ] Scaling data properly
+      - [x] Comparing spikes
+        - [x] Amplitude of spikes, spike time differences, and number of spikes
+        - [x] Scaling data properly
       - [x] Comparing static and coupled inputs
-      - [ ] Comparing spikes under various input conditions
+      - [x] Comparing spikes under various input conditions
+    - [ ] Potential objective function refactor with spike amplitude being height subtracted by minimum
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
   - [ ] Remove existing neurotranmission system and replace it with new one
