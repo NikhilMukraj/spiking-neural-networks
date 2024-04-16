@@ -253,10 +253,10 @@ pub fn get_hodgkin_huxley_voltages(
 pub struct FittingSettings<'a> {
     pub hodgkin_huxley_model: HodgkinHuxleyCell,
     pub if_params: &'a IFParameters,
-    pub action_potential_summary: &'a ActionPotentialSummary,
-    pub scaling_factors: Option<SummaryScalingFactors>,
+    pub action_potential_summary: &'a [ActionPotentialSummary],
+    pub scaling_factors: &'a [Option<SummaryScalingFactors>],
     pub spike_amplitude_default: f64,
-    pub input_current: f64,
+    pub input_currents: &'a [f64],
     pub iterations: usize,
     pub bayesian: bool,
 }
@@ -285,6 +285,7 @@ pub fn get_izhikevich_summary(
     postsynaptic_neuron: &mut Cell,
     if_params: &IFParameters,
     settings: &FittingSettings,
+    index: usize,
 ) -> Result<ActionPotentialSummary> {
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
@@ -297,7 +298,7 @@ pub fn get_izhikevich_summary(
         let pre_dv = bayesian_izhikevich_get_dv_change(
             presynaptic_neuron, 
             &if_params, 
-            settings.input_current, 
+            settings.input_currents[index], 
             settings.bayesian,
         );
 
@@ -336,7 +337,7 @@ pub fn get_izhikevich_summary(
         &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), None, settings.spike_amplitude_default
     )?;
 
-    match settings.scaling_factors {
+    match settings.scaling_factors[index] {
         Some(factors) => Ok(scale_summary(&summary, &factors)),
         None => Ok(summary),
     }
@@ -366,7 +367,7 @@ pub fn fitting_objective(
     let mut if_params = settings.if_params.clone();
     if_params.v_th = v_th;
 
-    let mut presynaptic_neuron = Cell { 
+    let test_cell = Cell { 
         current_voltage: if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -389,14 +390,57 @@ pub fn fitting_objective(
         last_dv: 0.,
     };
 
-    let mut postsynaptic_neuron = presynaptic_neuron.clone();
+    let summaries_results = (0..settings.input_currents.len())
+        .map(|i| {
+            get_izhikevich_summary(
+                &mut test_cell.clone(), 
+                &mut test_cell.clone(), 
+                &if_params,
+                settings,
+                i
+            )
+        })
+        .collect::<Vec<Result<ActionPotentialSummary>>>();
 
-    let summary = get_izhikevich_summary(
-        &mut presynaptic_neuron, 
-        &mut postsynaptic_neuron, 
-        &if_params,
-        settings,
-    )?;
+    for result in summaries_results.iter() {
+        if let Err(_) = result {
+            return Err(Error::new(ErrorKind::InvalidData, "Summary calculation could not be completed"));
+        }
+    }
 
-    Ok(compare_summary(&summary, settings.action_potential_summary))
+    let summaries = summaries_results.into_iter().map(|res| res.unwrap())
+        .collect::<Vec<ActionPotentialSummary>>();
+
+    let score = (0..settings.input_currents.len())
+        .map(|i| {
+            compare_summary(&settings.action_potential_summary[i], &summaries[i])
+        })
+        .sum::<f64>();
+
+    Ok(score)
+}
+
+pub fn print_action_potential_summaries(summaries: &[ActionPotentialSummary]) {
+    let mut pre_spike_amplitudes: Vec<f64> = Vec::new();
+    let mut post_spike_amplitudes: Vec<f64> = Vec::new();
+    let mut pre_spike_time_differences: Vec<f64> = Vec::new();
+    let mut post_spike_time_differences: Vec<f64> = Vec::new();
+    let mut num_pre_spikes: Vec<f64> = Vec::new();
+    let mut num_post_spikes: Vec<f64> = Vec::new();
+
+    for summary in summaries {
+        pre_spike_amplitudes.push(summary.average_pre_spike_amplitude);
+        post_spike_amplitudes.push(summary.average_post_spike_amplitude);
+        pre_spike_time_differences.push(summary.average_pre_spike_time_difference);
+        post_spike_time_differences.push(summary.average_post_spike_time_difference);
+        num_pre_spikes.push(summary.num_pre_spikes);
+        num_post_spikes.push(summary.num_post_spikes);
+    }
+
+    println!("Presynaptic spike amplitudes: {:?}", pre_spike_amplitudes);
+    println!("Postsynaptic spike amplitudes: {:?}", post_spike_amplitudes);
+    println!("Presynaptic spike time Differences: {:?}", pre_spike_time_differences);
+    println!("Postsynaptic spike time Differences: {:?}", post_spike_time_differences);
+    println!("# of presynaptic spikes: {:?}", num_pre_spikes);
+    println!("# of postsynaptic spikes: {:?}", num_post_spikes);
 }
