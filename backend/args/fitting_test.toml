@@ -8,6 +8,7 @@ input_current_step = 5.0
 # each input condition could be its own action potential summary
 do_scaling = true
 use_amplitude = false
+print_scaled = true
 
 reference_dt = 0.01
 v_init = 0.0
