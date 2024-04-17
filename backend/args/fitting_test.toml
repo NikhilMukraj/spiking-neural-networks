@@ -1,5 +1,5 @@
 [fit_neuron_models]
-iterations = 20000
+iterations = 30000
 # if number of spikes is not matching, increase timescale
 input_current_lower_bound = 30.0
 input_current_upper_bound = 50.0
@@ -7,9 +7,13 @@ input_current_step = 5.0
 # eventually implement version to various input conditions
 # each input condition could be its own action potential summary
 do_scaling = true
+use_amplitude = false
 
 reference_dt = 0.01
 v_init = 0.0
+
+weight_lower_bound = 0.0
+weight_upper_bound = 2.0
 
 n_bits = 16
 n_iter = 100
