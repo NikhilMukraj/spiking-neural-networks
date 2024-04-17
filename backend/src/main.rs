@@ -2860,6 +2860,9 @@ fn main() -> Result<()> {
         let do_scaling: bool = parse_value_with_default(fit_neuron_models_table, "do_scaling", parse_bool, false)?; 
         println!("do_scaling: {}", do_scaling); 
 
+        let use_amplitude: bool = parse_value_with_default(fit_neuron_models_table, "use_amplitude", parse_bool, false)?; 
+        println!("use_amplitude: {}", use_amplitude);
+
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
 
@@ -2892,13 +2895,20 @@ fn main() -> Result<()> {
 
         let v_th_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "v_th_upper_bound", parse_f64, 200.)?;
         println!("v_th_upper_bound: {}", v_th_upper_bound);
+
+        let weight_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "weight_lower_bound", parse_f64, 1.)?;
+        println!("weight_lower_bound: {}", weight_lower_bound);
+
+        let weight_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "weight_upper_bound", parse_f64, 1.)?;
+        println!("weight_upper_bound: {}", weight_upper_bound);
         
         let bounds: Vec<Vec<f64>> = vec![
             vec![a_lower_bound, a_upper_bound], 
             vec![b_lower_bound, b_upper_bound], 
             vec![c_lower_bound, c_upper_bound], 
             vec![d_lower_bound, d_upper_bound], 
-            vec![v_th_lower_bound, v_th_upper_bound]
+            vec![v_th_lower_bound, v_th_upper_bound],
+            vec![weight_lower_bound, weight_upper_bound]
         ];
 
         let n_bits: usize = parse_value_with_default(&fit_neuron_models_table, "n_bits", parse_usize, 10)?;
@@ -2984,6 +2994,7 @@ fn main() -> Result<()> {
             if_params: &if_params,
             action_potential_summary: &hodgkin_huxley_summaries.as_slice(),
             scaling_factors: &scaling_factors.as_slice(),
+            use_amplitude: use_amplitude,
             spike_amplitude_default: spike_amplitude_default,
             input_currents: input_currents,
             iterations: iterations,
@@ -3014,16 +3025,17 @@ fn main() -> Result<()> {
             Err(e) => return Err(e),
         };
 
-        println!("Decoded values (a, b, c, d, v_th): {:#?}", decoded);
+        println!("Decoded values (a, b, c, d, v_th, weight): {:#?}", decoded);
 
         println!("\nReference summaries:");
-        print_action_potential_summaries(&hodgkin_huxley_summaries);
+        print_action_potential_summaries(&hodgkin_huxley_summaries, &scaling_factors, use_amplitude);
 
         let a: f64 = decoded[0];
         let b: f64 = decoded[1];
         let c: f64 = decoded[2];
         let d: f64 = decoded[3];
         let v_th: f64 = decoded[4];
+        let weight: f64 = decoded[5];
 
         let mut generated_if_params: IFParameters = IzhikevichDefault::izhikevich_default();
         generated_if_params.dt = reference_dt;
@@ -3058,6 +3070,7 @@ fn main() -> Result<()> {
                     &mut test_cell.clone(), 
                     &mut test_cell.clone(), 
                     &if_params,
+                    weight,
                     &fitting_settings,
                     i
                 )
@@ -3074,7 +3087,7 @@ fn main() -> Result<()> {
             .collect::<Vec<ActionPotentialSummary>>();
 
         println!("\nGenerated summaries:");
-        print_action_potential_summaries(&generated_summaries);
+        print_action_potential_summaries(&generated_summaries, &scaling_factors, use_amplitude);
 
         // match fit_neuron_models_table.get("filename") {
         //     Some(value) => {
@@ -3085,6 +3098,9 @@ fn main() -> Result<()> {
         //         test_cell.clone().run_izhikevich_static_input(&if_params, input_currents[0], bayesian, iterations, &parsed_filename);
                 
         //         println!("Finished static test");
+
+        //         let mut refreshed_hodgkin_huxley = get_hodgkin_huxley_params(fit_neuron_models_table, Some("reference"))?;
+        //         refreshed_hodgkin_huxley.run_static_input(input_currents[0], bayesian, iterations, "output/ga_hodgkin_huxley.csv", false);
         //     },
         //     None => {},
         // };
