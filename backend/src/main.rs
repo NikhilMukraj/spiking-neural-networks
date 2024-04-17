@@ -2866,6 +2866,9 @@ fn main() -> Result<()> {
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
 
+        let print_scaled: bool = parse_value_with_default(fit_neuron_models_table, "print_scaled", parse_bool, false)?; 
+        println!("print_scaled: {}", print_scaled); 
+
         let a_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "a_lower_bound", parse_f64, 0.)?;
         println!("a_lower_bound: {}", a_lower_bound);
 
@@ -3028,7 +3031,11 @@ fn main() -> Result<()> {
         println!("Decoded values (a, b, c, d, v_th, weight): {:#?}", decoded);
 
         println!("\nReference summaries:");
-        print_action_potential_summaries(&hodgkin_huxley_summaries, &scaling_factors, use_amplitude);
+        if !print_scaled {
+            print_action_potential_summaries(&hodgkin_huxley_summaries, &scaling_factors, use_amplitude);
+        } else {
+            print_action_potential_summaries(&hodgkin_huxley_summaries, &vec![None; input_currents.len()], use_amplitude);
+        }
 
         let a: f64 = decoded[0];
         let b: f64 = decoded[1];
@@ -3087,7 +3094,11 @@ fn main() -> Result<()> {
             .collect::<Vec<ActionPotentialSummary>>();
 
         println!("\nGenerated summaries:");
-        print_action_potential_summaries(&generated_summaries, &scaling_factors, use_amplitude);
+        if !print_scaled {
+            print_action_potential_summaries(&generated_summaries, &scaling_factors, use_amplitude);
+        } else {
+            print_action_potential_summaries(&generated_summaries, &vec![None; input_currents.len()], use_amplitude);
+        }
 
         // match fit_neuron_models_table.get("filename") {
         //     Some(value) => {
