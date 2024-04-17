@@ -31,7 +31,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Eventually remove old neurotransmitter system and replace it with new one
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
-- Eventually remove input equation system
+- **Eventually remove input equation system**
+
+- Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
 
 - **Need to rename all `input_voltage` to `input_current`**
 - **Need to rename all post_synaptic and all pre_synaptic to postsynaptic and presynaptic**
@@ -113,6 +115,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] More complex neurotransmission equations (with delay time constants and such)
   - [ ] Multicompartmental models
     - [ ] Systemized method for adding compartments
+  - [ ] Hodgkin Huxley lattice simulation
 - [ ] TOML parsing
   - [x] Integrate and fire parsing
     - [x] Static input
