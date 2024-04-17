@@ -175,9 +175,15 @@ fn scale_summary(
     }
 }
 
-fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f64 {
-    let pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
-    let post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
+fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary, use_amplitudes: bool) -> f64 {
+    let mut score = 0.;
+
+    if use_amplitudes {
+        let pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
+        let post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
+
+        score += pre_spike_amplitude + post_spike_amplitude;
+    }
 
     let pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
     let post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
@@ -185,14 +191,13 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
     let num_pre_spikes = (summary1.num_pre_spikes - summary2.num_pre_spikes).powf(2.);
     let num_post_spikes = (summary1.num_post_spikes - summary2.num_post_spikes).powf(2.);
 
-    let output = pre_spike_amplitude + post_spike_amplitude + 
-        pre_spike_difference + post_spike_difference +
+    score += pre_spike_difference + post_spike_difference +
         num_pre_spikes + num_post_spikes;
 
-    if output.is_nan() {
+    if score.is_nan() {
         f64::INFINITY
     } else {
-        output
+        score
     }
 }
 
@@ -255,6 +260,7 @@ pub struct FittingSettings<'a> {
     pub if_params: &'a IFParameters,
     pub action_potential_summary: &'a [ActionPotentialSummary],
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
+    pub use_amplitude: bool,
     pub spike_amplitude_default: f64,
     pub input_currents: &'a [f64],
     pub iterations: usize,
@@ -284,6 +290,7 @@ pub fn get_izhikevich_summary(
     presynaptic_neuron: &mut Cell, 
     postsynaptic_neuron: &mut Cell,
     if_params: &IFParameters,
+    weight: f64,
     settings: &FittingSettings,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
@@ -308,7 +315,7 @@ pub fn get_izhikevich_summary(
 
         presynaptic_neuron.last_dv = pre_dv;
 
-        let postsynaptic_input = voltage_change_to_current_integrate_and_fire(
+        let postsynaptic_input = weight * voltage_change_to_current_integrate_and_fire(
             presynaptic_neuron.last_dv, if_params.dt, 1.0
         );
 
@@ -361,6 +368,7 @@ pub fn fitting_objective(
     let c: f64 = decoded[2];
     let d: f64 = decoded[3];
     let v_th: f64 = decoded[4];
+    let weight: f64 = decoded[5];
 
     let settings = settings.get("settings").unwrap();
 
@@ -396,6 +404,7 @@ pub fn fitting_objective(
                 &mut test_cell.clone(), 
                 &mut test_cell.clone(), 
                 &if_params,
+                weight,
                 settings,
                 i
             )
@@ -413,14 +422,18 @@ pub fn fitting_objective(
 
     let score = (0..settings.input_currents.len())
         .map(|i| {
-            compare_summary(&settings.action_potential_summary[i], &summaries[i])
+            compare_summary(&settings.action_potential_summary[i], &summaries[i], settings.use_amplitude)
         })
         .sum::<f64>();
 
     Ok(score)
 }
 
-pub fn print_action_potential_summaries(summaries: &[ActionPotentialSummary]) {
+pub fn print_action_potential_summaries(
+    summaries: &[ActionPotentialSummary], 
+    scaling_factors: &[Option<SummaryScalingFactors>],
+    use_amplitude: bool,
+) {
     let mut pre_spike_amplitudes: Vec<f64> = Vec::new();
     let mut post_spike_amplitudes: Vec<f64> = Vec::new();
     let mut pre_spike_time_differences: Vec<f64> = Vec::new();
@@ -428,17 +441,26 @@ pub fn print_action_potential_summaries(summaries: &[ActionPotentialSummary]) {
     let mut num_pre_spikes: Vec<f64> = Vec::new();
     let mut num_post_spikes: Vec<f64> = Vec::new();
 
-    for summary in summaries {
-        pre_spike_amplitudes.push(summary.average_pre_spike_amplitude);
-        post_spike_amplitudes.push(summary.average_post_spike_amplitude);
-        pre_spike_time_differences.push(summary.average_pre_spike_time_difference);
-        post_spike_time_differences.push(summary.average_post_spike_time_difference);
-        num_pre_spikes.push(summary.num_pre_spikes);
-        num_post_spikes.push(summary.num_post_spikes);
+    for (summary, scaling) in summaries.iter().zip(scaling_factors) {
+        let (amplitude_scaling, time_scaling, peaks_scaling) = match scaling {
+            Some(value) => (value.amplitude_scale, value.time_difference_scale, value.num_peaks_scale),
+            None => (1., 1., 1.)
+        };
+
+        if use_amplitude {
+            pre_spike_amplitudes.push(summary.average_pre_spike_amplitude * amplitude_scaling);
+            post_spike_amplitudes.push(summary.average_post_spike_amplitude * amplitude_scaling);
+        }
+        pre_spike_time_differences.push(summary.average_pre_spike_time_difference * time_scaling);
+        post_spike_time_differences.push(summary.average_post_spike_time_difference * time_scaling);
+        num_pre_spikes.push(summary.num_pre_spikes * peaks_scaling);
+        num_post_spikes.push(summary.num_post_spikes * peaks_scaling);
     }
 
-    println!("Presynaptic spike amplitudes: {:?}", pre_spike_amplitudes);
-    println!("Postsynaptic spike amplitudes: {:?}", post_spike_amplitudes);
+    if use_amplitude {
+        println!("Presynaptic spike amplitudes: {:?}", pre_spike_amplitudes);
+        println!("Postsynaptic spike amplitudes: {:?}", post_spike_amplitudes);
+    }
     println!("Presynaptic spike time Differences: {:?}", pre_spike_time_differences);
     println!("Postsynaptic spike time Differences: {:?}", post_spike_time_differences);
     println!("# of presynaptic spikes: {:?}", num_pre_spikes);
