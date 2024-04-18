@@ -7,24 +7,23 @@ use std::{
 };
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
-use exprtk_rs::{Expression, SymbolTable};
-use ndarray::Array1;
+// use ndarray::Array1;
 mod distribution;
 use crate::{distribution::limited_distr, fitting::ActionPotentialSummary};
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
-    hodgkin_huxley_bayesian, if_params_bayesian, 
+    hodgkin_huxley_bayesian, if_params_bayesian, gap_junction,
     voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel
 };
-mod eeg;
-use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
+// mod eeg;
+// use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
 mod ga;
-use crate::ga::{BitString, decode, genetic_algo};
+use crate::ga::{decode, genetic_algo};
 mod fitting;
 use crate::fitting::{
     FittingSettings, fitting_objective, 
@@ -65,38 +64,42 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
-fn input_with_current(
-    current: Option<(f64, f64)>, 
-    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
-    sign: f64, 
-    input_cell: &Cell
-) -> f64 {
-    match current {
-        Some(value) => {
-            input_calculation(
-                sign,
-                voltage_change_to_current_integrate_and_fire(
-                    input_cell.last_dv, value.0, value.1
-                ),
-                input_cell.receptor_density,
-                input_cell.neurotransmission_concentration,
-            )
-        },
-        None => {
-            input_calculation(
-                sign,
-                input_cell.current_voltage,
-                input_cell.receptor_density,
-                input_cell.neurotransmission_concentration,
-            )
-        }
-    }
+// fn input_with_current(
+//     current: Option<(f64, f64)>, 
+//     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
+//     sign: f64, 
+//     input_cell: &Cell
+// ) -> f64 {
+//     match current {
+//         Some(value) => {
+//             input_calculation(
+//                 sign,
+//                 voltage_change_to_current_integrate_and_fire(
+//                     input_cell.last_dv, value.0, value.1
+//                 ),
+//                 input_cell.receptor_density,
+//                 input_cell.neurotransmission_concentration,
+//             )
+//         },
+//         None => {
+//             input_calculation(
+//                 sign,
+//                 input_cell.current_voltage,
+//                 input_cell.receptor_density,
+//                 input_cell.neurotransmission_concentration,
+//             )
+//         }
+//     }
+// }
+
+fn signed_gap_junction(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell, sign: f64) -> f64 {
+    sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
 
 fn get_sign(cell: &Cell) -> f64 {
     match cell.potentiation_type {
-        PotentiationType::Excitatory => -1.,
-        PotentiationType::Inhibitory => 1.,
+        PotentiationType::Excitatory => 1.,
+        PotentiationType::Inhibitory => -1.,
     }
 }
 
@@ -111,11 +114,10 @@ fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) ->
 
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
+    postsynaptic_neuron: &Cell,
     input_positions: &Vec<Position>, 
-    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
-    current: Option<(f64, f64)>,
 ) -> f64 {
     let mut input_val = input_positions
         .iter()
@@ -125,7 +127,7 @@ fn get_input_from_positions(
             
             let sign = get_sign(&input_cell);
 
-            let final_input = input_with_current(current, input_calculation, sign, &input_cell);
+            let final_input = signed_gap_junction(&input_cell, &postsynaptic_neuron, sign);
             
             final_input
         })
@@ -145,11 +147,12 @@ fn weighted_get_input_from_positions(
     graph: &dyn GraphFunctionality,
     position: &Position,
     input_positions: &Vec<Position>, 
-    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     if_params: Option<&IFParameters>,
     averaged: bool,
-    current: Option<(f64, f64)>,
 ) -> f64 {
+    let (x, y) = position;
+    let postsynaptic_neuron = &cell_grid[*x][*y];
+
     let mut input_val = input_positions
         .iter()
         .map(|input_position| {
@@ -158,7 +161,7 @@ fn weighted_get_input_from_positions(
             
             let sign = get_sign(&input_cell);
 
-            let final_input = input_with_current(current, input_calculation, sign, &input_cell);
+            let final_input = signed_gap_junction(&input_cell, postsynaptic_neuron, sign);
             
             final_input * graph.lookup_weight(&input_position, position).unwrap()
 
@@ -333,7 +336,7 @@ impl Output {
                 }
             },
             Output::EEG(signals, _, _, _) => {
-                let mut eeg_file = BufWriter::new(File::create(format!("{}_eeg.tct", tag))
+                let mut eeg_file = BufWriter::new(File::create(format!("{}_eeg.txt", tag))
                     .expect("Could not create file"));
 
                 for value in signals {
@@ -398,17 +401,20 @@ fn run_simulation(
     if_type: IFType,
     if_params: &IFParameters,
     do_stdp: bool,
-    current: bool,
     graph_params: &GraphParameters,
     stdp_params: &STDPParameters,
     default_cell_values: &HashMap<String, f64>,
-    input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
     mut output_val: Output,
 ) -> Result<(Output, Box<dyn GraphFunctionality>)> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
         let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
         return Err(Error::new(ErrorKind::InvalidInput, err_msg));
     }
+
+    let gap_conductance = *default_cell_values.get("gap_conductance")
+        .unwrap_or(&7.);
+    let gap_conductance_std = *default_cell_values.get("gap_condutance_std")
+        .unwrap_or(&1.);
 
     let neurotransmission_release = *default_cell_values.get("neurotransmission_release")
         .unwrap_or(&1.);
@@ -450,6 +456,7 @@ fn run_simulation(
                     refractory_count: 0.0,
                     leak_constant: -1.,
                     integration_constant: 1.,
+                    gap_conductance: limited_distr(gap_conductance, gap_conductance_std, 0.1, 10.),
                     potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
                     neurotransmission_concentration: 0., 
                     neurotransmission_release: limited_distr(neurotransmission_release, neurotransmission_release_std, 0.0, 1.0),
@@ -503,11 +510,6 @@ fn run_simulation(
         }
     }
 
-    let current = match current {
-        true => Some((if_params.dt, 1.)),
-        false => None
-    };
-
     if do_stdp && graph_params.write_history {
         graph.update_history();
     }
@@ -536,19 +538,16 @@ fn run_simulation(
                             &*graph,
                             &pos,
                             &input_positions,
-                            input_calculation,
                             bayesian,
                             averaged,
-                            current,
                         )
                     } else {
                         get_input_from_positions(
                             &cell_grid, 
+                            &cell_grid[x][y],
                             &input_positions, 
-                            input_calculation, 
                             bayesian,
                             averaged,
-                            current,
                         )
                     };
                     
@@ -651,19 +650,16 @@ fn run_simulation(
                             &*graph,
                             &pos,
                             &input_positions,
-                            input_calculation,
                             bayesian,
                             averaged,
-                            current,
                         )
                     } else {
                         get_input_from_positions(
                             &cell_grid, 
+                            &cell_grid[x][y],
                             &input_positions, 
-                            input_calculation, 
                             bayesian,
                             averaged,
-                            current,
                         )
                     };
 
@@ -778,7 +774,6 @@ struct SimulationParameters {
     if_params: IFParameters,
     if_type: IFType,
     do_stdp: bool,
-    current: bool,
     stdp_params: STDPParameters,
     graph_params: GraphParameters,
     default_cell_values: HashMap<String, f64>,
@@ -790,6 +785,7 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
         None => String::from(""),
     };
 
+    if_params.gap_condutance_init = parse_value_with_default(table, &format!("{}gap_conductance_init", prefix_value), parse_f64, if_params.gap_condutance_init)?;
     if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
     if_params.exp_dt = parse_value_with_default(table, &format!("{}exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
     if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
@@ -932,37 +928,28 @@ fn get_bayesian_params(
 }
 
 fn get_default_cell_parameters(table: &Value, prefix: Option<&str>) -> Result<HashMap<String, f64>> {
+    let prefix_value = match prefix {
+        Some(value) => format!("{}_", value),
+        None => String::from(""),
+    };
+
     let mut default_cell_values: HashMap<String, f64> = HashMap::new();
-    match prefix {
-        Some(prefix_value) => {
-            default_cell_values.insert(format!("{}_neurotransmission_release", prefix_value), 1.);
-            default_cell_values.insert(format!("{}_receptor_density", prefix_value), 1.);
-            default_cell_values.insert(format!("{}_chance_of_releasing", prefix_value), 0.5);
-            default_cell_values.insert(format!("{}_dissipation_rate", prefix_value), 0.1);
-            default_cell_values.insert(format!("{}_chance_of_random_release", prefix_value), 0.2);
-            default_cell_values.insert(format!("{}_random_release_concentration", prefix_value), 0.1);
-            default_cell_values.insert(format!("{}_excitatory_chance", prefix_value), 0.5);
 
-            default_cell_values.insert(format!("{}_neurotransmission_release_std", prefix_value), 0.);
-            default_cell_values.insert(format!("{}_receptor_density_std", prefix_value), 0.);
-            default_cell_values.insert(format!("{}_dissipation_rate_std", prefix_value), 0.);
-            default_cell_values.insert(format!("{}_random_release_concentration_std", prefix_value), 0.);
-        },
-        None => {
-            default_cell_values.insert(String::from("neurotransmission_release"), 1.);
-            default_cell_values.insert(String::from("receptor_density"), 1.);
-            default_cell_values.insert(String::from("chance_of_releasing"), 0.5);
-            default_cell_values.insert(String::from("dissipation_rate"), 0.1);
-            default_cell_values.insert(String::from("chance_of_random_release"), 0.2);
-            default_cell_values.insert(String::from("random_release_concentration"), 0.1);
-            default_cell_values.insert(String::from("excitatory_chance"), 0.5);
+    default_cell_values.insert(format!("{}gap_condutance", prefix_value), 7.);
+    default_cell_values.insert(format!("{}gap_condutance_std", prefix_value), 1.);
 
-            default_cell_values.insert(String::from("neurotransmission_release_std"), 0.);
-            default_cell_values.insert(String::from("receptor_density_std"), 0.);
-            default_cell_values.insert(String::from("dissipation_rate_std"), 0.);
-            default_cell_values.insert(String::from("random_release_concentration_std"), 0.);
-        }
-    }
+    default_cell_values.insert(format!("{}neurotransmission_release", prefix_value), 1.);
+    default_cell_values.insert(format!("{}receptor_density", prefix_value), 1.);
+    default_cell_values.insert(format!("{}chance_of_releasing", prefix_value), 0.5);
+    default_cell_values.insert(format!("{}dissipation_rate", prefix_value), 0.1);
+    default_cell_values.insert(format!("{}chance_of_random_release", prefix_value), 0.2);
+    default_cell_values.insert(format!("{}random_release_concentration", prefix_value), 0.1);
+    default_cell_values.insert(format!("{}excitatory_chance", prefix_value), 0.5);
+
+    default_cell_values.insert(format!("{}neurotransmission_release_std", prefix_value), 0.);
+    default_cell_values.insert(format!("{}receptor_density_std", prefix_value), 0.);
+    default_cell_values.insert(format!("{}dissipation_rate_std", prefix_value), 0.);
+    default_cell_values.insert(format!("{}random_release_concentration_std", prefix_value), 0.);
 
     let updates: Vec<(String, Result<f64>)> = default_cell_values
         .iter()
@@ -1070,9 +1057,6 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     
     println!("{:#?}", if_params);
 
-    let current: bool = parse_value_with_default(table, "current", parse_bool, false)?;
-    println!("current: {}", current);
-
     // in ms
     let total_time: Option<usize> = match table.get("total_time") {
         Some(value) => {
@@ -1106,7 +1090,6 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         averaged: averaged,
         if_params: if_params,
         if_type: if_type,
-        current: current,
         do_stdp: do_stdp,
         stdp_params: stdp_params,
         graph_params: graph_params,
@@ -1114,95 +1097,69 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
     });
 }
 
-#[derive(Clone)]
-struct GASettings<'a> {
-    equation: &'a str, 
-    eeg: &'a Array1<f64>,
-    sim_params: SimulationParameters,
-    power_density_dt: f64,
-}
+// #[derive(Clone)]
+// struct GASettings<'a> {
+//     equation: &'a str, 
+//     eeg: &'a Array1<f64>,
+//     sim_params: SimulationParameters,
+//     power_density_dt: f64,
+// }
 
-fn objective(
-    bitstring: &BitString, 
-    bounds: &Vec<Vec<f64>>, 
-    n_bits: usize, 
-    settings: &HashMap<&str, GASettings>
-) -> Result<f64> {
-    let decoded = match decode(bitstring, bounds, n_bits) {
-        Ok(decoded_value) => decoded_value,
-        Err(e) => return Err(e),
-    };
+// fn objective(
+//     bitstring: &BitString, 
+//     bounds: &Vec<Vec<f64>>, 
+//     n_bits: usize, 
+//     settings: &HashMap<&str, GASettings>
+// ) -> Result<f64> {
+//     let decoded = match decode(bitstring, bounds, n_bits) {
+//         Ok(decoded_value) => decoded_value,
+//         Err(e) => return Err(e),
+//     };
 
-    let ga_settings = settings
-        .get("ga_settings")
-        .unwrap()
-        .clone();
-    let equation: &str = ga_settings.equation; // "sign * mp + x + rd * (nc^2 * y)"
-    let eeg: &Array1<f64> = ga_settings.eeg;
-    let sim_params: SimulationParameters = ga_settings.sim_params;
-    let power_density_dt: f64 = ga_settings.power_density_dt;
+//     let ga_settings = settings
+//         .get("ga_settings")
+//         .unwrap()
+//         .clone();
+//     let eeg: &Array1<f64> = ga_settings.eeg;
+//     let sim_params: SimulationParameters = ga_settings.sim_params;
+//     let power_density_dt: f64 = ga_settings.power_density_dt;
 
-    let mut symbol_table = SymbolTable::new();
-    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-    let x_id = symbol_table.add_variable("x", 0.).unwrap().unwrap();
-    let y_id = symbol_table.add_variable("y", 0.).unwrap().unwrap();
-    let z_id = symbol_table.add_variable("z", 0.).unwrap().unwrap();
+//     let (output_value, _) = run_simulation(
+//         sim_params.num_rows, 
+//         sim_params.num_cols, 
+//         sim_params.iterations, 
+//         sim_params.radius, 
+//         sim_params.random_volt_initialization,
+//         sim_params.averaged,
+//         sim_params.if_type,
+//         &sim_params.if_params,
+//         sim_params.do_stdp,
+//         &sim_params.graph_params,
+//         &sim_params.stdp_params,
+//         &sim_params.default_cell_values,
+//         Output::Averaged(vec![]),
+//     )?;
 
-    let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
+//     let x: Vec<f64> = match output_value {
+//         Output::Averaged(value) | Output::AveragedBinary(value) => { 
+//             value.iter()
+//                 .map(|val| val.voltage)
+//                 .collect()
+//         },
+//         _ => { unreachable!() },
+//     };
 
-    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-        expr.symbols().value_cell(sign_id).set(sign);
-        expr.symbols().value_cell(mp_id).set(mp);
-        expr.symbols().value_cell(rd_id).set(rd);
-        expr.symbols().value_cell(nc_id).set(nc);
-        expr.symbols().value_cell(x_id).set(decoded[0]);
-        expr.symbols().value_cell(y_id).set(decoded[1]);
-        expr.symbols().value_cell(z_id).set(decoded[2]);
+//     let total_time: f64 = sim_params.iterations as f64 * sim_params.if_params.dt;
+//     // let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
+//     let (_faxis, sxx) = get_power_density(x, power_density_dt, total_time);
+//     let score = power_density_comparison(eeg, &sxx)?;
 
-        expr.value()
-    };
-
-    let (output_value, _) = run_simulation(
-        sim_params.num_rows, 
-        sim_params.num_cols, 
-        sim_params.iterations, 
-        sim_params.radius, 
-        sim_params.random_volt_initialization,
-        sim_params.averaged,
-        sim_params.if_type,
-        &sim_params.if_params,
-        sim_params.do_stdp,
-        sim_params.current,
-        &sim_params.graph_params,
-        &sim_params.stdp_params,
-        &sim_params.default_cell_values,
-        &mut input_func,
-        Output::Averaged(vec![]),
-    )?;
-
-    let x: Vec<f64> = match output_value {
-        Output::Averaged(value) | Output::AveragedBinary(value) => { 
-            value.iter()
-                .map(|val| val.voltage)
-                .collect()
-        },
-        _ => { unreachable!() },
-    };
-
-    let total_time: f64 = sim_params.iterations as f64 * sim_params.if_params.dt;
-    // let (_faxis, sxx) = get_power_density(x, sim_params.lif_params.dt, total_time);
-    let (_faxis, sxx) = get_power_density(x, power_density_dt, total_time);
-    let score = power_density_comparison(eeg, &sxx)?;
-
-    if score.is_nan() || !score.is_finite() {
-        return Ok(f64::MAX);
-    } else {
-        return Ok(score);
-    }
-}
+//     if score.is_nan() || !score.is_finite() {
+//         return Ok(f64::MAX);
+//     } else {
+//         return Ok(score);
+//     }
+// }
 
 fn test_coupled_neurons(
     if_type: IFType,
@@ -1213,32 +1170,14 @@ fn test_coupled_neurons(
     default_post_values: &HashMap<String, f64>,
     iterations: usize,
     input_voltage: f64,
-    current: bool,
-    input_equation: &str,
     filename: &str,
 ) {
-    let mut symbol_table = SymbolTable::new();
-    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-
-    let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
-
-    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-        expr.symbols().value_cell(sign_id).set(sign);
-        expr.symbols().value_cell(mp_id).set(mp);
-        expr.symbols().value_cell(rd_id).set(rd);
-        expr.symbols().value_cell(nc_id).set(nc);
-
-        expr.value()
-    };
-
     let mut pre_synaptic_neuron = Cell { 
         current_voltage: pre_if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
+        gap_conductance: *default_pre_values.get("gap_condutance").unwrap(),
         potentiation_type: pre_potentiation_type,
         neurotransmission_concentration: 0., 
         neurotransmission_release: *default_pre_values.get("pre_neurotransmission_release").unwrap(),
@@ -1262,6 +1201,7 @@ fn test_coupled_neurons(
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
+        gap_conductance: *default_post_values.get("gap_condutance").unwrap(),
         potentiation_type: PotentiationType::Excitatory,
         neurotransmission_concentration: 0., 
         neurotransmission_release: *default_post_values.get("post_neurotransmission_release").unwrap(),
@@ -1278,11 +1218,6 @@ fn test_coupled_neurons(
         c: post_if_params.v_reset,
         d: post_if_params.d_init,
         last_dv: 0.,
-    };
-
-    let current = match current {
-        true => Some((post_if_params.dt, 1.)),
-        false => None
     };
 
     let mut file = BufWriter::new(File::create(filename)
@@ -1324,7 +1259,7 @@ fn test_coupled_neurons(
 
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
-                let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
+                let input = signed_gap_junction(&pre_synaptic_neuron, &post_synaptic_neuron, sign);
         
                 let (post_dv, post_is_spiking) = if post_bayesian {
                     post_synaptic_neuron.get_dv_change_and_spike(
@@ -1386,7 +1321,7 @@ fn test_coupled_neurons(
 
                 pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
-                let input = input_with_current(current, &mut input_func, sign, &pre_synaptic_neuron);
+                let input = signed_gap_junction(&pre_synaptic_neuron, &post_synaptic_neuron, sign);
 
                 let post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
                 let post_dv = if post_bayesian {
@@ -1411,7 +1346,7 @@ fn test_coupled_neurons(
                 post_synaptic_neuron.current_voltage += post_dv;
         
                 writeln!(file, "{}, {}", pre_synaptic_neuron.current_voltage, post_synaptic_neuron.current_voltage).expect("Unable to write to file");        
-           }
+            }
         }
     };
 }
@@ -1554,9 +1489,7 @@ fn run_isolated_stdp_test(
     n: usize,
     input_voltage: f64,
     default_cell_values: &HashMap<String, f64>,
-    current: bool,
     averaged: bool,
-    input_equation: &str,
     filename: &str,
 ) -> Result<()> {
     let mut if_params = match if_type {
@@ -1577,28 +1510,6 @@ fn run_isolated_stdp_test(
 
     println!("{:#?}", if_params);
 
-    let mut symbol_table = SymbolTable::new();
-    let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-    let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-    let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-    let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-
-    let (mut expr, _unknown_vars) = Expression::parse_vars(input_equation, symbol_table).unwrap();
-
-    let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-        expr.symbols().value_cell(sign_id).set(sign);
-        expr.symbols().value_cell(mp_id).set(mp);
-        expr.symbols().value_cell(rd_id).set(rd);
-        expr.symbols().value_cell(nc_id).set(nc);
-
-        expr.value()
-    };
-
-    let current = match current {
-        true => Some((if_params.dt, 1.)),
-        false => None
-    };
-
     let mut post_synaptic_neuron = match if_type {
         IFType::Basic | IFType::Adaptive |
         IFType::AdaptiveExponential => {
@@ -1613,6 +1524,7 @@ fn run_isolated_stdp_test(
         }
     };
 
+    post_synaptic_neuron.gap_conductance = if_params.gap_condutance_init;
     post_synaptic_neuron.w_value = if_params.v_init;
     post_synaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
     post_synaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
@@ -1691,7 +1603,7 @@ fn run_isolated_stdp_test(
                         |i| {
                             let sign = get_sign(&neurons[i]);
 
-                            let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
+                            let output = weights[i] * signed_gap_junction(&neurons[i], &post_synaptic_neuron, sign);
 
                             if averaged {
                                 output / (n as f64)
@@ -1790,7 +1702,7 @@ fn run_isolated_stdp_test(
                         |i| {
                             let sign = get_sign(&neurons[i]);
 
-                            let output = weights[i] * input_with_current(current, &mut input_func, sign, &neurons[i]);
+                            let output = weights[i] * signed_gap_junction(&neurons[i], &post_synaptic_neuron, sign);
 
                             if averaged {
                                 output / (n as f64)
@@ -2182,37 +2094,6 @@ fn main() -> Result<()> {
 
         let sim_params = get_parameters(&simulation_table)?;
 
-        let default_eq = match sim_params.if_type { 
-            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
-            _ => String::from("sign * mp + 100 + rd * (nc^2 * 200)")
-        };
-
-        let equation: String = parse_value_with_default(
-            &simulation_table, 
-            "input_equation", 
-            parse_string, 
-            default_eq
-        )?;
-        let equation: &str = equation.trim();
-        println!("input_equation: {}", equation);
-    
-        let mut symbol_table = SymbolTable::new();
-        let sign_id = symbol_table.add_variable("sign", 0.).unwrap().unwrap();
-        let mp_id = symbol_table.add_variable("mp", 0.).unwrap().unwrap();
-        let rd_id = symbol_table.add_variable("rd", 0.).unwrap().unwrap();
-        let nc_id = symbol_table.add_variable("nc", 0.).unwrap().unwrap();
-    
-        let (mut expr, _unknown_vars) = Expression::parse_vars(equation, symbol_table).unwrap();
-    
-        let mut input_func = |sign: f64, mp: f64, rd: f64, nc: f64| -> f64 {
-            expr.symbols().value_cell(sign_id).set(sign);
-            expr.symbols().value_cell(mp_id).set(mp);
-            expr.symbols().value_cell(rd_id).set(rd);
-            expr.symbols().value_cell(nc_id).set(nc);
-    
-            expr.value()
-        };
-
         let output_type: String = parse_value_with_default(
             &simulation_table, 
             "output_type", 
@@ -2254,11 +2135,9 @@ fn main() -> Result<()> {
             sim_params.if_type,
             &sim_params.if_params,
             sim_params.do_stdp,
-            sim_params.current,
             &sim_params.graph_params,
             &sim_params.stdp_params,
             &sim_params.default_cell_values,
-            &mut input_func,
             output_type,
         )?;
 
@@ -2296,102 +2175,102 @@ fn main() -> Result<()> {
         }
 
         println!("Finished lattice simulation");
-    } else if let Some(ga_table) = config.get("ga") {
-        let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
-        println!("n_bits: {}", n_bits);
+    // } else if let Some(ga_table) = config.get("ga") {
+    //     let n_bits: usize = parse_value_with_default(&ga_table, "n_bits", parse_usize, 10)?;
+    //     println!("n_bits: {}", n_bits);
 
-        let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
-        println!("n_iter: {}", n_iter);
+    //     let n_iter: usize = parse_value_with_default(&ga_table, "n_iter", parse_usize, 100)?;
+    //     println!("n_iter: {}", n_iter);
 
-        let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
-        println!("n_pop: {}", n_pop);
+    //     let n_pop: usize = parse_value_with_default(&ga_table, "n_pop", parse_usize, 100)?;
+    //     println!("n_pop: {}", n_pop);
 
-        let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.9)?;
-        println!("r_cross: {}", r_cross);
+    //     let r_cross: f64 = parse_value_with_default(&ga_table, "r_cross", parse_f64, 0.9)?;
+    //     println!("r_cross: {}", r_cross);
 
-        let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.1)?;
-        println!("r_mut: {}", r_mut);
+    //     let r_mut: f64 = parse_value_with_default(&ga_table, "r_mut", parse_f64, 0.1)?;
+    //     println!("r_mut: {}", r_mut);
 
-        let k: usize = 3;
+    //     let k: usize = 3;
 
-        let equation: String = parse_value_with_default(
-            &ga_table, 
-            "input_equation", 
-            parse_string, 
-            String::from("(sign * mp + x + rd * (nc^2 * y)) * z")
-        )?;
-        let equation: &str = equation.trim();
-        println!("equation: {}", equation);
+    //     let equation: String = parse_value_with_default(
+    //         &ga_table, 
+    //         "input_equation", 
+    //         parse_string, 
+    //         String::from("(sign * mp + x + rd * (nc^2 * y)) * z")
+    //     )?;
+    //     let equation: &str = equation.trim();
+    //     println!("equation: {}", equation);
 
-        let sim_params = get_parameters(&ga_table)?;
+    //     let sim_params = get_parameters(&ga_table)?;
 
-        // make sure lif_params.exp_dt = lif_params.dt
-        // sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
+    //     // make sure lif_params.exp_dt = lif_params.dt
+    //     // sim_params.lif_params.exp_dt = sim_params.lif_params.dt;
 
-        let eeg_file: &str = match ga_table.get("eeg_file") {
-            Some(value) => {
-                match value.as_str() {
-                    Some(output_value) => output_value,
-                    None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'eeg_file' as string")); }
-                }
-            },
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "Requires 'eeg_file' argument")); },
-        };
+    //     let eeg_file: &str = match ga_table.get("eeg_file") {
+    //         Some(value) => {
+    //             match value.as_str() {
+    //                 Some(output_value) => output_value,
+    //                 None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'eeg_file' as string")); }
+    //             }
+    //         },
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "Requires 'eeg_file' argument")); },
+    //     };
 
-        // eeg should have column specifying dt and total time
-        let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
-        let (_faxis, sxx) = get_power_density(x, dt, total_time);
+    //     // eeg should have column specifying dt and total time
+    //     let (x, dt, total_time) = read_eeg_csv(eeg_file)?;
+    //     let (_faxis, sxx) = get_power_density(x, dt, total_time);
 
-        let power_density_dt: f64 = parse_value_with_default(
-            &ga_table, 
-            "power_density_dt", 
-            parse_f64, 
-            dt
-        )?;
-        println!("power density calculation dt: {}", power_density_dt);
+    //     let power_density_dt: f64 = parse_value_with_default(
+    //         &ga_table, 
+    //         "power_density_dt", 
+    //         parse_f64, 
+    //         dt
+    //     )?;
+    //     println!("power density calculation dt: {}", power_density_dt);
 
-        let ga_settings = GASettings {
-            equation: equation, 
-            eeg: &sxx,
-            sim_params: sim_params,
-            power_density_dt: power_density_dt,
-        };
+    //     let ga_settings = GASettings {
+    //         equation: equation, 
+    //         eeg: &sxx,
+    //         sim_params: sim_params,
+    //         power_density_dt: power_density_dt,
+    //     };
 
-        let mut settings: HashMap<&str, GASettings<'_>> = HashMap::new();
-        settings.insert("ga_settings", ga_settings);
+    //     let mut settings: HashMap<&str, GASettings<'_>> = HashMap::new();
+    //     settings.insert("ga_settings", ga_settings);
 
-        let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
-        let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
+    //     let bounds_min: f64 = parse_value_with_default(&ga_table, "bounds_min", parse_f64, 0.)?;
+    //     let bounds_max: f64 = parse_value_with_default(&ga_table, "bounds_max", parse_f64, 100.)?;
 
-        let bounds: Vec<Vec<f64>> = (0..3)
-            .map(|_| vec![bounds_min, bounds_max])
-            .collect();
+    //     let bounds: Vec<Vec<f64>> = (0..3)
+    //         .map(|_| vec![bounds_min, bounds_max])
+    //         .collect();
 
-        println!("\nStarting genetic algorithm...");
-        let (best_bitstring, best_score, _scores) = genetic_algo(
-            objective, 
-            &bounds, 
-            n_bits, 
-            n_iter, 
-            n_pop, 
-            r_cross,
-            r_mut, 
-            k, 
-            &settings,
-        )?;
+    //     println!("\nStarting genetic algorithm...");
+    //     let (best_bitstring, best_score, _scores) = genetic_algo(
+    //         objective, 
+    //         &bounds, 
+    //         n_bits, 
+    //         n_iter, 
+    //         n_pop, 
+    //         r_cross,
+    //         r_mut, 
+    //         k, 
+    //         &settings,
+    //     )?;
 
-        println!("Best bitstring: {}", best_bitstring.string);
-        println!("Best score: {}", best_score);
+    //     println!("Best bitstring: {}", best_bitstring.string);
+    //     println!("Best score: {}", best_score);
 
-        let decoded = match decode(&best_bitstring, &bounds, n_bits) {
-            Ok(decoded_value) => decoded_value,
-            Err(e) => return Err(e),
-        };
+    //     let decoded = match decode(&best_bitstring, &bounds, n_bits) {
+    //         Ok(decoded_value) => decoded_value,
+    //         Err(e) => return Err(e),
+    //     };
 
-        println!("Decoded values: {:#?}", decoded);
+    //     println!("Decoded values: {:#?}", decoded);
 
-        // option to run a simulation and return the eeg signals
-        // option to write custom bounds
+    //     // option to run a simulation and return the eeg signals
+    //     // option to write custom bounds
     } else if let Some(single_neuron_test) = config.get("single_neuron_test") {
         let filename: String = match single_neuron_test.get("filename") {
             Some(value) => parse_string(value, "filename")?,
@@ -2460,6 +2339,7 @@ fn main() -> Result<()> {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
+            gap_conductance: if_params.gap_condutance_init,
             potentiation_type: PotentiationType::Excitatory,
             neurotransmission_concentration: 0., 
             neurotransmission_release: 1.,
@@ -2526,20 +2406,6 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let default_eq = match if_type {
-            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
-            _ => String::from("sign * mp + 100")
-        };
-
-        let equation: String = parse_value_with_default(
-            &coupled_table, 
-            "input_equation", 
-            parse_string, 
-            default_eq
-        )?;
-        let equation: &str = equation.trim();
-        println!("\ninput equation: {}", equation);
-
         let default_pre_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("pre"))?;
         let default_post_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("post"))?;
         
@@ -2582,9 +2448,6 @@ fn main() -> Result<()> {
             _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
         };     
 
-        let current: bool = parse_value_with_default(coupled_table, "current", parse_bool, false)?;
-        println!("current: {}", current);
-
         test_coupled_neurons(
             if_type,
             &pre_if_params, 
@@ -2594,8 +2457,6 @@ fn main() -> Result<()> {
             &default_post_values,
             iterations,
             input_voltage,
-            current,
-            equation,
             &filename,
         );   
         
@@ -2637,25 +2498,8 @@ fn main() -> Result<()> {
 
         let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&stdp_table, None)?;
 
-        let current: bool = parse_value_with_default(stdp_table, "current", parse_bool, false)?;
-        println!("current: {}", current);
-
         let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
         println!("averaged: {}", averaged);
-
-        let default_eq = match if_type {
-            IFType::Izhikevich | IFType::IzhikevichLeaky => String::from("(sign * mp + 65) / 15."),
-            _ => String::from("weight * (sign * mp + 100)")
-        };
-
-        let equation: String = parse_value_with_default(
-            &stdp_table, 
-            "input_equation", 
-            parse_string, 
-            default_eq
-        )?;
-        let equation: &str = equation.trim();
-        println!("\ninput equation: {}", equation);
 
         let mut stdp_params = STDPParameters::default();
 
@@ -2669,9 +2513,7 @@ fn main() -> Result<()> {
             n,
             input_voltage,
             &default_cell_values,
-            current,
             averaged,
-            &equation,
             &filename,
         )?;
 
@@ -3053,6 +2895,7 @@ fn main() -> Result<()> {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
+            gap_conductance: if_params.gap_condutance_init,
             potentiation_type: PotentiationType::Excitatory,
             neurotransmission_concentration: 0., 
             neurotransmission_release: 0.,
