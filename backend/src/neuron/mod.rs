@@ -35,6 +35,7 @@ pub struct IFParameters {
     pub v_reset: f64,
     pub tau_m: f64,
     pub g_l: f64,
+    pub gap_condutance_init: f64,
     pub v_init: f64,
     pub e_l: f64,
     pub tref: f64,
@@ -55,6 +56,7 @@ impl Default for IFParameters {
             v_reset: -75., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 10., // leak conductance (nS)
+            gap_condutance_init: 7., // gap condutance (nS)
             v_init: -75., // initial potential (mV)
             e_l: -75., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -80,6 +82,7 @@ impl ScaledDefault for IFParameters {
             v_reset: 0., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
+            gap_condutance_init: 7., // gap condutance (nS)
             v_init: 0., // initial potential (mV)
             e_l: 0., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -105,6 +108,7 @@ impl IzhikevichDefault for IFParameters {
             v_reset: -65., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 10., // leak conductance (nS)
+            gap_condutance_init: 7., // gap condutance (nS)
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -191,6 +195,7 @@ pub struct Cell {
     pub refractory_count: f64, // keeping track of refractory period
     pub leak_constant: f64, // leak constant gene
     pub integration_constant: f64, // integration constant gene
+    pub gap_conductance: f64, // condutance between synapses
     pub potentiation_type: PotentiationType,
     pub neurotransmission_concentration: f64, // concentration of neurotransmitter in synapse
     pub neurotransmission_release: f64, // concentration of neurotransmitter released at spiking
@@ -216,6 +221,7 @@ impl Default for Cell {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
+            gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
             neurotransmission_concentration: 0., 
             neurotransmission_release: 0.,
@@ -243,6 +249,7 @@ impl IzhikevichDefault for Cell {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
+            gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
             neurotransmission_concentration: 0., 
             neurotransmission_release: 0.,
@@ -1471,4 +1478,9 @@ pub fn voltage_change_to_current(presynaptic_neuron: &HodgkinHuxleyCell) -> f64 
 
 pub fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -> f64 {
     (dv / dt) * cm
+}
+
+pub fn gap_junction(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
+    postsynaptic_neuron.gap_conductance * 
+    (presynaptic_neuron.current_voltage - postsynaptic_neuron.current_voltage)
 }
