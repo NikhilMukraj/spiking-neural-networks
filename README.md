@@ -137,6 +137,7 @@ EEG processing with fourier transforms, and power spectral density calculations
         - [x] Scaling data properly
       - [x] Comparing static and coupled inputs
       - [x] Comparing spikes under various input conditions
+    - [ ] Option to calculate peaks from Izhikevich neuron based on deritative of data
     - [ ] [Spike time concidence objective function](https://www.sciencedirect.com/science/article/pii/S0893608019303065)
     - [ ] Potential objective function refactor with spike amplitude being height subtracted by minimum
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
