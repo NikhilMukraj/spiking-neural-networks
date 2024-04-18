@@ -380,6 +380,7 @@ pub fn fitting_objective(
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
+        gap_conductance: if_params.gap_condutance_init,
         potentiation_type: PotentiationType::Excitatory,
         neurotransmission_concentration: 0., 
         neurotransmission_release: 0.,
