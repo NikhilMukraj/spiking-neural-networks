@@ -1,13 +1,18 @@
 [stdp_test]
 if_type = "izhikevich"
 iterations = 10000
+
 weight_init = 1.0
 weight_max = 2.0
 weight_min = 0.0
 weight_std = 0.1
 n = 2
+averaged = true
 input_voltage = 30.0
-filename = "results/current_stdp.csv"
 bayesian_std = 0.3
-current = true
-input_equation = "-sign * mp"
+
+# v_th = 0.0
+# v_reset = -50.0
+gap_conductance_init = 1.0
+
+filename = "output/gap_junction_stdp.csv"
