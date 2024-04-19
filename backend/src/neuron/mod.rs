@@ -214,6 +214,11 @@ pub struct Cell {
     pub last_dv: f64, // last change in voltage
 }
 
+pub trait Coupling {
+    fn get_conductance(&self) -> f64;
+    fn get_current_voltage(&self) -> f64;
+}
+
 impl Default for Cell {
     fn default() -> Self {
         Cell {
@@ -267,6 +272,16 @@ impl IzhikevichDefault for Cell {
             d: IFParameters::izhikevich_default().d_init,
             last_dv: 0.,
         }
+    }
+}
+
+impl Coupling for Cell {
+    fn get_conductance(&self) -> f64 {
+        self.gap_conductance
+    }
+
+    fn get_current_voltage(&self) -> f64 {
+        self.current_voltage
     }
 }
 
@@ -1168,6 +1183,7 @@ impl Gate {
 #[derive(Clone)]
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
+    pub gap_condutance: f64,
     pub last_dv: f64,
     pub dt: f64,
     pub cm: f64,
@@ -1185,6 +1201,16 @@ pub struct HodgkinHuxleyCell {
     pub bayesian_params: BayesianParameters,
 }
 
+impl Coupling for HodgkinHuxleyCell {
+    fn get_conductance(&self) -> f64 {
+        self.gap_condutance
+    }
+
+    fn get_current_voltage(&self) -> f64 {
+        self.current_voltage
+    }
+}
+
 impl Default for HodgkinHuxleyCell {
     fn default() -> Self {
         let default_gate = Gate {
@@ -1195,6 +1221,7 @@ impl Default for HodgkinHuxleyCell {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
+            gap_condutance: 7.,
             last_dv: 0.,
             dt: 0.1,
             cm: 1., 
@@ -1480,7 +1507,7 @@ pub fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -
     (dv / dt) * cm
 }
 
-pub fn gap_junction(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
-    postsynaptic_neuron.gap_conductance * 
-    (presynaptic_neuron.current_voltage - postsynaptic_neuron.current_voltage)
+pub fn gap_junction<T: Coupling>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
+    postsynaptic_neuron.get_conductance() * 
+    (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
