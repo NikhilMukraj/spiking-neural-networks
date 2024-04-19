@@ -15,7 +15,7 @@ use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
     hodgkin_huxley_bayesian, if_params_bayesian, gap_junction,
-    voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
+    voltage_change_to_current_integrate_and_fire,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel
@@ -1777,6 +1777,14 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}cm: {}", prefix, cm);
 
+    let gap_conductance: f64 = parse_value_with_default(
+        &hodgkin_huxley_table, 
+        format!("{}gap_conductance", prefix).as_str(), 
+        parse_f64, 
+        7.
+    )?;
+    println!("{}gap_conductance: {}", prefix, gap_conductance);
+
     let e_na: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
         format!("{}e_na", prefix).as_str(), 
@@ -1970,6 +1978,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
+            gap_condutance: gap_conductance,
             last_dv: 0.,
             dt: dt,
             cm: cm,
@@ -2025,22 +2034,24 @@ fn coupled_hodgkin_huxley<'a>(
                 input_voltage * hodgkin_huxley_bayesian(&presynaptic_neuron)
             );
 
-            let current = voltage_change_to_current(
-                &presynaptic_neuron
+            let input_current = gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
             );
 
             postsynaptic_neuron.iterate(
-                current * bayesian_factor
+                input_current * bayesian_factor
             );
         } else {
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
             presynaptic_neuron.iterate(input_voltage);
 
-            let current = voltage_change_to_current(
-                &presynaptic_neuron
+            let input_current = gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
             );
 
-            postsynaptic_neuron.iterate(current);
+            postsynaptic_neuron.iterate(input_current);
         }
 
         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
