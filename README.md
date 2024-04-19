@@ -30,6 +30,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
 - Eventually remove old neurotransmitter system and replace it with new one
+  - Neurotransmitter concentration should be calculated as average voltage of presynaptic neurons
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 - **Eventually remove input equation system**
 
@@ -37,6 +38,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Need to rename all `input_voltage` to `input_current`**
 - **Need to rename all post_synaptic and all pre_synaptic to postsynaptic and presynaptic**
+
+- Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
 
 - Hopfield network
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
@@ -52,7 +55,14 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Or perceived cue could be above or below a given baseline, cue itself can be a fast (or excitatory) spike train or a slow (or potentially inhibitory) spike train, 0 is a baseline spike train speed (spike train just being a series of spikes)
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
-- When done modeling memory, attempt classifying with liquid state machines
+  - Decoding unit acts as readout
+  - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
+- When done modeling memory, attempt general classification tasks with liquid state machines
+
+- [Gap junction equation and various models for different currents](https://www.maths.nottingham.ac.uk/plp/pmzsc/cnn/CNN4.pdf)
+
+- Look into delta rule for learning
+- [Implementation details of a Izhikevich R-STDP synapse](https://link.springer.com/article/10.1007/s00521-022-07220-6)
 
 ## Todo
 
@@ -114,6 +124,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] M-current
   - [ ] More complex neurotransmission equations (with delay time constants and such)
   - [ ] Multicompartmental models
+    - [ ] [Cable theory](https://boulderschool.yale.edu/sites/default/files/files/DayanAbbott.pdf)
     - [ ] Systemized method for adding compartments
   - [ ] Hodgkin Huxley lattice simulation
 - [ ] TOML parsing
