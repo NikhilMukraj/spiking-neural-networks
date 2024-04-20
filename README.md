@@ -31,8 +31,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Eventually remove old neurotransmitter system and replace it with new one
   - Neurotransmitter concentration should be calculated as average voltage of presynaptic neurons
+  - Remove default cell value hashmap functions
+  - Gap condutance should be retrieved from TOML via IFParameters
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
-- **Eventually remove input equation system**
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
 
@@ -40,6 +41,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Need to rename all post_synaptic and all pre_synaptic to postsynaptic and presynaptic**
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
+
+- Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
 - Hopfield network
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
