@@ -15,7 +15,6 @@ use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
     hodgkin_huxley_bayesian, if_params_bayesian, gap_junction,
-    voltage_change_to_current_integrate_and_fire,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel
@@ -204,18 +203,15 @@ struct NeuroAndVolts {
 
 // distance: 6.8 mm
 // conductivity: 0.251 S/m 
+// refence voltage: 7 uV (microvolt)
 // either convert dist to m, or conductivity to S/mm
 // should be inputtable from user as well
-fn convert_to_eeg(cell_grid: &CellGrid, dt: f64, distance: f64, conductivity: f64) -> f64 {
+fn convert_to_eeg(cell_grid: &CellGrid, distance: f64, conductivity: f64, reference_voltage: f64) -> f64 {
     let mut total_current: f64 = 0.;
 
     for row in cell_grid {
         for value in row {
-            total_current += voltage_change_to_current_integrate_and_fire(
-                value.last_dv,
-                dt,
-                1.,
-            );
+            total_current += value.current_voltage - reference_voltage;
         }
     }
 
@@ -251,22 +247,22 @@ impl Output {
                     }
                 );
             },
-            Output::EEG(signals, dt, distance, conductivity) => {
+            Output::EEG(signals, distance, conductivity, reference_voltage) => {
                 signals.push((
-                    convert_to_eeg(cell_grid, *dt, *distance, *conductivity),
+                    convert_to_eeg(cell_grid, *distance, *conductivity, *reference_voltage),
                     get_neuro_avg(cell_grid),
                 ))
             }
         }
     }
 
-    fn from_str(string: &str, dt: f64, distance: f64, conductivity: f64) -> Result<Output> {
+    fn from_str(string: &str, distance: f64, conductivity: f64, reference_voltage: f64) -> Result<Output> {
         match string.to_ascii_lowercase().as_str() {
             "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
             "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid>::new())) },
             "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVolts>::new())) },
             "averaged binary" => { Ok(Output::AveragedBinary(Vec::<NeuroAndVolts>::new())) },
-            "eeg" => { Ok(Output::EEG(Vec::<(f64, f64)>::new(), dt, distance, conductivity)) }
+            "eeg" => { Ok(Output::EEG(Vec::<(f64, f64)>::new(), distance, conductivity, reference_voltage)) }
             _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
         }
     }
@@ -2129,11 +2125,19 @@ fn main() -> Result<()> {
         )?;
         println!("eeg_conductivity: {}", conductivity);
 
+        let reference_voltage = parse_value_with_default(
+            &simulation_table, 
+            "eeg_reference_voltage", 
+            parse_f64, 
+            0.007,
+        )?;
+        println!("eeg_reference_voltage: {}", reference_voltage);
+
         let output_type = Output::from_str(
             &output_type, 
-            sim_params.if_params.dt, 
             distance, 
-            conductivity
+            conductivity,
+            reference_voltage,
         )?;
 
         let (output_value, output_graph) = run_simulation(
@@ -2895,7 +2899,7 @@ fn main() -> Result<()> {
         let c: f64 = decoded[2];
         let d: f64 = decoded[3];
         let v_th: f64 = decoded[4];
-        let weight: f64 = decoded[5];
+        let gap_conductance: f64 = decoded[5];
 
         let mut generated_if_params: IFParameters = IzhikevichDefault::izhikevich_default();
         generated_if_params.dt = reference_dt;
@@ -2906,7 +2910,7 @@ fn main() -> Result<()> {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
-            gap_conductance: if_params.gap_condutance_init,
+            gap_conductance: gap_conductance,
             potentiation_type: PotentiationType::Excitatory,
             neurotransmission_concentration: 0., 
             neurotransmission_release: 0.,
@@ -2931,7 +2935,6 @@ fn main() -> Result<()> {
                     &mut test_cell.clone(), 
                     &mut test_cell.clone(), 
                     &if_params,
-                    weight,
                     &fitting_settings,
                     i
                 )
