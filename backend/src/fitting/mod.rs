@@ -5,8 +5,7 @@ use std::{
 use crate::distribution::limited_distr;
 use crate::neuron::{
     Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    find_peaks, diff, hodgkin_huxley_bayesian,
-    voltage_change_to_current, voltage_change_to_current_integrate_and_fire,
+    find_peaks, diff, hodgkin_huxley_bayesian, gap_junction,
 };
 use crate::ga::{BitString, decode};
 
@@ -225,8 +224,9 @@ pub fn get_hodgkin_huxley_voltages(
                 input_current * hodgkin_huxley_bayesian(&presynaptic_neuron)
             );
 
-            let current = voltage_change_to_current(
-                &presynaptic_neuron
+            let current = gap_junction(
+                &presynaptic_neuron,
+                &postsynaptic_neuron,
             );
 
             postsynaptic_neuron.iterate(
@@ -236,8 +236,9 @@ pub fn get_hodgkin_huxley_voltages(
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
             presynaptic_neuron.iterate(input_current);
 
-            let current = voltage_change_to_current(
-                &presynaptic_neuron
+            let current = gap_junction(
+                &presynaptic_neuron,
+                &postsynaptic_neuron,
             );
 
             postsynaptic_neuron.iterate(current);
@@ -290,7 +291,6 @@ pub fn get_izhikevich_summary(
     presynaptic_neuron: &mut Cell, 
     postsynaptic_neuron: &mut Cell,
     if_params: &IFParameters,
-    weight: f64,
     settings: &FittingSettings,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
@@ -315,8 +315,9 @@ pub fn get_izhikevich_summary(
 
         presynaptic_neuron.last_dv = pre_dv;
 
-        let postsynaptic_input = weight * voltage_change_to_current_integrate_and_fire(
-            presynaptic_neuron.last_dv, if_params.dt, 1.0
+        let postsynaptic_input = gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
         );
 
         let post_spike = postsynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
@@ -368,7 +369,7 @@ pub fn fitting_objective(
     let c: f64 = decoded[2];
     let d: f64 = decoded[3];
     let v_th: f64 = decoded[4];
-    let weight: f64 = decoded[5];
+    let gap_conductance: f64 = decoded[5];
 
     let settings = settings.get("settings").unwrap();
 
@@ -380,7 +381,7 @@ pub fn fitting_objective(
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
-        gap_conductance: if_params.gap_condutance_init,
+        gap_conductance: gap_conductance,
         potentiation_type: PotentiationType::Excitatory,
         neurotransmission_concentration: 0., 
         neurotransmission_release: 0.,
@@ -405,7 +406,6 @@ pub fn fitting_objective(
                 &mut test_cell.clone(), 
                 &mut test_cell.clone(), 
                 &if_params,
-                weight,
                 settings,
                 i
             )
