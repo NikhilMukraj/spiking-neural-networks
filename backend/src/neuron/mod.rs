@@ -1497,16 +1497,6 @@ pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
     )
 }
 
-// current / capacitance * time = change in voltage
-// change in voltage / time * capacitance = current
-pub fn voltage_change_to_current(presynaptic_neuron: &HodgkinHuxleyCell) -> f64 {
-    (presynaptic_neuron.last_dv / presynaptic_neuron.dt) * presynaptic_neuron.cm
-}
-
-pub fn voltage_change_to_current_integrate_and_fire(dv: f64, dt: f64, cm: f64) -> f64 {
-    (dv / dt) * cm
-}
-
 pub fn gap_junction<T: Coupling>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
     postsynaptic_neuron.get_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
