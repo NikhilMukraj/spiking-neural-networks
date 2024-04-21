@@ -35,6 +35,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Gap condutance should be retrieved from TOML via IFParameters
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
+- Split `main.rs` functions into a few different files for readability
+
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
 
 - **Need to rename all `input_voltage` to `input_current`**
@@ -66,6 +68,26 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Look into delta rule for learning
 - [Implementation details of a Izhikevich R-STDP synapse](https://link.springer.com/article/10.1007/s00521-022-07220-6)
+
+### Notes on what to modulate
+
+- Ion channels
+  - Na+, K+
+  - Leak current
+  - Ca++ (L-current HVA, T-current)
+  - M-current
+  - Rectifying channels
+- Ligand gated channels
+  - AMPA, GABA(a/b), NMDA
+- Metabotropic neurotransmitters
+  - Dopamine
+  - Serotonin
+  - Nitric oxide
+  - Acetylcholine
+  - Glutamate
+  - Adrenaline
+- Weights
+  - Weights between certain neurons or specific projections (pyramidal or chandelier for example)
 
 ## Todo
 
