@@ -63,34 +63,6 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
-// fn input_with_current(
-//     current: Option<(f64, f64)>, 
-//     input_calculation: &mut dyn FnMut(f64, f64, f64, f64) -> f64,
-//     sign: f64, 
-//     input_cell: &Cell
-// ) -> f64 {
-//     match current {
-//         Some(value) => {
-//             input_calculation(
-//                 sign,
-//                 voltage_change_to_current_integrate_and_fire(
-//                     input_cell.last_dv, value.0, value.1
-//                 ),
-//                 input_cell.receptor_density,
-//                 input_cell.neurotransmission_concentration,
-//             )
-//         },
-//         None => {
-//             input_calculation(
-//                 sign,
-//                 input_cell.current_voltage,
-//                 input_cell.receptor_density,
-//                 input_cell.neurotransmission_concentration,
-//             )
-//         }
-//     }
-// }
-
 fn signed_gap_junction(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell, sign: f64) -> f64 {
     sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
@@ -186,20 +158,20 @@ fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
     volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
 }
 
-fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
-    let neuro_mean: f64 = cell_grid
-        .iter()
-        .flatten()
-        .map(|x| x.neurotransmission_concentration)
-        .sum();
+// fn get_neuro_avg(cell_grid: &CellGrid) -> f64 {
+//     let neuro_mean: f64 = cell_grid
+//         .iter()
+//         .flatten()
+//         .map(|x| x.neurotransmission_concentration)
+//         .sum();
 
-    neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
-}
+//     neuro_mean / ((cell_grid[0].len() * cell_grid.len()) as f64) 
+// }
 
-struct NeuroAndVolts {
-    voltage: f64,
-    neurotransmitter: f64,
-}
+// struct NeuroAndVolts {
+//     voltage: f64,
+//     neurotransmitter: f64,
+// }
 
 // distance: 6.8 mm
 // conductivity: 0.251 S/m 
@@ -218,21 +190,21 @@ fn convert_to_eeg(cell_grid: &CellGrid, distance: f64, conductivity: f64, refere
     (1. / (4. * PI * conductivity * distance)) * total_current
 }
 
-fn create_voltage_and_neuro_files(tag: &str, extension: &str) -> (BufWriter<File>, BufWriter<File>) {
-    let voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, extension))
-        .expect("Could not create file"));
-    let neurotransmitter_file = BufWriter::new(File::create(format!("{}_neurotransmitter.{}", tag, extension))
-        .expect("Could not create file"));
+// fn create_voltage_and_neuro_files(tag: &str, extension: &str) -> (BufWriter<File>, BufWriter<File>) {
+//     let voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, extension))
+//         .expect("Could not create file"));
+//     let neurotransmitter_file = BufWriter::new(File::create(format!("{}_neurotransmitter.{}", tag, extension))
+//         .expect("Could not create file"));
 
-    (voltage_file, neurotransmitter_file)
-}
+//     (voltage_file, neurotransmitter_file)
+// }
 
 enum Output {
     Grid(Vec<CellGrid>),
     GridBinary(Vec<CellGrid>),
-    Averaged(Vec<NeuroAndVolts>),
-    AveragedBinary(Vec<NeuroAndVolts>),
-    EEG(Vec<(f64, f64)>, f64, f64, f64),
+    Averaged(Vec<f64>), // NeuroAndVolts
+    AveragedBinary(Vec<f64>), // NeuroAndVolts
+    EEG(Vec<f64>, f64, f64, f64), // Vec<(f64, f64)>, f64, f64, f64
 }
 
 impl Output {
@@ -241,17 +213,18 @@ impl Output {
             Output::Grid(grids) | Output::GridBinary(grids) => { grids.push(cell_grid.clone()) }
             Output::Averaged(averages) | Output::AveragedBinary(averages) => { 
                 averages.push(
-                    NeuroAndVolts {
-                        voltage: get_volt_avg(cell_grid),
-                        neurotransmitter: get_neuro_avg(cell_grid),
-                    }
+                    // NeuroAndVolts {
+                    //     voltage: get_volt_avg(cell_grid),
+                    //     neurotransmitter: get_neuro_avg(cell_grid),
+                    // }
+                    get_volt_avg(cell_grid)
                 );
             },
             Output::EEG(signals, distance, conductivity, reference_voltage) => {
-                signals.push((
-                    convert_to_eeg(cell_grid, *distance, *conductivity, *reference_voltage),
-                    get_neuro_avg(cell_grid),
-                ))
+                signals.push(
+                    convert_to_eeg(cell_grid, *distance, *conductivity, *reference_voltage)
+                    // get_neuro_avg(cell_grid),
+                )
             }
         }
     }
@@ -260,9 +233,9 @@ impl Output {
         match string.to_ascii_lowercase().as_str() {
             "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
             "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid>::new())) },
-            "averaged" => { Ok(Output::Averaged(Vec::<NeuroAndVolts>::new())) },
-            "averaged binary" => { Ok(Output::AveragedBinary(Vec::<NeuroAndVolts>::new())) },
-            "eeg" => { Ok(Output::EEG(Vec::<(f64, f64)>::new(), distance, conductivity, reference_voltage)) }
+            "averaged" => { Ok(Output::Averaged(Vec::<f64>::new())) },
+            "averaged binary" => { Ok(Output::AveragedBinary(Vec::<f64>::new())) },
+            "eeg" => { Ok(Output::EEG(Vec::<f64>::new(), distance, conductivity, reference_voltage)) }
             _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown output type")) }
         }
     }
@@ -270,29 +243,33 @@ impl Output {
     fn write_to_file(&self, tag: &str) {
         match &self {
             Output::Grid(grids) => {
-                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+                // let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+                let mut voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, ".txt"))
+                    .expect("Could not create file"));
 
                 for grid in grids {
                     for row in grid {
                         for value in row {
                             write!(voltage_file, "{} ", value.current_voltage)
                                 .expect("Could not write to file");
-                            write!(neurotransmitter_file, "{} ", value.neurotransmission_concentration)
-                                .expect("Could not write to file");
+                            // write!(neurotransmitter_file, "{} ", value.neurotransmission_concentration)
+                            //     .expect("Could not write to file");
                         }
                         writeln!(voltage_file)
                             .expect("Could not write to file");
-                        writeln!(neurotransmitter_file)
-                            .expect("Could not write to file");
+                        // writeln!(neurotransmitter_file)
+                        //     .expect("Could not write to file");
                     }
                     writeln!(voltage_file, "-----")
                         .expect("Could not write to file"); 
-                    writeln!(neurotransmitter_file, "-----")
-                        .expect("Could not write to file"); 
+                    // writeln!(neurotransmitter_file, "-----")
+                    //     .expect("Could not write to file"); 
                 }
             },
             Output::GridBinary(grids) => {
-                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
+                // let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
+                let mut voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, ".bin"))
+                    .expect("Could not create file"));
 
                 for grid in grids {
                     for row in grid {
@@ -302,33 +279,37 @@ impl Output {
                                 .write_all(&bytes)
                                 .expect("Could not write to file");
                 
-                            let bytes = value.neurotransmission_concentration.to_le_bytes();
-                            neurotransmitter_file
-                                .write_all(&bytes)
-                                .expect("Could not write to file");
+                            // let bytes = value.neurotransmission_concentration.to_le_bytes();
+                            // neurotransmitter_file
+                            //     .write_all(&bytes)
+                            //     .expect("Could not write to file");
                         }
                     }
                 }
             },
             Output::Averaged(averages) => {
-                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+                // let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "txt");
+                let mut voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, ".txt"))
+                    .expect("Could not create file"));
 
-                for neuro_and_volt in averages {
-                    writeln!(voltage_file, "{}", neuro_and_volt.voltage)
+                for voltage in averages {
+                    writeln!(voltage_file, "{}", voltage)
                         .expect("Could not write to file");
-                    writeln!(neurotransmitter_file, "{}", neuro_and_volt.neurotransmitter)
-                        .expect("Could not write to file");
+                    // writeln!(neurotransmitter_file, "{}", neuro_and_volt.neurotransmitter)
+                    //     .expect("Could not write to file");
                 } 
             },
             Output::AveragedBinary(averages) => {
-                let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
-                
-                for neuro_and_volt in averages {
-                    let volt_mean_bytes = neuro_and_volt.voltage.to_le_bytes();
-                    let neuro_mean_bytes = neuro_and_volt.neurotransmitter.to_le_bytes();
+                // let (mut voltage_file, mut neurotransmitter_file) = create_voltage_and_neuro_files(tag, "bin");
+                let mut voltage_file = BufWriter::new(File::create(format!("{}_voltage.{}", tag, ".bin"))
+                    .expect("Could not create file"));
+
+                for voltage in averages {
+                    let volt_mean_bytes = voltage.to_le_bytes();
+                    // let neuro_mean_bytes = neuro_and_volt.neurotransmitter.to_le_bytes();
 
                     voltage_file.write_all(&volt_mean_bytes).expect("Could not write to file"); 
-                    neurotransmitter_file.write_all(&neuro_mean_bytes).expect("Could not write to file");
+                    // neurotransmitter_file.write_all(&neuro_mean_bytes).expect("Could not write to file");
                 }
             },
             Output::EEG(signals, _, _, _) => {
@@ -336,7 +317,7 @@ impl Output {
                     .expect("Could not create file"));
 
                 for value in signals {
-                    writeln!(eeg_file, "{}", value.0)
+                    writeln!(eeg_file, "{}", value)
                         .expect("Could not write to file");
                 }
             }
@@ -394,47 +375,18 @@ fn run_simulation(
     radius: usize, 
     random_volt_initialization: bool,
     averaged: bool,
+    excitatory_chance: f64,
     if_type: IFType,
     if_params: &IFParameters,
     do_stdp: bool,
     graph_params: &GraphParameters,
     stdp_params: &STDPParameters,
-    default_cell_values: &HashMap<String, f64>,
     mut output_val: Output,
 ) -> Result<(Output, Box<dyn GraphFunctionality>)> {
     if radius / 2 > num_rows || radius / 2 > num_cols || radius == 0 {
         let err_msg = "Radius must be less than both number of rows or number of cols divided by 2 and greater than 0";
         return Err(Error::new(ErrorKind::InvalidInput, err_msg));
     }
-
-    let gap_conductance = *default_cell_values.get("gap_conductance")
-        .unwrap_or(&7.);
-    let gap_conductance_std = *default_cell_values.get("gap_condutance_std")
-        .unwrap_or(&1.);
-
-    let neurotransmission_release = *default_cell_values.get("neurotransmission_release")
-        .unwrap_or(&1.);
-    let receptor_density = *default_cell_values.get("receptor_density")
-        .unwrap_or(&1.);
-    let chance_of_releasing = *default_cell_values.get("chance_of_releasing")
-        .unwrap_or(&0.5);
-    let dissipation_rate = *default_cell_values.get("dissipation_rate")
-        .unwrap_or(&0.1);
-    let chance_of_random_release = *default_cell_values.get("chance_of_random_release")
-        .unwrap_or(&0.2);
-    let random_release_concentration = *default_cell_values.get("random_release_concentration")
-        .unwrap_or(&0.1);    
-    let excitatory_chance = *default_cell_values.get("excitatory_chance")
-        .unwrap_or(&0.5);
-
-    let neurotransmission_release_std = *default_cell_values.get("neurotransmission_release_std")
-        .unwrap_or(&0.);
-    let receptor_density_std = *default_cell_values.get("receptor_density_std")
-        .unwrap_or(&0.);
-    let dissipation_rate_std = *default_cell_values.get("dissipation_rate_std")
-        .unwrap_or(&0.);
-    let random_release_concentration_std = *default_cell_values.get("random_release_concentration_std")
-        .unwrap_or(&0.);
 
     let mean_change = &if_params.bayesian_params.mean != &BayesianParameters::default().mean;
     let std_change = &if_params.bayesian_params.std != &BayesianParameters::default().std;
@@ -452,15 +404,8 @@ fn run_simulation(
                     refractory_count: 0.0,
                     leak_constant: -1.,
                     integration_constant: 1.,
-                    gap_conductance: limited_distr(gap_conductance, gap_conductance_std, 0.1, 10.),
+                    gap_conductance: if_params.gap_conductance_init,
                     potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
-                    neurotransmission_concentration: 0., 
-                    neurotransmission_release: limited_distr(neurotransmission_release, neurotransmission_release_std, 0.0, 1.0),
-                    receptor_density: limited_distr(receptor_density, receptor_density_std, 0.0, 1.0),
-                    chance_of_releasing: chance_of_releasing, 
-                    dissipation_rate: limited_distr(dissipation_rate, dissipation_rate_std, 0.0, 1.0), 
-                    chance_of_random_release: chance_of_random_release,
-                    random_release_concentration: limited_distr(random_release_concentration, random_release_concentration_std, 0.0, 1.0),
                     w_value: if_params.w_init,
                     stdp_params: stdp_params.clone(),
                     last_firing_time: None,
@@ -560,7 +505,6 @@ fn run_simulation(
                 for (pos, is_spiking_value) in changes {
                     let (x, y) = pos;
                     
-                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
 
                     if do_stdp && is_spiking_value {
@@ -671,7 +615,6 @@ fn run_simulation(
 
                     let dv = adaptive_dv(&mut cell_grid[x][y], if_params, input_value);
 
-                    cell_grid[x][y].determine_neurotransmitter_concentration(is_spiking_value);
                     cell_grid[x][y].last_dv = dv;
                     cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
 
@@ -767,12 +710,12 @@ struct SimulationParameters {
     radius: usize, 
     random_volt_initialization: bool,
     averaged: bool,
+    excitatory_chance: f64,
     if_params: IFParameters,
     if_type: IFType,
     do_stdp: bool,
     stdp_params: STDPParameters,
     graph_params: GraphParameters,
-    default_cell_values: HashMap<String, f64>,
 }
 
 fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Value) -> Result<()> {
@@ -781,7 +724,7 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
         None => String::from(""),
     };
 
-    if_params.gap_condutance_init = parse_value_with_default(table, &format!("{}gap_conductance_init", prefix_value), parse_f64, if_params.gap_condutance_init)?;
+    if_params.gap_conductance_init = parse_value_with_default(table, &format!("{}gap_conductance_init", prefix_value), parse_f64, if_params.gap_conductance_init)?;
     if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
     if_params.exp_dt = parse_value_with_default(table, &format!("{}exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
     if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
@@ -923,58 +866,7 @@ fn get_bayesian_params(
     Ok(())
 }
 
-fn get_default_cell_parameters(table: &Value, prefix: Option<&str>) -> Result<HashMap<String, f64>> {
-    let prefix_value = match prefix {
-        Some(value) => format!("{}_", value),
-        None => String::from(""),
-    };
-
-    let mut default_cell_values: HashMap<String, f64> = HashMap::new();
-
-    default_cell_values.insert(format!("{}gap_condutance", prefix_value), 7.);
-    default_cell_values.insert(format!("{}gap_condutance_std", prefix_value), 1.);
-
-    default_cell_values.insert(format!("{}neurotransmission_release", prefix_value), 1.);
-    default_cell_values.insert(format!("{}receptor_density", prefix_value), 1.);
-    default_cell_values.insert(format!("{}chance_of_releasing", prefix_value), 0.5);
-    default_cell_values.insert(format!("{}dissipation_rate", prefix_value), 0.1);
-    default_cell_values.insert(format!("{}chance_of_random_release", prefix_value), 0.2);
-    default_cell_values.insert(format!("{}random_release_concentration", prefix_value), 0.1);
-    default_cell_values.insert(format!("{}excitatory_chance", prefix_value), 0.5);
-
-    default_cell_values.insert(format!("{}neurotransmission_release_std", prefix_value), 0.);
-    default_cell_values.insert(format!("{}receptor_density_std", prefix_value), 0.);
-    default_cell_values.insert(format!("{}dissipation_rate_std", prefix_value), 0.);
-    default_cell_values.insert(format!("{}random_release_concentration_std", prefix_value), 0.);
-
-    let updates: Vec<(String, Result<f64>)> = default_cell_values
-        .iter()
-        .map(|(key, &default_value)| {
-            let value_to_update = parse_value_with_default(
-                &table, &key, parse_f64, default_value
-            );
-
-            (String::from(key.clone()), value_to_update)
-        })
-        .collect();
-
-    for (key, value_to_update) in updates {
-        let value_to_update = match value_to_update {
-            Ok(output_value) => output_value,
-            Err(e) => { 
-                let err_msg = format!("Error with key '{}'\nError: {}", key, e.to_string());
-                return Err(Error::new(ErrorKind::InvalidInput, err_msg)); 
-            }
-        };
-
-        println!("{}: {}", key, value_to_update);
-        default_cell_values.insert(key, value_to_update);
-    }
-
-    return Ok(default_cell_values);
-}
-
-fn get_parameters(table: &Value) -> Result<SimulationParameters> {
+fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
 
@@ -997,6 +889,9 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
 
     let averaged: bool = parse_value_with_default(table, "averaged", parse_bool, false)?;
     println!("averaged: {}", averaged);
+
+    let excitatory_chance = parse_value_with_default(&table, "excitatory_chance", parse_f64, 0.8)?;
+    println!("excitatory_chance: {}", excitatory_chance);
 
     let output_type: String = parse_value_with_default(table, "output_type", parse_string, String::from("averaged"))?;
     println!("output_type: {}", output_type);
@@ -1027,8 +922,6 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         write_weights: write_weights,
         write_history: write_history,
     };
-
-    let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&table, None)?;
 
     let scaling_type_default = match if_type {
         IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
@@ -1084,12 +977,12 @@ fn get_parameters(table: &Value) -> Result<SimulationParameters> {
         radius: radius, 
         random_volt_initialization: random_volt_initialization,
         averaged: averaged,
+        excitatory_chance: excitatory_chance,
         if_params: if_params,
         if_type: if_type,
         do_stdp: do_stdp,
         stdp_params: stdp_params,
         graph_params: graph_params,
-        default_cell_values: default_cell_values,
     });
 }
 
@@ -1162,8 +1055,6 @@ fn test_coupled_neurons(
     pre_if_params: &IFParameters, 
     post_if_params: &IFParameters,
     pre_potentiation_type: PotentiationType,
-    default_pre_values: &HashMap<String, f64>,
-    default_post_values: &HashMap<String, f64>,
     iterations: usize,
     input_voltage: f64,
     filename: &str,
@@ -1173,15 +1064,8 @@ fn test_coupled_neurons(
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
-        gap_conductance: *default_pre_values.get("gap_condutance").unwrap(),
+        gap_conductance: pre_if_params.gap_conductance_init,
         potentiation_type: pre_potentiation_type,
-        neurotransmission_concentration: 0., 
-        neurotransmission_release: *default_pre_values.get("pre_neurotransmission_release").unwrap(),
-        receptor_density: *default_pre_values.get("pre_receptor_density").unwrap(),
-        chance_of_releasing: *default_pre_values.get("pre_chance_of_releasing").unwrap(), 
-        dissipation_rate: *default_pre_values.get("pre_dissipation_rate").unwrap(), 
-        chance_of_random_release: *default_pre_values.get("pre_chance_of_random_release").unwrap(), 
-        random_release_concentration: *default_pre_values.get("pre_random_release_concentration").unwrap(),
         w_value: pre_if_params.w_init,
         stdp_params: STDPParameters::default(),
         last_firing_time: None,
@@ -1197,15 +1081,8 @@ fn test_coupled_neurons(
         refractory_count: 0.0,
         leak_constant: -1.,
         integration_constant: 1.,
-        gap_conductance: *default_post_values.get("gap_condutance").unwrap(),
+        gap_conductance: post_if_params.gap_conductance_init,
         potentiation_type: PotentiationType::Excitatory,
-        neurotransmission_concentration: 0., 
-        neurotransmission_release: *default_post_values.get("post_neurotransmission_release").unwrap(),
-        receptor_density: *default_post_values.get("post_receptor_density").unwrap(),
-        chance_of_releasing: *default_post_values.get("post_chance_of_releasing").unwrap(), 
-        dissipation_rate: *default_post_values.get("post_dissipation_rate").unwrap(), 
-        chance_of_random_release: *default_post_values.get("post_chance_of_random_release").unwrap(),
-        random_release_concentration: *default_post_values.get("post_random_release_concentration").unwrap(),
         w_value: post_if_params.w_init,
         stdp_params: STDPParameters::default(),
         last_firing_time: None,
@@ -1242,7 +1119,7 @@ fn test_coupled_neurons(
     match if_type {
         IFType::Basic => { 
             for _ in 0..iterations {
-                let (pre_dv, pre_is_spiking) = if pre_bayesian {
+                let (pre_dv, _pre_is_spiking) = if pre_bayesian {
                     pre_synaptic_neuron.get_dv_change_and_spike(
                         &pre_if_params, 
                         input_voltage * limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.)
@@ -1252,12 +1129,10 @@ fn test_coupled_neurons(
                 };
 
                 pre_synaptic_neuron.last_dv = pre_dv;
-
-                pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
                 let input = signed_gap_junction(&pre_synaptic_neuron, &post_synaptic_neuron, sign);
         
-                let (post_dv, post_is_spiking) = if post_bayesian {
+                let (post_dv, _post_is_spiking) = if post_bayesian {
                     post_synaptic_neuron.get_dv_change_and_spike(
                         &pre_if_params, 
                         input * limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.)
@@ -1265,8 +1140,6 @@ fn test_coupled_neurons(
                 } else {
                     post_synaptic_neuron.get_dv_change_and_spike(&post_if_params, input)
                 };
-
-                post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
 
                 post_synaptic_neuron.last_dv = post_dv;
             
@@ -1298,7 +1171,7 @@ fn test_coupled_neurons(
             };
 
             for _ in 0..iterations {
-                let pre_is_spiking = adaptive_apply_and_get_spike(&mut pre_synaptic_neuron, &pre_if_params);
+                let _pre_is_spiking = adaptive_apply_and_get_spike(&mut pre_synaptic_neuron, &pre_if_params);
                 let pre_dv = if pre_bayesian {
                     adaptive_dv(
                         &mut pre_synaptic_neuron,
@@ -1314,12 +1187,10 @@ fn test_coupled_neurons(
                 };
 
                 pre_synaptic_neuron.last_dv = pre_dv;
-
-                pre_synaptic_neuron.determine_neurotransmitter_concentration(pre_is_spiking);
         
                 let input = signed_gap_junction(&pre_synaptic_neuron, &post_synaptic_neuron, sign);
 
-                let post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
+                let _post_is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &post_if_params);
                 let post_dv = if post_bayesian {
                     adaptive_dv(
                         &mut post_synaptic_neuron,
@@ -1333,8 +1204,6 @@ fn test_coupled_neurons(
                         input
                     )
                 };
-
-                post_synaptic_neuron.determine_neurotransmitter_concentration(post_is_spiking);
 
                 post_synaptic_neuron.last_dv = post_dv;
             
@@ -1365,19 +1234,6 @@ fn write_row(
             .join(", ")
     ).expect("Cannot write to file");
     write!(file, "{}, ", postsynaptic_neuron.current_voltage)
-        .expect("Cannot write to file");
-    write!(
-        file, 
-        "{}, ", 
-        presynaptic_neurons.iter()
-            .map(|i| i.neurotransmission_concentration)
-            .collect::<Vec<f64>>()
-            .iter()
-            .map(|&x| x.to_string())
-            .collect::<Vec<String>>()
-            .join(", ")
-    ).expect("Cannot write to file");
-    write!(file, "{}, ", postsynaptic_neuron.neurotransmission_concentration)
         .expect("Cannot write to file");
     write!(
         file, 
@@ -1484,7 +1340,7 @@ fn run_isolated_stdp_test(
     iterations: usize,
     n: usize,
     input_voltage: f64,
-    default_cell_values: &HashMap<String, f64>,
+    excitatory_chance: f64,
     averaged: bool,
     filename: &str,
 ) -> Result<()> {
@@ -1520,14 +1376,8 @@ fn run_isolated_stdp_test(
         }
     };
 
-    post_synaptic_neuron.gap_conductance = if_params.gap_condutance_init;
+    post_synaptic_neuron.gap_conductance = if_params.gap_conductance_init;
     post_synaptic_neuron.w_value = if_params.v_init;
-    post_synaptic_neuron.neurotransmission_release = *default_cell_values.get("neurotransmission_release").unwrap_or(&0.);
-    post_synaptic_neuron.receptor_density = *default_cell_values.get("receptor_density").unwrap_or(&0.);
-    post_synaptic_neuron.chance_of_releasing = *default_cell_values.get("chance_of_releasing").unwrap_or(&0.);
-    post_synaptic_neuron.dissipation_rate = *default_cell_values.get("dissipation_rate").unwrap_or(&0.);
-    post_synaptic_neuron.chance_of_random_release = *default_cell_values.get("chance_of_random_release").unwrap_or(&0.);
-    post_synaptic_neuron.random_release_concentration = *default_cell_values.get("random_release_concentration").unwrap_or(&0.);
     post_synaptic_neuron.w_value = if_params.w_init;
     post_synaptic_neuron.stdp_params = stdp_params.clone();
     post_synaptic_neuron.alpha = if_params.alpha_init;
@@ -1539,7 +1389,7 @@ fn run_isolated_stdp_test(
         .collect();
 
     for i in neurons.iter_mut() {
-        if rand::thread_rng().gen_range(0.0..=1.0) < *default_cell_values.get("excitatory_chance").unwrap_or(&0.) {
+        if rand::thread_rng().gen_range(0.0..=1.0) < excitatory_chance {
             i.potentiation_type = PotentiationType::Excitatory;
         } else {
             i.potentiation_type = PotentiationType::Inhibitory;
@@ -1589,9 +1439,7 @@ fn run_isolated_stdp_test(
 
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
-                    }
-
-                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                    }                   
                 }
 
                 let calculated_voltage: f64 = (0..n)
@@ -1613,9 +1461,7 @@ fn run_isolated_stdp_test(
                     .sum();
                 
                 let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
-                let (dv, is_spiking) = post_synaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);
-
-                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                let (dv, is_spiking) = post_synaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);                  
 
                 update_isolated_presynaptic_neuron_weights(
                     &mut neurons, 
@@ -1684,14 +1530,10 @@ fn run_isolated_stdp_test(
 
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
-                    }
-
-                    input_neuron.determine_neurotransmitter_concentration(is_spiking);                    
+                    }               
                 }
 
                 let is_spiking = adaptive_apply_and_get_spike(&mut post_synaptic_neuron, &if_params);
-
-                post_synaptic_neuron.determine_neurotransmitter_concentration(is_spiking);  
 
                 let calculated_voltage: f64 = (0..n)
                     .map(
@@ -2099,7 +1941,7 @@ fn main() -> Result<()> {
         };
         println!("tag: {}", tag);
 
-        let sim_params = get_parameters(&simulation_table)?;
+        let sim_params = get_simulation_parameters(&simulation_table)?;
 
         let output_type: String = parse_value_with_default(
             &simulation_table, 
@@ -2147,12 +1989,12 @@ fn main() -> Result<()> {
             sim_params.radius, 
             sim_params.random_volt_initialization,
             sim_params.averaged,
+            sim_params.excitatory_chance,
             sim_params.if_type,
             &sim_params.if_params,
             sim_params.do_stdp,
             &sim_params.graph_params,
             &sim_params.stdp_params,
-            &sim_params.default_cell_values,
             output_type,
         )?;
 
@@ -2354,15 +2196,8 @@ fn main() -> Result<()> {
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
-            gap_conductance: if_params.gap_condutance_init,
+            gap_conductance: if_params.gap_conductance_init,
             potentiation_type: PotentiationType::Excitatory,
-            neurotransmission_concentration: 0., 
-            neurotransmission_release: 1.,
-            receptor_density: 1.,
-            chance_of_releasing: 0.5, 
-            dissipation_rate: 0.1, 
-            chance_of_random_release: 0.2,
-            random_release_concentration: 0.1,
             w_value: if_params.w_init,
             stdp_params: STDPParameters::default(),
             last_firing_time: None,
@@ -2421,9 +2256,6 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let default_pre_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("pre"))?;
-        let default_post_values: HashMap<String, f64> = get_default_cell_parameters(&coupled_table, Some("post"))?;
-        
         let scaling_type_default = match if_type {
             IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
             _ => "regular",
@@ -2468,8 +2300,6 @@ fn main() -> Result<()> {
             &pre_if_params, 
             &post_if_params,
             pre_potentiation_type,
-            &default_pre_values,
-            &default_post_values,
             iterations,
             input_voltage,
             &filename,
@@ -2511,7 +2341,8 @@ fn main() -> Result<()> {
         };
         println!("input_voltage: {}", input_voltage);
 
-        let default_cell_values: HashMap<String, f64> = get_default_cell_parameters(&stdp_table, None)?;
+        let excitatory_chance = parse_value_with_default(stdp_table, "excitatory_chance", parse_f64, 1.0)?;
+        println!("excitatory_chance: {}", excitatory_chance);
 
         let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
         println!("averaged: {}", averaged);
@@ -2527,7 +2358,7 @@ fn main() -> Result<()> {
             iterations,
             n,
             input_voltage,
-            &default_cell_values,
+            excitatory_chance,
             averaged,
             &filename,
         )?;
@@ -2756,11 +2587,11 @@ fn main() -> Result<()> {
         let v_th_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "v_th_upper_bound", parse_f64, 200.)?;
         println!("v_th_upper_bound: {}", v_th_upper_bound);
 
-        let weight_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "weight_lower_bound", parse_f64, 1.)?;
-        println!("weight_lower_bound: {}", weight_lower_bound);
+        let gap_conductance_lower_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "gap_conductance_lower_bound", parse_f64, 0.)?;
+        println!("gap_conductance_lower_bound: {}", gap_conductance_lower_bound);
 
-        let weight_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "weight_upper_bound", parse_f64, 1.)?;
-        println!("weight_upper_bound: {}", weight_upper_bound);
+        let gap_conductance_upper_bound: f64 = parse_value_with_default(&fit_neuron_models_table, "gap_conductance_upper_bound", parse_f64, 10.)?;
+        println!("gap_conductance_upper_bound: {}", gap_conductance_upper_bound);
         
         let bounds: Vec<Vec<f64>> = vec![
             vec![a_lower_bound, a_upper_bound], 
@@ -2768,7 +2599,7 @@ fn main() -> Result<()> {
             vec![c_lower_bound, c_upper_bound], 
             vec![d_lower_bound, d_upper_bound], 
             vec![v_th_lower_bound, v_th_upper_bound],
-            vec![weight_lower_bound, weight_upper_bound]
+            vec![gap_conductance_lower_bound, gap_conductance_upper_bound]
         ];
 
         let n_bits: usize = parse_value_with_default(&fit_neuron_models_table, "n_bits", parse_usize, 10)?;
@@ -2912,13 +2743,6 @@ fn main() -> Result<()> {
             integration_constant: 1.,
             gap_conductance: gap_conductance,
             potentiation_type: PotentiationType::Excitatory,
-            neurotransmission_concentration: 0., 
-            neurotransmission_release: 0.,
-            receptor_density: 0.,
-            chance_of_releasing: 0., 
-            dissipation_rate: 0., 
-            chance_of_random_release: 0.,
-            random_release_concentration: 0.,
             w_value: if_params.w_init,
             stdp_params: STDPParameters::default(),
             last_firing_time: None,
