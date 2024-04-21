@@ -13,8 +13,8 @@ print_scaled = true
 reference_dt = 0.01
 v_init = 0.0
 
-weight_lower_bound = 0.0
-weight_upper_bound = 2.0
+gap_conductance_lower_bound = 0.0
+gap_conductance_upper_bound = 2.0
 
 n_bits = 16
 n_iter = 100
