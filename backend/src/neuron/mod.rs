@@ -35,7 +35,7 @@ pub struct IFParameters {
     pub v_reset: f64,
     pub tau_m: f64,
     pub g_l: f64,
-    pub gap_condutance_init: f64,
+    pub gap_conductance_init: f64,
     pub v_init: f64,
     pub e_l: f64,
     pub tref: f64,
@@ -56,7 +56,7 @@ impl Default for IFParameters {
             v_reset: -75., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 10., // leak conductance (nS)
-            gap_condutance_init: 7., // gap condutance (nS)
+            gap_conductance_init: 7., // gap condutance (nS)
             v_init: -75., // initial potential (mV)
             e_l: -75., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -82,7 +82,7 @@ impl ScaledDefault for IFParameters {
             v_reset: 0., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
-            gap_condutance_init: 7., // gap condutance (nS)
+            gap_conductance_init: 7., // gap condutance (nS)
             v_init: 0., // initial potential (mV)
             e_l: 0., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -108,7 +108,7 @@ impl IzhikevichDefault for IFParameters {
             v_reset: -65., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
             g_l: 10., // leak conductance (nS)
-            gap_condutance_init: 7., // gap condutance (nS)
+            gap_conductance_init: 7., // gap condutance (nS)
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
@@ -197,13 +197,6 @@ pub struct Cell {
     pub integration_constant: f64, // integration constant gene
     pub gap_conductance: f64, // condutance between synapses
     pub potentiation_type: PotentiationType,
-    pub neurotransmission_concentration: f64, // concentration of neurotransmitter in synapse
-    pub neurotransmission_release: f64, // concentration of neurotransmitter released at spiking
-    pub receptor_density: f64, // factor of how many receiving receptors for a given neurotransmitter
-    pub chance_of_releasing: f64, // chance cell can produce neurotransmitter
-    pub dissipation_rate: f64, // how quickly neurotransmitter concentration decreases
-    pub chance_of_random_release: f64, // likelyhood of neuron randomly releasing neurotransmitter
-    pub random_release_concentration: f64, // how much neurotransmitter is randomly released
     pub w_value: f64, // adaptive value 
     pub stdp_params: STDPParameters, // stdp parameters
     pub last_firing_time: Option<usize>,
@@ -228,13 +221,6 @@ impl Default for Cell {
             integration_constant: 1.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
-            neurotransmission_concentration: 0., 
-            neurotransmission_release: 0.,
-            receptor_density: 0.,
-            chance_of_releasing: 0., 
-            dissipation_rate: 0., 
-            chance_of_random_release: 0.,
-            random_release_concentration: 0.,
             w_value: IFParameters::default().w_init,
             stdp_params: STDPParameters::default(),
             last_firing_time: None,
@@ -256,13 +242,6 @@ impl IzhikevichDefault for Cell {
             integration_constant: 1.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
-            neurotransmission_concentration: 0., 
-            neurotransmission_release: 0.,
-            receptor_density: 0.,
-            chance_of_releasing: 0., 
-            dissipation_rate: 0., 
-            chance_of_random_release: 0.,
-            random_release_concentration: 0.,
             w_value: IFParameters::izhikevich_default().w_init,
             stdp_params: STDPParameters::default(),
             last_firing_time: None,
@@ -389,27 +368,6 @@ impl Cell {
         ) * (lif.dt / lif.tau_m);
 
         dv
-    }
-
-    pub fn determine_neurotransmitter_concentration(&mut self, is_spiking: bool) {
-        // (excitatory should increase voltage)
-        // (inhibitory should decrease voltage)
-        // (may also depend on kind of receptor)
-        let prob = rand::thread_rng().gen_range(0.0..=1.0);
-        if is_spiking && (prob <= self.chance_of_releasing) {
-            self.neurotransmission_concentration += self.neurotransmission_release;
-        } else if self.neurotransmission_concentration > 0. {
-            let concentration = (
-                    self.neurotransmission_concentration - self.dissipation_rate
-                )
-                .max(0.0); // reduce concentration until 0
-            self.neurotransmission_concentration = concentration;
-        }
-        
-        let prob = rand::thread_rng().gen_range(0.0..=1.0);
-        if self.refractory_count <= 0. && prob <= self.chance_of_random_release {
-            self.neurotransmission_concentration += self.random_release_concentration;
-        }
     }
 
     // voltage of cell should be initial voltage + this change
