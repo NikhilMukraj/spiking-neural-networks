@@ -40,7 +40,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
 
 - **Need to rename all `input_voltage` to `input_current`**
-- **Need to rename all post_synaptic and all pre_synaptic to postsynaptic and presynaptic**
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
 
@@ -57,8 +56,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Cue is removed and working memory output can be decoded
     - Decoded by taking weighted sum of working memory neurons
     - If below 0, then percieved cue is -1, if above 0, percieved cue is 1
-    - Or perceived cue could be above or below a given baseline, cue itself can be a fast (or excitatory) spike train or a slow (or potentially inhibitory) spike train, 0 is a baseline spike train speed (spike train just being a series of spikes)
+    - **Or perceived cue could be above or below a given baseline, cue itself can be a fast (or excitatory) spike train or a slow (or potentially inhibitory) spike train, 0 is a baseline spike train speed (spike train just being a series of spikes)**
+      - Probably more practical to use an excitatory and inhibitory input and check deviation from baseline over time
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
+  - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
   - Decoding unit acts as readout
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
@@ -71,23 +72,26 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ### Notes on what to modulate
 
-- Ion channels
+- Synaptic condutance of ion channels (potentially rate/gating constants)
   - Na+, K+
   - Leak current
   - Ca++ (L-current HVA, T-current)
   - M-current
   - Rectifying channels
-- Ligand gated channels
+- Synaptic conductance of ligand gated channels (potentially maximal neurotransmitter concentration) (and forward and backward rate constants)
   - AMPA, GABA(a/b), NMDA
-- Metabotropic neurotransmitters
+- Metabotropic neurotransmitters (concentration)
   - Dopamine
   - Serotonin
   - Nitric oxide
   - Acetylcholine
   - Glutamate
   - Adrenaline
+- Astrocytes
 - Weights
   - Weights between certain neurons or specific projections (pyramidal or chandelier for example)
+
+(simulation total time should be around 10 min)
 
 ## Todo
 
@@ -178,19 +182,27 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] Potential objective function refactor with spike amplitude being height subtracted by minimum
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
-  - [ ] Remove existing neurotranmission system and replace it with new one
+  - [x] Remove existing neurotranmission system
+- [ ] Astrocytes model
+  - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
+  - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
+  - [Astrocytes + Izhikevich](https://www.frontiersin.org/articles/10.3389/fncel.2021.631485/full)
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory (refer to guanfacine working memory model)
   - [ ] Discrete state neuron (for testing)
   - [ ] Discrete learning rules
   - [ ] Hopfield network
+  - [ ] Simple recurrent memory
   - [ ] Liquid state machine
+  - [ ] Liquid state machine with astrocytes
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
 - [ ] R-STDP based classifier
   - [ ] Simple encoding of input
   - [ ] Modifying the bursting parameters to encode more information in input
     - [ ] Potentially having weights directly calculated/modified from bursting parameters
+  - [ ] Liquid state machine with R-STDP
+  - [ ] Liquid state machine with astrocytes and R-STDP
 
 ### Lixirnet
 
