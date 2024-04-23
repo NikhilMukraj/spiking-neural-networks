@@ -1585,6 +1585,123 @@ fn run_isolated_stdp_test(
     Ok(())
 }
 
+fn get_ligand_gated_channel(table: &Value, prefix_value: &str) -> Result<Vec<GeneralLigandGatedChannel>> {
+    let ampa: bool = parse_value_with_default(
+        table,
+        format!("{}AMPA", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let gabaa: bool = parse_value_with_default(
+        table,
+        format!("{}GABAa", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let gabab: bool = parse_value_with_default(
+        table,
+        format!("{}GABAb", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let gabab_2: bool = parse_value_with_default(
+        table,
+        format!("{}GABAb (secondary)", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    if gabab && gabab_2 {
+        return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
+    }
+
+    let nmda: bool = parse_value_with_default(
+        table,
+        format!("{}NMDA", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let mut ligand_gates: Vec<GeneralLigandGatedChannel> = vec![];
+    if ampa {
+        ligand_gates.push(GeneralLigandGatedChannel::ampa_default());
+    }
+    if gabaa {
+        ligand_gates.push(GeneralLigandGatedChannel::gabaa_default());
+    }
+    if gabab {
+        ligand_gates.push(GeneralLigandGatedChannel::gabab_default());
+    }
+    if gabab_2 {
+        ligand_gates.push(GeneralLigandGatedChannel::gabab_default2())
+    }
+    if nmda {
+        let mg_conc: f64 = parse_value_with_default(
+            table,
+            format!("{}mg_conc", prefix_value).as_str(), 
+            parse_f64, 
+            BV::default().mg_conc
+        )?;
+
+        ligand_gates.push(GeneralLigandGatedChannel::nmda_with_bv(BV { mg_conc: mg_conc }));
+    }
+
+    if ligand_gates.len() != 0 {
+        println!("general ligand gated channels: {}", 
+            ligand_gates.iter()
+                .map(|i| i.to_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+    } else {
+        println!("general ligand gated channels: none")
+    }
+
+    Ok(ligand_gates)
+}
+
+fn get_additional_gates(table: &Value, prefix: &str) -> Result<Vec<AdditionalGates>> {
+    let mut additional_gates: Vec<AdditionalGates> = Vec::new();
+
+    let ltype_calcium: bool = parse_value_with_default(
+        table,
+        format!("{}ltype_calcium", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    let hva_ltype_calcium: bool = parse_value_with_default(
+        table,
+        format!("{}hva_ltype_calcium", prefix).as_str(), 
+        parse_bool, 
+        false
+    )?;
+
+    if ltype_calcium {
+        // maybe make calcium permeability editable
+        additional_gates.push(AdditionalGates::LTypeCa(HighThresholdCalciumChannel::default()));
+    }
+    if hva_ltype_calcium {
+        additional_gates.push(AdditionalGates::HVACa(HighVoltageActivatedCalciumChannel::default()))
+    }
+
+    if additional_gates.len() != 0 {
+        println!("additional gated channels: {}", 
+            additional_gates.iter()
+                .map(|i| i.to_str())
+                .collect::<Vec<&str>>()
+                .join(", ")
+        );
+    } else {
+        println!("additional gated channels: none")
+    }
+
+    Ok(additional_gates)
+}
+
 fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>) -> Result<HodgkinHuxleyCell> {
     let prefix = match prefix {
         Some(prefix_value) => format!("{}_", prefix_value),
@@ -1704,114 +1821,8 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         state: state_init, 
     };
 
-    let ampa: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}AMPA", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    let gabaa: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}GABAa", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    let gabab: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}GABAb", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    let gabab_2: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}GABAb (secondary)", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    if gabab && gabab_2 {
-        return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
-    }
-
-    let nmda: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}NMDA", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    let mut ligand_gates: Vec<GeneralLigandGatedChannel> = vec![];
-    if ampa {
-        ligand_gates.push(GeneralLigandGatedChannel::ampa_default());
-    }
-    if gabaa {
-        ligand_gates.push(GeneralLigandGatedChannel::gabaa_default());
-    }
-    if gabab {
-        ligand_gates.push(GeneralLigandGatedChannel::gabab_default());
-    }
-    if gabab_2 {
-        ligand_gates.push(GeneralLigandGatedChannel::gabab_default2())
-    }
-    if nmda {
-        let mg_conc: f64 = parse_value_with_default(
-            &hodgkin_huxley_table,
-            format!("{}mg_conc", prefix).as_str(), 
-            parse_f64, 
-            BV::default().mg_conc
-        )?;
-
-        ligand_gates.push(GeneralLigandGatedChannel::nmda_with_bv(BV { mg_conc: mg_conc }));
-    }
-
-    if ligand_gates.len() != 0 {
-        println!("general ligand gated channels: {}", 
-            ligand_gates.iter()
-                .map(|i| i.to_str())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-    } else {
-        println!("general ligand gated channels: none")
-    }
-
-    let mut additional_gates: Vec<AdditionalGates> = Vec::new();
-
-    let ltype_calcium: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}ltype_calcium", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    let hva_ltype_calcium: bool = parse_value_with_default(
-        &hodgkin_huxley_table,
-        format!("{}hva_ltype_calcium", prefix).as_str(), 
-        parse_bool, 
-        false
-    )?;
-
-    if ltype_calcium {
-        // maybe make calcium permeability editable
-        additional_gates.push(AdditionalGates::LTypeCa(HighThresholdCalciumChannel::default()));
-    }
-    if hva_ltype_calcium {
-        additional_gates.push(AdditionalGates::HVACa(HighVoltageActivatedCalciumChannel::default()))
-    }
-
-    if additional_gates.len() != 0 {
-        println!("additional gated channels: {}", 
-            additional_gates.iter()
-                .map(|i| i.to_str())
-                .collect::<Vec<&str>>()
-                .join(", ")
-        );
-    } else {
-        println!("additional gated channels: none")
-    }
+    let ligand_gates = get_ligand_gated_channel(&hodgkin_huxley_table, &prefix)?;
+    let additional_gates = get_additional_gates(&hodgkin_huxley_table, &prefix)?;
     
     Ok(
         HodgkinHuxleyCell {
