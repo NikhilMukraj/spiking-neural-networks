@@ -44,7 +44,7 @@ pub struct IFParameters {
     pub beta_init: f64,
     pub d_init: f64,
     pub dt: f64,
-    pub exp_dt: f64,
+    pub slope_factor: f64,
     pub bayesian_params: BayesianParameters,
     // total_time: f64,
 }
@@ -65,7 +65,7 @@ impl Default for IFParameters {
             beta_init: 10., // arbitrary b value
             d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
-            exp_dt: 1., // exponential time step (ms)
+            slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
@@ -91,7 +91,7 @@ impl ScaledDefault for IFParameters {
             beta_init: 10., // arbitrary b value
             d_init: 2., // arbitrary d value
             dt: 0.1, // simulation time step (ms)
-            exp_dt: 1., // exponential time step (ms)
+            slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
@@ -117,7 +117,7 @@ impl IzhikevichDefault for IFParameters {
             beta_init: 0.2, // arbitrary b value
             d_init: 8.0, // arbitrary d value
             dt: 0.5, // simulation time step (ms)
-            exp_dt: 1., // exponential time step (ms)
+            slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
         }
     }
@@ -205,6 +205,7 @@ pub struct Cell {
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
     pub last_dv: f64, // last change in voltage
+    // pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
 pub trait Coupling {
@@ -229,6 +230,7 @@ impl Default for Cell {
             c: IFParameters::default().v_reset,
             d: IFParameters::default().d_init,
             last_dv: 0.,
+            // ligand_gates: vec![],
         }
     }
 }
@@ -250,6 +252,7 @@ impl IzhikevichDefault for Cell {
             c: IFParameters::izhikevich_default().v_reset,
             d: IFParameters::izhikevich_default().d_init,
             last_dv: 0.,
+            // ligand_gates: vec![],
         }
     }
 }
@@ -325,7 +328,7 @@ impl Cell {
     pub fn exp_adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
-            (lif.exp_dt * ((self.current_voltage - lif.v_th) / lif.exp_dt).exp()) +
+            (lif.slope_factor * ((self.current_voltage - lif.v_th) / lif.slope_factor).exp()) +
             (self.integration_constant * (i / lif.g_l)) - 
             (self.w_value / lif.g_l)
         ) * (lif.dt / lif.tau_m);
@@ -499,6 +502,30 @@ impl Cell {
             writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
         }
     }
+
+    // pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64, if_params: &IFParameters) {
+    //     self.ligand_gates
+    //         .iter_mut()
+    //         .for_each(|i| {
+    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
+    //             i.neurotransmitter.apply_r_change(if_params.dt);
+    //         });
+    // }
+
+    // pub fn set_neurotransmitter_currents(&mut self, if_params: &IFParameters) {
+    //     self.ligand_gates
+    //         .iter_mut()
+    //         .map(|i| 
+    //             i.calculate_g(self.current_voltage, i.neurotransmitter.r, if_params.dt) * i.neurotransmitter.r
+    //         );
+    // }
+
+    // pub fn get_neurotransmitter_currents(&self) -> f64 {
+    //     self.ligand_gates
+    //         .iter()
+    //         .map(|i| i.current)
+    //         .sum::<f64>()
+    // }
 }
 
 pub type CellGrid = Vec<Vec<Cell>>;
@@ -509,38 +536,6 @@ pub type CellGrid = Vec<Vec<Cell>>;
 //     } else {
 //         0.
 //     }
-// }
-
-// struct NMDA {
-//     g_nmda: f64, // 1.0 nS
-//     tau1: f64,
-//     tau2: f64,
-//     mg_conc: f64,
-//     alpha: f64,
-//     beta: f64,
-//     e_syn: f64,
-// }
-
-// impl NMDA {
-//     fn caulcate_tpk(&self) -> f64 {
-//         (self.tau1 * self.tau2) / (self.tau2 - self.tau1) * (self.tau2 / self.tau1).ln()
-//     }
-
-//     fn calculate_gamma(&self) -> f64 {
-//         let tpk = calculate_tpk();
-//         1. / ((-tpk / self.tau2).exp() - (-tpk / self.tau1).exp())
-//     }
-
-//     fn calculate_g_syn(&self, t: f64, voltage: f64) -> f64 {
-//         let gamma = self.calculate_gamma();
-//         let term1 =  gamma / (1 + self.mg_conc * (-self.alpha * voltage).exp() / self.beta);
-//         let term2 = ((-t / self.tau2).exp() - (-t / self.tau1).exp()) * heaviside(t);
-//         self.g_nmda * term1 * term2
-//     }
-
-    // fn calculate_b(&self, voltage: f64) -> f64 {
-    //     1. / (1. + ((-0.062 * voltage).exp() * self.mg_conc / 3.57))
-    // }
 // }
 
 #[derive(Clone, Copy)]
@@ -1277,8 +1272,6 @@ impl HodgkinHuxleyCell {
             .map(|i| 
                 i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt) * i.neurotransmitter.r
             )
-            .collect::<Vec<f64>>()
-            .iter()
             .sum::<f64>();
 
         let i_additional_gates = self.additional_gates
@@ -1286,8 +1279,6 @@ impl HodgkinHuxleyCell {
             .map(|i| 
                 i.get_and_update_current(self.current_voltage, self.dt)
             ) 
-            .collect::<Vec<f64>>()
-            .iter()
             .sum::<f64>();
 
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
