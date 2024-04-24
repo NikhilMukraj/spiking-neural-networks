@@ -2009,31 +2009,6 @@ fn main() -> Result<()> {
             output_type,
         )?;
 
-        // let mut output_files = match output_value {
-        //     Output::Grid(_) | Output::Averaged(_) => { 
-        //         OutputFile::VoltageAndNeurotransmitter(   
-        //             BufWriter::new(File::create(format!("{}_voltage.txt", tag))
-        //                 .expect("Could not create file")),
-        //             BufWriter::new(File::create(format!("{}_neurotransmitter.txt", tag))
-        //                 .expect("Could not create file"))
-        //         )
-        //     },
-        //     Output::GridBinary(_) | Output::AveragedBinary(_) => { 
-        //         OutputFile::VoltageAndNeurotransmitter(   
-        //             BufWriter::new(File::create(format!("{}_voltage.bin", tag))
-        //                 .expect("Could not create file")),
-        //             BufWriter::new(File::create(format!("{}_neurotransmitter.bin", tag))
-        //                 .expect("Could not create file"))
-        //         )
-        //     },
-        //     Output::EEG(_, _, _, _) => {
-        //         OutputFile::EEG(   
-        //             BufWriter::new(File::create(format!("{}_eeg.txt", tag))
-        //                 .expect("Could not create file")),
-        //         )
-        //     }
-        // };
-
         output_value.write_to_file(tag);
 
         if sim_params.graph_params.write_history {
