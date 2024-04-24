@@ -726,7 +726,7 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
 
     if_params.gap_conductance_init = parse_value_with_default(table, &format!("{}gap_conductance_init", prefix_value), parse_f64, if_params.gap_conductance_init)?;
     if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
-    if_params.exp_dt = parse_value_with_default(table, &format!("{}exp_dt", prefix_value), parse_f64, if_params.exp_dt)?;
+    if_params.slope_factor = parse_value_with_default(table, &format!("{}slope_factor", prefix_value), parse_f64, if_params.slope_factor)?;
     if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
     if_params.tref = parse_value_with_default(table, &format!("{}tref", prefix_value), parse_f64, if_params.tref)?;
     if_params.alpha_init = parse_value_with_default(table, &format!("{}alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
