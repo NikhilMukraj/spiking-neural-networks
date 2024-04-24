@@ -35,6 +35,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Gap condutance should be retrieved from TOML via IFParameters
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
+- Move non initialization parameters to cell struct, move bayesian parameters to cell struct as well
+- Use integrate and fire parameters only for initialization not for calculation
+
 - Split `main.rs` functions into a few different files for readability
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
@@ -42,6 +45,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Need to rename all `input_voltage` to `input_current`**
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
+  - Update by copying over backend
 
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
@@ -177,16 +181,24 @@ EEG processing with fourier transforms, and power spectral density calculations
         - [x] Scaling data properly
       - [x] Comparing static and coupled inputs
       - [x] Comparing spikes under various input conditions
-    - [ ] Option to calculate peaks from Izhikevich neuron based on deritative of data
     - [ ] [Spike time concidence objective function](https://www.sciencedirect.com/science/article/pii/S0893608019303065)
     - [ ] Potential objective function refactor with spike amplitude being height subtracted by minimum
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
-  - [x] Remove existing neurotranmission system
+    - [x] Remove existing neurotranmission system
+    - [ ] Integrate and fire models with ligand gated channels interacting with neurotransmitters
+    - [ ] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
+      - $\frac{dT}{dt} = \alpha T + T_{max} H(V_p - V_{th})$ where $T$ is neurotransmitter concentration, $T_{max}$ is maximum neurotransmitter concentration, $\alpha$ is clearance rate, $H(x)$ is the heaviside function, $V_p$ is the average of the presynaptic voltages, and $V_{th}$ is the spiking threshold
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
   - [Astrocytes + Izhikevich](https://www.frontiersin.org/articles/10.3389/fncel.2021.631485/full)
+    - [Code for astrocytes and neural network](https://github.com/altergot/neuro-astro-network)
+  - [ ] Tripartite synapse
+    - Record how weights change over time
+  - [ ] Neuro-astrocytic network (hippocampal model)
+    - Could be tested with or without STDP occuring
+    - Record how weights change over time
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory (refer to guanfacine working memory model)
   - [ ] Discrete state neuron (for testing)
@@ -198,6 +210,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
 - [ ] R-STDP based classifier
+  - Reward may need to be applied after a grace period so the model can converge on an answer first
   - [ ] Simple encoding of input
   - [ ] Modifying the bursting parameters to encode more information in input
     - [ ] Potentially having weights directly calculated/modified from bursting parameters
