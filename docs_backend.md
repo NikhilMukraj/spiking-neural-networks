@@ -43,7 +43,7 @@ cargo run --release filename.toml
 - `beta_init: Float=10.`: Arbitrary $\beta$ value for `Izhikevich` mode
 - `d_init: Float=2.`: After spike reset value for `w` in `Izhikevich` mode
 - `dt: Float=0.1`: Simulation timestep (ms)
-- `exp_dt: Float=1.`: Exponential time step (ms) for `Adaptive Exponenial` mode
+- `slope_factor: Float=1.`: Sharpness of spike for `Adaptive Exponenial` mode
 - `a_minus: float`: STDP parameter for scaling weight if postsynaptic neuron fires first
 - `a_plus: float`: STDP parameters for scaling weight if presynaptic neuron fires first
 - `tau_minus: float`: stdp parameters for decay if postsynaptic neuron fires first
