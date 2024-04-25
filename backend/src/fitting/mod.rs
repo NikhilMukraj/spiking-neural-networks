@@ -6,6 +6,7 @@ use crate::distribution::limited_distr;
 use crate::neuron::{
     Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
     find_peaks, diff, hodgkin_huxley_bayesian, gap_junction,
+    handle_receptor_kinetics
 };
 use crate::ga::{BitString, decode};
 
@@ -266,20 +267,28 @@ pub struct FittingSettings<'a> {
     pub input_currents: &'a [f64],
     pub iterations: usize,
     pub bayesian: bool,
+    pub do_receptor_kinetics: bool,
 }
 
 fn bayesian_izhikevich_get_dv_change(
     izhikevich_neuron: &mut Cell, 
     if_params: &IFParameters, 
     input_current: f64,
-    bayesian: bool
+    bayesian: bool,
+    do_receptor_kinetics: bool,
 ) -> f64 {
     if bayesian {
+        let bayesian_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
+        let bayesian_input = input_current * bayesian_factor;
+        handle_receptor_kinetics(izhikevich_neuron, &if_params, bayesian_input, do_receptor_kinetics);
+
         izhikevich_neuron.izhikevich_get_dv_change(
             &if_params, 
-            input_current * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
-        )
+            bayesian_input,
+        ) + izhikevich_neuron.get_neurotransmitter_currents(if_params)
     } else {
+        handle_receptor_kinetics(izhikevich_neuron, &if_params, input_current, do_receptor_kinetics);
+
         izhikevich_neuron.izhikevich_get_dv_change(
             &if_params, 
             input_current,
@@ -307,6 +316,7 @@ pub fn get_izhikevich_summary(
             &if_params, 
             settings.input_currents[index], 
             settings.bayesian,
+            settings.do_receptor_kinetics,
         );
 
         if pre_spike {
@@ -326,6 +336,7 @@ pub fn get_izhikevich_summary(
             &if_params, 
             postsynaptic_input, 
             settings.bayesian,
+            settings.do_receptor_kinetics,
         );
 
         if post_spike {
