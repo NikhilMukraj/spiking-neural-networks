@@ -17,7 +17,7 @@ use crate::neuron::{
     hodgkin_huxley_bayesian, if_params_bayesian, gap_junction,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
-    HighVoltageActivatedCalciumChannel
+    HighVoltageActivatedCalciumChannel, handle_receptor_kinetics
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -1053,15 +1053,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 //     }
 // }
 
-fn handle_receptor_kinetics(cell: &mut Cell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
-    if do_receptor_kinetics {
-        cell.update_conc_and_receptor_kinetics(input_current, &if_params);
-    } else {
-        cell.update_neurotransmitter_concentration(input_current);
-    }
-    cell.set_neurotransmitter_currents(if_params);
-}
-
 fn test_coupled_neurons(
     if_type: IFType,
     pre_if_params: &IFParameters, 
@@ -1176,9 +1167,6 @@ fn test_coupled_neurons(
                 };
 
                 presynaptic_neuron.last_dv = pre_dv;
-
-                postsynaptic_neuron.update_conc_and_receptor_kinetics(presynaptic_neuron.current_voltage, &post_if_params);
-                postsynaptic_neuron.set_neurotransmitter_currents(post_if_params);
         
                 let input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
         
@@ -2686,6 +2674,9 @@ fn main() -> Result<()> {
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
 
+        let do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "do_receptor_kinetics", parse_bool, false)?;
+        println!("do_receptor_kinetics: {}", do_receptor_kinetics);
+
         let print_scaled: bool = parse_value_with_default(fit_neuron_models_table, "print_scaled", parse_bool, false)?; 
         println!("print_scaled: {}", print_scaled); 
 
@@ -2770,6 +2761,12 @@ fn main() -> Result<()> {
 
         if_params.dt = reference_dt;
 
+        if !do_receptor_kinetics {
+            if_params.ligand_gates_init.iter_mut().for_each(|i| {
+                i.neurotransmitter.r = 1.0;
+            });
+        }
+
         println!("{:#?}", if_params);
 
         let num_steps = ((input_current_upper_bound - input_current_lower_bound) / input_current_step)
@@ -2822,6 +2819,7 @@ fn main() -> Result<()> {
             input_currents: input_currents,
             iterations: iterations,
             bayesian: bayesian,
+            do_receptor_kinetics: do_receptor_kinetics,
         };
 
         let mut fitting_settings_map: HashMap<&str, FittingSettings> = HashMap::new();
