@@ -47,6 +47,7 @@ pub struct IFParameters {
     pub slope_factor: f64,
     pub bayesian_params: BayesianParameters,
     // total_time: f64,
+    pub ligand_gates_init: Vec<GeneralLigandGatedChannel>,
 }
 
 impl Default for IFParameters {
@@ -67,6 +68,7 @@ impl Default for IFParameters {
             dt: 0.1, // simulation time step (ms)
             slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
+            ligand_gates_init: vec![], // ligand gates
         }
     }
 }
@@ -93,6 +95,7 @@ impl ScaledDefault for IFParameters {
             dt: 0.1, // simulation time step (ms)
             slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
+            ligand_gates_init: vec![], // ligand gates
         }
     }
 }
@@ -119,6 +122,7 @@ impl IzhikevichDefault for IFParameters {
             dt: 0.5, // simulation time step (ms)
             slope_factor: 1., // exponential time step (ms)
             bayesian_params: BayesianParameters::default(), // default bayesian parameters
+            ligand_gates_init: vec![], // ligand gates
         }
     }
 }
@@ -205,7 +209,7 @@ pub struct Cell {
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
     pub last_dv: f64, // last change in voltage
-    // pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
+    pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
 pub trait Coupling {
@@ -230,7 +234,7 @@ impl Default for Cell {
             c: IFParameters::default().v_reset,
             d: IFParameters::default().d_init,
             last_dv: 0.,
-            // ligand_gates: vec![],
+            ligand_gates: vec![],
         }
     }
 }
@@ -252,7 +256,7 @@ impl IzhikevichDefault for Cell {
             c: IFParameters::izhikevich_default().v_reset,
             d: IFParameters::izhikevich_default().d_init,
             last_dv: 0.,
-            // ligand_gates: vec![],
+            ligand_gates: vec![],
         }
     }
 }
@@ -503,29 +507,37 @@ impl Cell {
         }
     }
 
-    // pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64, if_params: &IFParameters) {
-    //     self.ligand_gates
-    //         .iter_mut()
-    //         .for_each(|i| {
-    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
-    //             i.neurotransmitter.apply_r_change(if_params.dt);
-    //         });
-    // }
+    pub fn update_neurotransmitter_concentration(&mut self, presynaptic_voltage: f64) {
+        self.ligand_gates
+            .iter_mut()
+            .for_each(|i| {
+                i.neurotransmitter.apply_t_change(presynaptic_voltage);
+            });
+    }
 
-    // pub fn set_neurotransmitter_currents(&mut self, if_params: &IFParameters) {
-    //     self.ligand_gates
-    //         .iter_mut()
-    //         .map(|i| 
-    //             i.calculate_g(self.current_voltage, i.neurotransmitter.r, if_params.dt) * i.neurotransmitter.r
-    //         );
-    // }
+    pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64, if_params: &IFParameters) {
+        self.ligand_gates
+            .iter_mut()
+            .for_each(|i| {
+                i.neurotransmitter.apply_t_change(presynaptic_voltage);
+                i.neurotransmitter.apply_r_change(if_params.dt);
+            });
+    }
 
-    // pub fn get_neurotransmitter_currents(&self) -> f64 {
-    //     self.ligand_gates
-    //         .iter()
-    //         .map(|i| i.current)
-    //         .sum::<f64>()
-    // }
+    pub fn set_neurotransmitter_currents(&mut self, if_params: &IFParameters) {
+        self.ligand_gates
+            .iter_mut()
+            .for_each(|i| {
+                i.calculate_g(self.current_voltage, i.neurotransmitter.r, if_params.dt);
+        });
+    }
+
+    pub fn get_neurotransmitter_currents(&self, if_params: &IFParameters) -> f64 {
+        self.ligand_gates
+            .iter()
+            .map(|i| i.current * i.neurotransmitter.r)
+            .sum::<f64>() * (if_params.dt / if_params.tau_m)
+    }
 }
 
 pub type CellGrid = Vec<Vec<Cell>>;
@@ -538,7 +550,7 @@ pub type CellGrid = Vec<Vec<Cell>>;
 //     }
 // }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct BV {
     pub mg_conc: f64,
 }
@@ -555,7 +567,7 @@ impl BV {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GABAbDissociation {
     g: f64,
     n: f64,
@@ -606,7 +618,7 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Neurotransmitter {
     pub t_max: f64,
     pub alpha: f64,
@@ -711,7 +723,7 @@ impl Neurotransmitter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum NeurotransmitterType {
     AMPA,
     GABAa,
@@ -720,7 +732,7 @@ pub enum NeurotransmitterType {
     Basic,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GeneralLigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
