@@ -10,7 +10,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - (explanation of izhikevich)
 - (explaination of hodgkin huxley)
 - (explanation of ion channels)
-- (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich)
+- (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich, explain why receptor kinetics are fixed)
 
 ## Notes
 
