@@ -37,6 +37,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Move non initialization parameters to cell struct, move bayesian parameters to cell struct as well
 - Use integrate and fire parameters only for initialization not for calculation
+  - Update code in obsidian when refactor is done
 
 - Split `main.rs` functions into a few different files for readability
 
@@ -46,6 +47,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
+  - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
+  - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
 
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
@@ -65,6 +68,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
+  - Recurrent connections in reservoir compute act as working memory that stores information through recurrent connections that may slowly degrade over time, target is slowing the degradation in order to improve memory recall
   - Decoding unit acts as readout
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
 - When done modeling memory, attempt general classification tasks with liquid state machines
@@ -139,6 +143,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [x] Analysis with Fourier transforms
       - [x] Calculation of spectral analysis
       - [x] Calculation of Earth moving distance
+    - [ ] Option to rewrite Fourier analysis to file
 - [ ] Hodgkin Huxley
   - [x] Basic gating
   - [ ] Neurotransmission
@@ -187,8 +192,16 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
     - [x] Remove existing neurotranmission system
     - [ ] Integrate and fire models with ligand gated channels interacting with neurotransmitters
+      - [ ] Option to record each neurotransmitter current over time in lattice (g * r)
+      - [ ] Recording g, r, and T over time in STDP and coupling tests
     - [ ] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
       - $\frac{dT}{dt} = \alpha T + T_{max} H(V_p - V_{th})$ where $T$ is neurotransmitter concentration, $T_{max}$ is maximum neurotransmitter concentration, $\alpha$ is clearance rate, $H(x)$ is the heaviside function, $V_p$ is the average of the presynaptic voltages, and $V_{th}$ is the spiking threshold
+      - If not using average, add $w \alpha T + w T_{max} H(V_p - V_{th}) w$ for each presynaptic voltage where $w$ is a weight
+      - Cap $T$ to make sure it does not go below 0
+        - Apply change and then do `self.t = max(0, t_change);`
+      - Receptor occupancy could be assumed to be at maximum
+      - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
+- [ ] Poisson neuron
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
@@ -206,7 +219,14 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] Hopfield network
   - [ ] Simple recurrent memory
   - [ ] Liquid state machine
+    - Should have a cue and retrieval system (for now supervised, could look into unsupervised methods later)
+      - Present cue for duration, remove cue, see how long retrieval signal lasts
+        - Matching task, present cue, remove cue, present a new cue and determine whether the new cue is the same or different (DMS task)
+      - Could add noise over time similar to simple recurrent memory to modulate forgetting if signal stability stays constant
+      - **Measure signal stability after cue is removed (see guanfacine paper)**
+    - Could model cognition with something similar to a traveling salesman problem
   - [ ] Liquid state machine with astrocytes
+  - [ ] Neuro-astrocyte memory model
 - [ ] Simulation of psychiatric illness
 - [ ] Simulation of virtual medications
 - [ ] R-STDP based classifier
