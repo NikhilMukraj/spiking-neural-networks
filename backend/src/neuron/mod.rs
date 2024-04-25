@@ -542,6 +542,15 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
+pub fn handle_receptor_kinetics(cell: &mut Cell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
+    if do_receptor_kinetics {
+        cell.update_conc_and_receptor_kinetics(input_current, &if_params);
+    } else {
+        cell.update_neurotransmitter_concentration(input_current);
+    }
+    cell.set_neurotransmitter_currents(if_params);
+}
+
 // fn heaviside(x: f64) -> f64 {
 //     if (x > 0) {
 //         1.
