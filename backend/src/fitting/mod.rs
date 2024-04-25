@@ -391,6 +391,7 @@ pub fn fitting_objective(
         c: c,
         d: d,
         last_dv: 0.,
+        ligand_gates: if_params.ligand_gates_init.clone(),
     };
 
     let summaries_results = (0..settings.input_currents.len())
