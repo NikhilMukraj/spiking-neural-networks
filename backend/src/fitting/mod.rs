@@ -5,7 +5,7 @@ use std::{
 use crate::distribution::limited_distr;
 use crate::neuron::{
     Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    find_peaks, diff, hodgkin_huxley_bayesian, gap_junction,
+    find_peaks, diff, gap_junction, iterate_coupled_hodgkin_huxley,
     handle_receptor_kinetics
 };
 use crate::ga::{BitString, decode};
@@ -216,37 +216,7 @@ pub fn get_hodgkin_huxley_voltages(
     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
 
     for _ in 0..iterations {
-        if bayesian {
-            let pre_bayesian_factor = hodgkin_huxley_bayesian(&presynaptic_neuron);
-            let post_bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
-
-            presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
-
-            presynaptic_neuron.iterate(
-                input_current * pre_bayesian_factor
-            );
-
-            let current = gap_junction(
-                &presynaptic_neuron,
-                &postsynaptic_neuron,
-            );
-
-            postsynaptic_neuron.iterate(
-                current * post_bayesian_factor
-            );
-        } else {
-            presynaptic_neuron.update_neurotransmitter(input_current);
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-            presynaptic_neuron.iterate(input_current);
-
-            let current = gap_junction(
-                &presynaptic_neuron,
-                &postsynaptic_neuron,
-            );
-
-            postsynaptic_neuron.iterate(current);
-        }
+        iterate_coupled_hodgkin_huxley(&mut presynaptic_neuron, &mut postsynaptic_neuron, bayesian, input_current);
 
         pre_voltages.push(presynaptic_neuron.current_voltage);
         post_voltages.push(postsynaptic_neuron.current_voltage);
