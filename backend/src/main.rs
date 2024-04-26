@@ -9,12 +9,12 @@ use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
 mod distribution;
-use crate::{distribution::limited_distr, fitting::ActionPotentialSummary};
+use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, Cell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
-    hodgkin_huxley_bayesian, if_params_bayesian, gap_junction,
+    if_params_bayesian, gap_junction, iterate_coupled_hodgkin_huxley,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel, handle_receptor_kinetics
@@ -27,7 +27,7 @@ mod fitting;
 use crate::fitting::{
     FittingSettings, fitting_objective, 
     get_hodgkin_huxley_voltages, get_reference_scale, get_izhikevich_summary,
-    print_action_potential_summaries,
+    print_action_potential_summaries, ActionPotentialSummary,
     SummaryScalingDefaults, SummaryScalingFactors,
 };
 mod graph;
@@ -1454,7 +1454,7 @@ fn run_isolated_stdp_test(
     if_type: IFType,
     iterations: usize,
     n: usize,
-    input_voltage: f64,
+    input_current: f64,
     excitatory_chance: f64,
     averaged: bool,
     filename: &str,
@@ -1511,7 +1511,7 @@ fn run_isolated_stdp_test(
         }
     }
 
-    let input_voltages: Vec<f64> = (0..n).map(|_| input_voltage * limited_distr(1.0, 0.1, 0., 2.))
+    let input_currents: Vec<f64> = (0..n).map(|_| input_current * limited_distr(1.0, 0.1, 0., 2.))
         .collect();
 
     let mut pre_fires: Vec<Option<usize>> = (0..n).map(|_| None).collect();
@@ -1542,10 +1542,10 @@ fn run_isolated_stdp_test(
                     let (dv, is_spiking) = if if_params.bayesian_params.std != 0. {
                         input_neuron.get_dv_change_and_spike(
                             &if_params, 
-                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
+                            input_currents[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
                         )
                     } else {
-                        input_neuron.get_dv_change_and_spike(&if_params, input_voltages[n_neuron])
+                        input_neuron.get_dv_change_and_spike(&if_params, input_currents[n_neuron])
                     };
 
                     is_spikings.push(is_spiking);
@@ -1633,10 +1633,10 @@ fn run_isolated_stdp_test(
                         adaptive_dv(
                             input_neuron,
                             &if_params, 
-                            input_voltages[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
+                            input_currents[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
                         )
                     } else {
-                        adaptive_dv(input_neuron, &if_params, input_voltages[n_neuron])
+                        adaptive_dv(input_neuron, &if_params, input_currents[n_neuron])
                     };
 
                     is_spikings.push(is_spiking);
@@ -1965,7 +1965,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
 fn coupled_hodgkin_huxley<'a>(
     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
-    input: f64,
+    input_current: f64,
     iterations: usize,
     filename: &str,
     bayesian: bool,
@@ -1989,38 +1989,7 @@ fn coupled_hodgkin_huxley<'a>(
     write!(file, "\n").expect("Unable to write to file");
         
     for _ in 0..iterations {
-        if bayesian {
-            let pre_bayesian_factor = hodgkin_huxley_bayesian(&presynaptic_neuron);
-            let post_bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
-
-            presynaptic_neuron.update_neurotransmitter(input * pre_bayesian_factor);
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
-
-            presynaptic_neuron.iterate(
-                input * pre_bayesian_factor
-            );
-
-            let current = gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            );
-
-            postsynaptic_neuron.iterate(
-                current * post_bayesian_factor
-            );
-        } else {
-            presynaptic_neuron.update_neurotransmitter(input);
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-
-            presynaptic_neuron.iterate(input);
-
-            let current = gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            );
-
-            postsynaptic_neuron.iterate(current);
-        }
+        iterate_coupled_hodgkin_huxley(presynaptic_neuron, postsynaptic_neuron, bayesian, input_current);
 
         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
             writeln!(file, "{}, {}", 
@@ -2246,11 +2215,11 @@ fn main() -> Result<()> {
         };
         println!("iterations: {}", iterations);
 
-        let input_voltage: f64 = match single_neuron_test.get("input_voltage") {
-            Some(value) => parse_f64(value, "input_voltage")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        let input_current: f64 = match single_neuron_test.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
-        println!("input_voltage: {}", input_voltage);  
+        println!("input_current: {}", input_current);  
         
         let if_type: String = parse_value_with_default(
             single_neuron_test, 
@@ -2316,19 +2285,19 @@ fn main() -> Result<()> {
 
         match if_type {
             IFType::Basic => { 
-                test_cell.run_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
+                test_cell.run_static_input(&if_params, input_current, bayesian, iterations, &filename); 
             },
             IFType::Adaptive => { 
-                test_cell.run_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
+                test_cell.run_adaptive_static_input(&if_params, input_current, bayesian, iterations, &filename); 
             },
             IFType::AdaptiveExponential => { 
-                test_cell.run_exp_adaptive_static_input(&if_params, input_voltage, bayesian, iterations, &filename);
+                test_cell.run_exp_adaptive_static_input(&if_params, input_current, bayesian, iterations, &filename);
             },
             IFType::Izhikevich => { 
-                test_cell.run_izhikevich_static_input(&if_params, input_voltage, bayesian, iterations, &filename); 
+                test_cell.run_izhikevich_static_input(&if_params, input_current, bayesian, iterations, &filename); 
             },
             IFType::IzhikevichLeaky => {
-                test_cell.run_izhikevich_leaky_static_input(&if_params, input_voltage, bayesian, iterations, &filename);
+                test_cell.run_izhikevich_leaky_static_input(&if_params, input_current, bayesian, iterations, &filename);
             },
         };
 
@@ -2356,11 +2325,11 @@ fn main() -> Result<()> {
         };
         println!("filename: {}", filename);
     
-        let input_voltage: f64 = match coupled_table.get("input_voltage") {
-            Some(value) => parse_f64(value, "input_voltage")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        let input_current: f64 = match coupled_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
-        println!("input_voltage: {}", input_voltage);
+        println!("input_current: {}", input_current);
 
         let full: bool = parse_value_with_default(
             &coupled_table, 
@@ -2423,7 +2392,7 @@ fn main() -> Result<()> {
             &post_if_params,
             pre_potentiation_type,
             iterations,
-            input_voltage,
+            input_current,
             do_receptor_kinetics,
             full,
             &filename,
@@ -2459,11 +2428,11 @@ fn main() -> Result<()> {
         };
         println!("n: {}", n); 
     
-        let input_voltage: f64 = match stdp_table.get("input_voltage") {
-            Some(value) => parse_f64(value, "input_voltage")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        let input_current: f64 = match stdp_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
-        println!("input_voltage: {}", input_voltage);
+        println!("input_current: {}", input_current);
 
         let excitatory_chance = parse_value_with_default(stdp_table, "excitatory_chance", parse_f64, 1.0)?;
         println!("excitatory_chance: {}", excitatory_chance);
@@ -2481,7 +2450,7 @@ fn main() -> Result<()> {
             if_type,
             iterations,
             n,
-            input_voltage,
+            input_current,
             excitatory_chance,
             averaged,
             &filename,
@@ -2587,11 +2556,11 @@ fn main() -> Result<()> {
         };
         println!("filename: {}", filename);
     
-        let input_voltage: f64 = match coupled_hodgkin_huxley_table.get("input_voltage") {
-            Some(value) => parse_f64(value, "input_voltage")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_voltage' value not found")); },
+        let input_current: f64 = match coupled_hodgkin_huxley_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
-        println!("input_voltage: {}", input_voltage);
+        println!("input_current: {}", input_current);
 
         let bayesian: bool = parse_value_with_default(
             &coupled_hodgkin_huxley_table, 
@@ -2615,7 +2584,7 @@ fn main() -> Result<()> {
         coupled_hodgkin_huxley(
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron,
-            input_voltage,
+            input_current,
             iterations,
             &filename,
             bayesian,
