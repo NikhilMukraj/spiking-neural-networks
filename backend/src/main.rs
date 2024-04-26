@@ -1965,7 +1965,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
 fn coupled_hodgkin_huxley<'a>(
     presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
-    input_voltage: f64,
+    input: f64,
     iterations: usize,
     filename: &str,
     bayesian: bool,
@@ -1990,32 +1990,36 @@ fn coupled_hodgkin_huxley<'a>(
         
     for _ in 0..iterations {
         if bayesian {
-            let bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
+            let pre_bayesian_factor = hodgkin_huxley_bayesian(&presynaptic_neuron);
+            let post_bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
 
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
+            presynaptic_neuron.update_neurotransmitter(input * pre_bayesian_factor);
+            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
 
             presynaptic_neuron.iterate(
-                input_voltage * hodgkin_huxley_bayesian(&presynaptic_neuron)
+                input * pre_bayesian_factor
             );
 
-            let input_current = gap_junction(
+            let current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             );
 
             postsynaptic_neuron.iterate(
-                input_current * bayesian_factor
+                current * post_bayesian_factor
             );
         } else {
+            presynaptic_neuron.update_neurotransmitter(input);
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-            presynaptic_neuron.iterate(input_voltage);
 
-            let input_current = gap_junction(
+            presynaptic_neuron.iterate(input);
+
+            let current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             );
 
-            postsynaptic_neuron.iterate(input_current);
+            postsynaptic_neuron.iterate(current);
         }
 
         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
