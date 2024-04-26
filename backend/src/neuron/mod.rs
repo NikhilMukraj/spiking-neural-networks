@@ -1408,6 +1408,15 @@ impl HodgkinHuxleyCell {
         }
     }
 
+    pub fn get_bayesian_factor(&self) -> f64 {
+        limited_distr(
+            self.bayesian_params.mean, 
+            self.bayesian_params.std, 
+            self.bayesian_params.min, 
+            self.bayesian_params.max,
+        )
+    }
+
     pub fn peaks_test(
         &mut self, 
         input: f64, 
@@ -1423,14 +1432,16 @@ impl HodgkinHuxleyCell {
 
         for _ in 0..iterations {
             if bayesian {
-                self.iterate(
-                    input * limited_distr(
-                        self.bayesian_params.mean, 
-                        self.bayesian_params.std, 
-                        self.bayesian_params.min, 
-                        self.bayesian_params.max,
-                    )
+                let bayesian_factor = limited_distr(
+                    self.bayesian_params.mean, 
+                    self.bayesian_params.std, 
+                    self.bayesian_params.min, 
+                    self.bayesian_params.max,
                 );
+                let bayesian_input = input * bayesian_factor;
+
+                self.update_neurotransmitter(bayesian_input);
+                self.iterate(bayesian_input);
             } else {
                 self.iterate(input);
             }
@@ -1453,15 +1464,6 @@ impl HodgkinHuxleyCell {
     }
 }
 
-pub fn hodgkin_huxley_bayesian(hodgkin_huxley_model: &HodgkinHuxleyCell) -> f64 {
-    limited_distr(
-        hodgkin_huxley_model.bayesian_params.mean, 
-        hodgkin_huxley_model.bayesian_params.std, 
-        hodgkin_huxley_model.bayesian_params.min, 
-        hodgkin_huxley_model.bayesian_params.max,
-    )
-}
-
 pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
     limited_distr(
         if_params.bayesian_params.mean, 
@@ -1474,4 +1476,44 @@ pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
 pub fn gap_junction<T: Coupling>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
     postsynaptic_neuron.get_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
+}
+
+pub fn iterate_coupled_hodgkin_huxley(
+    presynaptic_neuron: &mut HodgkinHuxleyCell, 
+    postsynaptic_neuron: &mut HodgkinHuxleyCell,
+    bayesian: bool,
+    input_current: f64,
+) {
+    if bayesian {
+        let pre_bayesian_factor = &presynaptic_neuron.get_bayesian_factor();
+        let post_bayesian_factor = &postsynaptic_neuron.get_bayesian_factor();
+
+        presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
+        postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
+
+        presynaptic_neuron.iterate(
+            input_current * pre_bayesian_factor
+        );
+
+        let current = gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        );
+
+        postsynaptic_neuron.iterate(
+            current * post_bayesian_factor
+        );
+    } else {
+        presynaptic_neuron.update_neurotransmitter(input_current);
+        postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
+
+        presynaptic_neuron.iterate(input_current);
+
+        let current = gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        );
+
+        postsynaptic_neuron.iterate(current);
+    }
 }
