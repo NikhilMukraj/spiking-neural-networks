@@ -839,8 +839,8 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
 }
 
 impl GeneralLigandGatedChannel {
-    pub fn calculate_g(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
-        let modifier = match &mut self.neurotransmitter_type {
+    fn get_modifier(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
+        match &mut self.neurotransmitter_type {
             NeurotransmitterType::AMPA => 1.0,
             NeurotransmitterType::GABAa => 1.0,
             NeurotransmitterType::GABAb(value) => {
@@ -849,7 +849,11 @@ impl GeneralLigandGatedChannel {
             }, // G^N / (G^N + Kd)
             NeurotransmitterType::NMDA(value) => value.calculate_b(voltage),
             NeurotransmitterType::Basic => 1.0,
-        };
+        }
+    }
+
+    pub fn calculate_g(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
+        let modifier = self.get_modifier(voltage, r, dt);
 
         self.current = modifier * self.g * (voltage - self.reversal);
 
