@@ -37,14 +37,13 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Move non initialization parameters from IFParaemeters to cell struct, move bayesian parameters to cell struct as well**
   - Make function to translate IFParameters and STDPParameters to cell struct
+  - Make cell struct implemented function to get bayesian factor instead of passing IFParameters
 - Use integrate and fire parameters only for initialization not for calculation
   - Update code in obsidian when refactor is done
 
 - Split `main.rs` functions into a few different files for readability
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
-
-- **Need to rename all `input_voltage` to `input_current`**
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
