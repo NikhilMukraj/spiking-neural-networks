@@ -1,13 +1,15 @@
 [coupled_hodgkin_huxley]
-# post_AMPA = true
+pre_AMPA = true
+post_AMPA = true
 # post_GABAa = true
 # post_GABAb = true
 # post_NMDA = true
 pre_dt = 0.01
 post_dt = 0.01
-input_voltage = 50.0
+input_current = 50.0
 post_gap_conductance = 7.0
 iterations = 10000
-filename = "output/gap_junction_hodgkin_huxley.csv"
+# filename = "output/gap_junction_hodgkin_huxley.csv"
+filename = "output/coupled_both_ampa_hodgkin_huxley.csv"
 bayesian = false
 full = true
