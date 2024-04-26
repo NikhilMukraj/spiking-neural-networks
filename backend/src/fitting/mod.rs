@@ -217,12 +217,14 @@ pub fn get_hodgkin_huxley_voltages(
 
     for _ in 0..iterations {
         if bayesian {
-            let bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
+            let pre_bayesian_factor = hodgkin_huxley_bayesian(&presynaptic_neuron);
+            let post_bayesian_factor = hodgkin_huxley_bayesian(&postsynaptic_neuron);
 
-            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * bayesian_factor);
+            presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
+            postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
 
             presynaptic_neuron.iterate(
-                input_current * hodgkin_huxley_bayesian(&presynaptic_neuron)
+                input_current * pre_bayesian_factor
             );
 
             let current = gap_junction(
@@ -231,9 +233,10 @@ pub fn get_hodgkin_huxley_voltages(
             );
 
             postsynaptic_neuron.iterate(
-                current * bayesian_factor
+                current * post_bayesian_factor
             );
         } else {
+            presynaptic_neuron.update_neurotransmitter(input_current);
             postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
             presynaptic_neuron.iterate(input_current);
 
