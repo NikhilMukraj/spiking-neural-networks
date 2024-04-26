@@ -35,7 +35,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Gap condutance should be retrieved from TOML via IFParameters
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
-- Move non initialization parameters to cell struct, move bayesian parameters to cell struct as well
+- **Move non initialization parameters from IFParaemeters to cell struct, move bayesian parameters to cell struct as well**
+  - Make function to translate IFParameters and STDPParameters to cell struct
 - Use integrate and fire parameters only for initialization not for calculation
   - Update code in obsidian when refactor is done
 
@@ -64,7 +65,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Decoded by taking weighted sum of working memory neurons
     - If below 0, then percieved cue is -1, if above 0, percieved cue is 1
     - **Or perceived cue could be above or below a given baseline, cue itself can be a fast (or excitatory) spike train or a slow (or potentially inhibitory) spike train, 0 is a baseline spike train speed (spike train just being a series of spikes)**
-      - Probably more practical to use an excitatory and inhibitory input and check deviation from baseline over time
+      - Poisson neuron should be used to generate spike train
+      - Might be more practical to use an excitatory and inhibitory input and check deviation from baseline over time
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
