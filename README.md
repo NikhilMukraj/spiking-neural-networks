@@ -35,15 +35,22 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Gap condutance should be retrieved from TOML via IFParameters
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
-- **Move non initialization parameters from IFParaemeters to cell struct, move bayesian parameters to cell struct as well**
+- **Split `get_dv_change_and_get_spike` into `get_basic_dv_change` and `get_basic_spike`, that way there does not need to be a split between basic and rest of integrate and fires**
+  - Could have a function return the correct function for each IFType for now
+  - Could a function that sets a private field within the struct to the correct dv change function and the correct spiking function and then call a method that called that function instead of matching each time
+  - Could implement this by integrating IFType into cell struct and setting the right function when IFType is called
+
+- **Move non initialization parameters from IFParameters to cell struct, move bayesian parameters to cell struct as well**
   - Make function to translate IFParameters and STDPParameters to cell struct
   - Make cell struct implemented function to get bayesian factor instead of passing IFParameters
-- Use integrate and fire parameters only for initialization not for calculation
-  - Update code in obsidian when refactor is done
+- **Completely remove IFParameters**
+  - Consider removing 0-1 scaling default
+  - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
+  - Update code in obsidian when refactor is done, maybe update results
 
 - Split `main.rs` functions into a few different files for readability
 
-- Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct), add capacitance to struct for current calculation
+- Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
@@ -70,8 +77,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
   - Recurrent connections in reservoir compute act as working memory that stores information through recurrent connections that may slowly degrade over time, target is slowing the degradation in order to improve memory recall
-  - Decoding unit acts as readout
+  - Decoding unit acts as readout, decoding unit likely would need some training in the form of R-STDP
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
+  - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
 
 - [Gap junction equation and various models for different currents](https://www.maths.nottingham.ac.uk/plp/pmzsc/cnn/CNN4.pdf)
