@@ -296,8 +296,6 @@ pub fn get_izhikevich_summary(
             pre_peaks.push(timestep);
         }
 
-        presynaptic_neuron.last_dv = pre_dv;
-
         let postsynaptic_input = gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
@@ -315,8 +313,6 @@ pub fn get_izhikevich_summary(
         if post_spike {
             post_peaks.push(timestep);
         }
-
-        postsynaptic_neuron.last_dv = post_dv;
     
         presynaptic_neuron.current_voltage += pre_dv;
         postsynaptic_neuron.current_voltage += post_dv;
@@ -374,7 +370,6 @@ pub fn fitting_objective(
         beta: b,
         c: c,
         d: d,
-        last_dv: 0.,
         ligand_gates: if_params.ligand_gates_init.clone(),
     };
 
