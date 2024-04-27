@@ -208,7 +208,6 @@ pub struct Cell {
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
-    pub last_dv: f64, // last change in voltage
     pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
@@ -233,7 +232,6 @@ impl Default for Cell {
             beta: IFParameters::default().beta_init,
             c: IFParameters::default().v_reset,
             d: IFParameters::default().d_init,
-            last_dv: 0.,
             ligand_gates: vec![],
         }
     }
@@ -255,7 +253,6 @@ impl IzhikevichDefault for Cell {
             beta: IFParameters::izhikevich_default().beta_init,
             c: IFParameters::izhikevich_default().v_reset,
             d: IFParameters::izhikevich_default().d_init,
-            last_dv: 0.,
             ligand_gates: vec![],
         }
     }
@@ -524,19 +521,19 @@ impl Cell {
             });
     }
 
-    pub fn set_neurotransmitter_currents(&mut self, if_params: &IFParameters) {
+    pub fn set_neurotransmitter_currents(&mut self, lif: &IFParameters) {
         self.ligand_gates
             .iter_mut()
             .for_each(|i| {
-                i.calculate_g(self.current_voltage, i.neurotransmitter.r, if_params.dt);
+                i.calculate_g(self.current_voltage, i.neurotransmitter.r, lif.dt);
         });
     }
 
-    pub fn get_neurotransmitter_currents(&self, if_params: &IFParameters) -> f64 {
+    pub fn get_neurotransmitter_currents(&self, lif: &IFParameters) -> f64 {
         self.ligand_gates
             .iter()
             .map(|i| i.current * i.neurotransmitter.r)
-            .sum::<f64>() * (if_params.dt / if_params.tau_m)
+            .sum::<f64>() * (lif.dt / lif.tau_m)
     }
 }
 
@@ -1162,7 +1159,6 @@ impl Gate {
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
     pub gap_condutance: f64,
-    pub last_dv: f64,
     pub dt: f64,
     pub cm: f64,
     pub e_na: f64,
@@ -1200,7 +1196,6 @@ impl Default for HodgkinHuxleyCell {
         HodgkinHuxleyCell { 
             current_voltage: 0.,
             gap_condutance: 7.,
-            last_dv: 0.,
             dt: 0.1,
             cm: 1., 
             e_na: 115., 
@@ -1307,8 +1302,7 @@ impl HodgkinHuxleyCell {
             .sum::<f64>();
 
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
-        self.last_dv = self.dt * i_sum / self.cm;
-        self.current_voltage += self.last_dv;
+        self.current_voltage += self.dt * i_sum / self.cm;
     }
 
     pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
