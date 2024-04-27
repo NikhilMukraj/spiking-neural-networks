@@ -413,7 +413,6 @@ fn run_simulation(
                     beta: if_params.beta_init,
                     c: if_params.v_reset,
                     d: if_params.d_init,
-                    last_dv: 0.,
                     ligand_gates: if_params.ligand_gates_init.clone(),
                 })
                 .collect::<Vec<Cell>>()
@@ -494,7 +493,7 @@ fn run_simulation(
                     };
                     
                     let (dv, is_spiking) = cell_grid[x][y].get_dv_change_and_spike(if_params, input);
-                    cell_grid[x][y].last_dv = dv;
+                    cell_grid[x][y].current_voltage += dv;
 
                     changes.insert(pos, is_spiking);
                 }
@@ -505,8 +504,6 @@ fn run_simulation(
 
                 for (pos, is_spiking_value) in changes {
                     let (x, y) = pos;
-                    
-                    cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
 
                     if do_stdp && is_spiking_value {
                         cell_grid[x][y].last_firing_time = Some(timestep);
@@ -616,8 +613,7 @@ fn run_simulation(
 
                     let dv = adaptive_dv(&mut cell_grid[x][y], if_params, input_value);
 
-                    cell_grid[x][y].last_dv = dv;
-                    cell_grid[x][y].current_voltage += cell_grid[x][y].last_dv;
+                    cell_grid[x][y].current_voltage += dv;
 
                     if do_stdp && is_spiking_value {
                         cell_grid[x][y].last_firing_time = Some(timestep);
@@ -1078,7 +1074,6 @@ fn test_coupled_neurons(
         beta: pre_if_params.beta_init,
         c: pre_if_params.v_reset,
         d: pre_if_params.d_init,
-        last_dv: 0.,
         ligand_gates: pre_if_params.ligand_gates_init.clone(),
     };
 
@@ -1096,7 +1091,6 @@ fn test_coupled_neurons(
         beta: post_if_params.beta_init,
         c: post_if_params.v_reset,
         d: post_if_params.d_init,
-        last_dv: 0.,
         ligand_gates: post_if_params.ligand_gates_init.clone(),
     };
 
@@ -1165,8 +1159,6 @@ fn test_coupled_neurons(
                         is_spiking,
                     )
                 };
-
-                presynaptic_neuron.last_dv = pre_dv;
         
                 let input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
         
@@ -1194,8 +1186,6 @@ fn test_coupled_neurons(
                         is_spiking,
                     )
                 };
-
-                postsynaptic_neuron.last_dv = post_dv;
             
                 presynaptic_neuron.current_voltage += pre_dv;
                 postsynaptic_neuron.current_voltage += post_dv;
@@ -1271,7 +1261,6 @@ fn test_coupled_neurons(
                 };
 
                 let pre_i_syn = presynaptic_neuron.get_neurotransmitter_currents(&pre_if_params);
-                presynaptic_neuron.last_dv = pre_dv + pre_i_syn;
         
                 let input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
 
@@ -1300,10 +1289,10 @@ fn test_coupled_neurons(
                     dv
                 };
 
-                postsynaptic_neuron.last_dv = post_dv;
+                let post_i_syn = postsynaptic_neuron.get_neurotransmitter_currents(&post_if_params);
             
-                presynaptic_neuron.current_voltage += pre_dv;
-                postsynaptic_neuron.current_voltage += post_dv;
+                presynaptic_neuron.current_voltage += pre_dv + pre_i_syn;
+                postsynaptic_neuron.current_voltage += post_dv + post_i_syn;
         
                 if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
                     writeln!(file, "{}, {}", 
@@ -1435,10 +1424,6 @@ fn update_isolated_presynaptic_neuron_weights(
     timestep: usize,
     is_spikings: Vec<bool>,
 ) {
-    for input_neuron in neurons.iter_mut() {
-        input_neuron.current_voltage += input_neuron.last_dv;
-    }
-
     for (n, i) in is_spikings.iter().enumerate() {
         if *i {
             neurons[n].last_firing_time = Some(timestep);
@@ -1550,7 +1535,7 @@ fn run_isolated_stdp_test(
 
                     is_spikings.push(is_spiking);
 
-                    input_neuron.last_dv = dv;
+                    input_neuron.current_voltage += dv;
 
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
@@ -1586,8 +1571,6 @@ fn run_isolated_stdp_test(
                     timestep, 
                     is_spikings,
                 );
-
-                postsynaptic_neuron.last_dv = dv;
 
                 postsynaptic_neuron.current_voltage += dv;
 
@@ -1641,7 +1624,7 @@ fn run_isolated_stdp_test(
 
                     is_spikings.push(is_spiking);
 
-                    input_neuron.last_dv = dv;
+                    input_neuron.current_voltage += dv;
 
                     if is_spiking {
                         pre_fires[n_neuron] = Some(timestep);
@@ -1679,8 +1662,6 @@ fn run_isolated_stdp_test(
                     timestep, 
                     is_spikings,
                 );
-
-                postsynaptic_neuron.last_dv = dv;
 
                 postsynaptic_neuron.current_voltage += dv;
 
@@ -1943,7 +1924,6 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         HodgkinHuxleyCell {
             current_voltage: v_init,
             gap_condutance: gap_conductance,
-            last_dv: 0.,
             dt: dt,
             cm: cm,
             e_na: e_na,
@@ -2279,7 +2259,6 @@ fn main() -> Result<()> {
             beta: if_params.beta_init,
             c: if_params.v_reset,
             d: if_params.d_init,
-            last_dv: 0.,
             ligand_gates: if_params.ligand_gates_init.clone(),
         };
 
@@ -2853,7 +2832,6 @@ fn main() -> Result<()> {
             beta: b,
             c: c,
             d: d,
-            last_dv: 0.,
             ligand_gates: if_params.ligand_gates_init.clone(),
         };
 
