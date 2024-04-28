@@ -265,7 +265,7 @@ fn bayesian_izhikevich_get_dv_change(
         izhikevich_neuron.izhikevich_get_dv_change(
             &if_params, 
             input_current,
-        )
+        ) + izhikevich_neuron.get_neurotransmitter_currents(if_params)
     }
 }
 
