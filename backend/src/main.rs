@@ -1096,10 +1096,10 @@ fn test_coupled_neurons(
 
     if !do_receptor_kinetics {
         presynaptic_neuron.ligand_gates.iter_mut().for_each(|i| {
-            i.neurotransmitter.r = 1.0;
+            i.neurotransmitter.r = 0.8;
         });
         postsynaptic_neuron.ligand_gates.iter_mut().for_each(|i| {
-            i.neurotransmitter.r = 1.0;
+            i.neurotransmitter.r = 0.8;
         });
     }
 
@@ -2715,7 +2715,7 @@ fn main() -> Result<()> {
 
         if !do_receptor_kinetics {
             if_params.ligand_gates_init.iter_mut().for_each(|i| {
-                i.neurotransmitter.r = 1.0;
+                i.neurotransmitter.r = 0.8;
             });
         }
 
