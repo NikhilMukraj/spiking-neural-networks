@@ -340,7 +340,7 @@ impl Cell {
     pub fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         let dw = (
             self.alpha * (self.beta * self.current_voltage - self.w_value)
-        ) * (lif.dt / lif.tau_m);
+        ) * lif.dt;
 
         self.w_value += dw;
 
@@ -369,7 +369,7 @@ impl Cell {
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - 
             self.w_value * (self.current_voltage - lif.e_l) + i
-        ) * (lif.dt / lif.tau_m);
+        ) * lif.dt;
 
         dv
     }
