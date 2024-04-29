@@ -2,8 +2,8 @@
 if_type = "izhikevich"
 iterations = 10000
 input_current = 25.0
-pre_dt = 0.5
-post_dt = 0.5
+pre_dt = 0.1
+post_dt = 0.1
 pre_v_init = -65.0
 post_v_init = -65.0
 # post_alpha_init = 0.01
