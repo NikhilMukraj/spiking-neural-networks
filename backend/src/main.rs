@@ -725,6 +725,7 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
     if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
     if_params.slope_factor = parse_value_with_default(table, &format!("{}slope_factor", prefix_value), parse_f64, if_params.slope_factor)?;
     if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
+    if_params.c_m = parse_value_with_default(table, &format!("{}c_m", prefix_value), parse_f64, if_params.c_m)?;
     if_params.tref = parse_value_with_default(table, &format!("{}tref", prefix_value), parse_f64, if_params.tref)?;
     if_params.alpha_init = parse_value_with_default(table, &format!("{}alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
     if_params.beta_init = parse_value_with_default(table, &format!("{}beta_init", prefix_value), parse_f64, if_params.beta_init)?;
@@ -1820,13 +1821,13 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}dt: {}", prefix, dt);
 
-    let cm: f64 = parse_value_with_default(
+    let c_m: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
-        format!("{}cm", prefix).as_str(), 
+        format!("{}c_m", prefix).as_str(), 
         parse_f64, 
         1.
     )?;
-    println!("{}cm: {}", prefix, cm);
+    println!("{}c_m: {}", prefix, c_m);
 
     let gap_conductance: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
@@ -1925,7 +1926,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             current_voltage: v_init,
             gap_condutance: gap_conductance,
             dt: dt,
-            cm: cm,
+            c_m: c_m,
             e_na: e_na,
             e_k: e_k,
             e_k_leak: e_k_leak,

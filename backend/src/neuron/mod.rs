@@ -34,6 +34,7 @@ pub struct IFParameters {
     pub v_th: f64,
     pub v_reset: f64,
     pub tau_m: f64,
+    pub c_m: f64,
     pub g_l: f64,
     pub gap_conductance_init: f64,
     pub v_init: f64,
@@ -56,6 +57,7 @@ impl Default for IFParameters {
             v_th: -55., // spike threshold (mV)
             v_reset: -75., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
+            c_m: 1., // membrane capacitance (nF)
             g_l: 10., // leak conductance (nS)
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: -75., // initial potential (mV)
@@ -83,6 +85,7 @@ impl ScaledDefault for IFParameters {
             v_th: 1., // spike threshold (mV)
             v_reset: 0., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
+            c_m: 1., // membrane capacitance (nF)
             g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: 0., // initial potential (mV)
@@ -110,6 +113,7 @@ impl IzhikevichDefault for IFParameters {
             v_th: 30., // spike threshold (mV)
             v_reset: -65., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
+            c_m: 1., // membrane capacitance (nF)
             g_l: 10., // leak conductance (nS)
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: -65., // initial potential (mV)
@@ -285,7 +289,7 @@ impl Cell {
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
             (self.integration_constant * (i / lif.g_l))
-        ) * (lif.dt / lif.tau_m);
+        ) * (lif.dt / lif.c_m);
         // could be varied with a leak constant instead of -1 *
         // input could be varied with a integration constant times the input
 
@@ -377,7 +381,7 @@ impl Cell {
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
             (self.integration_constant * (i / lif.g_l)) - 
             (self.w_value / lif.g_l)
-        ) * (lif.dt / lif.tau_m);
+        ) * (lif.dt / lif.c_m);
 
         dv
     }
@@ -398,12 +402,12 @@ impl Cell {
             (lif.slope_factor * ((self.current_voltage - lif.v_th) / lif.slope_factor).exp()) +
             (self.integration_constant * (i / lif.g_l)) - 
             (self.w_value / lif.g_l)
-        ) * (lif.dt / lif.tau_m);
+        ) * (lif.dt / lif.c_m);
 
         dv
     }
 
-    // pub fn adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+    // pub fn exp_adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
     //     let dv = self.exp_adaptive_get_dv_change(lif, i);
     //     let dw = self.adaptive_get_dw_change(lif);
 
@@ -435,7 +439,7 @@ impl Cell {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - self.w_value + i
-        ) * (lif.dt / lif.tau_m);
+        ) * (lif.dt / lif.c_m);
 
         dv
     }
@@ -473,22 +477,12 @@ impl Cell {
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - 
             self.w_value * (self.current_voltage - lif.e_l) + i
-        ) * (lif.dt / lif.tau_m);
+        ) * (lif.dt / lif.c_m);
 
         dv
     }
 
-    // pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.izhikevich_get_dv_change(lif, i);
-    //     let dw = self.izhikevich_get_dw_change(lif);
-
-    //     self.current_voltage += dv;
-    //     self.w_value += dw;
-
-    //     self.izhikevich_handle_spiking(lif)
-    // }
-
-    // pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+    // pub fn leaky_izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
     //     let dv = self.izhikevich_leaky_get_dv_change(lif, i);
     //     let dw = self.izhikevich_get_dw_change(lif);
 
@@ -1284,7 +1278,7 @@ pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
     pub gap_condutance: f64,
     pub dt: f64,
-    pub cm: f64,
+    pub c_m: f64,
     pub e_na: f64,
     pub e_k: f64,
     pub e_k_leak: f64,
@@ -1321,7 +1315,7 @@ impl Default for HodgkinHuxleyCell {
             current_voltage: 0.,
             gap_condutance: 7.,
             dt: 0.1,
-            cm: 1., 
+            c_m: 1., 
             e_na: 115., 
             e_k: -12., 
             e_k_leak: 10.6, 
@@ -1426,7 +1420,7 @@ impl HodgkinHuxleyCell {
             .sum::<f64>();
 
         let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
-        self.current_voltage += self.dt * i_sum / self.cm;
+        self.current_voltage += self.dt * i_sum / self.c_m;
     }
 
     pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
