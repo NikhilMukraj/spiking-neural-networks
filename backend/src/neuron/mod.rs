@@ -113,7 +113,7 @@ impl IzhikevichDefault for IFParameters {
             v_th: 30., // spike threshold (mV)
             v_reset: -65., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
-            c_m: 1., // membrane capacitance (nF)
+            c_m: 10., // membrane capacitance (nF)
             g_l: 10., // leak conductance (nS)
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: -65., // initial potential (mV)
