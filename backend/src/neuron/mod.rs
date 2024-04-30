@@ -285,7 +285,6 @@ impl Cell {
             self.refractory_count = lif.tref / lif.dt
         }
 
-        // let dv = (-1. * (self.current_voltage - lif.e_l) + i / lif.g_l) * (lif.dt / lif.tau_m);
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
             (self.integration_constant * (i / lif.g_l))
@@ -420,7 +419,7 @@ impl Cell {
     pub fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         let dw = (
             self.alpha * (self.beta * self.current_voltage - self.w_value)
-        ) * lif.dt;
+        ) * (lif.dt / lif.tau_m);
 
         self.w_value += dw;
 
