@@ -657,6 +657,15 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
+// fn determine_calculaton_function(if_type: IFType) -> Result<(AdaptiveDwAndGetSpikeFunction, AdaptiveDvFunction)> {
+//     let iterate_and_spike_fn = match if_type {
+
+    // }  
+
+//     return Ok((adaptive_apply_and_get_spike, adaptive_dv));
+// }
+
+
 pub fn handle_receptor_kinetics(cell: &mut Cell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
     if do_receptor_kinetics {
         cell.update_conc_and_receptor_kinetics(input_current, &if_params);

@@ -40,8 +40,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Could have a function return the correct function for each IFType for now
     - One set of iterate and spike is used such that it directly modifies current voltage and current w, the other one is built to allow arc mutex access, it first calculates dv and dw and spike and then unlocks mutex to modify neuron
     - Need to built get dv, get dw, and get spike for each IF type
-      - Should also include neurotransmission current, concentration calculated separately (weight applied to concentration change not voltage input)
-    - **Inputs need to be calculated first, then after inputs calculated dv, dw, and spiking changes can be applied**
+      - **Build a function to return the correct function based on IF type**
+    - Inputs need to be calculated first, then after inputs calculated dv, dw, and spiking changes (and neurotransmitter concentration and respective currents) can be applied
       - For neuron, get input, add to Hashmap\<Position, Input\>, then apply input to each neuron
   - Could a function that sets a private field within the struct to the correct dv change function and the correct spiking function and then call a method that called that function instead of matching each time
   - Could implement this by integrating IFType into cell struct and setting the right function when IFType is called
