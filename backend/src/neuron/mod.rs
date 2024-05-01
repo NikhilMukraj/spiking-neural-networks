@@ -652,12 +652,13 @@ impl Cell {
         self.ligand_gates
             .iter()
             .map(|i| i.current * i.neurotransmitter.r)
-            .sum::<f64>() * (lif.dt / lif.tau_m)
+            .sum::<f64>() * (lif.dt / lif.c_m)
     }
 }
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
+// // could also consider soomething like Box::<dyn Fn(&mut Cell, &IFParameters, f64) -> bool>
 // fn determine_calculaton_function(if_type: IFType) -> impl Fn(&mut Cell, &IFParameters, f64) -> bool {
 //     let iterate_and_spike_fn = match if_type {
 //         IFType::Basic => {
