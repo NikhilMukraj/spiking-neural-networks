@@ -299,9 +299,9 @@ impl Cell {
     //     let dv = (
     //         (self.leak_constant * (self.current_voltage - lif.e_l)) +
     //         (self.integration_constant * (i / lif.g_l))
-    //     ) * (lif.dt / lif.tau_m)
+    //     ) * (lif.dt / lif.tau_m);
 
-        // dv
+    //     dv
     // }
 
     // pub fn basic_handle_spiking(&mut self, lif: &IFParameters) -> bool {
@@ -359,7 +359,7 @@ impl Cell {
     //     dw
     // }
 
-    // pub fn adaptive_handle_spiking(&mut self, lif: &IFParameters) {
+    // pub fn adaptive_handle_spiking(&mut self, lif: &IFParameters) -> bool {
     //     let mut is_spiking = false;
 
     //     if self.refractory_count > 0. {
@@ -443,7 +443,7 @@ impl Cell {
         dv
     }
 
-    // pub fn izhikevich_get_dw_change(&self, lif: &IFParameters) -> bool {
+    // pub fn izhikevich_get_dw_change(&self, lif: &IFParameters) -> f64 {
     //     let dw = (
     //         self.alpha * (self.beta * self.current_voltage - self.w_value)
     //     ) * lif.dt;
@@ -451,7 +451,7 @@ impl Cell {
     //     dw
     // }
 
-    // pub fn izhikevich_handle_spiking(&self, lif: &IFParameters) -> bool {
+    // pub fn izhikevich_handle_spiking(&mut self, lif: &IFParameters) -> bool {
     //     let mut is_spiking = false;
 
     //     if self.current_voltage >= lif.v_th {
@@ -459,6 +459,8 @@ impl Cell {
     //         self.current_voltage = self.c;
     //         self.w_value += self.d;
     //     }
+
+    //     is_spiking
     // }
 
     // pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
@@ -481,7 +483,7 @@ impl Cell {
         dv
     }
 
-    // pub fn leaky_izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+    // pub fn izhikevich_leaky_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
     //     let dv = self.izhikevich_leaky_get_dv_change(lif, i);
     //     let dw = self.izhikevich_get_dw_change(lif);
 
@@ -656,12 +658,31 @@ impl Cell {
 
 pub type CellGrid = Vec<Vec<Cell>>;
 
-// fn determine_calculaton_function(if_type: IFType) -> Result<(AdaptiveDwAndGetSpikeFunction, AdaptiveDvFunction)> {
+// fn determine_calculaton_function(if_type: IFType) -> impl Fn(&mut Cell, &IFParameters, f64) -> bool {
 //     let iterate_and_spike_fn = match if_type {
+//         IFType::Basic => {
+//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
+//             {neuron.basic_iterate_and_spike(if_params, input_value)}
+//         },
+//         IFType::Adaptive => {
+//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
+//             {neuron.adaptive_iterate_and_spike(if_params, input_value)}
+//         },
+//         IFType::AdaptiveExponential => {
+//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
+//             {neuron.exp_adaptive_iterate_and_spike(if_params, input_value)}
+//         },
+//         IFType::Izhikevich => {
+//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
+//             {neuron.izhikevich_iterate_and_spike(if_params, input_value)}
+//         },
+//         IFType::IzhikevichLeaky => {
+//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
+//             {neuron.izhikevich_leaky_iterate_and_spike(if_params, input_value)}
+//         }
+//     }; 
 
-    // }  
-
-//     return Ok((adaptive_apply_and_get_spike, adaptive_dv));
+//     iterate_and_spike_fn
 // }
 
 
