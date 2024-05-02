@@ -1090,253 +1090,67 @@ fn test_coupled_neurons(
         false
     };
 
-//     let iterate_and_spike_fn = determine_calculaton_function(if_type);
+    for _ in 0..iterations {
+        let presynaptic_input = if pre_bayesian {
+            let pre_bayesian_factor = limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.);
+            let pre_bayesian_input = input_current * pre_bayesian_factor;
 
-//     for _ in 0..iterations {
-//         let presynaptic_input = if bayesian {
-//             let pre_bayesian_factor = limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.);
-//             let pre_bayesian_input = input_current * pre_bayesian_factor;
+            pre_bayesian_input
+        } else {
+            input_current
+        };
 
-//             pre_bayesian_input
-//         } else {
-//             input_current
-//         };
+        let gap_junction_input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
 
-//         let gap_junction_input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
+        let postsynaptic_input = if post_bayesian {
+            let post_bayesian_factor = limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.);
+            let post_bayesian_input = gap_junction_input * post_bayesian_factor;
 
-//         let postsynaptic_input = if bayesian {
-//             let post_bayesian_factor = limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.);
-//             let post_bayesian_input = gap_junction_input * post_bayesian_factor;
-
-//             post_bayesian_input
-//         } else {
-//             gap_junction_input
-//         };
+            post_bayesian_input
+        } else {
+            gap_junction_input
+        };
             
-//         handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, presynaptic_input, do_receptor_kinetics);
-//         handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, postsynaptic_input, do_receptor_kinetics);
+        handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, presynaptic_input, do_receptor_kinetics);
+        handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, postsynaptic_input, do_receptor_kinetics);
 
-//         let _pre_is_spiking = iterate_and_spike_fn(
-//             &mut presynaptic_input,
-//             &pre_if_params, 
-//             presynaptic_input
-//         );
+        let _pre_is_spiking = presynaptic_neuron.iterate_and_spike(
+            &if_type,
+            &pre_if_params, 
+            presynaptic_input
+        );
 
-//         let _post_is_spiking = iterate_and_spike_fn(
-//             &mut postsynaptic_input,
-//             &post_if_params, 
-//             postsynaptic_input
-//         );
+        let _post_is_spiking = postsynaptic_neuron.iterate_and_spike(
+            &if_type,
+            &post_if_params, 
+            postsynaptic_input
+        );
+
+        presynaptic_neuron.update_based_on_neurotransmitter_currents(&pre_if_params);
+        postsynaptic_neuron.update_based_on_neurotransmitter_currents(&post_if_params);
    
-//         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
-//             writeln!(file, "{}, {}", 
-//                 presynaptic_neuron.current_voltage,
-//                 postsynaptic_neuron.current_voltage,
-//             ).expect("Unable to write to file");
-//         } else {
-//             write!(file, "{}, {}", 
-//                 presynaptic_neuron.current_voltage, 
-//                 postsynaptic_neuron.current_voltage,
-//             ).expect("Unable to write to file");
+        if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
+            writeln!(file, "{}, {}", 
+                presynaptic_neuron.current_voltage,
+                postsynaptic_neuron.current_voltage,
+            ).expect("Unable to write to file");
+        } else {
+            write!(file, "{}, {}", 
+                presynaptic_neuron.current_voltage, 
+                postsynaptic_neuron.current_voltage,
+            ).expect("Unable to write to file");
 
-//             for i in postsynaptic_neuron.ligand_gates.iter() {
-//                 write!(file, ", {}, {}, {}", 
-//                     i.current,
-//                     i.neurotransmitter.r,
-//                     i.neurotransmitter.t,
-//                 ).expect("Unable to write to file");
-//             }
-
-//             write!(file, "\n").expect("Unable to write to file");
-//         }
-//    }
-
-    match if_type {
-        IFType::Basic => { 
-            for _ in 0..iterations {
-                let (pre_dv, _pre_is_spiking) = if pre_bayesian {
-                    let bayesian_factor = limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.);
-                    let bayesian_input = input_current * bayesian_factor;
-                    handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, bayesian_input, do_receptor_kinetics);
-
-                    let (dv, is_spiking) = presynaptic_neuron.get_dv_change_and_spike(
-                        &pre_if_params, 
-                        bayesian_input
-                    );
-
-                    (
-                        dv + presynaptic_neuron.get_neurotransmitter_currents(&pre_if_params),
-                        is_spiking,
-                    )
-                } else {
-                    handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, input_current, do_receptor_kinetics);
-
-                    let (dv, is_spiking) = presynaptic_neuron.get_dv_change_and_spike(&pre_if_params, input_current);
-
-                    (
-                        dv + presynaptic_neuron.get_neurotransmitter_currents(&pre_if_params),
-                        is_spiking,
-                    )
-                };
-        
-                let input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
-        
-                let (post_dv, _post_is_spiking) = if post_bayesian {
-                    let bayesian_factor = limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.);
-                    let bayesian_input = input * bayesian_factor;
-                    handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, bayesian_input, do_receptor_kinetics);
-
-                    let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(
-                        &pre_if_params, 
-                        bayesian_input
-                    );
-
-                    (
-                        dv + postsynaptic_neuron.get_neurotransmitter_currents(&post_if_params),
-                        is_spiking,
-                    )
-                } else {
-                    handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, input, do_receptor_kinetics);
-
-                    let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&post_if_params, input);
-
-                    (
-                        dv + postsynaptic_neuron.get_neurotransmitter_currents(&post_if_params),
-                        is_spiking,
-                    )
-                };
-            
-                presynaptic_neuron.current_voltage += pre_dv;
-                postsynaptic_neuron.current_voltage += post_dv;
-           
-                if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
-                    writeln!(file, "{}, {}", 
-                        presynaptic_neuron.current_voltage,
-                        postsynaptic_neuron.current_voltage,
-                    ).expect("Unable to write to file");
-                } else {
-                    write!(file, "{}, {}", 
-                        presynaptic_neuron.current_voltage, 
-                        postsynaptic_neuron.current_voltage,
-                    ).expect("Unable to write to file");
-        
-                    for i in postsynaptic_neuron.ligand_gates.iter() {
-                        write!(file, ", {}, {}, {}", 
-                            i.current,
-                            i.neurotransmitter.r,
-                            i.neurotransmitter.t,
-                        ).expect("Unable to write to file");
-                    }
-        
-                    write!(file, "\n").expect("Unable to write to file");
-                }
-           }
-        },
-        IFType::Adaptive | IFType::AdaptiveExponential |
-        IFType::Izhikevich | IFType::IzhikevichLeaky => {
-            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
-                match if_type {
-                    IFType::Basic => unreachable!(),
-                    IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
-                    IFType::Izhikevich => neuron.izhikevich_apply_dw_and_get_spike(if_params),
-                    IFType::IzhikevichLeaky => neuron.izhikevich_apply_dw_and_get_spike(if_params),
-                }
-            };
-    
-            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
-                match if_type {
-                    IFType::Basic => unreachable!(), 
-                    IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value) + neuron.get_neurotransmitter_currents(if_params),
-                    IFType::AdaptiveExponential => neuron.exp_adaptive_get_dv_change(if_params, input_value) + neuron.get_neurotransmitter_currents(if_params),
-                    IFType::Izhikevich => neuron.izhikevich_get_dv_change(if_params, input_value) + neuron.get_neurotransmitter_currents(if_params),
-                    IFType::IzhikevichLeaky => neuron.izhikevich_leaky_get_dv_change(if_params, input_value) + neuron.get_neurotransmitter_currents(if_params),
-                }
-            };
-
-            for _ in 0..iterations {
-                let _pre_is_spiking = adaptive_apply_and_get_spike(&mut presynaptic_neuron, &pre_if_params);
-                let pre_dv = if pre_bayesian {
-                    let bayesian_factor = limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.);
-                    let bayesian_input = input_current * bayesian_factor;
-                    handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, bayesian_input, do_receptor_kinetics);
-
-                    let dv = adaptive_dv(
-                        &mut presynaptic_neuron,
-                        &pre_if_params, 
-                        bayesian_input
-                    );
-
-                    dv
-                } else {
-                    handle_receptor_kinetics(&mut presynaptic_neuron, &pre_if_params, input_current, do_receptor_kinetics);
-
-                    let dv = adaptive_dv(
-                        &mut presynaptic_neuron,
-                        &pre_if_params, 
-                        input_current
-                    );
-
-                    dv
-                };
-
-                let pre_i_syn = presynaptic_neuron.get_neurotransmitter_currents(&pre_if_params);
-        
-                let input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
-
-                let _post_is_spiking = adaptive_apply_and_get_spike(&mut postsynaptic_neuron, &post_if_params);
-                let post_dv = if post_bayesian {
-                    let bayesian_factor = limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.);
-                    let bayesian_input = input * bayesian_factor;
-                    handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, bayesian_input, do_receptor_kinetics);
-
-                    let dv = adaptive_dv(
-                        &mut postsynaptic_neuron,
-                        &post_if_params, 
-                        bayesian_input
-                    );
-
-                    dv
-                } else {
-                    handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, input, do_receptor_kinetics);
-
-                    let dv = adaptive_dv(
-                        &mut postsynaptic_neuron,
-                        &post_if_params, 
-                        input
-                    );
-
-                    dv
-                };
-
-                let post_i_syn = postsynaptic_neuron.get_neurotransmitter_currents(&post_if_params);
-            
-                presynaptic_neuron.current_voltage += pre_dv + pre_i_syn;
-                postsynaptic_neuron.current_voltage += post_dv + post_i_syn;
-        
-                if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
-                    writeln!(file, "{}, {}", 
-                        presynaptic_neuron.current_voltage,
-                        postsynaptic_neuron.current_voltage,
-                    ).expect("Unable to write to file");
-                } else {
-                    write!(file, "{}, {}", 
-                        presynaptic_neuron.current_voltage, 
-                        postsynaptic_neuron.current_voltage,
-                    ).expect("Unable to write to file");
-        
-                    for i in postsynaptic_neuron.ligand_gates.iter() {
-                        write!(file, ", {}, {}, {}", 
-                            i.current,
-                            i.neurotransmitter.r,
-                            i.neurotransmitter.t,
-                        ).expect("Unable to write to file");
-                    }
-        
-                    write!(file, "\n").expect("Unable to write to file");
-                }
+            for i in postsynaptic_neuron.ligand_gates.iter() {
+                write!(file, ", {}, {}, {}", 
+                    i.current,
+                    i.neurotransmitter.r,
+                    i.neurotransmitter.t,
+                ).expect("Unable to write to file");
             }
+
+            write!(file, "\n").expect("Unable to write to file");
         }
-    };
+   }
 }
 
 fn write_row(
@@ -1452,7 +1266,7 @@ fn update_isolated_presynaptic_neuron_weights(
     }
 }
 
-fn run_isolated_stdp_test(
+fn test_isolatd_stdp(
     stdp_table: &Value,
     stdp_params: &STDPParameters,
     if_type: IFType,
@@ -1536,6 +1350,72 @@ fn run_isolated_stdp_test(
         .expect("Unable to create file");
 
     write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
+
+    // for timestep in 0..iterations {
+    //     let mut is_spikings: Vec<bool> = Vec::new(); 
+
+    //     for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
+    //         let (dv, is_spiking) = if if_params.bayesian_params.std != 0. {
+    //             input_neuron.get_dv_change_and_spike(
+    //                 &if_params, 
+    //                 input_currents[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
+    //             )
+    //         } else {
+    //             input_neuron.get_dv_change_and_spike(&if_params, input_currents[n_neuron])
+    //         };
+
+    //         is_spikings.push(is_spiking);
+
+    //         input_neuron.current_voltage += dv;
+
+    //         if is_spiking {
+    //             pre_fires[n_neuron] = Some(timestep);
+    //         }                   
+    //     }
+
+    //     let calculated_voltage: f64 = (0..n)
+    //         .map(
+    //             |i| {
+    //                 let sign = get_sign(&neurons[i]);
+
+    //                 let output = weights[i] * signed_gap_junction(&neurons[i], &postsynaptic_neuron, sign);
+
+    //                 if averaged {
+    //                     output / (n as f64)
+    //                 } else {
+    //                     output
+    //                 }
+    //             }
+    //         ) 
+    //         .collect::<Vec<f64>>()
+    //         .iter()
+    //         .sum();
+        
+    //     let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
+    //     let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);                  
+
+    //     update_isolated_presynaptic_neuron_weights(
+    //         &mut neurons, 
+    //         &postsynaptic_neuron,
+    //         &mut weights, 
+    //         &mut delta_ws, 
+    //         timestep, 
+    //         is_spikings,
+    //     );
+
+    //      
+    //     postsynaptic_neuron.current_voltage += dv;
+
+    //     if is_spiking {
+    //         postsynaptic_neuron.last_firing_time = Some(timestep);
+    //         for (n_neuron, i) in neurons.iter().enumerate() {
+    //             delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+    //             weights[n_neuron] += delta_ws[n_neuron];
+    //         }
+    //     }
+
+    //     write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
+    // }
 
     match if_type {
         IFType::Basic => {
@@ -2442,7 +2322,7 @@ fn main() -> Result<()> {
 
         get_stdp_params(&mut stdp_params, stdp_table)?;
 
-        run_isolated_stdp_test(
+        test_isolatd_stdp(
             stdp_table,
             &stdp_params,
             if_type,
