@@ -50,6 +50,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Make function to translate IFParameters and STDPParameters to cell struct
   - Have a set of bayesian parameters for ensemble of neurons to use
     - Have separate function to get those parameters from TOML
+    - Bayesian should only be used with standard deviation is not 0 (for all functions)
 - **Completely remove IFParameters**
   - Repurpose get_if_params function to get IFCell parameters
   - Consider removing 0-1 scaling default
