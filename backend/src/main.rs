@@ -1351,27 +1351,10 @@ fn test_isolatd_stdp(
 
     write_row(&mut file, &neurons, &postsynaptic_neuron, &weights);
 
+    // let bayesian = if_params.bayesian_params.std != 0.;
+
     // for timestep in 0..iterations {
     //     let mut is_spikings: Vec<bool> = Vec::new(); 
-
-    //     for (n_neuron, input_neuron) in neurons.iter_mut().enumerate() {
-    //         let (dv, is_spiking) = if if_params.bayesian_params.std != 0. {
-    //             input_neuron.get_dv_change_and_spike(
-    //                 &if_params, 
-    //                 input_currents[n_neuron] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.)
-    //             )
-    //         } else {
-    //             input_neuron.get_dv_change_and_spike(&if_params, input_currents[n_neuron])
-    //         };
-
-    //         is_spikings.push(is_spiking);
-
-    //         input_neuron.current_voltage += dv;
-
-    //         if is_spiking {
-    //             pre_fires[n_neuron] = Some(timestep);
-    //         }                   
-    //     }
 
     //     let calculated_voltage: f64 = (0..n)
     //         .map(
@@ -1392,7 +1375,15 @@ fn test_isolatd_stdp(
     //         .sum();
         
     //     let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
-    //     let (dv, is_spiking) = postsynaptic_neuron.get_dv_change_and_spike(&if_params, noise_factor * calculated_voltage);                  
+        // let presynaptic_inputs: Vec<f64> = (0..n).iter()
+            // .map(|i| input_currents[i] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
+            // .collect();
+            // let is_spikings: Vec<bool> = neurons.iter().zip(presynaptic_inputs).iter()
+            //     .map(|(presynaptic_neuron, input_value)| {
+            //         presynaptic_neuron.iterate_and_spike(&if_type, &if_params, input_value)
+            //     })
+            //     .collect();
+    //     postsynaptic_neuron.iterate_and_spike(&if_type, &if_params, noise_factor * calculated_voltage);
 
     //     update_isolated_presynaptic_neuron_weights(
     //         &mut neurons, 
@@ -1402,9 +1393,6 @@ fn test_isolatd_stdp(
     //         timestep, 
     //         is_spikings,
     //     );
-
-    //      
-    //     postsynaptic_neuron.current_voltage += dv;
 
     //     if is_spiking {
     //         postsynaptic_neuron.last_firing_time = Some(timestep);
