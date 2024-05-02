@@ -46,9 +46,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Could a function that sets a private field within the struct to the correct dv change function and the correct spiking function and then call a method that called that function instead of matching each time
   - Could implement this by integrating IFType into cell struct and setting the right function when IFType is called
 
-- **Move non initialization parameters from IFParameters to cell struct, move bayesian parameters to cell struct as well**
+- **Move non initialization parameters from IFParameters to cell struct**
   - Make function to translate IFParameters and STDPParameters to cell struct
-  - Make cell struct implemented function to get bayesian factor instead of passing IFParameters
+  - Have a set of bayesian parameters for ensemble of neurons to use
+    - Have separate function to get those parameters from TOML
 - **Completely remove IFParameters**
   - Repurpose get_if_params function to get IFCell parameters
   - Consider removing 0-1 scaling default
