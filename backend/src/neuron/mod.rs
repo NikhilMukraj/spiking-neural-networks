@@ -216,7 +216,7 @@ pub struct Cell {
 }
 
 pub trait Coupling {
-    fn get_conductance(&self) -> f64;
+    fn get_gap_conductance(&self) -> f64;
     fn get_current_voltage(&self) -> f64;
 }
 
@@ -263,7 +263,7 @@ impl IzhikevichDefault for Cell {
 }
 
 impl Coupling for Cell {
-    fn get_conductance(&self) -> f64 {
+    fn get_gap_conductance(&self) -> f64 {
         self.gap_conductance
     }
 
@@ -295,36 +295,36 @@ impl Cell {
         return (dv, is_spiking);
     }
 
-    // pub fn get_basic_dv_change(&self, lif: &IFParameters, i: f64) -> f64 {
-    //     let dv = (
-    //         (self.leak_constant * (self.current_voltage - lif.e_l)) +
-    //         (self.integration_constant * (i / lif.g_l))
-    //     ) * (lif.dt / lif.tau_m);
+    pub fn get_basic_dv_change(&self, lif: &IFParameters, i: f64) -> f64 {
+        let dv = (
+            (self.leak_constant * (self.current_voltage - lif.e_l)) +
+            (self.integration_constant * (i / lif.g_l))
+        ) * (lif.dt / lif.tau_m);
 
-    //     dv
-    // }
+        dv
+    }
 
-    // pub fn basic_handle_spiking(&mut self, lif: &IFParameters) -> bool {
-    //     let mut is_spiking = false;
+    pub fn basic_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+        let mut is_spiking = false;
 
-    //     if self.refractory_count > 0. {
-    //         self.current_voltage = lif.v_reset;
-    //         self.refractory_count -= 1.;
-    //     } else if self.current_voltage >= lif.v_th {
-    //         is_spiking = !is_spiking;
-    //         self.current_voltage = lif.v_reset;
-    //         self.refractory_count = lif.tref / lif.dt
-    //     }
+        if self.refractory_count > 0. {
+            self.current_voltage = lif.v_reset;
+            self.refractory_count -= 1.;
+        } else if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = lif.v_reset;
+            self.refractory_count = lif.tref / lif.dt
+        }
 
-    //     is_spiking
-    // }
+        is_spiking
+    }
 
-    // fn basic_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.get_basic_dv_change(lif, i);
-    //     self.current_voltage += dv;
+    fn basic_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+        let dv = self.get_basic_dv_change(lif, i);
+        self.current_voltage += dv;
 
-    //     self.basic_handle_spiking(lif)
-    // }
+        self.basic_handle_spiking(lif)
+    }
 
     pub fn apply_dw_change_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         // dw = (self.a * (v[it]-self.V_L) - w[it]) * (self.dt/self.tau_m)
@@ -350,30 +350,30 @@ impl Cell {
         return is_spiking;
     }
 
-    // pub fn adaptive_get_dw_change(&self, lif: &IFParameters) -> f64 {
-    //     let dw = (
-    //         lif.alpha_init * (self.current_voltage - lif.e_l) -
-    //         self.w_value
-    //     ) * (lif.dt / lif.tau_m);
+    pub fn adaptive_get_dw_change(&self, lif: &IFParameters) -> f64 {
+        let dw = (
+            lif.alpha_init * (self.current_voltage - lif.e_l) -
+            self.w_value
+        ) * (lif.dt / lif.tau_m);
 
-    //     dw
-    // }
+        dw
+    }
 
-    // pub fn adaptive_handle_spiking(&mut self, lif: &IFParameters) -> bool {
-    //     let mut is_spiking = false;
+    pub fn adaptive_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+        let mut is_spiking = false;
 
-    //     if self.refractory_count > 0. {
-    //         self.current_voltage = lif.v_reset;
-    //         self.refractory_count -= 1.;
-    //     } else if self.current_voltage >= lif.v_th {
-    //         is_spiking = !is_spiking;
-    //         self.current_voltage = lif.v_reset;
-    //         self.w_value += lif.beta_init;
-    //         self.refractory_count = lif.tref / lif.dt
-    //     }
+        if self.refractory_count > 0. {
+            self.current_voltage = lif.v_reset;
+            self.refractory_count -= 1.;
+        } else if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = lif.v_reset;
+            self.w_value += lif.beta_init;
+            self.refractory_count = lif.tref / lif.dt
+        }
 
-    //     is_spiking
-    // }
+        is_spiking
+    }
 
     pub fn adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
@@ -385,15 +385,15 @@ impl Cell {
         dv
     }
 
-    // pub fn adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.adaptive_get_dv_change(lif, i);
-    //     let dw = self.adaptive_get_dw_change(lif);
+    pub fn adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+        let dv = self.adaptive_get_dv_change(lif, i);
+        let dw = self.adaptive_get_dw_change(lif);
 
-    //     self.current_voltage += dv;
-    //     self.w_value += dw;
+        self.current_voltage += dv;
+        self.w_value += dw;
 
-    //     self.adaptive_handle_spiking(lif)
-    // }
+        self.adaptive_handle_spiking(lif)
+    }
 
     pub fn exp_adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
@@ -406,15 +406,15 @@ impl Cell {
         dv
     }
 
-    // pub fn exp_adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.exp_adaptive_get_dv_change(lif, i);
-    //     let dw = self.adaptive_get_dw_change(lif);
+    pub fn exp_adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+        let dv = self.exp_adaptive_get_dv_change(lif, i);
+        let dw = self.adaptive_get_dw_change(lif);
 
-    //     self.current_voltage += dv;
-    //     self.w_value += dw;
+        self.current_voltage += dv;
+        self.w_value += dw;
 
-    //     self.adaptive_handle_spiking(lif)
-    // }
+        self.adaptive_handle_spiking(lif)
+    }
 
     pub fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
         let dw = (
@@ -443,35 +443,35 @@ impl Cell {
         dv
     }
 
-    // pub fn izhikevich_get_dw_change(&self, lif: &IFParameters) -> f64 {
-    //     let dw = (
-    //         self.alpha * (self.beta * self.current_voltage - self.w_value)
-    //     ) * lif.dt;
+    pub fn izhikevich_get_dw_change(&self, lif: &IFParameters) -> f64 {
+        let dw = (
+            self.alpha * (self.beta * self.current_voltage - self.w_value)
+        ) * lif.dt;
 
-    //     dw
-    // }
+        dw
+    }
 
-    // pub fn izhikevich_handle_spiking(&mut self, lif: &IFParameters) -> bool {
-    //     let mut is_spiking = false;
+    pub fn izhikevich_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+        let mut is_spiking = false;
 
-    //     if self.current_voltage >= lif.v_th {
-    //         is_spiking = !is_spiking;
-    //         self.current_voltage = self.c;
-    //         self.w_value += self.d;
-    //     }
+        if self.current_voltage >= lif.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = self.c;
+            self.w_value += self.d;
+        }
 
-    //     is_spiking
-    // }
+        is_spiking
+    }
 
-    // pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.izhikevich_get_dv_change(lif, i);
-    //     let dw = self.izhikevich_get_dw_change(lif);
+    pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+        let dv = self.izhikevich_get_dv_change(lif, i);
+        let dw = self.izhikevich_get_dw_change(lif);
 
-    //     self.current_voltage += dv;
-    //     self.w_value += dw;
+        self.current_voltage += dv;
+        self.w_value += dw;
 
-    //     self.izhikevich_handle_spiking(lif)
-    // }
+        self.izhikevich_handle_spiking(lif)
+    }
 
     pub fn izhikevich_leaky_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
@@ -483,15 +483,15 @@ impl Cell {
         dv
     }
 
-    // pub fn izhikevich_leaky_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-    //     let dv = self.izhikevich_leaky_get_dv_change(lif, i);
-    //     let dw = self.izhikevich_get_dw_change(lif);
+    pub fn izhikevich_leaky_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
+        let dv = self.izhikevich_leaky_get_dv_change(lif, i);
+        let dw = self.izhikevich_get_dw_change(lif);
 
-    //     self.current_voltage += dv;
-    //     self.w_value += dw;
+        self.current_voltage += dv;
+        self.w_value += dw;
 
-    //     self.izhikevich_handle_spiking(lif)
-    // }
+        self.izhikevich_handle_spiking(lif)
+    }
 
     // voltage of cell should be initial voltage + this change
     pub fn run_static_input(
@@ -653,6 +653,31 @@ impl Cell {
             .iter()
             .map(|i| i.current * i.neurotransmitter.r)
             .sum::<f64>() * (lif.dt / lif.c_m)
+    }
+
+    pub fn update_based_on_neurotransmitter_currents(&mut self, lif: &IFParameters) {
+        self.current_voltage += self.get_neurotransmitter_currents(lif)
+    }
+
+    // impl Fn(&mut Cell, &IFParameters, f64) -> bool
+    pub fn iterate_and_spike(&mut self, if_type: &IFType, if_params: &IFParameters, i: f64) -> bool  {
+        match if_type {
+            IFType::Basic => {
+                self.basic_iterate_and_spike(if_params, i)
+            },
+            IFType::Adaptive => {
+                self.adaptive_iterate_and_spike(if_params, i)
+            },
+            IFType::AdaptiveExponential => {
+                self.exp_adaptive_iterate_and_spike(if_params, i)
+            },
+            IFType::Izhikevich => {
+                self.izhikevich_iterate_and_spike(if_params, i)
+            },
+            IFType::IzhikevichLeaky => {
+                self.izhikevich_leaky_iterate_and_spike(if_params, i)
+            }
+        }
     }
 }
 
@@ -1324,7 +1349,7 @@ pub struct HodgkinHuxleyCell {
 }
 
 impl Coupling for HodgkinHuxleyCell {
-    fn get_conductance(&self) -> f64 {
+    fn get_gap_conductance(&self) -> f64 {
         self.gap_condutance
     }
 
@@ -1616,7 +1641,7 @@ pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
 }
 
 pub fn gap_junction<T: Coupling>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
-    postsynaptic_neuron.get_conductance() * 
+    postsynaptic_neuron.get_gap_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
 
