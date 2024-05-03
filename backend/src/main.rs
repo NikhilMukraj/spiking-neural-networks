@@ -325,7 +325,7 @@ impl Output {
     }
 }
 
-fn run_simulation(
+fn run_lattice(
     num_rows: usize, 
     num_cols: usize, 
     iterations: usize, 
@@ -411,6 +411,93 @@ fn run_simulation(
     if do_stdp && graph_params.write_history {
         graph.update_history();
     }
+
+    // for timestep in 0..iterations {
+    //     let mut inputs: HashMap<Position, f64> = graph.get_every_node()
+    //         .iter()
+    //         .map(|key| (*key, 0.))
+    //         .collect();          
+
+    //     // loop through every cell
+    //     // calculate the dv given the inputs
+    //     // write 
+    //     // end loop
+
+    //     for pos in graph.get_every_node() {
+    //         let (x, y) = pos;
+
+    //         let input_positions = graph.get_incoming_connections(&pos);
+
+    //         let input = if do_stdp {
+    //             weighted_get_input_from_positions(
+    //                 &cell_grid,
+    //                 &*graph,
+    //                 &pos,
+    //                 &input_positions,
+    //                 bayesian,
+    //                 averaged,
+    //             )
+    //         } else {
+    //             get_input_from_positions(
+    //                 &cell_grid, 
+    //                 &cell_grid[x][y],
+    //                 &input_positions, 
+    //                 bayesian,
+    //                 averaged,
+    //             )
+    //         };
+
+    //         changes.insert(pos, input);
+    //     }
+
+    //     // loop through every cell
+    //     // modify the voltage
+    //     // end loop
+
+    //     for (pos, input_value) in changes {
+    //         let (x, y) = pos;
+
+            // let is_spiking = cell_grid[x][y].iterate_and_spike(&if_type, &if_params, input_value);
+
+    //         if do_stdp && is_spiking {
+    //             cell_grid[x][y].last_firing_time = Some(timestep);
+
+    //             let input_positions = graph.get_incoming_connections(&pos);
+    //             for i in input_positions {
+    //                 let (x_in, y_in) = i;
+    //                 let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                                                
+    //                 graph.edit_weight(
+    //                     &(x_in, y_in), 
+    //                     &pos, 
+    //                     Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+    //                 );
+    //             }
+
+    //             let out_going_connections = graph.get_outgoing_connections(&pos);
+
+    //             for i in out_going_connections {
+    //                 let (x_out, y_out) = i;
+    //                 let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+
+    //                 graph.edit_weight(
+    //                     &pos, 
+    //                     &(x_out, y_out), 
+    //                     Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+    //                 ); 
+    //             }
+    //         } // need to also update neurons on receiving end of spiking neuron
+    //         // create hashmap of what neurons existing neurons point to and use that
+    //         // generate that hashmap alongside current adjancency list
+    //     }
+    //     // repeat until simulation is over
+
+    //     output_val.add(&cell_grid);
+
+    //     if do_stdp && graph_params.write_history {
+    //         graph.update_history();
+    //     }
+    // }
 
     match if_type {
         IFType::Basic => {
@@ -1783,7 +1870,7 @@ fn main() -> Result<()> {
             reference_voltage,
         )?;
 
-        let (output_value, output_graph) = run_simulation(
+        let (output_value, output_graph) = run_lattice(
             sim_params.num_rows, 
             sim_params.num_cols, 
             sim_params.iterations, 
