@@ -52,6 +52,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Have separate function to get those parameters from TOML
     - Bayesian should only be used with standard deviation is not 0 (for all functions)
 - **Completely remove IFParameters**
+  - STDP test should get parameters before scope of the function not within the scope
   - Repurpose get_if_params function to get IFCell parameters
   - Consider removing 0-1 scaling default
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
