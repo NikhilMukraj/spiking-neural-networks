@@ -2,14 +2,16 @@
 if_type = "izhikevich"
 iterations = 10000
 
-weight_init = 1.0
+weight_init = 1.5
 weight_max = 2.0
 weight_min = 0.0
 weight_std = 0.1
 n = 2
 averaged = true
-input_voltage = 30.0
+input_current = 30.0
 bayesian_std = 0.3
+
+c_m = 100.0
 
 # v_th = 0.0
 # v_reset = -50.0
