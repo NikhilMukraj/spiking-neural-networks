@@ -1,0 +1,6 @@
+[single_neuron_test]
+iterations = 10000
+input_current = 30.0
+if_type = "izhikevich"
+
+filename = "output/static_input_test.csv"
