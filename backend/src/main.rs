@@ -12,7 +12,7 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFParameters, IFType, PotentiationType, Cell, CellGrid, 
+    IFParameters, IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
     ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
     if_params_bayesian, gap_junction, iterate_coupled_hodgkin_huxley,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
@@ -63,11 +63,11 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
-fn signed_gap_junction(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell, sign: f64) -> f64 {
+fn signed_gap_junction(presynaptic_neuron: &IntegrateAndFireCell, postsynaptic_neuron: &IntegrateAndFireCell, sign: f64) -> f64 {
     sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
 
-fn get_sign(cell: &Cell) -> f64 {
+fn get_sign(cell: &IntegrateAndFireCell) -> f64 {
     match cell.potentiation_type {
         PotentiationType::Excitatory => 1.,
         PotentiationType::Inhibitory => -1.,
@@ -85,7 +85,7 @@ fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) ->
 
 fn get_input_from_positions(
     cell_grid: &CellGrid, 
-    postsynaptic_neuron: &Cell,
+    postsynaptic_neuron: &IntegrateAndFireCell,
     input_positions: &Vec<Position>, 
     if_params: Option<&IFParameters>,
     averaged: bool,
@@ -356,7 +356,7 @@ fn run_lattice(
     let mut cell_grid: CellGrid = (0..num_rows)
         .map(|_| {
             (0..num_cols)
-                .map(|_| Cell { 
+                .map(|_| IntegrateAndFireCell { 
                     current_voltage: if_params.v_init, 
                     refractory_count: 0.0,
                     leak_constant: -1.,
@@ -372,7 +372,7 @@ fn run_lattice(
                     d: if_params.d_init,
                     ligand_gates: if_params.ligand_gates_init.clone(),
                 })
-                .collect::<Vec<Cell>>()
+                .collect::<Vec<IntegrateAndFireCell>>()
         })
         .collect::<CellGrid>();
 
@@ -591,7 +591,7 @@ fn run_lattice(
         },
         IFType::Adaptive | IFType::AdaptiveExponential | 
         IFType::Izhikevich | IFType::IzhikevichLeaky => {
-            let adaptive_apply_and_get_spike = |neuron: &mut Cell, if_params: &IFParameters| -> bool {
+            let adaptive_apply_and_get_spike = |neuron: &mut IntegrateAndFireCell, if_params: &IFParameters| -> bool {
                 match if_type {
                     IFType::Basic => unreachable!(),
                     IFType::Adaptive | IFType::AdaptiveExponential => neuron.apply_dw_change_and_get_spike(if_params),
@@ -600,7 +600,7 @@ fn run_lattice(
                 }
             };
 
-            let adaptive_dv = |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> f64 {
+            let adaptive_dv = |neuron: &mut IntegrateAndFireCell, if_params: &IFParameters, input_value: f64| -> f64 {
                 match if_type {
                     IFType::Basic => unreachable!(), 
                     IFType::Adaptive => neuron.adaptive_get_dv_change(if_params, input_value),
@@ -1105,7 +1105,7 @@ fn test_coupled_neurons(
     full: bool,
     filename: &str,
 ) {
-    let mut presynaptic_neuron = Cell { 
+    let mut presynaptic_neuron = IntegrateAndFireCell { 
         current_voltage: pre_if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -1122,7 +1122,7 @@ fn test_coupled_neurons(
         ligand_gates: pre_if_params.ligand_gates_init.clone(),
     };
 
-    let mut postsynaptic_neuron = Cell { 
+    let mut postsynaptic_neuron = IntegrateAndFireCell { 
         current_voltage: post_if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -1242,8 +1242,8 @@ fn test_coupled_neurons(
 
 fn write_row(
     file: &mut File, 
-    presynaptic_neurons: &Vec<Cell>, 
-    postsynaptic_neuron: &Cell, 
+    presynaptic_neurons: &Vec<IntegrateAndFireCell>, 
+    postsynaptic_neuron: &IntegrateAndFireCell, 
     weights: &Vec<f64>,
 ) {
     write!(
@@ -1317,7 +1317,7 @@ fn write_row(
 
 // weight change = weight * dopamine
 
-fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
+fn update_weight(presynaptic_neuron: &IntegrateAndFireCell, postsynaptic_neuron: &IntegrateAndFireCell) -> f64 {
     let mut delta_w: f64 = 0.;
 
     match (presynaptic_neuron.last_firing_time, postsynaptic_neuron.last_firing_time) {
@@ -1337,8 +1337,8 @@ fn update_weight(presynaptic_neuron: &Cell, postsynaptic_neuron: &Cell) -> f64 {
 }
 
 fn update_isolated_presynaptic_neuron_weights(
-    neurons: &mut Vec<Cell>,
-    neuron: &Cell,
+    neurons: &mut Vec<IntegrateAndFireCell>,
+    neuron: &IntegrateAndFireCell,
     weights: &mut Vec<f64>,
     delta_ws: &mut Vec<f64>,
     timestep: usize,
@@ -1385,13 +1385,13 @@ fn test_isolated_stdp(
     let mut postsynaptic_neuron = match if_type {
         IFType::Basic | IFType::Adaptive |
         IFType::AdaptiveExponential => {
-            Cell {
-                ..Cell::default()
+            IntegrateAndFireCell {
+                ..IntegrateAndFireCell::default()
             }
         },
         IFType::Izhikevich | IFType::IzhikevichLeaky => {
-            Cell {
-                ..Cell::izhikevich_default()
+            IntegrateAndFireCell {
+                ..IntegrateAndFireCell::izhikevich_default()
             }
         }
     };
@@ -1405,7 +1405,7 @@ fn test_isolated_stdp(
     postsynaptic_neuron.c = if_params.v_reset;
     postsynaptic_neuron.d = if_params.d_init;
 
-    let mut neurons: Vec<Cell> = (0..n).map(|_| postsynaptic_neuron.clone())
+    let mut neurons: Vec<IntegrateAndFireCell> = (0..n).map(|_| postsynaptic_neuron.clone())
         .collect();
 
     for i in neurons.iter_mut() {
@@ -2054,7 +2054,7 @@ fn main() -> Result<()> {
         
         println!("{:#?}", if_params);
 
-        let mut test_cell = Cell { 
+        let mut test_cell = IntegrateAndFireCell { 
             current_voltage: if_params.v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -2627,7 +2627,7 @@ fn main() -> Result<()> {
         generated_if_params.dt = reference_dt;
         generated_if_params.v_th = v_th;
 
-        let test_cell = Cell { 
+        let test_cell = IntegrateAndFireCell { 
             current_voltage: if_params.v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,

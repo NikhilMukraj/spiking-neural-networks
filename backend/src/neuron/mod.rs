@@ -198,7 +198,7 @@ impl PotentiationType {
 }
 
 #[derive(Clone)]
-pub struct Cell {
+pub struct IntegrateAndFireCell {
     pub current_voltage: f64, // membrane potential
     pub refractory_count: f64, // keeping track of refractory period
     pub leak_constant: f64, // leak constant gene
@@ -220,9 +220,9 @@ pub trait Coupling {
     fn get_current_voltage(&self) -> f64;
 }
 
-impl Default for Cell {
+impl Default for IntegrateAndFireCell {
     fn default() -> Self {
-        Cell {
+        IntegrateAndFireCell {
             current_voltage: IFParameters::default().v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -241,9 +241,9 @@ impl Default for Cell {
     }
 }
 
-impl IzhikevichDefault for Cell {
+impl IzhikevichDefault for IntegrateAndFireCell {
     fn izhikevich_default() -> Self {
-        Cell {
+        IntegrateAndFireCell {
             current_voltage: IFParameters::izhikevich_default().v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -262,7 +262,7 @@ impl IzhikevichDefault for Cell {
     }
 }
 
-impl Coupling for Cell {
+impl Coupling for IntegrateAndFireCell {
     fn get_gap_conductance(&self) -> f64 {
         self.gap_conductance
     }
@@ -272,7 +272,7 @@ impl Coupling for Cell {
     }
 }
 
-impl Cell {
+impl IntegrateAndFireCell {
     pub fn get_dv_change_and_spike(&mut self, lif: &IFParameters, i: f64) -> (f64, bool) {
         let mut is_spiking = false;
 
@@ -681,7 +681,7 @@ impl Cell {
     }
 }
 
-pub type CellGrid = Vec<Vec<Cell>>;
+pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
 
 // // could also consider soomething like Box::<dyn Fn(&mut Cell, &IFParameters, f64) -> bool>
 // fn determine_calculaton_function(if_type: IFType) -> impl Fn(&mut Cell, &IFParameters, f64) -> bool {
@@ -712,7 +712,7 @@ pub type CellGrid = Vec<Vec<Cell>>;
 // }
 
 
-pub fn handle_receptor_kinetics(cell: &mut Cell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
+pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
     if do_receptor_kinetics {
         cell.update_conc_and_receptor_kinetics(input_current, &if_params);
     } else {
