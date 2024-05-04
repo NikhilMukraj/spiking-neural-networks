@@ -4,7 +4,7 @@ use std::{
 };
 use crate::distribution::limited_distr;
 use crate::neuron::{
-    Cell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
+    IntegrateAndFireCell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
     find_peaks, diff, gap_junction, iterate_coupled_hodgkin_huxley,
     handle_receptor_kinetics
 };
@@ -244,7 +244,7 @@ pub struct FittingSettings<'a> {
 }
 
 fn bayesian_izhikevich_get_dv_change(
-    izhikevich_neuron: &mut Cell, 
+    izhikevich_neuron: &mut IntegrateAndFireCell, 
     if_params: &IFParameters, 
     input_current: f64,
     bayesian: bool,
@@ -270,8 +270,8 @@ fn bayesian_izhikevich_get_dv_change(
 }
 
 pub fn get_izhikevich_summary(
-    presynaptic_neuron: &mut Cell, 
-    postsynaptic_neuron: &mut Cell,
+    presynaptic_neuron: &mut IntegrateAndFireCell, 
+    postsynaptic_neuron: &mut IntegrateAndFireCell,
     if_params: &IFParameters,
     settings: &FittingSettings,
     index: usize,
@@ -356,7 +356,7 @@ pub fn fitting_objective(
     let mut if_params = settings.if_params.clone();
     if_params.v_th = v_th;
 
-    let test_cell = Cell { 
+    let test_cell = IntegrateAndFireCell { 
         current_voltage: if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
