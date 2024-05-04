@@ -2071,25 +2071,9 @@ fn main() -> Result<()> {
             ligand_gates: if_params.ligand_gates_init.clone(),
         };
 
-        match if_type {
-            IFType::Basic => { 
-                test_cell.run_static_input(&if_params, input_current, bayesian, iterations, &filename); 
-            },
-            IFType::Adaptive => { 
-                test_cell.run_adaptive_static_input(&if_params, input_current, bayesian, iterations, &filename); 
-            },
-            IFType::AdaptiveExponential => { 
-                test_cell.run_exp_adaptive_static_input(&if_params, input_current, bayesian, iterations, &filename);
-            },
-            IFType::Izhikevich => { 
-                test_cell.run_izhikevich_static_input(&if_params, input_current, bayesian, iterations, &filename); 
-            },
-            IFType::IzhikevichLeaky => {
-                test_cell.run_izhikevich_leaky_static_input(&if_params, input_current, bayesian, iterations, &filename);
-            },
-        };
+        test_cell.run_static_input(&if_type, &if_params, input_current, bayesian, iterations, &filename);
 
-        println!("\nFinished volt test");
+        println!("\nFinished single neuron test");
     } else if let Some(coupled_table) = config.get("coupled_test") {
         let if_type: String = parse_value_with_default(
             coupled_table, 
