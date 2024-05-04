@@ -57,7 +57,7 @@ impl Default for IFParameters {
             v_th: -55., // spike threshold (mV)
             v_reset: -75., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
-            c_m: 1., // membrane capacitance (nF)
+            c_m: 100., // membrane capacitance (nF)
             g_l: 10., // leak conductance (nS)
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: -75., // initial potential (mV)
@@ -85,7 +85,7 @@ impl ScaledDefault for IFParameters {
             v_th: 1., // spike threshold (mV)
             v_reset: 0., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
-            c_m: 1., // membrane capacitance (nF)
+            c_m: 100., // membrane capacitance (nF)
             g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: 0., // initial potential (mV)
@@ -113,13 +113,13 @@ impl IzhikevichDefault for IFParameters {
             v_th: 30., // spike threshold (mV)
             v_reset: -65., // reset potential (mV)
             tau_m: 10., // membrane time constant (ms)
-            c_m: 10., // membrane capacitance (nF)
+            c_m: 100., // membrane capacitance (nF)
             g_l: 10., // leak conductance (nS)
             gap_conductance_init: 7., // gap condutance (nS)
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 30., // initial w value
+            w_init: 0., // initial w value
             alpha_init: 0.02, // arbitrary a value
             beta_init: 0.2, // arbitrary b value
             d_init: 8.0, // arbitrary d value
@@ -493,9 +493,29 @@ impl IntegrateAndFireCell {
         self.izhikevich_handle_spiking(lif)
     }
 
-    // voltage of cell should be initial voltage + this change
+    pub fn iterate_and_spike(&mut self, if_type: &IFType, if_params: &IFParameters, i: f64) -> bool  {
+        match if_type {
+            IFType::Basic => {
+                self.basic_iterate_and_spike(if_params, i)
+            },
+            IFType::Adaptive => {
+                self.adaptive_iterate_and_spike(if_params, i)
+            },
+            IFType::AdaptiveExponential => {
+                self.exp_adaptive_iterate_and_spike(if_params, i)
+            },
+            IFType::Izhikevich => {
+                self.izhikevich_iterate_and_spike(if_params, i)
+            },
+            IFType::IzhikevichLeaky => {
+                self.izhikevich_leaky_iterate_and_spike(if_params, i)
+            }
+        }
+    }
+
     pub fn run_static_input(
         &mut self, 
+        if_type: &IFType,
         lif: &IFParameters, 
         i: f64, 
         bayesian: bool, 
@@ -504,122 +524,36 @@ impl IntegrateAndFireCell {
     ) {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
-        writeln!(file, "voltage").expect("Unable to write to file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-
-        for _ in 0..iterations {
-            let (dv, _is_spiking) = if bayesian {
-                self.get_dv_change_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
-            } else {
-                self.get_dv_change_and_spike(lif, i)
-            };
-            self.current_voltage += dv;
-
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
-
-    pub fn run_adaptive_static_input(
-        &mut self, 
-        lif: &IFParameters, 
-        i: f64, 
-        bayesian: bool, 
-        iterations: usize, 
-        filename: &str,
-    ) {
-        let mut file = BufWriter::new(File::create(filename)
-            .expect("Unable to create file"));
-        writeln!(file, "voltage").expect("Unable to write to file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
         
-        for _ in 0..iterations {
-            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-            let dv = if bayesian {
-                self.adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
-            } else {
-                self.adaptive_get_dv_change(lif, i)
-            };
-            self.current_voltage += dv;
+        match if_type {
+            IFType::Basic => {
+                writeln!(file, "voltage").expect("Unable to write to file");
+                writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
-
-    pub fn run_exp_adaptive_static_input(
-        &mut self, 
-        lif: &IFParameters, 
-        i: f64, 
-        bayesian: bool, 
-        iterations: usize, 
-        filename: &str,
-    ) {
-        let mut file = BufWriter::new(File::create(filename)
-            .expect("Unable to create file"));
-        writeln!(file, "voltage").expect("Unable to write to file");
-        writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+                for _ in 0..iterations {
+                    let _is_spiking = if bayesian {
+                        self.iterate_and_spike(&if_type, lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
+                    } else {
+                        self.iterate_and_spike(&if_type, lif, i)
+                    };
         
-        for _ in 0..iterations {
-            let _is_spiking = self.apply_dw_change_and_get_spike(lif);
-            let dv = if bayesian {
-                self.exp_adaptive_get_dv_change(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
-            } else {
-                self.exp_adaptive_get_dv_change(lif, i)
-            };
-            self.current_voltage += dv;
+                    writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
+                }
+            },
+            IFType::Adaptive | IFType::AdaptiveExponential | IFType::Izhikevich | IFType::IzhikevichLeaky => {
+                writeln!(file, "voltage,w").expect("Unable to write to file");
+                writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
 
-            writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
-        }
-    }
-
-    pub fn run_izhikevich_static_input(
-        &mut self, 
-        if_params: &IFParameters, 
-        i: f64, 
-        bayesian: bool, 
-        iterations: usize,
-        filename: &str,
-    ) {
-        let mut file = BufWriter::new(File::create(filename)
-            .expect("Unable to create file"));
-        writeln!(file, "voltage,w").expect("Unable to write to file");
-        writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
+                for _ in 0..iterations {
+                    let _is_spiking = if bayesian {
+                        self.iterate_and_spike(&if_type, lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
+                    } else {
+                        self.iterate_and_spike(&if_type, lif, i)
+                    };
         
-        for _ in 0..iterations {
-            let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
-            let dv = if bayesian {
-                self.izhikevich_get_dv_change(if_params, i * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
-            } else {
-                self.izhikevich_get_dv_change(if_params, i)
-            };
-            self.current_voltage += dv;
-
-            writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
-        }
-    }
-
-    pub fn run_izhikevich_leaky_static_input(
-        &mut self, 
-        if_params: &IFParameters, 
-        i: f64, 
-        bayesian: bool, 
-        iterations: usize,
-        filename: &str,
-    ) {
-        let mut file = BufWriter::new(File::create(filename)
-            .expect("Unable to create file"));
-        writeln!(file, "voltage,w").expect("Unable to write to file");
-        writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
-        
-        for _ in 0..iterations {
-            let _is_spiking = self.izhikevich_apply_dw_and_get_spike(if_params);
-            let dv = if bayesian {
-                self.izhikevich_leaky_get_dv_change(if_params, i * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
-            } else {
-                self.izhikevich_leaky_get_dv_change(if_params, i)
-            };
-            self.current_voltage += dv;
-
-            writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
+                    writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
+                }
+            }
         }
     }
 
@@ -657,27 +591,6 @@ impl IntegrateAndFireCell {
 
     pub fn update_based_on_neurotransmitter_currents(&mut self, lif: &IFParameters) {
         self.current_voltage += self.get_neurotransmitter_currents(lif)
-    }
-
-    // impl Fn(&mut Cell, &IFParameters, f64) -> bool
-    pub fn iterate_and_spike(&mut self, if_type: &IFType, if_params: &IFParameters, i: f64) -> bool  {
-        match if_type {
-            IFType::Basic => {
-                self.basic_iterate_and_spike(if_params, i)
-            },
-            IFType::Adaptive => {
-                self.adaptive_iterate_and_spike(if_params, i)
-            },
-            IFType::AdaptiveExponential => {
-                self.exp_adaptive_iterate_and_spike(if_params, i)
-            },
-            IFType::Izhikevich => {
-                self.izhikevich_iterate_and_spike(if_params, i)
-            },
-            IFType::IzhikevichLeaky => {
-                self.izhikevich_leaky_iterate_and_spike(if_params, i)
-            }
-        }
     }
 }
 
