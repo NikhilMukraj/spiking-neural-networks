@@ -237,6 +237,11 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Receptor occupancy could be assumed to be at maximum
       - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
 - [ ] Poisson neuron
+  - [ ] Coupling
+- [ ] Spike train struct
+  - Given a set of times, the neuron will spike and not spike at given times
+    - Vector of times to spike at + delay before first spike + delay after last spike
+  - Internal clock starts at 0, and increments every iteration until the end time is reached where it will return to 0
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
