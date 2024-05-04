@@ -215,9 +215,12 @@ pub struct IntegrateAndFireCell {
     pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
-pub trait Coupling {
-    fn get_gap_conductance(&self) -> f64;
+pub trait CurrentVoltage {
     fn get_current_voltage(&self) -> f64;
+}
+
+pub trait GapConductance {
+    fn get_gap_conductance(&self) -> f64;
 }
 
 impl Default for IntegrateAndFireCell {
@@ -262,13 +265,15 @@ impl IzhikevichDefault for IntegrateAndFireCell {
     }
 }
 
-impl Coupling for IntegrateAndFireCell {
-    fn get_gap_conductance(&self) -> f64 {
-        self.gap_conductance
-    }
-
+impl CurrentVoltage for IntegrateAndFireCell {
     fn get_current_voltage(&self) -> f64 {
         self.current_voltage
+    }
+}
+
+impl GapConductance for IntegrateAndFireCell {
+    fn get_gap_conductance(&self) -> f64 {
+        self.gap_conductance
     }
 }
 
@@ -1261,13 +1266,15 @@ pub struct HodgkinHuxleyCell {
     pub bayesian_params: BayesianParameters,
 }
 
-impl Coupling for HodgkinHuxleyCell {
-    fn get_gap_conductance(&self) -> f64 {
-        self.gap_condutance
-    }
-
+impl CurrentVoltage for HodgkinHuxleyCell {
     fn get_current_voltage(&self) -> f64 {
         self.current_voltage
+    }
+}
+
+impl GapConductance for HodgkinHuxleyCell {
+    fn get_gap_conductance(&self) -> f64 {
+        self.gap_condutance
     }
 }
 
@@ -1553,7 +1560,10 @@ pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
     )
 }
 
-pub fn gap_junction<T: Coupling>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
+pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
+    presynaptic_neuron: &T, 
+    postsynaptic_neuron: &U
+) -> f64 {
     postsynaptic_neuron.get_gap_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
