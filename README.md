@@ -36,6 +36,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Add neurotransmitter output to each presynaptic neuron that calculates concentration with its own membrane potential, then have postsynaptic neurons sum the concentration * weight to calculate their neurotransmitters
 - Separate receptor kinetics struct, dependent on t_total
 
+- Add $\tau_m$ and $C_m$ to fitting parameters
+
 - **Split `get_dv_change_and_get_spike` into `get_basic_dv_change` and `get_basic_spike`, that way there does not need to be a split between basic and rest of integrate and fires**
   - Could have a function return the correct function for each IFType for now
     - One set of iterate and spike is used such that it directly modifies current voltage and current w, the other one is built to allow arc mutex access, it first calculates dv and dw and spike and then unlocks mutex to modify neuron
@@ -55,8 +57,11 @@ EEG processing with fourier transforms, and power spectral density calculations
   - STDP test should get parameters before scope of the function not within the scope
   - Repurpose get_if_params function to get IFCell parameters
   - Consider removing 0-1 scaling default
+  - **Receptor kinetics handling should have an inputtable value to set r at**
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
   - Update code in obsidian when refactor is done, maybe update results
+
+- Have system to generate new neurotransmitter and receptors from TOML
 
 - Split `main.rs` functions into a few different files for readability
 
@@ -237,8 +242,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
   - [Astrocytes + Izhikevich](https://www.frontiersin.org/articles/10.3389/fncel.2021.631485/full)
     - [Code for astrocytes and neural network](https://github.com/altergot/neuro-astro-network)
+    - Astrocyte should respond to total glutamate levels of modulated synapses, glutamate input should only have an effect for $t$ steps after the coherence threshold is met
   - [ ] Tripartite synapse
     - Record how weights change over time
+    - Isolated tripartite synapse should not include diffusion from other astrocytes
   - [ ] Neuro-astrocytic network (hippocampal model)
     - Could be tested with or without STDP occuring
     - Record how weights change over time
@@ -269,7 +276,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Or could input as an adjacency matrix (SMILES enumeration compatible)
   - [ ] Liquid state machine with astrocytes and R-STDP
   - [ ] Combining input with neurotransmission, encoding certain inputs with more or less neurotransmitter (ionotropic or otherwise)
-
+- [ ] R-STDP based regression
+  - [ ] Liquid state machine fitting differential equation or time series
+    - Potentially physics prediction, parameters of physics simulation could be inputs along with current position, next position could be target to predict
+  
 ### Lixirnet
 
 - [x] Integrate and fire models
