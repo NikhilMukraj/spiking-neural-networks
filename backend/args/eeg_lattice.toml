@@ -1,6 +1,7 @@
 [lattice_simulation]
 # tag = "output/lattice_test"
-tag = "output/lattice_test_grid"
+# tag = "output/lattice_test_grid"
+tag = "output/refactor_lattice_test_grid"
 # tag = "output/lattice_test_averaged"
 # output_type = "eeg"
 output_type = "grid"
@@ -20,7 +21,11 @@ iterations = 10000
 # weight_min = 10.0
 # weight_max = 10.0
 
-# bayesian = true
+# could also set c_m and tau_m to 
+gap_condutance_init = 1.0
+
+bayesian = true
+bayesian_std = 1.0
 averaged = true
 
 # current = true
