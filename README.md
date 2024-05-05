@@ -59,6 +59,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Consider removing 0-1 scaling default
   - **Receptor kinetics handling should have an inputtable value to set r at**
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
+  - **Integrate IFType parameter into cell struct**
   - Update code in obsidian when refactor is done, maybe update results
 
 - Have system to generate new neurotransmitter and receptors from TOML
@@ -71,6 +72,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
+  - Use macros to generate getter and setter methods given the argument name
+    - For integrate and fire cell and Hodgkin Huxley model
+    - **Enable multiple-pymethods so the macro can be written**
+    - [Reference for macro](https://github.com/PyO3/pyo3/discussions/3628)
   - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
 
@@ -224,6 +229,8 @@ EEG processing with fourier transforms, and power spectral density calculations
       - [ ] Moving neurotransmitter concentration into seperate struct and moving receptor kinetics variables to seperate struct (with parameter $T_max$)
         - [ ] Presynaptic neuron calculates concentration and saves it
         - [ ] Post synaptic neuron applies weight to the concentration and sums it, then applies receptor kinetics
+          - [ ] Neurotransmission current should be calculated with `iterate_and_spike` function after $dv$ is calculated and before spike is handled, `iterate_and_spike` should have a input neurotransmitter concentration as an option, if some do neurotransmitter current processing, if `None` then do not perform neurotransmitter current operation
+            - [ ] Update this within fitting Izhikevich neuron too
         - [ ] Integrate this into Hodgkin Huxley models too
       - [ ] Option to record each neurotransmitter current over time in lattice (g * r)
       - [ ] Recording g, r, and T over time
@@ -231,9 +238,6 @@ EEG processing with fourier transforms, and power spectral density calculations
         - [ ] STDP tests
     - [ ] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
       - $\frac{dT}{dt} = \alpha T + T_{max} H(V_p - V_{th})$ where $T$ is neurotransmitter concentration, $T_{max}$ is maximum neurotransmitter concentration, $\alpha$ is clearance rate, $H(x)$ is the heaviside function, $V_p$ is the average of the presynaptic voltages, and $V_{th}$ is the spiking threshold
-      - If not using average, add $w \alpha T + w T_{max} H(V_p - V_{th}) w$ for each presynaptic voltage where $w$ is a weight
-      - Cap $T$ to make sure it does not go below 0
-        - Apply change and then do `self.t = max(0, t_change);`
       - Receptor occupancy could be assumed to be at maximum
       - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
 - [ ] Poisson neuron
