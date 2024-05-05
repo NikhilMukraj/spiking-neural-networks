@@ -66,6 +66,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
   - Build function to allow arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type
+  - Inputs should be calculated in parallel
+  - Parallel functionality should also be benchmarked
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
@@ -174,6 +176,7 @@ EEG processing with fourier transforms, and power spectral density calculations
       - [x] Calculation of spectral analysis
       - [x] Calculation of Earth moving distance
     - [ ] Option to rewrite Fourier analysis to file
+  - [ ] Function that can simulate more than one lattice that have different parameters but are connected by neurons (for instance one lattice can have plasticity while the other does not)
 - [ ] Hodgkin Huxley
   - [x] Basic gating
   - [ ] Neurotransmission
@@ -195,7 +198,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] [Cable theory](https://boulderschool.yale.edu/sites/default/files/files/DayanAbbott.pdf)
     - [ ] Systemized method for adding compartments
   - [ ] Hodgkin Huxley lattice simulation
-    - [ ] Spike detection (have a window of past voltages and use find peaks to determine if it is spiking)
+    - [ ] Spike detection (have a window of past voltages and use find peaks and whether it is above a certain threshold to determine if it is spiking)
+    - Hodgkin Huxley lattice function should share as much code as possible with integrate and fire function
 - [ ] TOML parsing
   - [x] Integrate and fire parsing
     - [x] Static input
