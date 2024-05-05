@@ -47,6 +47,22 @@ pub struct IFCell {
     pub if_params: IFParameters,
 }
 
+// write macro that essentially writes the following for each parameter
+// #[pymethods]
+// impl IFCell {
+//     fn get_param(&self) -> type {
+//         self.cell_backend.param
+//     }
+
+//     fn set_param(&mut self, value: type) {
+//         self.cell_backend.param = value;
+//     }
+
+//     // repeat
+//     ...
+// }
+// need to enable https://pyo3.rs/v0.21.2/features.html#multiple-pymethods
+
 #[pymethods]
 impl IFCell {
     #[new]

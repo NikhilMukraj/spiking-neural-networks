@@ -201,7 +201,7 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
     }
 }
 
-pub fn get_hodgkin_huxley_voltages(
+pub fn get_hodgkin_huxley_summary(
     hodgkin_huxley_model: &HodgkinHuxleyCell, 
     input_current: f64, 
     iterations: usize,
@@ -243,29 +243,37 @@ pub struct FittingSettings<'a> {
     pub do_receptor_kinetics: bool,
 }
 
-fn bayesian_izhikevich_get_dv_change(
+fn bayesian_izhikevich_iterate(
     izhikevich_neuron: &mut IntegrateAndFireCell, 
     if_params: &IFParameters, 
     input_current: f64,
     bayesian: bool,
     do_receptor_kinetics: bool,
-) -> f64 {
+) -> bool {
     if bayesian {
         let bayesian_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
         let bayesian_input = input_current * bayesian_factor;
         handle_receptor_kinetics(izhikevich_neuron, &if_params, bayesian_input, do_receptor_kinetics);
 
-        izhikevich_neuron.izhikevich_get_dv_change(
+        let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
             &if_params, 
             bayesian_input,
-        ) + izhikevich_neuron.get_neurotransmitter_currents(if_params)
+        );
+
+        izhikevich_neuron.update_based_on_neurotransmitter_currents(if_params);
+
+        spike
     } else {
         handle_receptor_kinetics(izhikevich_neuron, &if_params, input_current, do_receptor_kinetics);
 
-        izhikevich_neuron.izhikevich_get_dv_change(
+        let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
             &if_params, 
             input_current,
-        ) + izhikevich_neuron.get_neurotransmitter_currents(if_params)
+        );
+
+        izhikevich_neuron.update_based_on_neurotransmitter_currents(if_params);
+
+        spike
     }
 }
 
@@ -283,39 +291,21 @@ pub fn get_izhikevich_summary(
     let mut post_peaks: Vec<usize> = vec![];
 
     for timestep in 0..settings.iterations {
-        let pre_spike = presynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
-        let pre_dv = bayesian_izhikevich_get_dv_change(
-            presynaptic_neuron, 
-            &if_params, 
-            settings.input_currents[index], 
-            settings.bayesian,
-            settings.do_receptor_kinetics,
-        );
-
-        if pre_spike {
-            pre_peaks.push(timestep);
-        }
-
         let postsynaptic_input = gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
 
-        let post_spike = postsynaptic_neuron.izhikevich_apply_dw_and_get_spike(&if_params);
-        let post_dv = bayesian_izhikevich_get_dv_change(
-            postsynaptic_neuron, 
-            &if_params, 
-            postsynaptic_input, 
-            settings.bayesian,
-            settings.do_receptor_kinetics,
-        );
+        let pre_spike = bayesian_izhikevich_iterate(presynaptic_neuron, if_params, settings.input_currents[index], settings.bayesian, settings.do_receptor_kinetics);
+        let post_spike = bayesian_izhikevich_iterate(postsynaptic_neuron, if_params, postsynaptic_input, settings.bayesian, settings.do_receptor_kinetics);
+
+        if pre_spike {
+            pre_peaks.push(timestep);
+        }
 
         if post_spike {
             post_peaks.push(timestep);
         }
-    
-        presynaptic_neuron.current_voltage += pre_dv;
-        postsynaptic_neuron.current_voltage += post_dv;
 
         pre_voltages.push(presynaptic_neuron.current_voltage);
         post_voltages.push(postsynaptic_neuron.current_voltage);
