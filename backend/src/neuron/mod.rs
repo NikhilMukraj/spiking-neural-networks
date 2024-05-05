@@ -278,28 +278,6 @@ impl GapConductance for IntegrateAndFireCell {
 }
 
 impl IntegrateAndFireCell {
-    pub fn get_dv_change_and_spike(&mut self, lif: &IFParameters, i: f64) -> (f64, bool) {
-        let mut is_spiking = false;
-
-        if self.refractory_count > 0. {
-            self.current_voltage = lif.v_reset;
-            self.refractory_count -= 1.;
-        } else if self.current_voltage >= lif.v_th {
-            is_spiking = !is_spiking;
-            self.current_voltage = lif.v_reset;
-            self.refractory_count = lif.tref / lif.dt
-        }
-
-        let dv = (
-            (self.leak_constant * (self.current_voltage - lif.e_l)) +
-            (self.integration_constant * (i / lif.g_l))
-        ) * (lif.dt / lif.c_m);
-        // could be varied with a leak constant instead of -1 *
-        // input could be varied with a integration constant times the input
-
-        return (dv, is_spiking);
-    }
-
     pub fn get_basic_dv_change(&self, lif: &IFParameters, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - lif.e_l)) +
@@ -329,30 +307,6 @@ impl IntegrateAndFireCell {
         self.current_voltage += dv;
 
         self.basic_handle_spiking(lif)
-    }
-
-    pub fn apply_dw_change_and_get_spike(&mut self, lif: &IFParameters) -> bool {
-        // dw = (self.a * (v[it]-self.V_L) - w[it]) * (self.dt/self.tau_m)
-        let dw = (
-            lif.alpha_init * (self.current_voltage - lif.e_l) -
-            self.w_value
-        ) * (lif.dt / lif.tau_m);
-
-        self.w_value += dw;
-
-        let mut is_spiking = false;
-
-        if self.refractory_count > 0. {
-            self.current_voltage = lif.v_reset;
-            self.refractory_count -= 1.;
-        } else if self.current_voltage >= lif.v_th {
-            is_spiking = !is_spiking;
-            self.current_voltage = lif.v_reset;
-            self.w_value += lif.beta_init;
-            self.refractory_count = lif.tref / lif.dt
-        }
-
-        return is_spiking;
     }
 
     pub fn adaptive_get_dw_change(&self, lif: &IFParameters) -> f64 {
@@ -419,24 +373,6 @@ impl IntegrateAndFireCell {
         self.w_value += dw;
 
         self.adaptive_handle_spiking(lif)
-    }
-
-    pub fn izhikevich_apply_dw_and_get_spike(&mut self, lif: &IFParameters) -> bool {
-        let dw = (
-            self.alpha * (self.beta * self.current_voltage - self.w_value)
-        ) * (lif.dt / lif.tau_m);
-
-        self.w_value += dw;
-
-        let mut is_spiking = false;
-
-        if self.current_voltage >= lif.v_th {
-            is_spiking = !is_spiking;
-            self.current_voltage = self.c;
-            self.w_value += self.d;
-        }
-
-        return is_spiking;
     }
 
     pub fn izhikevich_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
