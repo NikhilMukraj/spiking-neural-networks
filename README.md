@@ -34,19 +34,15 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
 - Add neurotransmitter output to each presynaptic neuron that calculates concentration with its own membrane potential, then have postsynaptic neurons sum the concentration * weight to calculate their neurotransmitters
-- Separate receptor kinetics struct, dependent on t_total
+- Separate receptor kinetics struct, dependent on $t_total$
+- Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
+  - ie add argument to `iterate_and_spike` which is an `Option<f64>` called `additional_dv` that adds the $dv$ change calculated by the neurotransmitter current after neurotransmitter currents are set and returned
+    - Get presynaptic neurotransmitter concentrate
+    - Calculate $dv$ change from neurotransmitter current
+    - Add it to the voltage in the `iterate_and_spike` function
+  - Old update neurotransmitter function should be removed in favor of this
 
 - Add $\tau_m$ and $C_m$ to fitting parameters
-
-- **Split `get_dv_change_and_get_spike` into `get_basic_dv_change` and `get_basic_spike`, that way there does not need to be a split between basic and rest of integrate and fires**
-  - Could have a function return the correct function for each IFType for now
-    - One set of iterate and spike is used such that it directly modifies current voltage and current w, the other one is built to allow arc mutex access, it first calculates dv and dw and spike and then unlocks mutex to modify neuron
-    - Need to built get dv, get dw, and get spike for each IF type
-      - **Build a function to return the correct function based on IF type**
-    - Inputs need to be calculated first, then after inputs calculated dv, dw, and spiking changes (and neurotransmitter concentration and respective currents) can be applied
-      - For neuron, get input, add to Hashmap\<Position, Input\>, then apply input to each neuron
-  - Could a function that sets a private field within the struct to the correct dv change function and the correct spiking function and then call a method that called that function instead of matching each time
-  - Could implement this by integrating IFType into cell struct and setting the right function when IFType is called
 
 - **Move non initialization parameters from IFParameters to cell struct**
   - Make function to translate IFParameters and STDPParameters to cell struct
@@ -69,6 +65,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Should create a CellType enum to store IFType and Hodgkin Huxley type for later use in lattice simulation function
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
+  - Build function to allow arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
