@@ -5,7 +5,7 @@ use std::{
 use crate::distribution::limited_distr;
 use crate::neuron::{
     IntegrateAndFireCell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    find_peaks, diff, gap_junction, iterate_coupled_hodgkin_huxley,
+    IFType, find_peaks, diff, gap_junction, iterate_coupled_hodgkin_huxley,
     handle_receptor_kinetics
 };
 use crate::ga::{BitString, decode};
@@ -347,6 +347,7 @@ pub fn fitting_objective(
     if_params.v_th = v_th;
 
     let test_cell = IntegrateAndFireCell { 
+        if_type: IFType::Izhikevich,
         current_voltage: if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
