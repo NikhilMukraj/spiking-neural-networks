@@ -357,6 +357,7 @@ fn run_lattice(
         .map(|_| {
             (0..num_cols)
                 .map(|_| IntegrateAndFireCell { 
+                    if_type: if_type,
                     current_voltage: if_params.v_init, 
                     refractory_count: 0.0,
                     leak_constant: -1.,
@@ -423,6 +424,16 @@ fn run_lattice(
         // write 
         // end loop
 
+        // eventually convert to this
+        // let mut inputs: HashMap<Position, f64> = graph
+        //     .get_every_node()
+        //     .par_iter()
+        //     .map(|&pos| {
+        //     // .. calculating input
+        //     (pos, change)
+        //     });
+        //     .collect();
+
         for pos in graph.get_every_node() {
             let (x, y) = pos;
 
@@ -457,7 +468,7 @@ fn run_lattice(
         for (pos, input_value) in inputs {
             let (x, y) = pos;
 
-            let is_spiking = cell_grid[x][y].iterate_and_spike(&if_type, &if_params, input_value);
+            let is_spiking = cell_grid[x][y].iterate_and_spike(&if_params, input_value);
 
             if do_stdp && is_spiking {
                 cell_grid[x][y].last_firing_time = Some(timestep);
@@ -465,7 +476,7 @@ fn run_lattice(
                 let input_positions = graph.get_incoming_connections(&pos);
                 for i in input_positions {
                     let (x_in, y_in) = i;
-                    let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).unwrap();
+                    let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).expect("Could not find weight");
                                                 
                     graph.edit_weight(
                         &(x_in, y_in), 
@@ -478,7 +489,7 @@ fn run_lattice(
 
                 for i in out_going_connections {
                     let (x_out, y_out) = i;
-                    let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).unwrap();
+                    let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).expect("Could not find weight");
 
                     graph.edit_weight(
                         &pos, 
@@ -902,6 +913,7 @@ fn test_coupled_neurons(
     filename: &str,
 ) {
     let mut presynaptic_neuron = IntegrateAndFireCell { 
+        if_type: if_type,
         current_voltage: pre_if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -919,6 +931,7 @@ fn test_coupled_neurons(
     };
 
     let mut postsynaptic_neuron = IntegrateAndFireCell { 
+        if_type: if_type,
         current_voltage: post_if_params.v_init, 
         refractory_count: 0.0,
         leak_constant: -1.,
@@ -998,13 +1011,11 @@ fn test_coupled_neurons(
         handle_receptor_kinetics(&mut postsynaptic_neuron, &post_if_params, postsynaptic_input, do_receptor_kinetics);
 
         let _pre_is_spiking = presynaptic_neuron.iterate_and_spike(
-            &if_type,
             &pre_if_params, 
             presynaptic_input
         );
 
         let _post_is_spiking = postsynaptic_neuron.iterate_and_spike(
-            &if_type,
             &post_if_params, 
             postsynaptic_input
         );
@@ -1182,11 +1193,13 @@ fn test_isolated_stdp(
         IFType::Basic | IFType::Adaptive |
         IFType::AdaptiveExponential => {
             IntegrateAndFireCell {
+                if_type: if_type,
                 ..IntegrateAndFireCell::default()
             }
         },
         IFType::Izhikevich | IFType::IzhikevichLeaky => {
             IntegrateAndFireCell {
+                if_type: if_type,
                 ..IntegrateAndFireCell::izhikevich_default()
             }
         }
@@ -1258,10 +1271,10 @@ fn test_isolated_stdp(
             .collect();
         let is_spikings: Vec<bool> = neurons.iter_mut().zip(presynaptic_inputs.iter())
             .map(|(presynaptic_neuron, input_value)| {
-                presynaptic_neuron.iterate_and_spike(&if_type, &if_params, *input_value)
+                presynaptic_neuron.iterate_and_spike(&if_params, *input_value)
             })
             .collect();
-        let is_spiking = postsynaptic_neuron.iterate_and_spike(&if_type, &if_params, noise_factor * calculated_voltage);
+        let is_spiking = postsynaptic_neuron.iterate_and_spike(&if_params, noise_factor * calculated_voltage);
 
         update_isolated_presynaptic_neuron_weights(
             &mut neurons, 
@@ -1851,6 +1864,7 @@ fn main() -> Result<()> {
         println!("{:#?}", if_params);
 
         let mut test_cell = IntegrateAndFireCell { 
+            if_type: if_type,
             current_voltage: if_params.v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -1867,7 +1881,7 @@ fn main() -> Result<()> {
             ligand_gates: if_params.ligand_gates_init.clone(),
         };
 
-        test_cell.run_static_input(&if_type, &if_params, input_current, bayesian, iterations, &filename);
+        test_cell.run_static_input(&if_params, input_current, bayesian, iterations, &filename);
 
         println!("\nFinished single neuron test");
     } else if let Some(coupled_table) = config.get("coupled_test") {
@@ -2408,6 +2422,7 @@ fn main() -> Result<()> {
         generated_if_params.v_th = v_th;
 
         let test_cell = IntegrateAndFireCell { 
+            if_type: IFType::Izhikevich,
             current_voltage: if_params.v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
