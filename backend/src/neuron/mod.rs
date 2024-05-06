@@ -157,7 +157,7 @@ impl Default for STDPParameters {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum IFType {
     Basic,
     Adaptive,
@@ -199,6 +199,7 @@ impl PotentiationType {
 
 #[derive(Clone)]
 pub struct IntegrateAndFireCell {
+    pub if_type: IFType,
     pub current_voltage: f64, // membrane potential
     pub refractory_count: f64, // keeping track of refractory period
     pub leak_constant: f64, // leak constant gene
@@ -226,6 +227,7 @@ pub trait GapConductance {
 impl Default for IntegrateAndFireCell {
     fn default() -> Self {
         IntegrateAndFireCell {
+            if_type: IFType::Basic,
             current_voltage: IFParameters::default().v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -247,6 +249,7 @@ impl Default for IntegrateAndFireCell {
 impl IzhikevichDefault for IntegrateAndFireCell {
     fn izhikevich_default() -> Self {
         IntegrateAndFireCell {
+            if_type: IFType::Izhikevich,
             current_voltage: IFParameters::izhikevich_default().v_init, 
             refractory_count: 0.0,
             leak_constant: -1.,
@@ -434,8 +437,8 @@ impl IntegrateAndFireCell {
         self.izhikevich_handle_spiking(lif)
     }
 
-    pub fn iterate_and_spike(&mut self, if_type: &IFType, if_params: &IFParameters, i: f64) -> bool  {
-        match if_type {
+    pub fn iterate_and_spike(&mut self, if_params: &IFParameters, i: f64) -> bool  {
+        match self.if_type {
             IFType::Basic => {
                 self.basic_iterate_and_spike(if_params, i)
             },
@@ -456,7 +459,6 @@ impl IntegrateAndFireCell {
 
     pub fn run_static_input(
         &mut self, 
-        if_type: &IFType,
         lif: &IFParameters, 
         i: f64, 
         bayesian: bool, 
@@ -466,16 +468,16 @@ impl IntegrateAndFireCell {
         let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
         
-        match if_type {
+        match self.if_type {
             IFType::Basic => {
                 writeln!(file, "voltage").expect("Unable to write to file");
                 writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
                 for _ in 0..iterations {
                     let _is_spiking = if bayesian {
-                        self.iterate_and_spike(&if_type, lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
+                        self.iterate_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
                     } else {
-                        self.iterate_and_spike(&if_type, lif, i)
+                        self.iterate_and_spike(lif, i)
                     };
         
                     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
@@ -487,9 +489,9 @@ impl IntegrateAndFireCell {
 
                 for _ in 0..iterations {
                     let _is_spiking = if bayesian {
-                        self.iterate_and_spike(&if_type, lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
+                        self.iterate_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
                     } else {
-                        self.iterate_and_spike(&if_type, lif, i)
+                        self.iterate_and_spike(lif, i)
                     };
         
                     writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
