@@ -30,11 +30,14 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
 - Eventually remove old neurotransmitter system and replace it with new one
-  - Gap condutance should be retrieved from TOML
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
 - Add neurotransmitter output to each presynaptic neuron that calculates concentration with its own membrane potential, then have postsynaptic neurons sum the concentration * weight to calculate their neurotransmitters
 - Separate receptor kinetics struct, dependent on $t_total$
+  - Receptor kinetics input (of weighted neurotransmitter concentration) should only be calculated if receptor kinetics is not static
+  - Receptor kinetics static value should be able to be inputtable (default should be 0.8)
+  - Neurotransmitter and receptor kinetics structs should be stored in different hashmaps that relate an enum (specifying the type, basic, AMPA, NMDA, GABAa, GABAb) to the struct (the struct would then have the appriopriate parameters associated with that enum)
+    - `HashMap<NeurotransmitterType, Neurotransmitter>`, `HashMap<NeurotrnasmitterType, ReceptorKinetics>`
 - Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
   - ie add argument to `iterate_and_spike` which is an `Option<f64>` called `additional_dv` that adds the $dv$ change calculated by the neurotransmitter current after neurotransmitter currents are set and returned
     - Get presynaptic neurotransmitter concentrate
@@ -44,6 +47,14 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Add $\tau_m$ and $C_m$ to fitting parameters
 
+- **Hodgkin Huxley should implement `iterate_and_spike` function** (could be done after neurotransmitter refactor)
+  - Spike should return true when it is above a certain threshold and it has stopped increasing
+    - Should have a `last_firing_time` field and a `is_increasing` field as well as a `v_th` field
+    - Might need a NeurotransmitterAndReceptor trait
+      - Trait ensures that the struct has neurotransmitters
+      - Ensures that there are receptor kinetics structs as well
+      - Ensures that it has functionality to update both the kinetics and neurotransmitter concentration
+
 - **Move non initialization parameters from IFParameters to cell struct**
   - Make function to translate IFParameters and STDPParameters to cell struct
   - Have a set of bayesian parameters for ensemble of neurons to use
@@ -52,10 +63,11 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Completely remove IFParameters**
   - STDP test should get parameters before scope of the function not within the scope
   - Repurpose get_if_params function to get IFCell parameters
+    - Standardize creation of IFCell and have `test_coupled_neurons` function and `test_isolated_stdp` function take in the neurons as parameters rather than generating them from inside the function
+      - Standard creation in the same way Hodgkin Huxley model is generated
   - Consider removing 0-1 scaling default
   - **Receptor kinetics handling should have an inputtable value to set r at**
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
-  - **Integrate IFType parameter into cell struct**
   - Update code in obsidian when refactor is done, maybe update results
 
 - Have system to generate new neurotransmitter and receptors from TOML
@@ -65,9 +77,19 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Should create a CellType enum to store IFType and Hodgkin Huxley type for later use in lattice simulation function
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
-  - Build function to allow arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type
   - Inputs should be calculated in parallel
+    - There should be a GraphFunctionalitySynced trait for the lookup weight function, get incoming connections, get outgoing connections, and get every node function, the rest can be under the regular GraphFunctionality trait, the weighted input function should have a `&dyn GraphFunctionalitySynced` argument
+      - Could replace `&dyn GraphFuntionality` with a generic and a trait
+      - Maybe graph should be in an `Arc<Mutex<T>>`, unlocked to edit weights, would need to be able to pass locked version to get weights without unlocking Mutex
+  - Build function to allow Arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks Mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type
+  - Calculations could be chunked (a section of neurons to operate on instead of just one at a time)
+    - Weight changes do not need to be parallelized immediately if many spikes do not occur at once
   - Parallel functionality should also be benchmarked
+
+- EEG testing
+  - Determine frequency band of EEG values over 30 seconds (could calculate frequencies seperately in Python with Numpy for now)
+  - Leave room for convergence (about 500 steps with $dt=0.1$)
+    - Should expect beta or gamma frequencies above 10 hz and below 50 hz
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
@@ -84,6 +106,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
   - [Hopfield network tutorial](https://github.com/ImagineOrange/Hopfield-Network/blob/main/hopfield_MNIST.py)
   - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
+  - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
 - When done with Hopfield, move to the [cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
   - Cue input is fed into working memory neurons
     - Cue is -1 or 1
@@ -197,8 +220,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] Multicompartmental models
     - [ ] [Cable theory](https://boulderschool.yale.edu/sites/default/files/files/DayanAbbott.pdf)
     - [ ] Systemized method for adding compartments
-  - [ ] Hodgkin Huxley lattice simulation
-    - [ ] Spike detection (have a window of past voltages and use find peaks and whether it is above a certain threshold to determine if it is spiking)
+  - [ ] Hodgkin Huxley iterate and spike functionality
+    - Should implement a trait shared with integrate and fire neuron that iterates the state of the neuron and returns whether it is spiking
+    - Should be implemented for coupling test, STDP, and lattice simulation
     - Hodgkin Huxley lattice function should share as much code as possible with integrate and fire function
 - [ ] TOML parsing
   - [x] Integrate and fire parsing
@@ -287,6 +311,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] Liquid state machine with astrocytes and R-STDP
   - [ ] Combining input with neurotransmission, encoding certain inputs with more or less neurotransmitter (ionotropic or otherwise)
 - [ ] R-STDP based regression
+  - Number of spikes in an interval or distance between spikes could act as regression value
+    - Additionally multiple outputs from different neurons in the output layer could be summed for a single regression value (for example one neuron could represnt 0-9, another could be 0, 10, 20, ..., 90 and summed together for the full number)
   - [ ] Liquid state machine fitting differential equation or time series
     - Potentially physics prediction, parameters of physics simulation could be inputs along with current position, next position could be target to predict
   
