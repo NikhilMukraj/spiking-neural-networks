@@ -2,6 +2,7 @@ use std::{
     collections::HashMap, 
     fs::File, 
     io::{Write, BufWriter, Result, Error, ErrorKind}, 
+    fmt::Display,
 };
 use serde_json;
 #[path = "../distribution/mod.rs"]
@@ -50,7 +51,7 @@ impl AdjacencyMatrix {
     }
 }
 
-fn csv_write<T: std::fmt::Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) {
+fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) {
     for row in grid {
         for (n, i) in row.iter().enumerate() {
             let item_to_write = match i {
