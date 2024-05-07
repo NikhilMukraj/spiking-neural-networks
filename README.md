@@ -81,9 +81,11 @@ EEG processing with fourier transforms, and power spectral density calculations
     - There should be a GraphFunctionalitySynced trait for the lookup weight function, get incoming connections, get outgoing connections, and get every node function, the rest can be under the regular GraphFunctionality trait, the weighted input function should have a `&dyn GraphFunctionalitySynced` argument
       - Could replace `&dyn GraphFuntionality` with a generic and a trait
       - Maybe graph should be in an `Arc<Mutex<T>>`, unlocked to edit weights, would need to be able to pass locked version to get weights without unlocking Mutex
-  - Build function to allow Arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks Mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type
-  - Calculations could be chunked (a section of neurons to operate on instead of just one at a time)
-    - Weight changes do not need to be parallelized immediately if many spikes do not occur at once
+  <!-- - Build function to allow Arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks Mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type -->
+  <!-- - Calculations could be chunked (a section of neurons to operate on instead of just one at a time)
+    - Weight changes do not need to be parallelized immediately if many spikes do not occur at once -->
+  - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
+    - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
   - Parallel functionality should also be benchmarked
 
 - EEG testing
