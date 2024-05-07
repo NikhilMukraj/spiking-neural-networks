@@ -425,7 +425,7 @@ fn run_lattice(
         // end loop
 
         // eventually convert to this
-        // let mut inputs: HashMap<Position, f64> = graph
+        // let inputs: HashMap<Position, f64> = graph
         //     .get_every_node()
         //     .par_iter()
         //     .map(|&pos| {
@@ -470,9 +470,11 @@ fn run_lattice(
 
             let is_spiking = cell_grid[x][y].iterate_and_spike(&if_params, input_value);
 
-            if do_stdp && is_spiking {
+            if is_spiking {
                 cell_grid[x][y].last_firing_time = Some(timestep);
+            }
 
+            if do_stdp && is_spiking {
                 let input_positions = graph.get_incoming_connections(&pos);
                 for i in input_positions {
                     let (x_in, y_in) = i;
