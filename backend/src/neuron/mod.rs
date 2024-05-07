@@ -213,6 +213,19 @@ pub struct IntegrateAndFireCell {
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
+    // pub v_th: f64, // voltage threshold
+    // pub v_reset: f64, // voltage reset
+    // pub tau_m: f64, // membrane time constant
+    // pub c_m: f64, // membrane capacitance
+    // pub g_l: f64, // leak constant
+    // pub v_init: f64, // initial voltage
+    // pub e_l: f64, // leak reversal potential
+    // pub tref: f64, // total refractory period
+    // pub w_init: f64, // initial adaptive value
+    // pub slope_factor: f64, // slope factor in exponential adaptive neuron
+    // pub dt: f64, // time step
+    // pub bayesian_params: BayesianParameters,
+    // pub stdp_params: STDPParameters,
     pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
