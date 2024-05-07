@@ -25,6 +25,13 @@ pub trait GraphFunctionality {
     fn write_history(&self, tag: &str);
 }
 
+// pub trait GraphFunctionalitySynced: Sync {
+//     fn get_every_node(&self) -> Vec<Position>;
+//     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; 
+//     fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>; 
+//     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
+// }
+
 #[derive(Clone, Debug)]
 pub struct AdjacencyMatrix {
     pub position_to_index: HashMap<Position, usize>,
