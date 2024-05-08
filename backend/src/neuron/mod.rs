@@ -553,6 +553,19 @@ impl IntegrateAndFireCell {
     }
 }
 
+// trait IterateAndSpike {
+//     pub fn iterate_and_spike(&mut self, i: f64);
+// }
+
+// trait UpdateNeurotransmitter {
+//     pub fn update_neurotransmitter_concentration(&mut self);
+//     pub fn update_receptor_kinetics(&mut self, t_total: f64);
+//     pub fn set_neurotransmitter_currents(&mut self);
+//     pub fn get_neurotransmitter_currents(&self) -> f64;
+//     pub fn update_based_on_neurotransmitter_currents(&self);
+//     pub fn get_ligand_gated_channels(&self) -> &[GeneralLigandGatedChannel];
+// }
+
 pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
 
 pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
