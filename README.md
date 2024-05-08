@@ -73,6 +73,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Get coupled neuron test to work with IterateAndSpike trait**
   - Get it to work with Hodgkin Huxley model with IterateAndSpike trait
   - Can ignore neurotransmission for now
+    - Iterate and spike trait could be modified to take in a `Option<f64>` for additional $dv$ changes where the additional change in voltage is the neurotransmission current
 
 - Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
 
