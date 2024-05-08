@@ -660,6 +660,11 @@ fn get_default_if_params(if_type: &IFType) -> IFParameters {
 //         table,
 //         prefix_value,
 //         if_neuron,
+        // leak_constant,
+        // integration_constant,
+        // gap_conductance,
+        // v_init,
+        // w_init,
 //         alpha,
 //         beta,
 //         c,
@@ -669,10 +674,9 @@ fn get_default_if_params(if_type: &IFType) -> IFParameters {
 //         tau_m,
 //         c_m,
 //         g_l,
-//         v_init, 
 //         e_l, 
 //         tref, 
-//         w_init, 
+        // slope_factor
 //         dt 
 //     );
 
@@ -684,11 +688,11 @@ fn get_default_if_params(if_type: &IFType) -> IFParameters {
 //     if_neuron.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
 //     if_neuron.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
 
-//     let mut stdp_params = STDPParameters::default();
-//     get_stdp_params(&mut stdp_params, table)?;
-//     if_neuron.stdp_params = stdp_params;
+//     if_neuron.stdp_params = get_stdp_params(table)?;
 
 //     if_neuron.ligand_gates = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
+
+    // Ok(if_neuron)
 // }
 
 fn get_stdp_params(table: &Value) -> Result<STDPParameters> {
