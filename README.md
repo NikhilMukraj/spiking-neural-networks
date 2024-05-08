@@ -35,7 +35,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Add neurotransmitter output to each presynaptic neuron that calculates concentration with its own membrane potential, then have postsynaptic neurons sum the concentration * weight to calculate their neurotransmitters
 - Separate receptor kinetics struct, dependent on $t_total$
   - Receptor kinetics input (of weighted neurotransmitter concentration) should only be calculated if receptor kinetics is not static
-  - Receptor kinetics static value should be able to be inputtable (default should be 0.8)
+    - **Receptor kinetics handling should have an inputtable value to set r at**
   - Neurotransmitter and receptor kinetics structs should be stored in different hashmaps that relate an enum (specifying the type, basic, AMPA, NMDA, GABAa, GABAb) to the struct (the struct would then have the appriopriate parameters associated with that enum)
     - `HashMap<NeurotransmitterType, Neurotransmitter>`, `HashMap<NeurotrnasmitterType, ReceptorKinetics>`
 - Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
@@ -61,18 +61,28 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Have separate function to get those parameters from TOML
     - Bayesian should only be used with standard deviation is not 0 (for all functions)
 - **Completely remove IFParameters**
-  - STDP test should get parameters before scope of the function not within the scope
   - Repurpose get_if_params function to get IFCell parameters
     - Standardize creation of IFCell and have `test_coupled_neurons` function and `test_isolated_stdp` function take in the neurons as parameters rather than generating them from inside the function
       - Standard creation in the same way Hodgkin Huxley model is generated
   - Consider removing 0-1 scaling default
-  - **Receptor kinetics handling should have an inputtable value to set r at**
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
   - Update code in obsidian when refactor is done, maybe update results
+- Seperate STDP parameters into STDP parameters and weight initialization parameters
+  - Obsidian notes on STDP equations
+
+- Coupled neurons should be have to change potentiation type
+
+- Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
+
+- Weighted neuron input should be the only input function
 
 - Have system to generate new neurotransmitter and receptors from TOML
 
 - Split `main.rs` functions into a few different files for readability
+
+- Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
+
+- FitzHugh–Nagumo model (FHN)
 
 - Should create a CellType enum to store IFType and Hodgkin Huxley type for later use in lattice simulation function
 
@@ -102,6 +112,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
 
+- Should also be adapted for a cargo package
+
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
 - Hopfield network
@@ -125,6 +137,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Recurrent connections in reservoir compute act as working memory that stores information through recurrent connections that may slowly degrade over time, target is slowing the degradation in order to improve memory recall
   - Decoding unit acts as readout, decoding unit likely would need some training in the form of R-STDP
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
+  - Can also check for time until convergence as a measure of learning
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
 
@@ -226,6 +239,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should implement a trait shared with integrate and fire neuron that iterates the state of the neuron and returns whether it is spiking
     - Should be implemented for coupling test, STDP, and lattice simulation
     - Hodgkin Huxley lattice function should share as much code as possible with integrate and fire function
+- [ ] FitzHugh-Nagumo model
 - [ ] TOML parsing
   - [x] Integrate and fire parsing
     - [x] Static input
@@ -269,10 +283,12 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
 - [ ] Poisson neuron
   - [ ] Coupling
+    - [ ] Potentiation type
 - [ ] Spike train struct
   - Given a set of times, the neuron will spike and not spike at given times
     - Vector of times to spike at + delay before first spike + delay after last spike
   - Internal clock starts at 0, and increments every iteration until the end time is reached where it will return to 0
+    - [ ] Potentiation type
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
