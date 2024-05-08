@@ -13,7 +13,7 @@ use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
     IFParameters, IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
-    ScaledDefault, IzhikevichDefault, BayesianParameters, STDPParameters, 
+    IzhikevichDefault, BayesianParameters, STDPParameters, 
     if_params_bayesian, gap_junction, iterate_coupled_hodgkin_huxley,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
@@ -568,24 +568,38 @@ struct SimulationParameters {
     graph_params: GraphParameters,
 }
 
+macro_rules! get_if_params_with_default {
+    ($table:expr, $prefix:expr, $if_params:expr, $($param:ident),+ ) => {
+        $(
+            $if_params.$param = parse_value_with_default($table, &format!("{}{}", $prefix, stringify!($param)), parse_f64, $if_params.$param)?;
+        )+
+    };
+}
+
 fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Value) -> Result<()> {
     let prefix_value = match prefix {
         Some(value) => format!("{}_", value),
         None => String::from(""),
     };
 
-    if_params.gap_conductance_init = parse_value_with_default(table, &format!("{}gap_conductance_init", prefix_value), parse_f64, if_params.gap_conductance_init)?;
-    if_params.dt = parse_value_with_default(table, &format!("{}dt", prefix_value), parse_f64, if_params.dt)?;
-    if_params.slope_factor = parse_value_with_default(table, &format!("{}slope_factor", prefix_value), parse_f64, if_params.slope_factor)?;
-    if_params.tau_m = parse_value_with_default(table, &format!("{}tau_m", prefix_value), parse_f64, if_params.tau_m)?;
-    if_params.c_m = parse_value_with_default(table, &format!("{}c_m", prefix_value), parse_f64, if_params.c_m)?;
-    if_params.tref = parse_value_with_default(table, &format!("{}tref", prefix_value), parse_f64, if_params.tref)?;
-    if_params.alpha_init = parse_value_with_default(table, &format!("{}alpha_init", prefix_value), parse_f64, if_params.alpha_init)?;
-    if_params.beta_init = parse_value_with_default(table, &format!("{}beta_init", prefix_value), parse_f64, if_params.beta_init)?;
-    if_params.v_reset = parse_value_with_default(table, &format!("{}v_reset", prefix_value), parse_f64, if_params.v_reset)?; 
-    if_params.d_init = parse_value_with_default(table, &format!("{}d_init", prefix_value), parse_f64, if_params.d_init)?;
-    if_params.w_init = parse_value_with_default(table, &format!("{}w_init", prefix_value), parse_f64, if_params.w_init)?;
-    if_params.v_init = parse_value_with_default(table, &format!("{}v_init", prefix_value), parse_f64, if_params.w_init)?;
+    get_if_params_with_default!(
+        table, 
+        prefix_value, 
+        if_params, 
+        gap_conductance_init, 
+        dt, 
+        slope_factor, 
+        tau_m, 
+        c_m, 
+        tref, 
+        alpha_init, 
+        beta_init, 
+        v_reset, 
+        d_init, 
+        w_init, 
+        v_init
+    );
+   
     if_params.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
     if_params.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
     if_params.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
@@ -596,72 +610,155 @@ fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Val
     Ok(())
 }
 
-fn get_stdp_params(stdp: &mut STDPParameters, table: &Value) -> Result<()> {
-    stdp.a_plus = parse_value_with_default(
+fn get_default_if_params(if_type: &IFType) -> IFParameters {
+    match if_type {
+        IFType::Basic | IFType::Adaptive |
+        IFType::AdaptiveExponential => {
+            IFParameters {
+                ..IFParameters::default()
+            }
+        },
+        IFType::Izhikevich | IFType::IzhikevichLeaky => {
+            IFParameters {
+                ..IzhikevichDefault::izhikevich_default()
+            }
+        }
+    }
+}
+
+// macro_rules! get_integrate_and_fire_params_with_default {
+//     ($table:expr, $prefix:expr, $if_neuron:expr, $($param:ident),+ ) => {
+//         $(
+//             $if_neuron.$param = parse_value_with_default($table, &format!("{}{}", $prefix, stringify!($param)), parse_f64, $if_neuron.$param)?;
+//         )+
+//     };
+// }
+
+// fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Value) -> Result<IntegrateAndFireCell> {
+//     let prefix_value = match prefix {
+//         Some(value) => format!("{}_", value),
+//         None => String::from(""),
+//     };
+
+//     let mut if_neuron = match if_type {
+//         IFType::Basic | IFType::Adaptive |
+//         IFType::AdaptiveExponential => {
+//             IntegrateAndFireCell {
+//                 if_type: if_type,
+//                 ..IntegrateAndFireCell::default()
+//             }
+//         },
+//         IFType::Izhikevich | IFType::IzhikevichLeaky => {
+//             IntegrateAndFireCell {
+//                 if_type: if_type,
+//                 ..IzhikevichDefault::izhikevich_default()
+//             }
+//         }
+//     };
+    
+//     get_integrate_and_fire_params_with_default!(
+//         table,
+//         prefix_value,
+//         if_neuron,
+//         alpha,
+//         beta,
+//         c,
+//         d,
+//         v_th,
+//         v_reset,
+//         tau_m,
+//         c_m,
+//         g_l,
+//         v_init, 
+//         e_l, 
+//         tref, 
+//         w_init, 
+//         dt 
+//     );
+
+//     let potentiation_type = parse_value_with_default(table, &format!("{}potentiation_type", prefix_value), parse_string, "excitatory")?;
+//     if_neuron.potentiation_type = PotentiationType::from_str(&potentiation_type)?;
+
+//     if_neuron.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
+//     if_neuron.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
+//     if_neuron.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
+//     if_neuron.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
+
+//     let mut stdp_params = STDPParameters::default();
+//     get_stdp_params(&mut stdp_params, table)?;
+//     if_neuron.stdp_params = stdp_params;
+
+//     if_neuron.ligand_gates = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
+// }
+
+fn get_stdp_params(table: &Value) -> Result<STDPParameters> {
+    let mut stdp_params = STDPParameters::default();
+
+    stdp_params.a_plus = parse_value_with_default(
         table, 
         "a_plus", 
         parse_f64, 
         STDPParameters::default().a_plus
     )?;
-    println!("a_plus: {}", stdp.a_plus);
+    println!("a_plus: {}", stdp_params.a_plus);
 
-    stdp.a_minus = parse_value_with_default(
+    stdp_params.a_minus = parse_value_with_default(
         table, 
         "a_minus", 
         parse_f64, 
         STDPParameters::default().a_minus
     )?;
-    println!("a_minus: {}", stdp.a_minus);
+    println!("a_minus: {}", stdp_params.a_minus);
 
-    stdp.tau_plus = parse_value_with_default(
+    stdp_params.tau_plus = parse_value_with_default(
         table, 
         "tau_plus", 
         parse_f64, 
-        stdp.tau_plus
+        stdp_params.tau_plus
     )?; 
-    println!("tau_plus: {}", stdp.tau_plus);
+    println!("tau_plus: {}", stdp_params.tau_plus);
 
-    stdp.tau_minus = parse_value_with_default(
+    stdp_params.tau_minus = parse_value_with_default(
         table, 
         "tau_minus", 
         parse_f64, 
-        stdp.tau_minus
+        stdp_params.tau_minus
     )?; 
-    println!("tau_minus: {}", stdp.tau_minus);
+    println!("tau_minus: {}", stdp_params.tau_minus);
 
-    stdp.weight_bayesian_params.mean = parse_value_with_default(
+    stdp_params.weight_bayesian_params.mean = parse_value_with_default(
         table, 
         "weight_init", 
         parse_f64, 
-        stdp.weight_bayesian_params.mean
+        stdp_params.weight_bayesian_params.mean
     )?;
-    println!("weight_init: {}", stdp.weight_bayesian_params.mean);
+    println!("weight_init: {}", stdp_params.weight_bayesian_params.mean);
 
-    stdp.weight_bayesian_params.std = parse_value_with_default(
+    stdp_params.weight_bayesian_params.std = parse_value_with_default(
         table, 
         "weight_std", 
         parse_f64, 
-        stdp.weight_bayesian_params.std
+        stdp_params.weight_bayesian_params.std
     )?;
-    println!("weight_std: {}", stdp.weight_bayesian_params.std);
+    println!("weight_std: {}", stdp_params.weight_bayesian_params.std);
 
-    stdp.weight_bayesian_params.min = parse_value_with_default(
+    stdp_params.weight_bayesian_params.min = parse_value_with_default(
         table, 
         "weight_min", 
         parse_f64, 
-        stdp.weight_bayesian_params.min
+        stdp_params.weight_bayesian_params.min
     )?;
-    println!("weight_min: {}", stdp.weight_bayesian_params.min);
+    println!("weight_min: {}", stdp_params.weight_bayesian_params.min);
 
-    stdp.weight_bayesian_params.max = parse_value_with_default(
+    stdp_params.weight_bayesian_params.max = parse_value_with_default(
         table, 
         "weight_max", 
         parse_f64, 
-        stdp.weight_bayesian_params.max
+        stdp_params.weight_bayesian_params.max
     )?;
-    println!("weight_max: {}", stdp.weight_bayesian_params.max);
+    println!("weight_max: {}", stdp_params.weight_bayesian_params.max);
 
-    Ok(())
+    Ok(stdp_params)
 }
 
 fn get_bayesian_params(
@@ -752,9 +849,7 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     let do_stdp: bool = parse_value_with_default(&table, "do_stdp", parse_bool, false)?;
     println!("do_stdp: {}", do_stdp);
 
-    let mut stdp_params = STDPParameters::default();
-
-    get_stdp_params(&mut stdp_params, &table)?;
+    let stdp_params = get_stdp_params(&table)?;
 
     let graph_type: String = parse_value_with_default(&table, "graph_type", parse_string, String::from("list"))?;
 
@@ -776,24 +871,7 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         write_history: write_history,
     };
 
-    let scaling_type_default = match if_type {
-        IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
-        _ => "regular",
-    };
-    let scaling_type: String = parse_value_with_default(
-        table, 
-        "scaling_type", 
-        parse_string, 
-        String::from(scaling_type_default)
-    )?;
-    println!("scaling_type: {}", scaling_type);
-
-    let mut if_params = match scaling_type.as_str() {
-        "regular" => IFParameters { ..IFParameters::default() },
-        "scaled" => IFParameters { ..IFParameters::scaled_default() },
-        "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
-        _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
-    };
+    let mut if_params = get_default_if_params(&if_type);
 
     get_if_params(&mut if_params, None, table)?;
     
@@ -1173,19 +1251,7 @@ fn test_isolated_stdp(
     averaged: bool,
     filename: &str,
 ) -> Result<()> {
-    let mut if_params = match if_type {
-        IFType::Basic | IFType::Adaptive |
-        IFType::AdaptiveExponential => {
-            IFParameters {
-                ..IFParameters::default()
-            }
-        },
-        IFType::Izhikevich | IFType::IzhikevichLeaky => {
-            IFParameters {
-                ..IzhikevichDefault::izhikevich_default()
-            }
-        }
-    };
+    let mut if_params = get_default_if_params(&if_type);
 
     get_if_params(&mut if_params, None, &stdp_table)?;
 
@@ -1831,25 +1897,7 @@ fn main() -> Result<()> {
 
         let if_type = IFType::from_str(&if_type)?;
 
-        let scaling_type_default = match if_type {
-            IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
-            _ => "regular",
-        };
-
-        let scaling_type: String = parse_value_with_default(
-            single_neuron_test, 
-            "scaling_type", 
-            parse_string, 
-            String::from(scaling_type_default)
-        )?;
-        println!("scaling_type: {}", scaling_type);
-
-        let mut if_params = match scaling_type.as_str() {
-            "regular" => IFParameters { ..IFParameters::default() },
-            "scaled" => IFParameters { ..IFParameters::scaled_default() },
-            "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
-            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
-        };
+        let mut if_params = get_default_if_params(&if_type);
 
         get_if_params(&mut if_params, None, &single_neuron_test)?;
 
@@ -1931,25 +1979,7 @@ fn main() -> Result<()> {
         )?;
         println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
-        let scaling_type_default = match if_type {
-            IFType::Izhikevich | IFType::IzhikevichLeaky => "izhikevich",
-            _ => "regular",
-        };
-        
-        let scaling_type: String = parse_value_with_default(
-            coupled_table, 
-            "scaling_type", 
-            parse_string, 
-            String::from(scaling_type_default)
-        )?;
-        println!("scaling_type: {}", scaling_type);
-
-        let mut pre_if_params = match scaling_type.as_str() {
-            "regular" => IFParameters { ..IFParameters::default() },
-            "scaled" => IFParameters { ..IFParameters::scaled_default() },
-            "izhikevich" | "adaptive quadratic" => IFParameters { ..IFParameters::izhikevich_default() },
-            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown scaling")) }
-        };
+        let mut pre_if_params = get_default_if_params(&if_type);
         
         let mut post_if_params = pre_if_params.clone();
 
@@ -2024,9 +2054,7 @@ fn main() -> Result<()> {
         let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
         println!("averaged: {}", averaged);
 
-        let mut stdp_params = STDPParameters::default();
-
-        get_stdp_params(&mut stdp_params, stdp_table)?;
+        let stdp_params = get_stdp_params(&stdp_table)?;
 
         test_isolated_stdp(
             stdp_table,
