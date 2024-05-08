@@ -70,7 +70,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Seperate STDP parameters into STDP parameters and weight initialization parameters
   - Obsidian notes on STDP equations
 
-- Coupled neurons should be have to change potentiation type
+- **Get coupled neuron test to work with IterateAndSpike trait**
+  - Get it to work with Hodgkin Huxley model with IterateAndSpike trait
+  - Can ignore neurotransmission for now
 
 - Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
 
