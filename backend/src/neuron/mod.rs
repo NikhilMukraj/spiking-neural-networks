@@ -75,34 +75,6 @@ impl Default for IFParameters {
     }
 }
 
-pub trait ScaledDefault {
-    fn scaled_default() -> Self;
-}
-
-impl ScaledDefault for IFParameters {
-    fn scaled_default() -> Self {
-        IFParameters { 
-            v_th: 1., // spike threshold (mV)
-            v_reset: 0., // reset potential (mV)
-            tau_m: 10., // membrane time constant (ms)
-            c_m: 100., // membrane capacitance (nF)
-            g_l: 4.25, // leak conductance (nS) ((10 - (-75)) / ((-55) - (-75))) * (1 - 0)) + 1
-            gap_conductance_init: 7., // gap condutance (nS)
-            v_init: 0., // initial potential (mV)
-            e_l: 0., // leak reversal potential (mV)
-            tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 0., // initial w value
-            alpha_init: 6., // arbitrary a value
-            beta_init: 10., // arbitrary b value
-            d_init: 2., // arbitrary d value
-            dt: 0.1, // simulation time step (ms)
-            slope_factor: 1., // exponential time step (ms)
-            bayesian_params: BayesianParameters::default(), // default bayesian parameters
-            ligand_gates_init: vec![], // ligand gates
-        }
-    }
-}
-
 pub trait IzhikevichDefault {
     fn izhikevich_default() -> Self;
 }
@@ -188,6 +160,14 @@ pub enum PotentiationType {
 }
 
 impl PotentiationType {
+    // pub fn from_str(string: &str) -> Result<PotentiationType> {
+    //     match string.to_ascii_lowercase().as_str() {
+    //         "excitatory" => Ok(PotentiationType::Excitatory),
+    //         "inhibitory" => Ok(PotentiationType::Inhibitory),
+    //         _ => Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")),
+    //     }
+    // }
+
     pub fn weighted_random_type(prob: f64) -> PotentiationType {
         if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
             PotentiationType::Excitatory
@@ -207,7 +187,6 @@ pub struct IntegrateAndFireCell {
     pub gap_conductance: f64, // condutance between synapses
     pub potentiation_type: PotentiationType,
     pub w_value: f64, // adaptive value 
-    pub stdp_params: STDPParameters, // stdp parameters
     pub last_firing_time: Option<usize>,
     pub alpha: f64, // arbitrary value (controls speed in izhikevich)
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
@@ -224,8 +203,8 @@ pub struct IntegrateAndFireCell {
     // pub w_init: f64, // initial adaptive value
     // pub slope_factor: f64, // slope factor in exponential adaptive neuron
     // pub dt: f64, // time step
-    // pub bayesian_params: BayesianParameters,
-    // pub stdp_params: STDPParameters,
+    // pub bayesian_params: BayesianParameters, // bayesian parameters
+    pub stdp_params: STDPParameters, // stdp parameters
     pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
@@ -248,12 +227,24 @@ impl Default for IntegrateAndFireCell {
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
             w_value: IFParameters::default().w_init,
-            stdp_params: STDPParameters::default(),
             last_firing_time: None,
-            alpha: IFParameters::default().alpha_init,
-            beta: IFParameters::default().beta_init,
-            c: IFParameters::default().v_reset,
-            d: IFParameters::default().d_init,
+            alpha: 0.02,
+            beta: 0.2,
+            c: -55.0,
+            d: 8.0,
+            // v_th: -55., // spike threshold (mV)
+            // v_reset: -75., // reset potential (mV)
+            // tau_m: 10., // membrane time constant (ms)
+            // c_m: 100., // membrane capacitance (nF)
+            // g_l: 10., // leak conductance (nS)
+            // v_init: -75., // initial potential (mV)
+            // e_l: -75., // leak reversal potential (mV)
+            // tref: 10., // refractory time (ms), could rename to refract_time
+            // w_init: 0., // initial w value
+            // dt: 0.1, // simulation time step (ms)
+            // slope_factor: 1., // exponential time step (ms)
+            stdp_params: STDPParameters::default(),
+            // bayesian_params: BayesianParameters::default(),
             ligand_gates: vec![],
         }
     }
@@ -270,12 +261,24 @@ impl IzhikevichDefault for IntegrateAndFireCell {
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
             w_value: IFParameters::izhikevich_default().w_init,
-            stdp_params: STDPParameters::default(),
             last_firing_time: None,
-            alpha: IFParameters::izhikevich_default().alpha_init,
-            beta: IFParameters::izhikevich_default().beta_init,
-            c: IFParameters::izhikevich_default().v_reset,
-            d: IFParameters::izhikevich_default().d_init,
+            alpha: 0.02,
+            beta: 0.2,
+            c: -55.0,
+            d: 8.0,
+            // v_th: 30., // spike threshold (mV)
+            // v_reset: -65., // reset potential (mV)
+            // tau_m: 10., // membrane time constant (ms)
+            // c_m: 100., // membrane capacitance (nF)
+            // g_l: 10., // leak conductance (nS)
+            // v_init: -65., // initial potential (mV)
+            // e_l: -65., // leak reversal potential (mV)
+            // tref: 10., // refractory time (ms), could rename to refract_time
+            // w_init: 0., // initial w value
+            // dt: 0.1, // simulation time step (ms)
+            // slope_factor: 1., // exponential time step (ms)
+            stdp_params: STDPParameters::default(),
+            // bayesian_params: BayesianParameters::default(),
             ligand_gates: vec![],
         }
     }
@@ -551,35 +554,6 @@ impl IntegrateAndFireCell {
 }
 
 pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
-
-// // could also consider soomething like Box::<dyn Fn(&mut Cell, &IFParameters, f64) -> bool>
-// fn determine_calculaton_function(if_type: IFType) -> impl Fn(&mut Cell, &IFParameters, f64) -> bool {
-//     let iterate_and_spike_fn = match if_type {
-//         IFType::Basic => {
-//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
-//             {neuron.basic_iterate_and_spike(if_params, input_value)}
-//         },
-//         IFType::Adaptive => {
-//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
-//             {neuron.adaptive_iterate_and_spike(if_params, input_value)}
-//         },
-//         IFType::AdaptiveExponential => {
-//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
-//             {neuron.exp_adaptive_iterate_and_spike(if_params, input_value)}
-//         },
-//         IFType::Izhikevich => {
-//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
-//             {neuron.izhikevich_iterate_and_spike(if_params, input_value)}
-//         },
-//         IFType::IzhikevichLeaky => {
-//             |neuron: &mut Cell, if_params: &IFParameters, input_value: f64| -> bool
-//             {neuron.izhikevich_leaky_iterate_and_spike(if_params, input_value)}
-//         }
-//     }; 
-
-//     iterate_and_spike_fn
-// }
-
 
 pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
     if do_receptor_kinetics {
