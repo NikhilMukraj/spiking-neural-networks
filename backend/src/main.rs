@@ -83,37 +83,37 @@ fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) ->
     }
 }
 
+// fn get_input_from_positions(
+//     cell_grid: &CellGrid, 
+//     postsynaptic_neuron: &IntegrateAndFireCell,
+//     input_positions: &Vec<Position>, 
+//     if_params: Option<&IFParameters>,
+//     averaged: bool,
+// ) -> f64 {
+//     let mut input_val = input_positions
+//         .iter()
+//         .map(|input_position| {
+//             let (pos_x, pos_y) = input_position;
+//             let input_cell = &cell_grid[*pos_x][*pos_y];
+            
+//             let sign = get_sign(&input_cell);
+
+//             let final_input = signed_gap_junction(&input_cell, &postsynaptic_neuron, sign);
+            
+//             final_input
+//         })
+//         .sum();
+
+//     input_val = handle_bayesian_modifier(if_params, input_val);
+
+//     if averaged {
+//         input_val /= input_positions.len() as f64;
+//     }
+
+//     return input_val;
+// }
+
 fn get_input_from_positions(
-    cell_grid: &CellGrid, 
-    postsynaptic_neuron: &IntegrateAndFireCell,
-    input_positions: &Vec<Position>, 
-    if_params: Option<&IFParameters>,
-    averaged: bool,
-) -> f64 {
-    let mut input_val = input_positions
-        .iter()
-        .map(|input_position| {
-            let (pos_x, pos_y) = input_position;
-            let input_cell = &cell_grid[*pos_x][*pos_y];
-            
-            let sign = get_sign(&input_cell);
-
-            let final_input = signed_gap_junction(&input_cell, &postsynaptic_neuron, sign);
-            
-            final_input
-        })
-        .sum();
-
-    input_val = handle_bayesian_modifier(if_params, input_val);
-
-    if averaged {
-        input_val /= input_positions.len() as f64;
-    }
-
-    return input_val;
-}
-
-fn weighted_get_input_from_positions(
     cell_grid: &CellGrid, 
     graph: &dyn GraphFunctionality,
     position: &Position,
@@ -435,28 +435,37 @@ fn run_lattice(
         //     .collect();
 
         for pos in graph.get_every_node() {
-            let (x, y) = pos;
+            // let (x, y) = pos;
 
             let input_positions = graph.get_incoming_connections(&pos);
 
-            let input = if do_stdp {
-                weighted_get_input_from_positions(
-                    &cell_grid,
-                    &*graph,
-                    &pos,
-                    &input_positions,
-                    bayesian,
-                    averaged,
-                )
-            } else {
-                get_input_from_positions(
-                    &cell_grid, 
-                    &cell_grid[x][y],
-                    &input_positions, 
-                    bayesian,
-                    averaged,
-                )
-            };
+            // let input = if do_stdp {
+            //     weighted_get_input_from_positions(
+            //         &cell_grid,
+            //         &*graph,
+            //         &pos,
+            //         &input_positions,
+            //         bayesian,
+            //         averaged,
+            //     )
+            // } else {
+            //     get_input_from_positions(
+            //         &cell_grid, 
+            //         &cell_grid[x][y],
+            //         &input_positions, 
+            //         bayesian,
+            //         averaged,
+            //     )
+            // };
+
+            let input = get_input_from_positions(
+                &cell_grid,
+                &*graph,
+                &pos,
+                &input_positions,
+                bayesian,
+                averaged,
+            );
 
             inputs.insert(pos, input);
         }
