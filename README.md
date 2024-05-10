@@ -65,6 +65,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Standardize creation of IFCell and have `test_coupled_neurons` function and `test_isolated_stdp` function take in the neurons as parameters rather than generating them from inside the function
       - Standard creation in the same way Hodgkin Huxley model is generated
   - Consider removing 0-1 scaling default
+  - Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
   - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
   - Update code in obsidian when refactor is done, maybe update results
 - Seperate STDP parameters into STDP parameters and weight initialization parameters
