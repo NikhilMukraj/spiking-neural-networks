@@ -4,8 +4,8 @@ use std::{
 };
 use crate::distribution::limited_distr;
 use crate::neuron::{
-    IntegrateAndFireCell, HodgkinHuxleyCell, IFParameters, PotentiationType, STDPParameters,
-    IFType, find_peaks, diff, gap_junction, iterate_coupled_hodgkin_huxley,
+    IntegrateAndFireCell, HodgkinHuxleyCell, find_peaks, diff,
+    gap_junction, iterate_coupled_hodgkin_huxley,
     handle_receptor_kinetics
 };
 use crate::ga::{BitString, decode};
@@ -232,7 +232,7 @@ pub fn get_hodgkin_huxley_summary(
 #[derive(Clone)]
 pub struct FittingSettings<'a> {
     pub hodgkin_huxley_model: HodgkinHuxleyCell,
-    pub if_params: &'a IFParameters,
+    pub if_neuron: &'a IntegrateAndFireCell,
     pub action_potential_summary: &'a [ActionPotentialSummary],
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
     pub use_amplitude: bool,
@@ -245,42 +245,33 @@ pub struct FittingSettings<'a> {
 
 fn bayesian_izhikevich_iterate(
     izhikevich_neuron: &mut IntegrateAndFireCell, 
-    if_params: &IFParameters, 
     input_current: f64,
     bayesian: bool,
     do_receptor_kinetics: bool,
 ) -> bool {
-    if bayesian {
-        let bayesian_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
+    let processed_input = if bayesian {
+        let bayesian_factor = limited_distr(izhikevich_neuron.bayesian_params.mean, izhikevich_neuron.bayesian_params.std, 0., 1.);
         let bayesian_input = input_current * bayesian_factor;
-        handle_receptor_kinetics(izhikevich_neuron, &if_params, bayesian_input, do_receptor_kinetics);
 
-        let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
-            &if_params, 
-            bayesian_input,
-        );
-
-        izhikevich_neuron.update_based_on_neurotransmitter_currents(if_params);
-
-        spike
+        bayesian_input
     } else {
-        handle_receptor_kinetics(izhikevich_neuron, &if_params, input_current, do_receptor_kinetics);
+        input_current
+    };
 
-        let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
-            &if_params, 
-            input_current,
-        );
+    handle_receptor_kinetics(izhikevich_neuron, processed_input, do_receptor_kinetics);
 
-        izhikevich_neuron.update_based_on_neurotransmitter_currents(if_params);
+    let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
+        processed_input,
+    );
 
-        spike
-    }
+    izhikevich_neuron.update_based_on_neurotransmitter_currents();
+
+    spike
 }
 
 pub fn get_izhikevich_summary(
     presynaptic_neuron: &mut IntegrateAndFireCell, 
     postsynaptic_neuron: &mut IntegrateAndFireCell,
-    if_params: &IFParameters,
     settings: &FittingSettings,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
@@ -296,8 +287,8 @@ pub fn get_izhikevich_summary(
             &*postsynaptic_neuron,
         );
 
-        let pre_spike = bayesian_izhikevich_iterate(presynaptic_neuron, if_params, settings.input_currents[index], settings.bayesian, settings.do_receptor_kinetics);
-        let post_spike = bayesian_izhikevich_iterate(postsynaptic_neuron, if_params, postsynaptic_input, settings.bayesian, settings.do_receptor_kinetics);
+        let pre_spike = bayesian_izhikevich_iterate(presynaptic_neuron, settings.input_currents[index], settings.bayesian, settings.do_receptor_kinetics);
+        let post_spike = bayesian_izhikevich_iterate(postsynaptic_neuron, postsynaptic_input, settings.bayesian, settings.do_receptor_kinetics);
 
         if pre_spike {
             pre_peaks.push(timestep);
@@ -343,33 +334,40 @@ pub fn fitting_objective(
 
     let settings = settings.get("settings").unwrap();
 
-    let mut if_params = settings.if_params.clone();
-    if_params.v_th = v_th;
+    // let mut if_params = settings.if_params.clone();
+    // if_params.v_th = v_th;
 
-    let test_cell = IntegrateAndFireCell { 
-        if_type: IFType::Izhikevich,
-        current_voltage: if_params.v_init, 
-        refractory_count: 0.0,
-        leak_constant: -1.,
-        integration_constant: 1.,
-        gap_conductance: gap_conductance,
-        potentiation_type: PotentiationType::Excitatory,
-        w_value: if_params.w_init,
-        stdp_params: STDPParameters::default(),
-        last_firing_time: None,
-        alpha: a,
-        beta: b,
-        c: c,
-        d: d,
-        ligand_gates: if_params.ligand_gates_init.clone(),
-    };
+    // let test_cell = IntegrateAndFireCell { 
+    //     if_type: IFType::Izhikevich,
+    //     current_voltage: if_params.v_init, 
+    //     refractory_count: 0.0,
+    //     leak_constant: -1.,
+    //     integration_constant: 1.,
+    //     gap_conductance: gap_conductance,
+    //     potentiation_type: PotentiationType::Excitatory,
+    //     w_value: if_params.w_init,
+    //     stdp_params: STDPParameters::default(),
+    //     last_firing_time: None,
+    //     alpha: a,
+    //     beta: b,
+    //     c: c,
+    //     d: d,
+    //     ligand_gates: if_params.ligand_gates_init.clone(),
+    // };
+
+    let mut test_cell = settings.if_neuron.clone();
+    test_cell.v_th = v_th;
+    test_cell.gap_conductance = gap_conductance;
+    test_cell.alpha = a;
+    test_cell.beta = b;
+    test_cell.c = c;
+    test_cell.d = d;
 
     let summaries_results = (0..settings.input_currents.len())
         .map(|i| {
             get_izhikevich_summary(
                 &mut test_cell.clone(), 
                 &mut test_cell.clone(), 
-                &if_params,
                 settings,
                 i
             )
