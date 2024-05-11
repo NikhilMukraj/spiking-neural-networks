@@ -29,81 +29,11 @@ impl Default for BayesianParameters {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct IFParameters {
-    pub v_th: f64,
-    pub v_reset: f64,
-    pub tau_m: f64,
-    pub c_m: f64,
-    pub g_l: f64,
-    pub gap_conductance_init: f64,
-    pub v_init: f64,
-    pub e_l: f64,
-    pub tref: f64,
-    pub w_init: f64,
-    pub alpha_init: f64,
-    pub beta_init: f64,
-    pub d_init: f64,
-    pub dt: f64,
-    pub slope_factor: f64,
-    pub bayesian_params: BayesianParameters,
-    // total_time: f64,
-    pub ligand_gates_init: Vec<GeneralLigandGatedChannel>,
-}
-
-impl Default for IFParameters {
-    fn default() -> Self {
-        IFParameters { 
-            v_th: -55., // spike threshold (mV)
-            v_reset: -75., // reset potential (mV)
-            tau_m: 10., // membrane time constant (ms)
-            c_m: 100., // membrane capacitance (nF)
-            g_l: 10., // leak conductance (nS)
-            gap_conductance_init: 7., // gap condutance (nS)
-            v_init: -75., // initial potential (mV)
-            e_l: -75., // leak reversal potential (mV)
-            tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 0., // initial w value
-            alpha_init: 6., // arbitrary a value
-            beta_init: 10., // arbitrary b value
-            d_init: 2., // arbitrary d value
-            dt: 0.1, // simulation time step (ms)
-            slope_factor: 1., // exponential time step (ms)
-            bayesian_params: BayesianParameters::default(), // default bayesian parameters
-            ligand_gates_init: vec![], // ligand gates
-        }
-    }
-}
-
 pub trait IzhikevichDefault {
     fn izhikevich_default() -> Self;
 }
 
-impl IzhikevichDefault for IFParameters {
-    fn izhikevich_default() -> Self {
-        IFParameters { 
-            v_th: 30., // spike threshold (mV)
-            v_reset: -65., // reset potential (mV)
-            tau_m: 10., // membrane time constant (ms)
-            c_m: 100., // membrane capacitance (nF)
-            g_l: 10., // leak conductance (nS)
-            gap_conductance_init: 7., // gap condutance (nS)
-            v_init: -65., // initial potential (mV)
-            e_l: -65., // leak reversal potential (mV)
-            tref: 10., // refractory time (ms), could rename to refract_time
-            w_init: 0., // initial w value
-            alpha_init: 0.02, // arbitrary a value
-            beta_init: 0.2, // arbitrary b value
-            d_init: 8.0, // arbitrary d value
-            dt: 0.5, // simulation time step (ms)
-            slope_factor: 1., // exponential time step (ms)
-            bayesian_params: BayesianParameters::default(), // default bayesian parameters
-            ligand_gates_init: vec![], // ligand gates
-        }
-    }
-}
-
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct STDPParameters {
     pub a_plus: f64, // postitive stdp modifier 
     pub a_minus: f64, // negative stdp modifier 
@@ -153,20 +83,20 @@ impl IFType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum PotentiationType {
     Excitatory,
     Inhibitory,
 }
 
 impl PotentiationType {
-    // pub fn from_str(string: &str) -> Result<PotentiationType> {
-    //     match string.to_ascii_lowercase().as_str() {
-    //         "excitatory" => Ok(PotentiationType::Excitatory),
-    //         "inhibitory" => Ok(PotentiationType::Inhibitory),
-    //         _ => Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")),
-    //     }
-    // }
+    pub fn from_str(string: &str) -> Result<PotentiationType> {
+        match string.to_ascii_lowercase().as_str() {
+            "excitatory" => Ok(PotentiationType::Excitatory),
+            "inhibitory" => Ok(PotentiationType::Inhibitory),
+            _ => Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")),
+        }
+    }
 
     pub fn weighted_random_type(prob: f64) -> PotentiationType {
         if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
@@ -177,7 +107,7 @@ impl PotentiationType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IntegrateAndFireCell {
     pub if_type: IFType,
     pub current_voltage: f64, // membrane potential
@@ -192,18 +122,18 @@ pub struct IntegrateAndFireCell {
     pub beta: f64, // arbitrary value (controls sensitivity to w in izhikevich)
     pub c: f64, // after spike reset value for voltage
     pub d: f64, // after spike reset value for w
-    // pub v_th: f64, // voltage threshold
-    // pub v_reset: f64, // voltage reset
-    // pub tau_m: f64, // membrane time constant
-    // pub c_m: f64, // membrane capacitance
-    // pub g_l: f64, // leak constant
-    // pub v_init: f64, // initial voltage
-    // pub e_l: f64, // leak reversal potential
-    // pub tref: f64, // total refractory period
-    // pub w_init: f64, // initial adaptive value
-    // pub slope_factor: f64, // slope factor in exponential adaptive neuron
-    // pub dt: f64, // time step
-    // pub bayesian_params: BayesianParameters, // bayesian parameters
+    pub v_th: f64, // voltage threshold
+    pub v_reset: f64, // voltage reset
+    pub tau_m: f64, // membrane time constant
+    pub c_m: f64, // membrane capacitance
+    pub g_l: f64, // leak constant
+    pub v_init: f64, // initial voltage
+    pub e_l: f64, // leak reversal potential
+    pub tref: f64, // total refractory period
+    pub w_init: f64, // initial adaptive value
+    pub slope_factor: f64, // slope factor in exponential adaptive neuron
+    pub dt: f64, // time step
+    pub bayesian_params: BayesianParameters, // bayesian parameters
     pub stdp_params: STDPParameters, // stdp parameters
     pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
@@ -220,31 +150,31 @@ impl Default for IntegrateAndFireCell {
     fn default() -> Self {
         IntegrateAndFireCell {
             if_type: IFType::Basic,
-            current_voltage: IFParameters::default().v_init, 
+            current_voltage: -75., 
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
-            w_value: IFParameters::default().w_init,
+            w_value: 0.,
             last_firing_time: None,
-            alpha: 0.02,
-            beta: 0.2,
+            alpha: 6.0,
+            beta: 10.0,
             c: -55.0,
             d: 8.0,
-            // v_th: -55., // spike threshold (mV)
-            // v_reset: -75., // reset potential (mV)
-            // tau_m: 10., // membrane time constant (ms)
-            // c_m: 100., // membrane capacitance (nF)
-            // g_l: 10., // leak conductance (nS)
-            // v_init: -75., // initial potential (mV)
-            // e_l: -75., // leak reversal potential (mV)
-            // tref: 10., // refractory time (ms), could rename to refract_time
-            // w_init: 0., // initial w value
-            // dt: 0.1, // simulation time step (ms)
-            // slope_factor: 1., // exponential time step (ms)
+            v_th: -55., // spike threshold (mV)
+            v_reset: -75., // reset potential (mV)
+            tau_m: 10., // membrane time constant (ms)
+            c_m: 100., // membrane capacitance (nF)
+            g_l: 10., // leak conductance (nS)
+            v_init: -75., // initial potential (mV)
+            e_l: -75., // leak reversal potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            w_init: 0., // initial w value
+            dt: 0.1, // simulation time step (ms)
+            slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
-            // bayesian_params: BayesianParameters::default(),
+            bayesian_params: BayesianParameters::default(),
             ligand_gates: vec![],
         }
     }
@@ -254,31 +184,31 @@ impl IzhikevichDefault for IntegrateAndFireCell {
     fn izhikevich_default() -> Self {
         IntegrateAndFireCell {
             if_type: IFType::Izhikevich,
-            current_voltage: IFParameters::izhikevich_default().v_init, 
+            current_voltage: -75., 
             refractory_count: 0.0,
             leak_constant: -1.,
             integration_constant: 1.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
-            w_value: IFParameters::izhikevich_default().w_init,
+            w_value: 0.,
             last_firing_time: None,
             alpha: 0.02,
             beta: 0.2,
             c: -55.0,
             d: 8.0,
-            // v_th: 30., // spike threshold (mV)
-            // v_reset: -65., // reset potential (mV)
-            // tau_m: 10., // membrane time constant (ms)
-            // c_m: 100., // membrane capacitance (nF)
-            // g_l: 10., // leak conductance (nS)
-            // v_init: -65., // initial potential (mV)
-            // e_l: -65., // leak reversal potential (mV)
-            // tref: 10., // refractory time (ms), could rename to refract_time
-            // w_init: 0., // initial w value
-            // dt: 0.1, // simulation time step (ms)
-            // slope_factor: 1., // exponential time step (ms)
+            v_th: 30., // spike threshold (mV)
+            v_reset: -65., // reset potential (mV)
+            tau_m: 10., // membrane time constant (ms)
+            c_m: 100., // membrane capacitance (nF)
+            g_l: 10., // leak conductance (nS)
+            v_init: -65., // initial potential (mV)
+            e_l: -65., // leak reversal potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            w_init: 0., // initial w value
+            dt: 0.1, // simulation time step (ms)
+            slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
-            // bayesian_params: BayesianParameters::default(),
+            bayesian_params: BayesianParameters::default(),
             ligand_gates: vec![],
         }
     }
@@ -297,124 +227,124 @@ impl GapConductance for IntegrateAndFireCell {
 }
 
 impl IntegrateAndFireCell {
-    pub fn get_basic_dv_change(&self, lif: &IFParameters, i: f64) -> f64 {
+    pub fn get_basic_dv_change(&self, i: f64) -> f64 {
         let dv = (
-            (self.leak_constant * (self.current_voltage - lif.e_l)) +
-            (self.integration_constant * (i / lif.g_l))
-        ) * (lif.dt / lif.tau_m);
+            (self.leak_constant * (self.current_voltage - self.e_l)) +
+            (self.integration_constant * (i / self.g_l))
+        ) * (self.dt / self.tau_m);
 
         dv
     }
 
-    pub fn basic_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+    pub fn basic_handle_spiking(&mut self) -> bool {
         let mut is_spiking = false;
 
         if self.refractory_count > 0. {
-            self.current_voltage = lif.v_reset;
+            self.current_voltage = self.v_reset;
             self.refractory_count -= 1.;
-        } else if self.current_voltage >= lif.v_th {
+        } else if self.current_voltage >= self.v_th {
             is_spiking = !is_spiking;
-            self.current_voltage = lif.v_reset;
-            self.refractory_count = lif.tref / lif.dt
+            self.current_voltage = self.v_reset;
+            self.refractory_count = self.tref / self.dt
         }
 
         is_spiking
     }
 
-    fn basic_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-        let dv = self.get_basic_dv_change(lif, i);
+    fn basic_iterate_and_spike(&mut self, i: f64) -> bool {
+        let dv = self.get_basic_dv_change(i);
         self.current_voltage += dv;
 
-        self.basic_handle_spiking(lif)
+        self.basic_handle_spiking()
     }
 
-    pub fn adaptive_get_dw_change(&self, lif: &IFParameters) -> f64 {
+    pub fn adaptive_get_dw_change(&self) -> f64 {
         let dw = (
-            lif.alpha_init * (self.current_voltage - lif.e_l) -
+            self.alpha * (self.current_voltage - self.e_l) -
             self.w_value
-        ) * (lif.dt / lif.tau_m);
+        ) * (self.dt / self.tau_m);
 
         dw
     }
 
-    pub fn adaptive_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+    pub fn adaptive_handle_spiking(&mut self) -> bool {
         let mut is_spiking = false;
 
         if self.refractory_count > 0. {
-            self.current_voltage = lif.v_reset;
+            self.current_voltage = self.v_reset;
             self.refractory_count -= 1.;
-        } else if self.current_voltage >= lif.v_th {
+        } else if self.current_voltage >= self.v_th {
             is_spiking = !is_spiking;
-            self.current_voltage = lif.v_reset;
-            self.w_value += lif.beta_init;
-            self.refractory_count = lif.tref / lif.dt
+            self.current_voltage = self.v_reset;
+            self.w_value += self.beta;
+            self.refractory_count = self.tref / self.dt
         }
 
         is_spiking
     }
 
-    pub fn adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+    pub fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
-            (self.leak_constant * (self.current_voltage - lif.e_l)) +
-            (self.integration_constant * (i / lif.g_l)) - 
-            (self.w_value / lif.g_l)
-        ) * (lif.dt / lif.c_m);
+            (self.leak_constant * (self.current_voltage - self.e_l)) +
+            (self.integration_constant * (i / self.g_l)) - 
+            (self.w_value / self.g_l)
+        ) * (self.dt / self.c_m);
 
         dv
     }
 
-    pub fn adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-        let dv = self.adaptive_get_dv_change(lif, i);
-        let dw = self.adaptive_get_dw_change(lif);
+    pub fn adaptive_iterate_and_spike(&mut self, i: f64) -> bool {
+        let dv = self.adaptive_get_dv_change(i);
+        let dw = self.adaptive_get_dw_change();
 
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.adaptive_handle_spiking(lif)
+        self.adaptive_handle_spiking()
     }
 
-    pub fn exp_adaptive_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+    pub fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
-            (self.leak_constant * (self.current_voltage - lif.e_l)) +
-            (lif.slope_factor * ((self.current_voltage - lif.v_th) / lif.slope_factor).exp()) +
-            (self.integration_constant * (i / lif.g_l)) - 
-            (self.w_value / lif.g_l)
-        ) * (lif.dt / lif.c_m);
+            (self.leak_constant * (self.current_voltage - self.e_l)) +
+            (self.slope_factor * ((self.current_voltage - self.v_th) / self.slope_factor).exp()) +
+            (self.integration_constant * (i / self.g_l)) - 
+            (self.w_value / self.g_l)
+        ) * (self.dt / self.c_m);
 
         dv
     }
 
-    pub fn exp_adaptive_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-        let dv = self.exp_adaptive_get_dv_change(lif, i);
-        let dw = self.adaptive_get_dw_change(lif);
+    pub fn exp_adaptive_iterate_and_spike(&mut self, i: f64) -> bool {
+        let dv = self.exp_adaptive_get_dv_change(i);
+        let dw = self.adaptive_get_dw_change();
 
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.adaptive_handle_spiking(lif)
+        self.adaptive_handle_spiking()
     }
 
-    pub fn izhikevich_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+    pub fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - self.w_value + i
-        ) * (lif.dt / lif.c_m);
+        ) * (self.dt / self.c_m);
 
         dv
     }
 
-    pub fn izhikevich_get_dw_change(&self, lif: &IFParameters) -> f64 {
+    pub fn izhikevich_get_dw_change(&self) -> f64 {
         let dw = (
             self.alpha * (self.beta * self.current_voltage - self.w_value)
-        ) * lif.dt;
+        ) * self.dt;
 
         dw
     }
 
-    pub fn izhikevich_handle_spiking(&mut self, lif: &IFParameters) -> bool {
+    pub fn izhikevich_handle_spiking(&mut self) -> bool {
         let mut is_spiking = false;
 
-        if self.current_voltage >= lif.v_th {
+        if self.current_voltage >= self.v_th {
             is_spiking = !is_spiking;
             self.current_voltage = self.c;
             self.w_value += self.d;
@@ -423,59 +353,66 @@ impl IntegrateAndFireCell {
         is_spiking
     }
 
-    pub fn izhikevich_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-        let dv = self.izhikevich_get_dv_change(lif, i);
-        let dw = self.izhikevich_get_dw_change(lif);
+    pub fn izhikevich_iterate_and_spike(&mut self, i: f64) -> bool {
+        let dv = self.izhikevich_get_dv_change(i);
+        let dw = self.izhikevich_get_dw_change();
 
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.izhikevich_handle_spiking(lif)
+        self.izhikevich_handle_spiking()
     }
 
-    pub fn izhikevich_leaky_get_dv_change(&mut self, lif: &IFParameters, i: f64) -> f64 {
+    pub fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - 
-            self.w_value * (self.current_voltage - lif.e_l) + i
-        ) * (lif.dt / lif.c_m);
+            self.w_value * (self.current_voltage - self.e_l) + i
+        ) * (self.dt / self.c_m);
 
         dv
     }
 
-    pub fn izhikevich_leaky_iterate_and_spike(&mut self, lif: &IFParameters, i: f64) -> bool {
-        let dv = self.izhikevich_leaky_get_dv_change(lif, i);
-        let dw = self.izhikevich_get_dw_change(lif);
+    pub fn izhikevich_leaky_iterate_and_spike(&mut self, i: f64) -> bool {
+        let dv = self.izhikevich_leaky_get_dv_change(i);
+        let dw = self.izhikevich_get_dw_change();
 
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.izhikevich_handle_spiking(lif)
+        self.izhikevich_handle_spiking()
     }
 
-    pub fn iterate_and_spike(&mut self, if_params: &IFParameters, i: f64) -> bool  {
+    pub fn iterate_and_spike(&mut self, i: f64) -> bool  {
         match self.if_type {
             IFType::Basic => {
-                self.basic_iterate_and_spike(if_params, i)
+                self.basic_iterate_and_spike(i)
             },
             IFType::Adaptive => {
-                self.adaptive_iterate_and_spike(if_params, i)
+                self.adaptive_iterate_and_spike(i)
             },
             IFType::AdaptiveExponential => {
-                self.exp_adaptive_iterate_and_spike(if_params, i)
+                self.exp_adaptive_iterate_and_spike(i)
             },
             IFType::Izhikevich => {
-                self.izhikevich_iterate_and_spike(if_params, i)
+                self.izhikevich_iterate_and_spike(i)
             },
             IFType::IzhikevichLeaky => {
-                self.izhikevich_leaky_iterate_and_spike(if_params, i)
+                self.izhikevich_leaky_iterate_and_spike(i)
             }
+        }
+    }
+
+    pub fn bayesian_iterate_and_spike(&mut self, i: f64, bayesian: bool) -> bool {
+        if bayesian {
+            self.iterate_and_spike(i * limited_distr(self.bayesian_params.mean, self.bayesian_params.std, 0., 1.))
+        } else {
+            self.iterate_and_spike(i)
         }
     }
 
     pub fn run_static_input(
         &mut self, 
-        lif: &IFParameters, 
         i: f64, 
         bayesian: bool, 
         iterations: usize, 
@@ -490,11 +427,7 @@ impl IntegrateAndFireCell {
                 writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
 
                 for _ in 0..iterations {
-                    let _is_spiking = if bayesian {
-                        self.iterate_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
-                    } else {
-                        self.iterate_and_spike(lif, i)
-                    };
+                    let _is_spiking = self.bayesian_iterate_and_spike(i, bayesian);
         
                     writeln!(file, "{}", self.current_voltage).expect("Unable to write to file");
                 }
@@ -504,11 +437,7 @@ impl IntegrateAndFireCell {
                 writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
 
                 for _ in 0..iterations {
-                    let _is_spiking = if bayesian {
-                        self.iterate_and_spike(lif, i * limited_distr(lif.bayesian_params.mean, lif.bayesian_params.std, 0., 1.))
-                    } else {
-                        self.iterate_and_spike(lif, i)
-                    };
+                    let _is_spiking = self.bayesian_iterate_and_spike(i, bayesian);
         
                     writeln!(file, "{}, {}", self.current_voltage, self.w_value).expect("Unable to write to file");
                 }
@@ -524,32 +453,32 @@ impl IntegrateAndFireCell {
             });
     }
 
-    pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64, if_params: &IFParameters) {
+    pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64) {
         self.ligand_gates
             .iter_mut()
             .for_each(|i| {
                 i.neurotransmitter.apply_t_change(presynaptic_voltage);
-                i.neurotransmitter.apply_r_change(if_params.dt);
+                i.neurotransmitter.apply_r_change(self.dt);
             });
     }
 
-    pub fn set_neurotransmitter_currents(&mut self, lif: &IFParameters) {
+    pub fn set_neurotransmitter_currents(&mut self) {
         self.ligand_gates
             .iter_mut()
             .for_each(|i| {
-                i.calculate_g(self.current_voltage, i.neurotransmitter.r, lif.dt);
+                i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt);
         });
     }
 
-    pub fn get_neurotransmitter_currents(&self, lif: &IFParameters) -> f64 {
+    pub fn get_neurotransmitter_currents(&self) -> f64 {
         self.ligand_gates
             .iter()
             .map(|i| i.current * i.neurotransmitter.r)
-            .sum::<f64>() * (lif.dt / lif.c_m)
+            .sum::<f64>() * (self.dt / self.c_m)
     }
 
-    pub fn update_based_on_neurotransmitter_currents(&mut self, lif: &IFParameters) {
-        self.current_voltage += self.get_neurotransmitter_currents(lif)
+    pub fn update_based_on_neurotransmitter_currents(&mut self) {
+        self.current_voltage += self.get_neurotransmitter_currents()
     }
 }
 
@@ -568,13 +497,13 @@ impl IntegrateAndFireCell {
 
 pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
 
-pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, if_params: &IFParameters, input_current: f64, do_receptor_kinetics: bool) {
+pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, input_current: f64, do_receptor_kinetics: bool) {
     if do_receptor_kinetics {
-        cell.update_conc_and_receptor_kinetics(input_current, &if_params);
+        cell.update_conc_and_receptor_kinetics(input_current);
     } else {
         cell.update_neurotransmitter_concentration(input_current);
     }
-    cell.set_neurotransmitter_currents(if_params);
+    cell.set_neurotransmitter_currents();
 }
 
 // fn heaviside(x: f64) -> f64 {
@@ -1487,15 +1416,6 @@ impl HodgkinHuxleyCell {
             writeln!(file, "{},{}", i, is_peak).expect("Could not write to file");
         }
     }
-}
-
-pub fn if_params_bayesian(if_params: &IFParameters) -> f64 {
-    limited_distr(
-        if_params.bayesian_params.mean, 
-        if_params.bayesian_params.std, 
-        if_params.bayesian_params.min, 
-        if_params.bayesian_params.max,
-    )
 }
 
 pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
