@@ -41,33 +41,17 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
   - ie add argument to `iterate_and_spike` which is an `Option<f64>` called `additional_dv` that adds the $dv$ change calculated by the neurotransmitter current after neurotransmitter currents are set and returned
     - Get presynaptic neurotransmitter concentrate
+      - Multiple by receptor value
+      - **Generating noise factor from bayesian parameters (outside of neuron)** and then applying that noise to input current and input neurotransmitter (for sake of handling Hodgkin Huxley and integrate and fire)
     - Calculate $dv$ change from neurotransmitter current
     - Add it to the voltage in the `iterate_and_spike` function
   - Old update neurotransmitter function should be removed in favor of this
 
 - Add $\tau_m$ and $C_m$ to fitting parameters
 
-- **Hodgkin Huxley should implement `iterate_and_spike` function** (could be done after neurotransmitter refactor)
-  - Spike should return true when it is above a certain threshold and it has stopped increasing
-    - Should have a `last_firing_time` field and a `is_increasing` field as well as a `v_th` field
-    - Might need a NeurotransmitterAndReceptor trait
-      - Trait ensures that the struct has neurotransmitters
-      - Ensures that there are receptor kinetics structs as well
-      - Ensures that it has functionality to update both the kinetics and neurotransmitter concentration
-
-- **Move non initialization parameters from IFParameters to cell struct**
-  - Make function to translate IFParameters and STDPParameters to cell struct
-  - Have a set of bayesian parameters for ensemble of neurons to use
-    - Have separate function to get those parameters from TOML
-    - Bayesian should only be used with standard deviation is not 0 (for all functions)
-- **Completely remove IFParameters**
-  - Repurpose get_if_params function to get IFCell parameters
-    - Standardize creation of IFCell and have `test_coupled_neurons` function and `test_isolated_stdp` function take in the neurons as parameters rather than generating them from inside the function
-      - Standard creation in the same way Hodgkin Huxley model is generated
-  - Consider removing 0-1 scaling default
-  - Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
-  - Make sure to use regular parameters default if IFType is not Izhikevich or Izhikevich Leaky, but if it is use the Izhikevich default
-  - Update code in obsidian when refactor is done, maybe update results
+- Have a set of bayesian parameters for ensemble of neurons to use
+- Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
+- Update code in obsidian when refactor is done, maybe update results
 - Seperate STDP parameters into STDP parameters and weight initialization parameters
   - Obsidian notes on STDP equations
 
