@@ -337,6 +337,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Additionally multiple outputs from different neurons in the output layer could be summed for a single regression value (for example one neuron could represnt 0-9, another could be 0, 10, 20, ..., 90 and summed together for the full number)
   - [ ] Liquid state machine fitting differential equation or time series
     - Potentially physics prediction, parameters of physics simulation could be inputs along with current position, next position could be target to predict
+- [ ] Liquid state machine solving of more general cognition problem  
+  - [ ] Traveling salesman
+  - [ ] Maze solve/navigation to reward
+  - Could model general cognition with similar test case and the effect of different neurotransmitters on the efficacy of the solve
   
 ### Lixirnet
 
