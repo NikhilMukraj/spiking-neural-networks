@@ -12,9 +12,9 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFParameters, IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
+    IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
     IzhikevichDefault, BayesianParameters, STDPParameters, 
-    if_params_bayesian, gap_junction, iterate_coupled_hodgkin_huxley,
+    gap_junction, iterate_coupled_hodgkin_huxley,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel, handle_receptor_kinetics
@@ -74,15 +74,6 @@ fn get_sign(cell: &IntegrateAndFireCell) -> f64 {
     }
 }
 
-fn handle_bayesian_modifier(if_params: Option<&IFParameters>, input_val: f64) -> f64 {
-    match if_params {
-        Some(params) => { 
-            input_val * if_params_bayesian(params)
-        },
-        None => input_val,
-    }
-}
-
 // fn get_input_from_positions(
 //     cell_grid: &CellGrid, 
 //     postsynaptic_neuron: &IntegrateAndFireCell,
@@ -118,7 +109,7 @@ fn get_input_from_positions(
     graph: &dyn GraphFunctionality,
     position: &Position,
     input_positions: &Vec<Position>, 
-    if_params: Option<&IFParameters>,
+    bayesian: bool,
     averaged: bool,
 ) -> f64 {
     let (x, y) = position;
@@ -139,7 +130,14 @@ fn get_input_from_positions(
         })
         .sum();
 
-    input_val = handle_bayesian_modifier(if_params, input_val);
+    if bayesian {
+        input_val *= limited_distr(
+            postsynaptic_neuron.bayesian_params.mean, 
+            postsynaptic_neuron.bayesian_params.std, 
+            0., 
+            1.
+        );
+    }
 
     if averaged {
         input_val /= input_positions.len() as f64;
@@ -332,20 +330,12 @@ fn run_lattice(
     radius: usize, 
     cell_grid: &mut CellGrid,
     averaged: bool,
-    if_params: &IFParameters,
+    bayesian: bool,
     do_stdp: bool,
     graph_params: &GraphParameters,
     stdp_params: &STDPParameters,
     mut output_val: Output,
 ) -> Result<(Output, Box<dyn GraphFunctionality>)> {
-    let mean_change = &if_params.bayesian_params.mean != &BayesianParameters::default().mean;
-    let std_change = &if_params.bayesian_params.std != &BayesianParameters::default().std;
-    let bayesian = if mean_change || std_change {
-        Some(if_params)
-    } else {
-        None
-    };
-
     let mut rng = rand::thread_rng();
 
     let mut graph: Box<dyn GraphFunctionality> = match graph_params.graph_type {
@@ -437,7 +427,7 @@ fn run_lattice(
         for (pos, input_value) in inputs {
             let (x, y) = pos;
 
-            let is_spiking = cell_grid[x][y].iterate_and_spike(&if_params, input_value);
+            let is_spiking = cell_grid[x][y].iterate_and_spike(input_value);
 
             if is_spiking {
                 cell_grid[x][y].last_firing_time = Some(timestep);
@@ -528,139 +518,81 @@ struct SimulationParameters {
     iterations: usize, 
     radius: usize, 
     averaged: bool,
-    if_params: IFParameters,
+    bayesian: bool,
     do_stdp: bool,
     stdp_params: STDPParameters,
     graph_params: GraphParameters,
     cell_grid: CellGrid,
 }
 
-macro_rules! get_if_params_with_default {
-    ($table:expr, $prefix:expr, $if_params:expr, $($param:ident),+ ) => {
+macro_rules! get_integrate_and_fire_params_with_default {
+    ($table:expr, $prefix:expr, $if_neuron:expr, $($param:ident),+ ) => {
         $(
-            $if_params.$param = parse_value_with_default($table, &format!("{}{}", $prefix, stringify!($param)), parse_f64, $if_params.$param)?;
+            $if_neuron.$param = parse_value_with_default($table, &format!("{}{}", $prefix, stringify!($param)), parse_f64, $if_neuron.$param)?;
         )+
     };
 }
 
-fn get_if_params(if_params: &mut IFParameters, prefix: Option<&str>, table: &Value) -> Result<()> {
+fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Value) -> Result<IntegrateAndFireCell> {
     let prefix_value = match prefix {
         Some(value) => format!("{}_", value),
         None => String::from(""),
     };
 
-    get_if_params_with_default!(
-        table, 
-        prefix_value, 
-        if_params, 
-        gap_conductance_init, 
-        dt, 
-        slope_factor, 
-        tau_m, 
-        c_m, 
-        tref, 
-        alpha_init, 
-        beta_init, 
-        v_reset, 
-        d_init, 
-        w_init, 
-        v_init
-    );
-   
-    if_params.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
-    if_params.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
-    if_params.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
-    if_params.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
-
-    if_params.ligand_gates_init = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
-
-    Ok(())
-}
-
-fn get_default_if_params(if_type: &IFType) -> IFParameters {
-    match if_type {
+    let mut if_neuron = match if_type {
         IFType::Basic | IFType::Adaptive |
         IFType::AdaptiveExponential => {
-            IFParameters {
-                ..IFParameters::default()
+            IntegrateAndFireCell {
+                if_type: if_type,
+                ..IntegrateAndFireCell::default()
             }
         },
         IFType::Izhikevich | IFType::IzhikevichLeaky => {
-            IFParameters {
+            IntegrateAndFireCell {
+                if_type: if_type,
                 ..IzhikevichDefault::izhikevich_default()
             }
         }
-    }
-}
-
-// macro_rules! get_integrate_and_fire_params_with_default {
-//     ($table:expr, $prefix:expr, $if_neuron:expr, $($param:ident),+ ) => {
-//         $(
-//             $if_neuron.$param = parse_value_with_default($table, &format!("{}{}", $prefix, stringify!($param)), parse_f64, $if_neuron.$param)?;
-//         )+
-//     };
-// }
-
-// fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Value) -> Result<IntegrateAndFireCell> {
-//     let prefix_value = match prefix {
-//         Some(value) => format!("{}_", value),
-//         None => String::from(""),
-//     };
-
-//     let mut if_neuron = match if_type {
-//         IFType::Basic | IFType::Adaptive |
-//         IFType::AdaptiveExponential => {
-//             IntegrateAndFireCell {
-//                 if_type: if_type,
-//                 ..IntegrateAndFireCell::default()
-//             }
-//         },
-//         IFType::Izhikevich | IFType::IzhikevichLeaky => {
-//             IntegrateAndFireCell {
-//                 if_type: if_type,
-//                 ..IzhikevichDefault::izhikevich_default()
-//             }
-//         }
-//     };
+    };
     
-//     get_integrate_and_fire_params_with_default!(
-//         table,
-//         prefix_value,
-//         if_neuron,
-        // leak_constant,
-        // integration_constant,
-        // gap_conductance,
-        // v_init,
-        // w_init,
-//         alpha,
-//         beta,
-//         c,
-//         d,
-//         v_th,
-//         v_reset,
-//         tau_m,
-//         c_m,
-//         g_l,
-//         e_l, 
-//         tref, 
-        // slope_factor
-//         dt 
-//     );
+    get_integrate_and_fire_params_with_default!(
+        table,
+        prefix_value,
+        if_neuron,
+        leak_constant,
+        integration_constant,
+        gap_conductance,
+        v_init,
+        w_init,
+        alpha,
+        beta,
+        c,
+        d,
+        v_th,
+        v_reset,
+        tau_m,
+        c_m,
+        g_l,
+        e_l, 
+        tref, 
+        slope_factor,
+        dt 
+    );
 
-//     let potentiation_type = parse_value_with_default(table, &format!("{}potentiation_type", prefix_value), parse_string, "excitatory")?;
-//     if_neuron.potentiation_type = PotentiationType::from_str(&potentiation_type)?;
+    let potentiation_type = parse_value_with_default(table, &format!("{}potentiation_type", prefix_value), parse_string, String::from("excitatory"))?;
+    if_neuron.potentiation_type = PotentiationType::from_str(&potentiation_type)?;
 
-//     if_neuron.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_params.bayesian_params.mean)?;
-//     if_neuron.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_params.bayesian_params.std)?;
-//     if_neuron.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_params.bayesian_params.max)?;
-//     if_neuron.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_params.bayesian_params.min)?;
+    if_neuron.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_neuron.bayesian_params.mean)?;
+    if_neuron.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_neuron.bayesian_params.std)?;
+    if_neuron.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_neuron.bayesian_params.max)?;
+    if_neuron.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_neuron.bayesian_params.min)?;
 
-//     if_neuron.stdp_params = get_stdp_params(table)?;
+    if_neuron.stdp_params = get_stdp_params(table)?;
 
-//     if_neuron.ligand_gates = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
+    if_neuron.ligand_gates = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
 
-    // Ok(if_neuron)
-// }
+    Ok(if_neuron)
+}
 
 fn get_stdp_params(table: &Value) -> Result<STDPParameters> {
     let mut stdp_params = STDPParameters::default();
@@ -847,11 +779,11 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         write_history: write_history,
     };
 
-    let mut if_params = get_default_if_params(&if_type);
+    let bayesian = parse_value_with_default(&table, "bayesian", parse_bool, false)?;
+    println!("bayesian: {}", bayesian);
 
-    get_if_params(&mut if_params, None, table)?;
-    
-    println!("{:#?}", if_params);
+    let if_neuron = get_integrate_and_fire_cell(if_type, None, table)?;
+    println!("{:#?}", if_neuron);
 
     // in ms
     let total_time: Option<usize> = match table.get("total_time") {
@@ -872,7 +804,7 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
                 None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'iterations' as unsigned integer")); }
             }
         },
-        (None, Some(total_time_value)) => { (total_time_value as f64 / if_params.dt) as usize },
+        (None, Some(total_time_value)) => { (total_time_value as f64 / if_neuron.dt) as usize },
         (None, None) => { return Err(Error::new(ErrorKind::InvalidInput, "Missing 'iterations' or 'total_time' argument")); },
     };
     println!("iterations: {}", iterations);
@@ -880,22 +812,27 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     let mut cell_grid: CellGrid = (0..num_rows)
         .map(|_| {
             (0..num_cols)
-                .map(|_| IntegrateAndFireCell { 
-                    if_type: if_type,
-                    current_voltage: if_params.v_init, 
-                    refractory_count: 0.0,
-                    leak_constant: -1.,
-                    integration_constant: 1.,
-                    gap_conductance: if_params.gap_conductance_init,
-                    potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
-                    w_value: if_params.w_init,
-                    stdp_params: stdp_params.clone(),
-                    last_firing_time: None,
-                    alpha: if_params.alpha_init,
-                    beta: if_params.beta_init,
-                    c: if_params.v_reset,
-                    d: if_params.d_init,
-                    ligand_gates: if_params.ligand_gates_init.clone(),
+                .map(|_| {
+                    // IntegrateAndFireCell { 
+                    // if_type: if_type,
+                    // current_voltage: if_params.v_init, 
+                    // refractory_count: 0.0,
+                    // leak_constant: -1.,
+                    // integration_constant: 1.,
+                    // gap_conductance: if_params.gap_conductance_init,
+                    // potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
+                    // w_value: if_params.w_init,
+                    // stdp_params: stdp_params.clone(),
+                    // last_firing_time: None,
+                    // alpha: if_params.alpha_init,
+                    // beta: if_params.beta_init,
+                    // c: if_params.v_reset,
+                    // d: if_params.d_init,
+                    // ligand_gates: if_params.ligand_gates_init.clone(),
+                    let mut current_neuron = if_neuron.clone();
+                    current_neuron.potentiation_type = PotentiationType::weighted_random_type(excitatory_chance);
+
+                    current_neuron
                 })
                 .collect::<Vec<IntegrateAndFireCell>>()
         })
@@ -906,8 +843,8 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     if random_volt_initialization {
         for section in cell_grid.iter_mut() {
             for neuron in section {
-                neuron.current_voltage = rng.gen_range(if_params.v_init..=if_params.v_th);
-                neuron.refractory_count = rng.gen_range(0.0..=if_params.tref);
+                neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+                neuron.refractory_count = rng.gen_range(0.0..=neuron.tref);
             }
         }
     }
@@ -918,7 +855,7 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         iterations: iterations, 
         radius: radius, 
         averaged: averaged,
-        if_params: if_params,
+        bayesian: bayesian,
         do_stdp: do_stdp,
         stdp_params: stdp_params,
         graph_params: graph_params,
@@ -993,8 +930,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 fn test_coupled_neurons(
     presynaptic_neuron: &mut IntegrateAndFireCell,
     postsynaptic_neuron: &mut IntegrateAndFireCell,
-    pre_if_params: &IFParameters,
-    post_if_params: &IFParameters,
     iterations: usize,
     input_current: f64,
     do_receptor_kinetics: bool,
@@ -1023,16 +958,16 @@ fn test_coupled_neurons(
 
     let sign = get_sign(&presynaptic_neuron);
 
-    let pre_mean_change = &pre_if_params.bayesian_params.mean != &BayesianParameters::default().mean;
-    let pre_std_change = &pre_if_params.bayesian_params.std != &BayesianParameters::default().std;
+    let pre_mean_change = &presynaptic_neuron.bayesian_params.mean != &BayesianParameters::default().mean;
+    let pre_std_change = &presynaptic_neuron.bayesian_params.std != &BayesianParameters::default().std;
     let pre_bayesian = if pre_mean_change || pre_std_change {
         true
     } else { 
         false
     };
 
-    let post_mean_change = &post_if_params.bayesian_params.mean != &BayesianParameters::default().mean;
-    let post_std_change = &post_if_params.bayesian_params.std != &BayesianParameters::default().std;
+    let post_mean_change = &postsynaptic_neuron.bayesian_params.mean != &BayesianParameters::default().mean;
+    let post_std_change = &postsynaptic_neuron.bayesian_params.std != &BayesianParameters::default().std;
     let post_bayesian = if post_mean_change || post_std_change {
         true
     } else { 
@@ -1041,7 +976,7 @@ fn test_coupled_neurons(
 
     for _ in 0..iterations {
         let presynaptic_input = if pre_bayesian {
-            let pre_bayesian_factor = limited_distr(pre_if_params.bayesian_params.mean, pre_if_params.bayesian_params.std, 0., 1.);
+            let pre_bayesian_factor = limited_distr(presynaptic_neuron.bayesian_params.mean, presynaptic_neuron.bayesian_params.std, 0., 1.);
             let pre_bayesian_input = input_current * pre_bayesian_factor;
 
             pre_bayesian_input
@@ -1052,7 +987,7 @@ fn test_coupled_neurons(
         let gap_junction_input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
 
         let postsynaptic_input = if post_bayesian {
-            let post_bayesian_factor = limited_distr(post_if_params.bayesian_params.mean, post_if_params.bayesian_params.std, 0., 1.);
+            let post_bayesian_factor = limited_distr(postsynaptic_neuron.bayesian_params.mean, postsynaptic_neuron.bayesian_params.std, 0., 1.);
             let post_bayesian_input = gap_junction_input * post_bayesian_factor;
 
             post_bayesian_input
@@ -1060,21 +995,15 @@ fn test_coupled_neurons(
             gap_junction_input
         };
             
-        handle_receptor_kinetics(presynaptic_neuron, &pre_if_params, presynaptic_input, do_receptor_kinetics);
-        handle_receptor_kinetics(postsynaptic_neuron, &post_if_params, postsynaptic_input, do_receptor_kinetics);
+        handle_receptor_kinetics(presynaptic_neuron, presynaptic_input, do_receptor_kinetics);
+        handle_receptor_kinetics(postsynaptic_neuron, postsynaptic_input, do_receptor_kinetics);
 
-        let _pre_is_spiking = presynaptic_neuron.iterate_and_spike(
-            &pre_if_params, 
-            presynaptic_input
-        );
+        let _pre_is_spiking = presynaptic_neuron.iterate_and_spike(presynaptic_input);
 
-        let _post_is_spiking = postsynaptic_neuron.iterate_and_spike(
-            &post_if_params, 
-            postsynaptic_input
-        );
+        let _post_is_spiking = postsynaptic_neuron.iterate_and_spike(postsynaptic_input);
 
-        presynaptic_neuron.update_based_on_neurotransmitter_currents(&pre_if_params);
-        postsynaptic_neuron.update_based_on_neurotransmitter_currents(&post_if_params);
+        presynaptic_neuron.update_based_on_neurotransmitter_currents();
+        postsynaptic_neuron.update_based_on_neurotransmitter_currents();
    
         if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
             writeln!(file, "{}, {}", 
@@ -1217,7 +1146,6 @@ fn test_isolated_stdp(
     stdp_params: &STDPParameters,
     presynaptic_neurons: &mut Vec<IntegrateAndFireCell>,
     postsynaptic_neuron: &mut IntegrateAndFireCell,
-    if_params: &IFParameters,
     iterations: usize,
     n: usize,
     input_current: f64,
@@ -1264,16 +1192,21 @@ fn test_isolated_stdp(
             .iter()
             .sum();
         
-        let noise_factor = limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.);
+        let noise_factor = limited_distr(postsynaptic_neuron.bayesian_params.mean, postsynaptic_neuron.bayesian_params.std, 0., 1.);
         let presynaptic_inputs: Vec<f64> = (0..n)
-            .map(|i| input_currents[i] * limited_distr(if_params.bayesian_params.mean, if_params.bayesian_params.std, 0., 1.))
+            .map(|i| input_currents[i] * limited_distr(
+                presynaptic_neurons[i].bayesian_params.mean, 
+                presynaptic_neurons[i].bayesian_params.std, 
+                0., 
+                1.
+            ))
             .collect();
         let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
             .map(|(presynaptic_neuron, input_value)| {
-                presynaptic_neuron.iterate_and_spike(&if_params, *input_value)
+                presynaptic_neuron.iterate_and_spike(*input_value)
             })
             .collect();
-        let is_spiking = postsynaptic_neuron.iterate_and_spike(&if_params, noise_factor * calculated_voltage);
+        let is_spiking = postsynaptic_neuron.iterate_and_spike(noise_factor * calculated_voltage);
 
         update_isolated_presynaptic_neuron_weights(
             presynaptic_neurons, 
@@ -1685,7 +1618,7 @@ fn main() -> Result<()> {
             sim_params.radius, 
             &mut sim_params.cell_grid.clone(),
             sim_params.averaged,
-            &sim_params.if_params,
+            sim_params.bayesian,
             sim_params.do_stdp,
             &sim_params.graph_params,
             &sim_params.stdp_params,
@@ -1797,27 +1730,27 @@ fn main() -> Result<()> {
 
     //     // option to run a simulation and return the eeg signals
     //     // option to write custom bounds
-    } else if let Some(single_neuron_test) = config.get("single_neuron_test") {
-        let filename: String = match single_neuron_test.get("filename") {
+    } else if let Some(single_neuron_table) = config.get("single_neuron_test") {
+        let filename: String = match single_neuron_table.get("filename") {
             Some(value) => parse_string(value, "filename")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
         };
         println!("filename: {}", filename);
 
-        let iterations: usize = match single_neuron_test.get("iterations") {
+        let iterations: usize = match single_neuron_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
         };
         println!("iterations: {}", iterations);
 
-        let input_current: f64 = match single_neuron_test.get("input_current") {
+        let input_current: f64 = match single_neuron_table.get("input_current") {
             Some(value) => parse_f64(value, "input_current")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
         };
         println!("input_current: {}", input_current);  
         
         let if_type: String = parse_value_with_default(
-            single_neuron_test, 
+            single_neuron_table, 
             "if_type", 
             parse_string, 
             String::from("basic")
@@ -1826,41 +1759,31 @@ fn main() -> Result<()> {
 
         let if_type = IFType::from_str(&if_type)?;
 
-        let mut if_params = get_default_if_params(&if_type);
+        let bayesian: bool = parse_value_with_default(&single_neuron_table, "bayesian", parse_bool, false)?; 
+        println!("bayesian: {}", bayesian);
 
-        get_if_params(&mut if_params, None, &single_neuron_test)?;
+        // let mut test_cell = IntegrateAndFireCell { 
+        //     if_type: if_type,
+        //     current_voltage: if_params.v_init, 
+        //     refractory_count: 0.0,
+        //     leak_constant: -1.,
+        //     integration_constant: 1.,
+        //     gap_conductance: if_params.gap_conductance_init,
+        //     potentiation_type: PotentiationType::Excitatory,
+        //     w_value: if_params.w_init,
+        //     stdp_params: STDPParameters::default(),
+        //     last_firing_time: None,
+        //     alpha: if_params.alpha_init,
+        //     beta: if_params.beta_init,
+        //     c: if_params.v_reset,
+        //     d: if_params.d_init,
+        //     ligand_gates: if_params.ligand_gates_init.clone(),
+        // };
 
-        // let bayesian: bool = parse_value_with_default(single_neuron_test, "bayesian", parse_bool, false)?; 
+        let mut test_cell = get_integrate_and_fire_cell(if_type, None, single_neuron_table)?;
+        println!("{:#?}", test_cell);
 
-        let mean_change = &if_params.bayesian_params.mean != &BayesianParameters::default().mean;
-        let std_change = &if_params.bayesian_params.std != &BayesianParameters::default().std;
-        let bayesian = if mean_change || std_change {
-            true
-        } else {
-            false
-        };
-        
-        println!("{:#?}", if_params);
-
-        let mut test_cell = IntegrateAndFireCell { 
-            if_type: if_type,
-            current_voltage: if_params.v_init, 
-            refractory_count: 0.0,
-            leak_constant: -1.,
-            integration_constant: 1.,
-            gap_conductance: if_params.gap_conductance_init,
-            potentiation_type: PotentiationType::Excitatory,
-            w_value: if_params.w_init,
-            stdp_params: STDPParameters::default(),
-            last_firing_time: None,
-            alpha: if_params.alpha_init,
-            beta: if_params.beta_init,
-            c: if_params.v_reset,
-            d: if_params.d_init,
-            ligand_gates: if_params.ligand_gates_init.clone(),
-        };
-
-        test_cell.run_static_input(&if_params, input_current, bayesian, iterations, &filename);
+        test_cell.run_static_input(input_current, bayesian, iterations, &filename);
 
         println!("\nFinished single neuron test");
     } else if let Some(coupled_table) = config.get("coupled_test") {
@@ -1908,68 +1831,62 @@ fn main() -> Result<()> {
         )?;
         println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
-        let mut pre_if_params = get_default_if_params(&if_type);
-        
-        let mut post_if_params = pre_if_params.clone();
+        let mut presynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("pre"), coupled_table)?;
+        let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("post"), coupled_table)?;
+        println!("presynaptic: {:#?}", presynaptic_neuron);
+        println!("postsynaptic: {:#?}", postsynaptic_neuron);
 
-        get_if_params(&mut pre_if_params, Some("pre"), coupled_table)?;
-        println!("pre if params: {:#?}", pre_if_params);
-        get_if_params(&mut post_if_params, Some("post"), coupled_table)?;
-        println!("post if params: {:#?}", post_if_params);
+        // let pre_potentiation_type = parse_value_with_default(
+        //     coupled_table, 
+        //     "pre_potentiation_type", 
+        //     parse_string, 
+        //     String::from("excitatory")
+        // )?;
+        // let pre_potentiation_type = match pre_potentiation_type.to_ascii_lowercase().as_str() {
+        //     "excitatory" => PotentiationType::Excitatory,
+        //     "inhibitory" => PotentiationType::Inhibitory,
+        //     _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
+        // };     
 
-        let pre_potentiation_type = parse_value_with_default(
-            coupled_table, 
-            "pre_potentiation_type", 
-            parse_string, 
-            String::from("excitatory")
-        )?;
-        let pre_potentiation_type = match pre_potentiation_type.to_ascii_lowercase().as_str() {
-            "excitatory" => PotentiationType::Excitatory,
-            "inhibitory" => PotentiationType::Inhibitory,
-            _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
-        };     
-
-        let mut presynaptic_neuron = IntegrateAndFireCell { 
-            if_type: if_type,
-            current_voltage: pre_if_params.v_init, 
-            refractory_count: 0.0,
-            leak_constant: -1.,
-            integration_constant: 1.,
-            gap_conductance: pre_if_params.gap_conductance_init,
-            potentiation_type: pre_potentiation_type,
-            w_value: pre_if_params.w_init,
-            stdp_params: STDPParameters::default(),
-            last_firing_time: None,
-            alpha: pre_if_params.alpha_init,
-            beta: pre_if_params.beta_init,
-            c: pre_if_params.v_reset,
-            d: pre_if_params.d_init,
-            ligand_gates: pre_if_params.ligand_gates_init.clone(),
-        };
+        // let mut presynaptic_neuron = IntegrateAndFireCell { 
+        //     if_type: if_type,
+        //     current_voltage: pre_if_params.v_init, 
+        //     refractory_count: 0.0,
+        //     leak_constant: -1.,
+        //     integration_constant: 1.,
+        //     gap_conductance: pre_if_params.gap_conductance_init,
+        //     potentiation_type: pre_potentiation_type,
+        //     w_value: pre_if_params.w_init,
+        //     stdp_params: STDPParameters::default(),
+        //     last_firing_time: None,
+        //     alpha: pre_if_params.alpha_init,
+        //     beta: pre_if_params.beta_init,
+        //     c: pre_if_params.v_reset,
+        //     d: pre_if_params.d_init,
+        //     ligand_gates: pre_if_params.ligand_gates_init.clone(),
+        // };
     
-        let mut postsynaptic_neuron = IntegrateAndFireCell { 
-            if_type: if_type,
-            current_voltage: post_if_params.v_init, 
-            refractory_count: 0.0,
-            leak_constant: -1.,
-            integration_constant: 1.,
-            gap_conductance: post_if_params.gap_conductance_init,
-            potentiation_type: PotentiationType::Excitatory,
-            w_value: post_if_params.w_init,
-            stdp_params: STDPParameters::default(),
-            last_firing_time: None,
-            alpha: post_if_params.alpha_init,
-            beta: post_if_params.beta_init,
-            c: post_if_params.v_reset,
-            d: post_if_params.d_init,
-            ligand_gates: post_if_params.ligand_gates_init.clone(),
-        };
+        // let mut postsynaptic_neuron = IntegrateAndFireCell { 
+        //     if_type: if_type,
+        //     current_voltage: post_if_params.v_init, 
+        //     refractory_count: 0.0,
+        //     leak_constant: -1.,
+        //     integration_constant: 1.,
+        //     gap_conductance: post_if_params.gap_conductance_init,
+        //     potentiation_type: PotentiationType::Excitatory,
+        //     w_value: post_if_params.w_init,
+        //     stdp_params: STDPParameters::default(),
+        //     last_firing_time: None,
+        //     alpha: post_if_params.alpha_init,
+        //     beta: post_if_params.beta_init,
+        //     c: post_if_params.v_reset,
+        //     d: post_if_params.d_init,
+        //     ligand_gates: post_if_params.ligand_gates_init.clone(),
+        // };
 
         test_coupled_neurons(
             &mut presynaptic_neuron,
             &mut postsynaptic_neuron,
-            &pre_if_params,
-            &post_if_params,
             iterations,
             input_current,
             do_receptor_kinetics,
@@ -2021,36 +1938,33 @@ fn main() -> Result<()> {
 
         let stdp_params = get_stdp_params(&stdp_table)?;
 
-        let mut if_params = get_default_if_params(&if_type);
+        // let mut postsynaptic_neuron = match if_type {
+        //     IFType::Basic | IFType::Adaptive |
+        //     IFType::AdaptiveExponential => {
+        //         IntegrateAndFireCell {
+        //             if_type: if_type,
+        //             ..IntegrateAndFireCell::default()
+        //         }
+        //     },
+        //     IFType::Izhikevich | IFType::IzhikevichLeaky => {
+        //         IntegrateAndFireCell {
+        //             if_type: if_type,
+        //             ..IntegrateAndFireCell::izhikevich_default()
+        //         }
+        //     }
+        // };
 
-        get_if_params(&mut if_params, None, &stdp_table)?;
+        let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, None, &stdp_table)?;
+        println!("{:#?}", postsynaptic_neuron);
     
-        println!("{:#?}", if_params);
-    
-        let mut postsynaptic_neuron = match if_type {
-            IFType::Basic | IFType::Adaptive |
-            IFType::AdaptiveExponential => {
-                IntegrateAndFireCell {
-                    if_type: if_type,
-                    ..IntegrateAndFireCell::default()
-                }
-            },
-            IFType::Izhikevich | IFType::IzhikevichLeaky => {
-                IntegrateAndFireCell {
-                    if_type: if_type,
-                    ..IntegrateAndFireCell::izhikevich_default()
-                }
-            }
-        };
-    
-        postsynaptic_neuron.gap_conductance = if_params.gap_conductance_init;
-        postsynaptic_neuron.w_value = if_params.v_init;
-        postsynaptic_neuron.w_value = if_params.w_init;
-        postsynaptic_neuron.stdp_params = stdp_params.clone();
-        postsynaptic_neuron.alpha = if_params.alpha_init;
-        postsynaptic_neuron.beta = if_params.beta_init;
-        postsynaptic_neuron.c = if_params.v_reset;
-        postsynaptic_neuron.d = if_params.d_init;
+        // postsynaptic_neuron.gap_conductance = if_params.gap_conductance_init;
+        // postsynaptic_neuron.w_value = if_params.v_init;
+        // postsynaptic_neuron.w_value = if_params.w_init;
+        // postsynaptic_neuron.stdp_params = stdp_params.clone();
+        // postsynaptic_neuron.alpha = if_params.alpha_init;
+        // postsynaptic_neuron.beta = if_params.beta_init;
+        // postsynaptic_neuron.c = if_params.v_reset;
+        // postsynaptic_neuron.d = if_params.d_init;
     
         let mut presynaptic_neurons: Vec<IntegrateAndFireCell> = (0..n).map(|_| postsynaptic_neuron.clone())
             .collect();
@@ -2067,7 +1981,6 @@ fn main() -> Result<()> {
             &stdp_params,
             &mut presynaptic_neurons,
             &mut postsynaptic_neuron,
-            &if_params,
             iterations,
             n,
             input_current,
@@ -2348,19 +2261,6 @@ fn main() -> Result<()> {
             None => {}
         };
 
-        let mut if_params = IzhikevichDefault::izhikevich_default();
-        get_if_params(&mut if_params, None, fit_neuron_models_table)?;
-
-        if_params.dt = reference_dt;
-
-        if !do_receptor_kinetics {
-            if_params.ligand_gates_init.iter_mut().for_each(|i| {
-                i.neurotransmitter.r = 0.8;
-            });
-        }
-
-        println!("{:#?}", if_params);
-
         let num_steps = ((input_current_upper_bound - input_current_lower_bound) / input_current_step)
             .ceil() as usize + 1;
         let input_currents_vector: Vec<f64> = (0..num_steps)
@@ -2400,10 +2300,18 @@ fn main() -> Result<()> {
 
             (hodgkin_huxley_summaries, scaling_factors_vector)            
         };
+
+        let mut test_cell = get_integrate_and_fire_cell(IFType::Izhikevich, None, fit_neuron_models_table)?;
     
+        if !do_receptor_kinetics {
+            test_cell.ligand_gates.iter_mut().for_each(|i| {
+                i.neurotransmitter.r = 0.8;
+            });
+        }
+
         let fitting_settings = FittingSettings {
             hodgkin_huxley_model: hodgkin_huxley_model,
-            if_params: &if_params,
+            if_neuron: &test_cell.clone(),
             action_potential_summary: &hodgkin_huxley_summaries.as_slice(),
             scaling_factors: &scaling_factors.as_slice(),
             use_amplitude: use_amplitude,
@@ -2454,34 +2362,37 @@ fn main() -> Result<()> {
         let v_th: f64 = decoded[4];
         let gap_conductance: f64 = decoded[5];
 
-        let mut generated_if_params: IFParameters = IzhikevichDefault::izhikevich_default();
-        generated_if_params.dt = reference_dt;
-        generated_if_params.v_th = v_th;
+        test_cell.dt = reference_dt;
+        test_cell.v_th = v_th;
+        test_cell.gap_conductance = gap_conductance;
+        test_cell.alpha = a;
+        test_cell.beta = b;
+        test_cell.c = c;
+        test_cell.d = d;
 
-        let test_cell = IntegrateAndFireCell { 
-            if_type: IFType::Izhikevich,
-            current_voltage: if_params.v_init, 
-            refractory_count: 0.0,
-            leak_constant: -1.,
-            integration_constant: 1.,
-            gap_conductance: gap_conductance,
-            potentiation_type: PotentiationType::Excitatory,
-            w_value: if_params.w_init,
-            stdp_params: STDPParameters::default(),
-            last_firing_time: None,
-            alpha: a,
-            beta: b,
-            c: c,
-            d: d,
-            ligand_gates: if_params.ligand_gates_init.clone(),
-        };
+        // let test_cell = IntegrateAndFireCell { 
+        //     if_type: IFType::Izhikevich,
+        //     current_voltage: if_params.v_init, 
+        //     refractory_count: 0.0,
+        //     leak_constant: -1.,
+        //     integration_constant: 1.,
+        //     gap_conductance: gap_conductance,
+        //     potentiation_type: PotentiationType::Excitatory,
+        //     w_value: if_params.w_init,
+        //     stdp_params: STDPParameters::default(),
+        //     last_firing_time: None,
+        //     alpha: a,
+        //     beta: b,
+        //     c: c,
+        //     d: d,
+        //     ligand_gates: if_params.ligand_gates_init.clone(),
+        // };
 
         let summaries_results = (0..fitting_settings.input_currents.len())
             .map(|i| {
                 get_izhikevich_summary(
                     &mut test_cell.clone(), 
                     &mut test_cell.clone(), 
-                    &if_params,
                     &fitting_settings,
                     i
                 )
