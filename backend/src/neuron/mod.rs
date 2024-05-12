@@ -83,7 +83,7 @@ impl IFType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum PotentiationType {
     Excitatory,
     Inhibitory,
@@ -144,6 +144,10 @@ pub trait CurrentVoltage {
 
 pub trait GapConductance {
     fn get_gap_conductance(&self) -> f64;
+}
+
+pub trait Potentiation {
+    fn get_potentiation_type(&self) -> PotentiationType;
 }
 
 impl Default for IntegrateAndFireCell {
@@ -223,6 +227,12 @@ impl CurrentVoltage for IntegrateAndFireCell {
 impl GapConductance for IntegrateAndFireCell {
     fn get_gap_conductance(&self) -> f64 {
         self.gap_conductance
+    }
+}
+
+impl Potentiation for IntegrateAndFireCell {
+    fn get_potentiation_type(&self) -> PotentiationType {
+        self.potentiation_type
     }
 }
 
@@ -1117,6 +1127,7 @@ impl Gate {
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
     pub gap_condutance: f64,
+    pub potentiation_type: PotentiationType,
     pub dt: f64,
     pub c_m: f64,
     pub e_na: f64,
@@ -1145,6 +1156,12 @@ impl GapConductance for HodgkinHuxleyCell {
     }
 }
 
+impl Potentiation for HodgkinHuxleyCell {
+    fn get_potentiation_type(&self) -> PotentiationType {
+        self.potentiation_type
+    }
+}
+
 impl Default for HodgkinHuxleyCell {
     fn default() -> Self {
         let default_gate = Gate {
@@ -1156,6 +1173,7 @@ impl Default for HodgkinHuxleyCell {
         HodgkinHuxleyCell { 
             current_voltage: 0.,
             gap_condutance: 7.,
+            potentiation_type: PotentiationType::Excitatory,
             dt: 0.1,
             c_m: 1., 
             e_na: 115., 
@@ -1426,6 +1444,18 @@ pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
 
+pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage + GapConductance>(
+    presynaptic_neuron: &T, 
+    postsynaptic_neuron: &U
+) -> f64 {
+    let sign = match presynaptic_neuron.get_potentiation_type() {
+        PotentiationType::Excitatory => 1.,
+        PotentiationType::Inhibitory => -1.,
+    };
+
+    sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
+}
+
 pub fn iterate_coupled_hodgkin_huxley(
     presynaptic_neuron: &mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &mut HodgkinHuxleyCell,
@@ -1443,7 +1473,7 @@ pub fn iterate_coupled_hodgkin_huxley(
             input_current * pre_bayesian_factor
         );
 
-        let current = gap_junction(
+        let current = signed_gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
