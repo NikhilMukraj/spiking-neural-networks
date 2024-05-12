@@ -14,7 +14,7 @@ mod neuron;
 use crate::neuron::{
     IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
     IzhikevichDefault, BayesianParameters, STDPParameters, 
-    gap_junction, iterate_coupled_hodgkin_huxley,
+    signed_gap_junction, iterate_coupled_hodgkin_huxley,
     Gate, HodgkinHuxleyCell, GeneralLigandGatedChannel, AMPADefault, GABAaDefault, 
     GABAbDefault, GABAbDefault2, NMDAWithBV, BV, AdditionalGates, HighThresholdCalciumChannel,
     HighVoltageActivatedCalciumChannel, handle_receptor_kinetics
@@ -63,17 +63,6 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
     positions
 }
 
-fn signed_gap_junction(presynaptic_neuron: &IntegrateAndFireCell, postsynaptic_neuron: &IntegrateAndFireCell, sign: f64) -> f64 {
-    sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
-}
-
-fn get_sign(cell: &IntegrateAndFireCell) -> f64 {
-    match cell.potentiation_type {
-        PotentiationType::Excitatory => 1.,
-        PotentiationType::Inhibitory => -1.,
-    }
-}
-
 // fn get_input_from_positions(
 //     cell_grid: &CellGrid, 
 //     postsynaptic_neuron: &IntegrateAndFireCell,
@@ -120,10 +109,8 @@ fn get_input_from_positions(
         .map(|input_position| {
             let (pos_x, pos_y) = input_position;
             let input_cell = &cell_grid[*pos_x][*pos_y];
-            
-            let sign = get_sign(&input_cell);
 
-            let final_input = signed_gap_junction(&input_cell, postsynaptic_neuron, sign);
+            let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
             
             final_input * graph.lookup_weight(&input_position, position).unwrap()
 
@@ -956,8 +943,6 @@ fn test_coupled_neurons(
     }
     write!(file, "\n").expect("Unable to write to file");
 
-    let sign = get_sign(&presynaptic_neuron);
-
     let pre_mean_change = &presynaptic_neuron.bayesian_params.mean != &BayesianParameters::default().mean;
     let pre_std_change = &presynaptic_neuron.bayesian_params.std != &BayesianParameters::default().std;
     let pre_bayesian = if pre_mean_change || pre_std_change {
@@ -984,7 +969,7 @@ fn test_coupled_neurons(
             input_current
         };
 
-        let gap_junction_input = signed_gap_junction(&presynaptic_neuron, &postsynaptic_neuron, sign);
+        let gap_junction_input = signed_gap_junction(&*presynaptic_neuron, &*postsynaptic_neuron);
 
         let postsynaptic_input = if post_bayesian {
             let post_bayesian_factor = limited_distr(postsynaptic_neuron.bayesian_params.mean, postsynaptic_neuron.bayesian_params.std, 0., 1.);
@@ -1177,9 +1162,7 @@ fn test_isolated_stdp(
         let calculated_voltage: f64 = (0..n)
             .map(
                 |i| {
-                    let sign = get_sign(&presynaptic_neurons[i]);
-
-                    let output = weights[i] * signed_gap_junction(&presynaptic_neurons[i], &postsynaptic_neuron, sign);
+                    let output = weights[i] * signed_gap_junction(&presynaptic_neurons[i], &*postsynaptic_neuron);
 
                     if averaged {
                         output / (n as f64)
@@ -1386,6 +1369,15 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}gap_conductance: {}", prefix, gap_conductance);
 
+    let potentiation_type_str = parse_value_with_default(
+        hodgkin_huxley_table, 
+        &format!("{}potentiation_type", prefix).as_str(), 
+        parse_string, 
+        String::from("excitatory")
+    )?;
+    let potentiation_type = PotentiationType::from_str(&potentiation_type_str)?;
+    println!("{}potentiation_type: {:?}", prefix, potentiation_type);
+
     let e_na: f64 = parse_value_with_default(
         &hodgkin_huxley_table, 
         format!("{}e_na", prefix).as_str(), 
@@ -1474,6 +1466,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         HodgkinHuxleyCell {
             current_voltage: v_init,
             gap_condutance: gap_conductance,
+            potentiation_type: potentiation_type,
             dt: dt,
             c_m: c_m,
             e_na: e_na,
