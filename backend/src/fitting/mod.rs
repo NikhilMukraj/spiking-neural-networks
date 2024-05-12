@@ -334,27 +334,6 @@ pub fn fitting_objective(
 
     let settings = settings.get("settings").unwrap();
 
-    // let mut if_params = settings.if_params.clone();
-    // if_params.v_th = v_th;
-
-    // let test_cell = IntegrateAndFireCell { 
-    //     if_type: IFType::Izhikevich,
-    //     current_voltage: if_params.v_init, 
-    //     refractory_count: 0.0,
-    //     leak_constant: -1.,
-    //     integration_constant: 1.,
-    //     gap_conductance: gap_conductance,
-    //     potentiation_type: PotentiationType::Excitatory,
-    //     w_value: if_params.w_init,
-    //     stdp_params: STDPParameters::default(),
-    //     last_firing_time: None,
-    //     alpha: a,
-    //     beta: b,
-    //     c: c,
-    //     d: d,
-    //     ligand_gates: if_params.ligand_gates_init.clone(),
-    // };
-
     let mut test_cell = settings.if_neuron.clone();
     test_cell.v_th = v_th;
     test_cell.gap_conductance = gap_conductance;
