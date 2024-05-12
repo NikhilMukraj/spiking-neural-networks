@@ -36,13 +36,15 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Separate receptor kinetics struct, dependent on $t_total$
   - Receptor kinetics input (of weighted neurotransmitter concentration) should only be calculated if receptor kinetics is not static
     - **Receptor kinetics handling should have an inputtable value to set r at**
+      - **If receptor kinetics are static do not calculate neurotransmitter input**
   - Neurotransmitter and receptor kinetics structs should be stored in different hashmaps that relate an enum (specifying the type, basic, AMPA, NMDA, GABAa, GABAb) to the struct (the struct would then have the appriopriate parameters associated with that enum)
     - `HashMap<NeurotransmitterType, Neurotransmitter>`, `HashMap<NeurotrnasmitterType, ReceptorKinetics>`
 - Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
   - ie add argument to `iterate_and_spike` which is an `Option<f64>` called `additional_dv` that adds the $dv$ change calculated by the neurotransmitter current after neurotransmitter currents are set and returned
     - Get presynaptic neurotransmitter concentrate
-      - Multiple by receptor value
+      - Multiply by receptor value
       - **Generating noise factor from bayesian parameters (outside of neuron)** and then applying that noise to input current and input neurotransmitter (for sake of handling Hodgkin Huxley and integrate and fire)
+        - Noise should be applied to total input current and total input neurotransmitter
     - Calculate $dv$ change from neurotransmitter current
     - Add it to the voltage in the `iterate_and_spike` function
   - Old update neurotransmitter function should be removed in favor of this
@@ -50,10 +52,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Add $\tau_m$ and $C_m$ to fitting parameters
 
 - Have a set of bayesian parameters for ensemble of neurons to use
-- Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
-- Update code in obsidian when refactor is done, maybe update results
 - Seperate STDP parameters into STDP parameters and weight initialization parameters
   - Obsidian notes on STDP equations
+- Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
+- Update code in obsidian when refactor is done, maybe update results
 
 - **Get coupled neuron test to work with IterateAndSpike trait**
   - Get it to work with Hodgkin Huxley model with IterateAndSpike trait
@@ -102,6 +104,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Should also be adapted for a cargo package
 
+- Option to subtract 70 mV (or n mV) from Hodgkin Huxley model to set resting potential at n
+
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
 - Hopfield network
@@ -109,7 +113,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Hopfield network tutorial](https://github.com/ImagineOrange/Hopfield-Network/blob/main/hopfield_MNIST.py)
   - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
-- When done with Hopfield, move to the [cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
+- Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
+- [Cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
   - Cue input is fed into working memory neurons
     - Cue is -1 or 1
   - Working memory neurons loop back into themselves with some bayesian noise
@@ -291,7 +296,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Record how weights change over time
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory (refer to guanfacine working memory model)
-  - [ ] Discrete state neuron (for testing)
+  - [ ] Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
+  - [ ] Discrete state neuron
   - [ ] Discrete learning rules
   - [ ] Hopfield network
   - [ ] Simple recurrent memory
