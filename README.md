@@ -47,9 +47,18 @@ EEG processing with fourier transforms, and power spectral density calculations
         - Noise should be applied to total input current and total input neurotransmitter
     - Calculate $dv$ change from neurotransmitter current
     - Add it to the voltage in the `iterate_and_spike` function
+  - Or integrate the neurotransmitter calculation into the `iterate_and_spike` function
+  - **Or into a seperate `iterate_and_spike_with_neurotransmission` function**
+    - `pub fn iterate_and_spike_with_neurotransmission(&mut self, i: f64, t_total: Option<HashMap<NeurotransmitterType, f64>>) -> bool`
+    - If `t_total` is `Some` then update receptor kinetics, if `t_total` is `None` then do not change receptor kinetics
+      - If `t_total` is `Some` but neurotransmitter type in `t_total` does not match the receptors on the neuron, assume neurotransmitter concentrate is 0
+    - In lattice, return `(f64, Option<HashMap<NeurotransmitterType, f64>>)`, if `receptor_kinetics` is `false`, return `(f64, None)`
   - Old update neurotransmitter function should be removed in favor of this
 
+- **When neurotransmitter refactor done, move to Hopfield network or lixirnet or Poisson/spike train or FitzHugh-Nagumo**
+
 - Add $\tau_m$ and $C_m$ to fitting parameters
+- Add option to subtract 70 mV to set resting potential for Hodgkin Huxley model in fitting
 
 - Have a set of bayesian parameters for ensemble of neurons to use
 - Seperate STDP parameters into STDP parameters and weight initialization parameters
@@ -131,6 +140,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Decoding unit acts as readout, decoding unit likely would need some training in the form of R-STDP
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
   - Can also check for time until convergence as a measure of learning
+  - Can also check the stability of liquid as metric
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
 
@@ -307,6 +317,7 @@ EEG processing with fourier transforms, and power spectral density calculations
         - Matching task, present cue, remove cue, present a new cue and determine whether the new cue is the same or different (DMS task)
       - Could add noise over time similar to simple recurrent memory to modulate forgetting if signal stability stays constant
       - **Measure signal stability after cue is removed (see guanfacine paper)**
+      - Measure ability to complete task, time taken to converge, and potentially liquid stability
     - Could model cognition with something similar to a traveling salesman problem
   - [ ] Liquid state machine with astrocytes
   - [ ] Neuro-astrocyte memory model
