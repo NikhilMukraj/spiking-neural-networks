@@ -592,6 +592,72 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
+// enum NeurotransmitterType {
+    // Basic,
+//     AMPA,
+//     NMDA,
+//     GABAa,
+//     GABAb,
+// }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct Neurotransmitter {
+//     pub t_max: f64,
+//     pub t: f64,
+//     pub v_p: f64,
+//     pub k_p: f64,
+// }
+
+// macro_rules! impl_neurotransmitter_default {
+//     ($trait:ident, $method:ident, $t_max:expr) => {
+//         impl $trait for Neurotransmitter {
+//             fn $method() -> Self {
+//                 Neurotransmitter {
+//                     t_max: $t_max,
+//                     t: 0.,
+//                     v_p: 2., // 2 mV
+//                     k_p: 5., // 5 mV
+//                 }
+//             }
+//         }
+//     };
+// }
+
+// impl_neurotransmitter_default!(Default, default, 1.0);
+// impl_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
+// impl_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
+// impl_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
+// impl_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
+// impl_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct Receptor {
+//     pub r: f64,
+//     pub alpha: f64,
+//     pub beta: f64,
+// }
+
+// macro_rules! impl_receptor_default {
+//     ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
+//         impl $trait for Receptor {
+//             fn $method() -> Self {
+//                 Receptor {
+//                     r: 0.,
+//                     alpha: $alpha, // mM^-1 * ms^-1
+//                     beta: $beta, // ms^-1
+//                 }
+//             }
+//         }
+//     };
+// }
+
+// impl_receptor_default!(Default, default, 1., 1.);
+// impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
+// impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
+// impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
+// impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
+// impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
+
 #[derive(Debug, Clone, Copy)]
 pub struct Neurotransmitter {
     pub t_max: f64,
@@ -698,12 +764,12 @@ impl Neurotransmitter {
 }
 
 #[derive(Debug, Clone)]
-pub enum NeurotransmitterType {
-    AMPA,
-    GABAa,
+pub enum IonotropicReceptorType {
+    Basic(f64),
+    AMPA(f64),
+    GABAa(f64),
     GABAb(GABAbDissociation),
     NMDA(BV),
-    Basic,
 }
 
 #[derive(Debug, Clone)]
@@ -711,7 +777,7 @@ pub struct GeneralLigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
     pub neurotransmitter: Neurotransmitter,
-    pub neurotransmitter_type: NeurotransmitterType,
+    pub neurotransmitter_type: IonotropicReceptorType,
     pub current: f64,
 }
 
@@ -721,7 +787,7 @@ impl Default for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::default(),
-            neurotransmitter_type: NeurotransmitterType::Basic,
+            neurotransmitter_type: IonotropicReceptorType::Basic(1.0),
             current: 0.,
         }
     }
@@ -733,7 +799,7 @@ impl AMPADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::ampa_default(),
-            neurotransmitter_type: NeurotransmitterType::AMPA,
+            neurotransmitter_type: IonotropicReceptorType::AMPA(1.0),
             current: 0.,
         }
     }
@@ -743,9 +809,9 @@ impl GABAaDefault for GeneralLigandGatedChannel {
     fn gabaa_default() -> Self {
         GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
-            reversal: -80., // 0.0 mV
+            reversal: -80., // -80 mV
             neurotransmitter: Neurotransmitter::gabaa_default(),
-            neurotransmitter_type: NeurotransmitterType::GABAa,
+            neurotransmitter_type: IonotropicReceptorType::GABAa(1.0),
             current: 0.,
         }
     }
@@ -755,9 +821,9 @@ impl GABAbDefault for GeneralLigandGatedChannel {
     fn gabab_default() -> Self {
         GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
-            reversal: -95., // 0.0 mV
+            reversal: -95., // -95 mV
             neurotransmitter: Neurotransmitter::gabab_default(),
-            neurotransmitter_type: NeurotransmitterType::GABAb(GABAbDissociation::default()),
+            neurotransmitter_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
@@ -767,9 +833,9 @@ impl GABAbDefault2 for GeneralLigandGatedChannel {
     fn gabab_default2() -> Self {
         GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
-            reversal: -95., // 0.0 mV
+            reversal: -95., // -95 mV
             neurotransmitter: Neurotransmitter::gabab_default2(),
-            neurotransmitter_type: NeurotransmitterType::GABAb(GABAbDissociation::default()),
+            neurotransmitter_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
@@ -781,7 +847,7 @@ impl NMDADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
-            neurotransmitter_type: NeurotransmitterType::NMDA(BV::default()),
+            neurotransmitter_type: IonotropicReceptorType::NMDA(BV::default()),
             current: 0.,
         }
     }
@@ -797,7 +863,7 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
-            neurotransmitter_type: NeurotransmitterType::NMDA(bv),
+            neurotransmitter_type: IonotropicReceptorType::NMDA(bv),
             current: 0.,
         }
     }
@@ -806,14 +872,14 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
 impl GeneralLigandGatedChannel {
     fn get_modifier(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
         match &mut self.neurotransmitter_type {
-            NeurotransmitterType::AMPA => 1.0,
-            NeurotransmitterType::GABAa => 1.0,
-            NeurotransmitterType::GABAb(value) => {
+            IonotropicReceptorType::AMPA(value) => *value,
+            IonotropicReceptorType::GABAa(value) => *value,
+            IonotropicReceptorType::GABAb(value) => {
                 value.g += (value.k3 * r - value.k4 * value.g) * dt;
                 value.calculate_modifer()
             }, // G^N / (G^N + Kd)
-            NeurotransmitterType::NMDA(value) => value.calculate_b(voltage),
-            NeurotransmitterType::Basic => 1.0,
+            IonotropicReceptorType::NMDA(value) => value.calculate_b(voltage),
+            IonotropicReceptorType::Basic(value) => *value,
         }
     }
 
@@ -827,11 +893,11 @@ impl GeneralLigandGatedChannel {
 
     pub fn to_str(&self) -> &str {
         match self.neurotransmitter_type {
-            NeurotransmitterType::AMPA => "AMPA",
-            NeurotransmitterType::GABAa => "GABAa",
-            NeurotransmitterType::GABAb(_) => "GABAb",
-            NeurotransmitterType::NMDA(_) => "NMDA",
-            NeurotransmitterType::Basic => "Basic",
+            IonotropicReceptorType::Basic(_) => "Basic",
+            IonotropicReceptorType::AMPA(_) => "AMPA",
+            IonotropicReceptorType::GABAa(_) => "GABAa",
+            IonotropicReceptorType::GABAb(_) => "GABAb",
+            IonotropicReceptorType::NMDA(_) => "NMDA",
         }
     }
 }
