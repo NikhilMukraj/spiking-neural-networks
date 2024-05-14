@@ -2,6 +2,7 @@ use std::{
     f64::consts::E, 
     fs::File, 
     io::{BufWriter, Error, ErrorKind, Result, Write},
+    // collections::HashMap,
     ops::Sub,
 };
 use rand::Rng;
@@ -776,8 +777,8 @@ pub enum IonotropicReceptorType {
 pub struct GeneralLigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
-    pub neurotransmitter: Neurotransmitter,
-    pub neurotransmitter_type: IonotropicReceptorType,
+    pub neurotransmitter: Neurotransmitter, // receptor: Receptor
+    pub receptor_type: IonotropicReceptorType,
     pub current: f64,
 }
 
@@ -787,7 +788,7 @@ impl Default for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::default(),
-            neurotransmitter_type: IonotropicReceptorType::Basic(1.0),
+            receptor_type: IonotropicReceptorType::Basic(1.0),
             current: 0.,
         }
     }
@@ -799,7 +800,7 @@ impl AMPADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::ampa_default(),
-            neurotransmitter_type: IonotropicReceptorType::AMPA(1.0),
+            receptor_type: IonotropicReceptorType::AMPA(1.0),
             current: 0.,
         }
     }
@@ -811,7 +812,7 @@ impl GABAaDefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -80., // -80 mV
             neurotransmitter: Neurotransmitter::gabaa_default(),
-            neurotransmitter_type: IonotropicReceptorType::GABAa(1.0),
+            receptor_type: IonotropicReceptorType::GABAa(1.0),
             current: 0.,
         }
     }
@@ -823,7 +824,7 @@ impl GABAbDefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
             neurotransmitter: Neurotransmitter::gabab_default(),
-            neurotransmitter_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
+            receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
@@ -835,7 +836,7 @@ impl GABAbDefault2 for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
             neurotransmitter: Neurotransmitter::gabab_default2(),
-            neurotransmitter_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
+            receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
@@ -847,7 +848,7 @@ impl NMDADefault for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
-            neurotransmitter_type: IonotropicReceptorType::NMDA(BV::default()),
+            receptor_type: IonotropicReceptorType::NMDA(BV::default()),
             current: 0.,
         }
     }
@@ -863,7 +864,7 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             neurotransmitter: Neurotransmitter::nmda_default(),
-            neurotransmitter_type: IonotropicReceptorType::NMDA(bv),
+            receptor_type: IonotropicReceptorType::NMDA(bv),
             current: 0.,
         }
     }
@@ -871,7 +872,7 @@ impl NMDAWithBV for GeneralLigandGatedChannel {
 
 impl GeneralLigandGatedChannel {
     fn get_modifier(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
-        match &mut self.neurotransmitter_type {
+        match &mut self.receptor_type {
             IonotropicReceptorType::AMPA(value) => *value,
             IonotropicReceptorType::GABAa(value) => *value,
             IonotropicReceptorType::GABAb(value) => {
@@ -892,7 +893,7 @@ impl GeneralLigandGatedChannel {
     }
 
     pub fn to_str(&self) -> &str {
-        match self.neurotransmitter_type {
+        match self.receptor_type {
             IonotropicReceptorType::Basic(_) => "Basic",
             IonotropicReceptorType::AMPA(_) => "AMPA",
             IonotropicReceptorType::GABAa(_) => "GABAa",
@@ -901,6 +902,59 @@ impl GeneralLigandGatedChannel {
         }
     }
 }
+
+// struct GeneralLigandGatedChannels{ 
+//     ligand_gates: HashMap<NeurotransmitterType, GeneralLigandGatedChannel> 
+// }
+
+// impl GeneralLigandGatedChannels {
+//     // r should be stored with receptor
+//     // should be 
+//     // self.current = modifier * self.r * self.g * (voltage - self.reversal);
+//     fn set_neurotransmitter_currents(&mut self, voltage: f64, dt: f64) {
+//         self.ligand_gates
+//             .values_mut()
+//             .for_each(|i| {
+//                 i.calculate_g(self.current_voltage, self.dt);
+//         });
+//     }
+
+//     fn get_neurotransmitter_currents(&self, dt: f64, c_m: f64) -> f64 {
+//         self.ligand_gates
+//             .values()
+//             .iter()
+//             .map(|i| i.current)
+//             .sum::<f64>() * (self.dt / self.c_m)
+//     }
+
+//     fn update_receptor_kinetics(&mut self, t_total: Option<HashMap<NeurotransmitterType, f64>>) {
+//         match t_total {
+//             Some(t_hashmap) => {
+//                 t_hashmap.iter()
+//                     .for_each(|(key, value)| {
+//                         if let Some(gate) = self.ligand_gates.get(key) {
+//                             gate.receptor.apply_r_change(value);
+//                         }
+//                     })
+//             },
+//             None => {}
+//         }
+//     }
+// }
+
+// struct Neurotransmitters {
+//     neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter>
+// }
+
+// impl Neurotransmitters {
+//     fn get_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+//         self.iter()
+//             .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
+//             .collect::<HashMap<NeurotransmitterType, f64>>();
+//     }
+// }
+
+// fn get_neurotransmitter_concentration
 
 // NMDA
 // alpha: 7.2 * 10^4 M^-1 * sec^-1, beta: 6.6 sec^-1
@@ -1207,6 +1261,8 @@ pub struct HodgkinHuxleyCell {
     pub h: Gate,
     pub ligand_gates: Vec<GeneralLigandGatedChannel>,
     pub additional_gates: Vec<AdditionalGates>,
+    // pub presynaptic_neurotransmitter: 
+    // pub ligand_gates: GeneralLigandGatedChannels,
     pub bayesian_params: BayesianParameters,
 }
 
