@@ -624,6 +624,12 @@ pub trait NMDADefault {
 //     };
 // }
 
+// impl Neurotransmitter {
+//     fn apply_t_change(&mut self, voltage: f64) {
+//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
+//     }
+// }
+
 // impl_neurotransmitter_default!(Default, default, 1.0);
 // impl_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
 // impl_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
@@ -650,6 +656,12 @@ pub trait NMDADefault {
 //             }
 //         }
 //     };
+// }
+
+// impl Receptor {
+//     fn apply_r_change(&mut self, t: f64, dt: f64) {
+//         self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
+//     }
 // }
 
 // impl_receptor_default!(Default, default, 1., 1.);
