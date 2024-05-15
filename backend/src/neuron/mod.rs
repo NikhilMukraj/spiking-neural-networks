@@ -964,9 +964,32 @@ impl GeneralLigandGatedChannel {
 //             .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
 //             .collect::<HashMap<NeurotransmitterType, f64>>();
 //     }
+
+    // fn apply_t_changes(&mut self, voltage: f64) {
+    //     self.values_mut()
+    //         .for_each(|value| value.apply_t_change(voltage));
+    // }
 // }
 
-// fn get_neurotransmitter_concentration
+// fn weight_neurotransmitter_concentration(
+//     neurotransmitter_hashmap: &mut HashMap<NeurotransmitterType, f64>, 
+//     weight: f64
+// ) {
+//     neurotransmitter_hashmap.values_mut()
+//         .for_each(|value| *value *= weight);
+// }
+
+// fn sum_neurotransmitter_concentrations(
+//     neurotransmitter_hashmaps: &Vec<HashMap<NeurotransmitterType, f64>>
+// ) -> HashMap<NeurotransmitterType, f64> {
+//     let mut cumulative_map: HashMap<NeurotransmitterType, f64> = HashMap::new();
+
+//     for map in vec_of_maps {
+//         for (key, value) in map {
+//             *cumulative_map.entry(key).or_insert(0.0) += value;
+//         }
+//     }
+// }
 
 // NMDA
 // alpha: 7.2 * 10^4 M^-1 * sec^-1, beta: 6.6 sec^-1
