@@ -2147,7 +2147,7 @@ fn main() -> Result<()> {
             &coupled_hodgkin_huxley_table, 
             "do_receptor_kinetics", 
             parse_bool, 
-            false
+            true
         )?;
         println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
@@ -2236,6 +2236,9 @@ fn main() -> Result<()> {
 
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
+
+        let reference_do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "reference_do_receptor_kinetics", parse_bool, false)?;
+        println!("reference_do_receptor_kinetics: {}", reference_do_receptor_kinetics);
 
         let do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "do_receptor_kinetics", parse_bool, false)?;
         println!("do_receptor_kinetics: {}", do_receptor_kinetics);
@@ -2335,7 +2338,7 @@ fn main() -> Result<()> {
                     &hodgkin_huxley_model, 
                     *current, 
                     iterations,
-                    do_receptor_kinetics,
+                    reference_do_receptor_kinetics,
                     bayesian, 
                     tolerance, 
                     spike_amplitude_default
@@ -2359,7 +2362,7 @@ fn main() -> Result<()> {
                     &hodgkin_huxley_model, 
                     *current, 
                     iterations,
-                    do_receptor_kinetics,
+                    reference_do_receptor_kinetics,
                     bayesian, 
                     tolerance, 
                     spike_amplitude_default
