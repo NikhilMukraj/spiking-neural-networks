@@ -2,7 +2,7 @@ use std::{
     f64::consts::E, 
     fs::File, 
     io::{BufWriter, Error, ErrorKind, Result, Write},
-    // collections::HashMap,
+    collections::{HashMap, hash_map::Values},
     ops::Sub,
 };
 use rand::Rng;
@@ -136,7 +136,7 @@ pub struct IntegrateAndFireCell {
     pub dt: f64, // time step
     pub bayesian_params: BayesianParameters, // bayesian parameters
     pub stdp_params: STDPParameters, // stdp parameters
-    pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
+    // pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
 }
 
 pub trait CurrentVoltage {
@@ -149,6 +149,18 @@ pub trait GapConductance {
 
 pub trait Potentiation {
     fn get_potentiation_type(&self) -> PotentiationType;
+}
+
+pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation {
+    fn iterate_and_spike(&mut self, input_current: f64) -> bool;
+    fn get_ligand_gates(&self) -> LigandGatedChannels;
+    fn get_neurotransmitters(&self) -> Neurotransmitters;
+    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f64, 
+        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+    ) -> bool;
 }
 
 impl Default for IntegrateAndFireCell {
@@ -180,7 +192,7 @@ impl Default for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            ligand_gates: vec![],
+            // ligand_gates: vec![],
         }
     }
 }
@@ -214,7 +226,7 @@ impl IzhikevichDefault for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            ligand_gates: vec![],
+            // ligand_gates: vec![],
         }
     }
 }
@@ -456,41 +468,41 @@ impl IntegrateAndFireCell {
         }
     }
 
-    pub fn update_neurotransmitter_concentration(&mut self, presynaptic_voltage: f64) {
-        self.ligand_gates
-            .iter_mut()
-            .for_each(|i| {
-                i.neurotransmitter.apply_t_change(presynaptic_voltage);
-            });
-    }
+    // pub fn update_neurotransmitter_concentration(&mut self, presynaptic_voltage: f64) {
+    //     self.ligand_gates
+    //         .iter_mut()
+    //         .for_each(|i| {
+    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
+    //         });
+    // }
 
-    pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64) {
-        self.ligand_gates
-            .iter_mut()
-            .for_each(|i| {
-                i.neurotransmitter.apply_t_change(presynaptic_voltage);
-                i.neurotransmitter.apply_r_change(self.dt);
-            });
-    }
+    // pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64) {
+    //     self.ligand_gates
+    //         .iter_mut()
+    //         .for_each(|i| {
+    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
+    //             i.neurotransmitter.apply_r_change(self.dt);
+    //         });
+    // }
 
-    pub fn set_neurotransmitter_currents(&mut self) {
-        self.ligand_gates
-            .iter_mut()
-            .for_each(|i| {
-                i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt);
-        });
-    }
+    // pub fn set_neurotransmitter_currents(&mut self) {
+    //     self.ligand_gates
+    //         .iter_mut()
+    //         .for_each(|i| {
+    //             i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt);
+    //     });
+    // }
 
-    pub fn get_neurotransmitter_currents(&self) -> f64 {
-        self.ligand_gates
-            .iter()
-            .map(|i| i.current * i.neurotransmitter.r)
-            .sum::<f64>() * (self.dt / self.c_m)
-    }
+    // pub fn get_neurotransmitter_currents(&self) -> f64 {
+    //     self.ligand_gates
+    //         .iter()
+    //         .map(|i| i.current * i.neurotransmitter.r)
+    //         .sum::<f64>() * (self.dt / self.c_m)
+    // }
 
-    pub fn update_based_on_neurotransmitter_currents(&mut self) {
-        self.current_voltage += self.get_neurotransmitter_currents()
-    }
+    // pub fn update_based_on_neurotransmitter_currents(&mut self) {
+    //     self.current_voltage += self.get_neurotransmitter_currents()
+    // }
 }
 
 // trait IterateAndSpike {
@@ -508,14 +520,14 @@ impl IntegrateAndFireCell {
 
 pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
 
-pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, input_current: f64, do_receptor_kinetics: bool) {
-    if do_receptor_kinetics {
-        cell.update_conc_and_receptor_kinetics(input_current);
-    } else {
-        cell.update_neurotransmitter_concentration(input_current);
-    }
-    cell.set_neurotransmitter_currents();
-}
+// pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, input_current: f64, do_receptor_kinetics: bool) {
+//     if do_receptor_kinetics {
+//         cell.update_conc_and_receptor_kinetics(input_current);
+//     } else {
+//         cell.update_neurotransmitter_concentration(input_current);
+//     }
+//     cell.set_neurotransmitter_currents();
+// }
 
 // fn heaviside(x: f64) -> f64 {
 //     if (x > 0) {
@@ -593,188 +605,98 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
-// enum NeurotransmitterType {
-    // Basic,
-//     AMPA,
-//     NMDA,
-//     GABAa,
-//     GABAb,
-// }
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+#[allow(dead_code)] 
+// basic neurotransmitter type for unspecific general glutamate testing
+pub enum NeurotransmitterType {
+    Basic,
+    AMPA,
+    NMDA,
+    GABAa,
+    GABAb,
+}
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct Neurotransmitter {
-//     pub t_max: f64,
-//     pub t: f64,
-//     pub v_p: f64,
-//     pub k_p: f64,
-// }
-
-// macro_rules! impl_neurotransmitter_default {
-//     ($trait:ident, $method:ident, $t_max:expr) => {
-//         impl $trait for Neurotransmitter {
-//             fn $method() -> Self {
-//                 Neurotransmitter {
-//                     t_max: $t_max,
-//                     t: 0.,
-//                     v_p: 2., // 2 mV
-//                     k_p: 5., // 5 mV
-//                 }
-//             }
-//         }
-//     };
-// }
-
-// impl Neurotransmitter {
-//     fn apply_t_change(&mut self, voltage: f64) {
-//         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
-//     }
-// }
-
-// impl_neurotransmitter_default!(Default, default, 1.0);
-// impl_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-// impl_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-// impl_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-// impl_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
-// impl_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
-
-// #[derive(Debug, Clone, Copy)]
-// pub struct Receptor {
-//     pub r: f64,
-//     pub alpha: f64,
-//     pub beta: f64,
-// }
-
-// macro_rules! impl_receptor_default {
-//     ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
-//         impl $trait for Receptor {
-//             fn $method() -> Self {
-//                 Receptor {
-//                     r: 0.,
-//                     alpha: $alpha, // mM^-1 * ms^-1
-//                     beta: $beta, // ms^-1
-//                 }
-//             }
-//         }
-//     };
-// }
-
-// impl Receptor {
-//     fn apply_r_change(&mut self, t: f64, dt: f64) {
-//         self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
-//     }
-// }
-
-// impl_receptor_default!(Default, default, 1., 1.);
-// impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
-// impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
-// impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
-// impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
-// impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
+impl NeurotransmitterType {
+    pub fn to_str(&self) -> &str {
+        match self {
+            NeurotransmitterType::Basic => "Basic",
+            NeurotransmitterType::AMPA => "AMPA",
+            NeurotransmitterType::GABAa => "GABAa",
+            NeurotransmitterType::GABAb => "GABAb",
+            NeurotransmitterType::NMDA => "NMDA",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct Neurotransmitter {
     pub t_max: f64,
-    pub alpha: f64,
-    pub beta: f64,
     pub t: f64,
-    pub r: f64,
     pub v_p: f64,
     pub k_p: f64,
 }
 
-impl Default for Neurotransmitter {
-    fn default() -> Self {
-        Neurotransmitter {
-            t_max: 1.,
-            alpha: 1.,
-            beta: 1.,
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
+macro_rules! impl_neurotransmitter_default {
+    ($trait:ident, $method:ident, $t_max:expr) => {
+        impl $trait for Neurotransmitter {
+            fn $method() -> Self {
+                Neurotransmitter {
+                    t_max: $t_max,
+                    t: 0.,
+                    v_p: 2., // 2 mV
+                    k_p: 5., // 5 mV
+                }
+            }
         }
-    }
-}
-
-impl AMPADefault for Neurotransmitter {
-    fn ampa_default() -> Self {
-        Neurotransmitter {
-            t_max: 1.,
-            alpha: 1.1, // mM^-1 * ms^-1
-            beta: 0.19, // ms^-1
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
-        }
-    }
-}
-
-impl GABAaDefault for Neurotransmitter {
-    fn gabaa_default() -> Self {
-        Neurotransmitter {
-            t_max: 1.,
-            alpha: 5.0, // mM^-1 * ms^-1
-            beta: 0.18, // ms^-1
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
-        }
-    }
-}
-
-impl GABAbDefault for Neurotransmitter {
-    fn gabab_default() -> Self {
-        Neurotransmitter {
-            t_max: 0.5,
-            alpha: 0.016, // mM^-1 * ms^-1
-            beta: 0.0047, // ms^-1
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
-        }
-    }
-}
-
-impl GABAbDefault2 for Neurotransmitter {
-    fn gabab_default2() -> Self {
-        Neurotransmitter {
-            t_max: 0.5,
-            alpha: 0.52, // mM^-1 * ms^-1 // k1
-            beta: 0.0013, // ms^-1 // k2
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
-        }
-    }
-}
-
-impl NMDADefault for Neurotransmitter {
-    fn nmda_default() -> Self {
-        Neurotransmitter {
-            t_max: 1.,
-            alpha: 0.072, // mM^-1 * ms^-1
-            beta: 0.0066, // ms^-1
-            t: 0.,
-            r: 0.,
-            v_p: 2., // 2 mV
-            k_p: 5., // 5 mV
-        }
-    }
+    };
 }
 
 impl Neurotransmitter {
-    fn apply_r_change(&mut self, dt: f64) {
-        self.r += (self.alpha * self.t * (1. - self.r) - self.beta * self.r) * dt;
-    }
-
     fn apply_t_change(&mut self, voltage: f64) {
         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
     }
 }
+
+impl_neurotransmitter_default!(Default, default, 1.0);
+impl_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
+impl_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
+impl_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
+impl_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
+impl_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
+
+#[derive(Debug, Clone, Copy)]
+pub struct Receptor {
+    pub r: f64,
+    pub alpha: f64,
+    pub beta: f64,
+}
+
+macro_rules! impl_receptor_default {
+    ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
+        impl $trait for Receptor {
+            fn $method() -> Self {
+                Receptor {
+                    r: 0.,
+                    alpha: $alpha, // mM^-1 * ms^-1
+                    beta: $beta, // ms^-1
+                }
+            }
+        }
+    };
+}
+
+impl Receptor {
+    fn apply_r_change(&mut self, t: f64, dt: f64) {
+        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
+    }
+}
+
+impl_receptor_default!(Default, default, 1., 1.);
+impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
+impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
+impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
+impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
+impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
 
 #[derive(Debug, Clone)]
 pub enum IonotropicReceptorType {
@@ -786,80 +708,80 @@ pub enum IonotropicReceptorType {
 }
 
 #[derive(Debug, Clone)]
-pub struct GeneralLigandGatedChannel {
+pub struct LigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
-    pub neurotransmitter: Neurotransmitter, // receptor: Receptor
+    pub receptor: Receptor,
     pub receptor_type: IonotropicReceptorType,
     pub current: f64,
 }
 
-impl Default for GeneralLigandGatedChannel {
+impl Default for LigandGatedChannel {
     fn default() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            neurotransmitter: Neurotransmitter::default(),
+            receptor: Receptor::default(),
             receptor_type: IonotropicReceptorType::Basic(1.0),
             current: 0.,
         }
     }
 }
 
-impl AMPADefault for GeneralLigandGatedChannel {
+impl AMPADefault for LigandGatedChannel {
     fn ampa_default() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            neurotransmitter: Neurotransmitter::ampa_default(),
+            receptor: Receptor::ampa_default(),
             receptor_type: IonotropicReceptorType::AMPA(1.0),
             current: 0.,
         }
     }
 }
 
-impl GABAaDefault for GeneralLigandGatedChannel {
+impl GABAaDefault for LigandGatedChannel {
     fn gabaa_default() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -80., // -80 mV
-            neurotransmitter: Neurotransmitter::gabaa_default(),
+            receptor: Receptor::gabaa_default(),
             receptor_type: IonotropicReceptorType::GABAa(1.0),
             current: 0.,
         }
     }
 }
 
-impl GABAbDefault for GeneralLigandGatedChannel {
+impl GABAbDefault for LigandGatedChannel {
     fn gabab_default() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
-            neurotransmitter: Neurotransmitter::gabab_default(),
+            receptor: Receptor::gabab_default(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
 }
 
-impl GABAbDefault2 for GeneralLigandGatedChannel {
+impl GABAbDefault2 for LigandGatedChannel {
     fn gabab_default2() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
-            neurotransmitter: Neurotransmitter::gabab_default2(),
+            receptor: Receptor::gabab_default2(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
 }
 
-impl NMDADefault for GeneralLigandGatedChannel {
+impl NMDADefault for LigandGatedChannel {
     fn nmda_default() -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            neurotransmitter: Neurotransmitter::nmda_default(),
+            receptor: Receptor::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(BV::default()),
             current: 0.,
         }
@@ -870,25 +792,25 @@ pub trait NMDAWithBV {
     fn nmda_with_bv(bv: BV) -> Self;
 }
 
-impl NMDAWithBV for GeneralLigandGatedChannel {
+impl NMDAWithBV for LigandGatedChannel {
     fn nmda_with_bv(bv: BV) -> Self {
-        GeneralLigandGatedChannel {
+        LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            neurotransmitter: Neurotransmitter::nmda_default(),
+            receptor: Receptor::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(bv),
             current: 0.,
         }
     }
 }
 
-impl GeneralLigandGatedChannel {
-    fn get_modifier(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
+impl LigandGatedChannel {
+    fn get_modifier(&mut self, voltage: f64, dt: f64) -> f64 {
         match &mut self.receptor_type {
             IonotropicReceptorType::AMPA(value) => *value,
             IonotropicReceptorType::GABAa(value) => *value,
             IonotropicReceptorType::GABAb(value) => {
-                value.g += (value.k3 * r - value.k4 * value.g) * dt;
+                value.g += (value.k3 * self.receptor.r - value.k4 * value.g) * dt;
                 value.calculate_modifer()
             }, // G^N / (G^N + Kd)
             IonotropicReceptorType::NMDA(value) => value.calculate_b(voltage),
@@ -896,10 +818,10 @@ impl GeneralLigandGatedChannel {
         }
     }
 
-    pub fn calculate_g(&mut self, voltage: f64, r: f64, dt: f64) -> f64 {
-        let modifier = self.get_modifier(voltage, r, dt);
+    pub fn calculate_g(&mut self, voltage: f64, dt: f64) -> f64 {
+        let modifier = self.get_modifier(voltage, dt);
 
-        self.current = modifier * self.g * (voltage - self.reversal);
+        self.current = modifier * self.receptor.r * self.g * (voltage - self.reversal);
 
         self.current
     }
@@ -915,69 +837,106 @@ impl GeneralLigandGatedChannel {
     }
 }
 
-// struct GeneralLigandGatedChannels{ 
-//     ligand_gates: HashMap<NeurotransmitterType, GeneralLigandGatedChannel> 
-// }
+#[derive(Clone, Debug)]
+pub struct LigandGatedChannels{ 
+    pub ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> 
+}
 
-// impl GeneralLigandGatedChannels {
-//     // r should be stored with receptor
-//     // should be 
-//     // self.current = modifier * self.r * self.g * (voltage - self.reversal);
-//     fn set_neurotransmitter_currents(&mut self, voltage: f64, dt: f64) {
-//         self.ligand_gates
-//             .values_mut()
-//             .for_each(|i| {
-//                 i.calculate_g(self.current_voltage, self.dt);
-//         });
-//     }
+impl Default for LigandGatedChannels {
+    fn default() -> Self {
+        LigandGatedChannels {
+            ligand_gates: HashMap::new(),
+        }
+    }
+}
 
-//     fn get_neurotransmitter_currents(&self, dt: f64, c_m: f64) -> f64 {
-//         self.ligand_gates
-//             .values()
-//             .iter()
-//             .map(|i| i.current)
-//             .sum::<f64>() * (self.dt / self.c_m)
-//     }
+impl LigandGatedChannels {
+    pub fn len(&self) -> usize {
+        self.ligand_gates.len()
+    }
 
-//     fn update_receptor_kinetics(&mut self, t_total: Option<HashMap<NeurotransmitterType, f64>>) {
-//         match t_total {
-//             Some(t_hashmap) => {
-//                 t_hashmap.iter()
-//                     .for_each(|(key, value)| {
-//                         if let Some(gate) = self.ligand_gates.get(key) {
-//                             gate.receptor.apply_r_change(value);
-//                         }
-//                     })
-//             },
-//             None => {}
-//         }
-//     }
-// }
-
-// struct Neurotransmitters {
-//     neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter>
-// }
-
-// impl Neurotransmitters {
-//     fn get_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
-//         self.iter()
-//             .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
-//             .collect::<HashMap<NeurotransmitterType, f64>>();
-//     }
-
-    // fn apply_t_changes(&mut self, voltage: f64) {
-    //     self.values_mut()
-    //         .for_each(|value| value.apply_t_change(voltage));
+    // pub fn keys(&self) -> Keys<NeurotransmitterType, LigandGatedChannel> {
+    //     self.ligand_gates.keys()
     // }
-// }
 
-// fn weight_neurotransmitter_concentration(
-//     neurotransmitter_hashmap: &mut HashMap<NeurotransmitterType, f64>, 
-//     weight: f64
-// ) {
-//     neurotransmitter_hashmap.values_mut()
-//         .for_each(|value| *value *= weight);
-// }
+    pub fn values(&self) -> Values<NeurotransmitterType, LigandGatedChannel> {
+        self.ligand_gates.values()
+    }
+
+    pub fn set_receptor_currents(&mut self, voltage: f64, dt: f64) {
+        self.ligand_gates
+            .values_mut()
+            .for_each(|i| {
+                i.calculate_g(voltage, dt);
+        });
+    }
+
+    pub fn get_neurotransmitter_currents(&self, dt: f64, c_m: f64) -> f64 {
+        self.ligand_gates
+            .values()
+            .map(|i| i.current)
+            .sum::<f64>() * (dt / c_m)
+    }
+
+    pub fn update_receptor_kinetics(&mut self, t_total: Option<HashMap<NeurotransmitterType, f64>>, dt: f64) {
+        match t_total {
+            Some(mut t_hashmap) => {
+                t_hashmap.iter_mut()
+                    .for_each(|(key, value)| {
+                        if let Some(gate) = self.ligand_gates.get_mut(key) {
+                            gate.receptor.apply_r_change(*value, dt);
+                        }
+                    })
+            },
+            None => {}
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Neurotransmitters {
+    pub neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter>
+}
+
+impl Default for Neurotransmitters {
+    fn default() -> Self {
+        Neurotransmitters {
+            neurotransmitters: HashMap::new(),
+        }
+    }
+}
+
+impl Neurotransmitters {
+    // pub fn keys(&self) -> Keys<NeurotransmitterType, Neurotransmitter> {
+    //     self.neurotransmitters.keys()
+    // }
+
+    pub fn values(&self) -> Values<NeurotransmitterType, Neurotransmitter> {
+        self.neurotransmitters.values()
+    }
+
+    fn get_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+        self.neurotransmitters.iter()
+            .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
+            .collect::<HashMap<NeurotransmitterType, f64>>()
+    }
+
+    fn apply_t_changes(&mut self, voltage: f64) {
+        self.neurotransmitters.values_mut()
+            .for_each(|value| value.apply_t_change(voltage));
+    }
+}
+
+fn weight_neurotransmitter_concentration(
+    neurotransmitter_hashmap: &HashMap<NeurotransmitterType, f64>, 
+    weight: f64
+) -> HashMap<NeurotransmitterType, f64> {
+    let mut return_hashmap = neurotransmitter_hashmap.clone();
+
+    return_hashmap.values_mut().for_each(|value| *value *= weight);
+
+    return_hashmap
+}
 
 // fn sum_neurotransmitter_concentrations(
 //     neurotransmitter_hashmaps: &Vec<HashMap<NeurotransmitterType, f64>>
@@ -1294,10 +1253,10 @@ pub struct HodgkinHuxleyCell {
     pub m: Gate,
     pub n: Gate,
     pub h: Gate,
-    pub ligand_gates: Vec<GeneralLigandGatedChannel>,
+    // pub ligand_gates: Vec<GeneralLigandGatedChannel>,
     pub additional_gates: Vec<AdditionalGates>,
-    // pub presynaptic_neurotransmitter: 
-    // pub ligand_gates: GeneralLigandGatedChannels,
+    pub synaptic_neurotransmitters: Neurotransmitters,
+    pub ligand_gates: LigandGatedChannels,
     pub bayesian_params: BayesianParameters,
 }
 
@@ -1342,7 +1301,8 @@ impl Default for HodgkinHuxleyCell {
             m: default_gate.clone(), 
             n: default_gate.clone(), 
             h: default_gate,  
-            ligand_gates: vec![],
+            synaptic_neurotransmitters: Neurotransmitters::default(), 
+            ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
             bayesian_params: BayesianParameters::default() 
         }
@@ -1422,12 +1382,7 @@ impl HodgkinHuxleyCell {
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
 
-        let i_ligand_gates = self.ligand_gates
-            .iter_mut()
-            .map(|i| 
-                i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt) * i.neurotransmitter.r
-            )
-            .sum::<f64>();
+        let i_ligand_gates = self.ligand_gates.get_neurotransmitter_currents(self.dt, self.c_m);
 
         let i_additional_gates = self.additional_gates
             .iter_mut()
@@ -1440,13 +1395,16 @@ impl HodgkinHuxleyCell {
         self.current_voltage += self.dt * i_sum / self.c_m;
     }
 
-    pub fn update_neurotransmitter(&mut self, presynaptic_voltage: f64) {
-        self.ligand_gates
-            .iter_mut()
-            .for_each(|i| {
-                i.neurotransmitter.apply_t_change(presynaptic_voltage);
-                i.neurotransmitter.apply_r_change(self.dt);
-            });
+    pub fn update_neurotransmitters(&mut self) {
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+    }
+
+    pub fn update_receptors(
+        &mut self, 
+        t_total: Option<HashMap<NeurotransmitterType, f64>>
+    ) {
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt)
     }
 
     pub fn update_gate_states(&mut self) {
@@ -1459,6 +1417,16 @@ impl HodgkinHuxleyCell {
         self.update_gate_time_constants(self.current_voltage);
         self.update_cell_voltage(input);
         self.update_gate_states();
+    }
+
+    pub fn iterate_with_neurotransmitter(
+        &mut self, 
+        input: f64, 
+        t_total: Option<HashMap<NeurotransmitterType, f64>>
+    ) {
+        self.update_neurotransmitters();
+        self.update_receptors(t_total);
+        self.iterate(input);
     }
 
     pub fn run_static_input(
@@ -1569,7 +1537,6 @@ impl HodgkinHuxleyCell {
                 );
                 let bayesian_input = input * bayesian_factor;
 
-                self.update_neurotransmitter(bayesian_input);
                 self.iterate(bayesian_input);
             } else {
                 self.iterate(input);
@@ -1616,15 +1583,16 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
 pub fn iterate_coupled_hodgkin_huxley(
     presynaptic_neuron: &mut HodgkinHuxleyCell, 
     postsynaptic_neuron: &mut HodgkinHuxleyCell,
+    do_receptor_kinetics: bool,
     bayesian: bool,
     input_current: f64,
 ) {
     if bayesian {
-        let pre_bayesian_factor = &presynaptic_neuron.get_bayesian_factor();
-        let post_bayesian_factor = &postsynaptic_neuron.get_bayesian_factor();
+        let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
+        let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
 
-        presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
-        postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
+        // presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
+        // postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
 
         presynaptic_neuron.iterate(
             input_current * pre_bayesian_factor
@@ -1635,18 +1603,39 @@ pub fn iterate_coupled_hodgkin_huxley(
             &*postsynaptic_neuron,
         );
 
-        postsynaptic_neuron.iterate(
-            current * post_bayesian_factor
+        let t_total = match do_receptor_kinetics {
+            true => {
+                let t = presynaptic_neuron.synaptic_neurotransmitters.get_concentrations();
+                let t = weight_neurotransmitter_concentration(&t, post_bayesian_factor);
+
+                Some(t)
+            },
+            false => None,
+        };
+
+        postsynaptic_neuron.iterate_with_neurotransmitter(
+            current * post_bayesian_factor,
+            t_total,
         );
     } else {
-        presynaptic_neuron.update_neurotransmitter(input_current);
-        postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
+        // presynaptic_neuron.update_neurotransmitter(input_current);
+        // postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
 
         presynaptic_neuron.iterate(input_current);
 
         let current = gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
+        );
+
+        let t_total = match do_receptor_kinetics {
+            true => Some(presynaptic_neuron.synaptic_neurotransmitters.get_concentrations()),
+            false => None,
+        };
+
+        postsynaptic_neuron.iterate_with_neurotransmitter(
+            current,
+            t_total,
         );
 
         postsynaptic_neuron.iterate(current);
