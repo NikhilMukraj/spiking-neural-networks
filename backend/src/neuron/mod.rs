@@ -151,10 +151,14 @@ pub trait Potentiation {
     fn get_potentiation_type(&self) -> PotentiationType;
 }
 
-pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation {
+pub trait BayesianFactor {
+    fn get_bayesian_factor(&self) -> f64;
+}
+
+pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation + BayesianFactor {
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
-    fn get_ligand_gates(&self) -> LigandGatedChannels;
-    fn get_neurotransmitters(&self) -> Neurotransmitters;
+    fn get_ligand_gates(&self) -> &LigandGatedChannels;
+    fn get_neurotransmitters(&self) -> &Neurotransmitters;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
@@ -907,6 +911,10 @@ impl Default for Neurotransmitters {
 }
 
 impl Neurotransmitters {
+    pub fn len(&self) -> usize {
+        self.neurotransmitters.keys().len()
+    }
+
     // pub fn keys(&self) -> Keys<NeurotransmitterType, Neurotransmitter> {
     //     self.neurotransmitters.keys()
     // }
@@ -928,14 +936,10 @@ impl Neurotransmitters {
 }
 
 fn weight_neurotransmitter_concentration(
-    neurotransmitter_hashmap: &HashMap<NeurotransmitterType, f64>, 
+    neurotransmitter_hashmap: &mut HashMap<NeurotransmitterType, f64>, 
     weight: f64
-) -> HashMap<NeurotransmitterType, f64> {
-    let mut return_hashmap = neurotransmitter_hashmap.clone();
-
-    return_hashmap.values_mut().for_each(|value| *value *= weight);
-
-    return_hashmap
+) {
+    neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
 
 // fn sum_neurotransmitter_concentrations(
@@ -1253,7 +1257,10 @@ pub struct HodgkinHuxleyCell {
     pub m: Gate,
     pub n: Gate,
     pub h: Gate,
-    // pub ligand_gates: Vec<GeneralLigandGatedChannel>,
+    pub v_th: f64,
+    pub was_increasing: bool,
+    pub last_spiking_time: Option<f64>,
+    pub is_spiking: bool,
     pub additional_gates: Vec<AdditionalGates>,
     pub synaptic_neurotransmitters: Neurotransmitters,
     pub ligand_gates: LigandGatedChannels,
@@ -1275,6 +1282,17 @@ impl GapConductance for HodgkinHuxleyCell {
 impl Potentiation for HodgkinHuxleyCell {
     fn get_potentiation_type(&self) -> PotentiationType {
         self.potentiation_type
+    }
+}
+
+impl BayesianFactor for HodgkinHuxleyCell {
+    fn get_bayesian_factor(&self) -> f64 {
+        limited_distr(
+            self.bayesian_params.mean, 
+            self.bayesian_params.std, 
+            self.bayesian_params.min, 
+            self.bayesian_params.max,
+        )
     }
 }
 
@@ -1301,6 +1319,10 @@ impl Default for HodgkinHuxleyCell {
             m: default_gate.clone(), 
             n: default_gate.clone(), 
             h: default_gate,  
+            v_th: 60.,
+            is_spiking: false,
+            was_increasing: false,
+            last_spiking_time: None,
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
@@ -1417,6 +1439,7 @@ impl HodgkinHuxleyCell {
         self.update_gate_time_constants(self.current_voltage);
         self.update_cell_voltage(input);
         self.update_gate_states();
+        self.update_neurotransmitters();
     }
 
     pub fn iterate_with_neurotransmitter(
@@ -1424,7 +1447,6 @@ impl HodgkinHuxleyCell {
         input: f64, 
         t_total: Option<HashMap<NeurotransmitterType, f64>>
     ) {
-        self.update_neurotransmitters();
         self.update_receptors(t_total);
         self.iterate(input);
     }
@@ -1505,15 +1527,6 @@ impl HodgkinHuxleyCell {
         }
     }
 
-    pub fn get_bayesian_factor(&self) -> f64 {
-        limited_distr(
-            self.bayesian_params.mean, 
-            self.bayesian_params.std, 
-            self.bayesian_params.min, 
-            self.bayesian_params.max,
-        )
-    }
-
     pub fn peaks_test(
         &mut self, 
         input: f64, 
@@ -1560,6 +1573,51 @@ impl HodgkinHuxleyCell {
     }
 }
 
+impl IterateAndSpike for HodgkinHuxleyCell {
+    fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+        let last_voltage = self.current_voltage;
+        self.iterate(input_current);
+
+        let increasing_right_now = last_voltage < self.current_voltage;
+        let threshold_crossed = self.current_voltage > self.v_th;
+        let is_spiking = threshold_crossed  && self.was_increasing && !increasing_right_now;
+        self.is_spiking = is_spiking;
+        self.was_increasing = increasing_right_now;
+
+        is_spiking
+    }
+
+    fn get_ligand_gates(&self) -> &LigandGatedChannels {
+        &self.ligand_gates
+    }
+
+    fn get_neurotransmitters(&self) -> &Neurotransmitters {
+        &self.synaptic_neurotransmitters
+    }
+
+    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+        self.synaptic_neurotransmitters.get_concentrations()
+    }
+
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f64, 
+        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+    ) -> bool {
+        let last_voltage = self.current_voltage;
+        self.iterate_with_neurotransmitter(input_current, t_total);
+
+        let increasing_right_now = last_voltage < self.current_voltage;
+        let threshold_crossed = self.current_voltage > self.v_th;
+        let is_spiking = threshold_crossed  && self.was_increasing && !increasing_right_now;
+
+        self.is_spiking = is_spiking;
+        self.was_increasing = increasing_right_now;
+
+        is_spiking
+    }
+}
+
 pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
@@ -1580,9 +1638,9 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
     sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
 
-pub fn iterate_coupled_hodgkin_huxley(
-    presynaptic_neuron: &mut HodgkinHuxleyCell, 
-    postsynaptic_neuron: &mut HodgkinHuxleyCell,
+pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
+    presynaptic_neuron: &mut T, 
+    postsynaptic_neuron: &mut T,
     do_receptor_kinetics: bool,
     bayesian: bool,
     input_current: f64,
@@ -1591,10 +1649,7 @@ pub fn iterate_coupled_hodgkin_huxley(
         let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
         let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
 
-        // presynaptic_neuron.update_neurotransmitter(input_current * pre_bayesian_factor);
-        // postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage * post_bayesian_factor);
-
-        presynaptic_neuron.iterate(
+        let _pre_spiking = presynaptic_neuron.iterate_and_spike(
             input_current * pre_bayesian_factor
         );
 
@@ -1605,23 +1660,20 @@ pub fn iterate_coupled_hodgkin_huxley(
 
         let t_total = match do_receptor_kinetics {
             true => {
-                let t = presynaptic_neuron.synaptic_neurotransmitters.get_concentrations();
-                let t = weight_neurotransmitter_concentration(&t, post_bayesian_factor);
+                let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
+                weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
 
                 Some(t)
             },
             false => None,
         };
 
-        postsynaptic_neuron.iterate_with_neurotransmitter(
+        let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
             current * post_bayesian_factor,
             t_total,
         );
     } else {
-        // presynaptic_neuron.update_neurotransmitter(input_current);
-        // postsynaptic_neuron.update_neurotransmitter(presynaptic_neuron.current_voltage);
-
-        presynaptic_neuron.iterate(input_current);
+        let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
 
         let current = gap_junction(
             &*presynaptic_neuron,
@@ -1629,15 +1681,13 @@ pub fn iterate_coupled_hodgkin_huxley(
         );
 
         let t_total = match do_receptor_kinetics {
-            true => Some(presynaptic_neuron.synaptic_neurotransmitters.get_concentrations()),
+            true => Some(presynaptic_neuron.get_neurotransmitter_concentrations()),
             false => None,
         };
 
-        postsynaptic_neuron.iterate_with_neurotransmitter(
+        let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
             current,
             t_total,
         );
-
-        postsynaptic_neuron.iterate(current);
     }
 }
