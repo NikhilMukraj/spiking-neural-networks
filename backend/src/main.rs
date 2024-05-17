@@ -12,9 +12,9 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFType, PotentiationType, IntegrateAndFireCell, CellGrid, 
+    IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, CellGrid, 
     IzhikevichDefault, BayesianParameters, STDPParameters, 
-    signed_gap_junction, iterate_coupled_hodgkin_huxley,
+    signed_gap_junction, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
     NeurotransmitterType, Neurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
@@ -921,7 +921,7 @@ fn test_coupled_neurons(
     iterations: usize,
     input_current: f64,
     // do_receptor_kinetics: bool,
-    // full: bool,
+    // verbose: bool,
     filename: &str,
 ) {
     // if !do_receptor_kinetics {
@@ -936,7 +936,7 @@ fn test_coupled_neurons(
     let mut file = BufWriter::new(File::create(filename)
         .expect("Unable to create file"));
     write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
-    // if full && postsynaptic_neuron.ligand_gates.len() != 0{
+    // if verbose && postsynaptic_neuron.ligand_gates.len() != 0{
     //     for i in postsynaptic_neuron.ligand_gates.iter() {
     //         let name = i.to_str();
     //         write!(file, ",g_{},r_{},T_{}", name, name, name).expect("Unable to write to file");
@@ -991,8 +991,8 @@ fn test_coupled_neurons(
         // presynaptic_neuron.update_based_on_neurotransmitter_currents();
         // postsynaptic_neuron.update_based_on_neurotransmitter_currents();
    
-        // if !full || postsynaptic_neuron.ligand_gates.len() == 0 {
-        // if !full {
+        // if !verbose || postsynaptic_neuron.ligand_gates.len() == 0 {
+        // if !verbose {
         //     writeln!(file, "{}, {}", 
         //         presynaptic_neuron.current_voltage,
         //         postsynaptic_neuron.current_voltage,
@@ -1257,7 +1257,7 @@ fn get_ligand_gates_and_neurotransmitters(
         parse_f64, 
         0.
     )?;
-    println!("{}receptor_occupancy_default", r_default);
+    println!("{}receptor_occupancy_default: {}", prefix_value, r_default);
 
     let t_default: f64 = parse_value_with_default(
         table, 
@@ -1265,7 +1265,7 @@ fn get_ligand_gates_and_neurotransmitters(
         parse_f64, 
         0.
     )?;
-    println!("{}neurotransmitter_concentration_default", t_default);
+    println!("{}neurotransmitter_concentration_default: {}", prefix_value, t_default);
 
     if gabab && gabab_2 {
         return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
@@ -1494,6 +1494,14 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}state_init: {}", prefix, state_init);
 
+    let v_th: f64 = parse_value_with_default(
+        &hodgkin_huxley_table,
+        format!("{}v_th", prefix).as_str(),
+        parse_f64,
+        60.
+    )?;
+    println!("{}v_th: {}", prefix, v_th);
+
     let mut bayesian_params = BayesianParameters::default();
     get_bayesian_params(&mut bayesian_params, hodgkin_huxley_table, None)?;
 
@@ -1522,6 +1530,10 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             m: gate.clone(),
             n: gate.clone(),
             h: gate,
+            v_th: v_th,
+            is_spiking: false,
+            was_increasing: false,
+            last_spiking_time: None,
             synaptic_neurotransmitters: neurotransmitters,
             ligand_gates: ligand_gates,
             additional_gates: additional_gates,
@@ -1543,12 +1555,13 @@ fn coupled_hodgkin_huxley<'a>(
     let mut file = BufWriter::new(File::create(filename)
             .expect("Unable to create file"));
 
-    presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
-    postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
-
     write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
+
+    let has_full_neurotransmission = 
+        presynaptic_neuron.synaptic_neurotransmitters.len() != 0 &&
+        postsynaptic_neuron.ligand_gates.len() != 0;
     
-    if verbose && postsynaptic_neuron.ligand_gates.len() != 0{
+    if verbose && has_full_neurotransmission {
         for i in postsynaptic_neuron.ligand_gates.values() {
             let name = i.to_str();
             write!(file, ",g_{},r_{},T_{}", name, name, name)?;
@@ -1558,7 +1571,7 @@ fn coupled_hodgkin_huxley<'a>(
     write!(file, "\n").expect("Unable to write to file");
         
     for _ in 0..iterations {
-        iterate_coupled_hodgkin_huxley(
+        iterate_coupled_spiking_neurons(
             presynaptic_neuron,
             postsynaptic_neuron, 
             do_receptor_kinetics, 
@@ -1566,7 +1579,7 @@ fn coupled_hodgkin_huxley<'a>(
             input_current
         );
 
-        if !verbose || postsynaptic_neuron.ligand_gates.len() == 0 {
+        if !verbose || !has_full_neurotransmission {
             writeln!(file, "{}, {}", 
                 presynaptic_neuron.current_voltage,
                 postsynaptic_neuron.current_voltage,
@@ -1577,7 +1590,9 @@ fn coupled_hodgkin_huxley<'a>(
                 postsynaptic_neuron.current_voltage,
             ).expect("Unable to write to file");
 
-            for (ligand_gate, neurotransmitter) in postsynaptic_neuron.ligand_gates
+            let ligand_gates = postsynaptic_neuron.get_ligand_gates();
+
+            for (ligand_gate, neurotransmitter) in ligand_gates
                 .values().zip(
                     presynaptic_neuron.synaptic_neurotransmitters.values()
                 ) 
@@ -1864,13 +1879,13 @@ fn main() -> Result<()> {
         };
         println!("input_current: {}", input_current);
 
-        // let full: bool = parse_value_with_default(
+        // let verbose: bool = parse_value_with_default(
         //     &coupled_table, 
-        //     "full", 
+        //     "verbose", 
         //     parse_bool, 
         //     false
         // )?;
-        // println!("full: {}", full);
+        // println!("verbose: {}", verbose);
 
         // let do_receptor_kinetics: bool = parse_value_with_default(
         //     &coupled_table, 
@@ -1939,7 +1954,7 @@ fn main() -> Result<()> {
             iterations,
             input_current,
             // do_receptor_kinetics,
-            // full,
+            // verbose,
             &filename,
         );   
         
@@ -2057,13 +2072,13 @@ fn main() -> Result<()> {
         };
         println!("input_current: {}", input_current);
 
-        let full: bool = parse_value_with_default(
+        let verbose: bool = parse_value_with_default(
             &hodgkin_huxley_table, 
-            "full", 
+            "verbose", 
             parse_bool, 
             false
         )?;
-        println!("full: {}", full);
+        println!("verbose: {}", verbose);
 
         let mut hodgkin_huxley = get_hodgkin_huxley_params(hodgkin_huxley_table, None)?;
 
@@ -2075,7 +2090,7 @@ fn main() -> Result<()> {
             false
         };
 
-        hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename, full);
+        hodgkin_huxley.run_static_input(input_current, bayesian, iterations, &filename, verbose);
 
         println!("\nFinished Hodgkin Huxley test");
     } else if let Some(hodgkin_huxley_peaks) = config.get("hodgkin_huxley_peaks") {
@@ -2103,13 +2118,13 @@ fn main() -> Result<()> {
         };
         println!("tolerance: {}", tolerance);
 
-        let full: bool = parse_value_with_default(
+        let verbose: bool = parse_value_with_default(
             &hodgkin_huxley_peaks, 
-            "full", 
+            "verbose", 
             parse_bool, 
             false
         )?;
-        println!("full: {}", full);
+        println!("verbose: {}", verbose);
 
         let mut hodgkin_huxley = get_hodgkin_huxley_params(hodgkin_huxley_peaks, None)?;
 
@@ -2169,6 +2184,9 @@ fn main() -> Result<()> {
 
         let mut presynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("pre"))?;
         let mut postsynaptic_neuron = get_hodgkin_huxley_params(coupled_hodgkin_huxley_table, Some("post"))?;
+
+        presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
+        postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
 
         coupled_hodgkin_huxley(
             &mut presynaptic_neuron, 
