@@ -5,7 +5,7 @@ use std::{
 use crate::distribution::limited_distr;
 use crate::neuron::{
     IntegrateAndFireCell, HodgkinHuxleyCell, find_peaks, diff,
-    gap_junction, iterate_coupled_hodgkin_huxley,
+    gap_junction, iterate_coupled_spiking_neurons,
     // handle_receptor_kinetics
 };
 use crate::ga::{BitString, decode};
@@ -213,11 +213,14 @@ pub fn get_hodgkin_huxley_summary(
     let mut presynaptic_neuron = hodgkin_huxley_model.clone();
     let mut postsynaptic_neuron = hodgkin_huxley_model.clone();
 
+    presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
+    postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
+
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
 
     for _ in 0..iterations {
-        iterate_coupled_hodgkin_huxley(
+        iterate_coupled_spiking_neurons(
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron, 
             do_receptor_kinetics,
