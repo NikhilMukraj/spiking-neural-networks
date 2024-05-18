@@ -5,6 +5,7 @@ use std::{
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
+use neuron::BayesianFactor;
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
@@ -12,8 +13,8 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, CellGrid, 
-    IzhikevichDefault, BayesianParameters, STDPParameters, 
+    IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, 
+    CellGrid, IzhikevichDefault, BayesianParameters, STDPParameters, 
     signed_gap_junction, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
     NeurotransmitterType, Neurotransmitter, Neurotransmitters,
@@ -321,7 +322,7 @@ fn run_lattice(
     bayesian: bool,
     do_stdp: bool,
     graph_params: &GraphParameters,
-    stdp_params: &STDPParameters,
+    weight_params: &Option<BayesianParameters>,
     mut output_val: Output,
 ) -> Result<(Output, Box<dyn GraphFunctionality>)> {
     let mut rng = rand::thread_rng();
@@ -343,7 +344,7 @@ fn run_lattice(
             let num_to_select = rng.gen_range(1..positions.len());
             let positions = randomly_select_positions(positions, num_to_select);
 
-            graph.initialize_connections((row, col), positions, do_stdp, stdp_params);
+            graph.initialize_connections((row, col), positions, weight_params);
         }
     }
 
@@ -508,8 +509,8 @@ struct SimulationParameters {
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
-    stdp_params: STDPParameters,
     graph_params: GraphParameters,
+    weight_params: Option<BayesianParameters>,
     cell_grid: CellGrid,
 }
 
@@ -570,14 +571,13 @@ fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Va
     let potentiation_type = parse_value_with_default(table, &format!("{}potentiation_type", prefix_value), parse_string, String::from("excitatory"))?;
     if_neuron.potentiation_type = PotentiationType::from_str(&potentiation_type)?;
 
-    if_neuron.bayesian_params.mean = parse_value_with_default(table, &format!("{}bayesian_mean", prefix_value), parse_f64, if_neuron.bayesian_params.mean)?;
-    if_neuron.bayesian_params.std = parse_value_with_default(table, &format!("{}bayesian_std", prefix_value), parse_f64, if_neuron.bayesian_params.std)?;
-    if_neuron.bayesian_params.max = parse_value_with_default(table, &format!("{}bayesian_max", prefix_value), parse_f64, if_neuron.bayesian_params.max)?;
-    if_neuron.bayesian_params.min = parse_value_with_default(table, &format!("{}bayesian_min", prefix_value), parse_f64, if_neuron.bayesian_params.min)?;
+    if_neuron.bayesian_params = get_bayesian_params(table, Some(&format!("{}bayesian", prefix_value)))?;
 
     if_neuron.stdp_params = get_stdp_params(table)?;
 
-    // if_neuron.ligand_gates = get_ligand_gated_channel(table, &format!("{}", prefix_value))?;
+    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(table, &format!("{}", prefix_value))?;
+    if_neuron.synaptic_neurotransmitters = neurotransmitters;
+    if_neuron.ligand_gates = ligand_gates;
 
     Ok(if_neuron)
 }
@@ -617,94 +617,53 @@ fn get_stdp_params(table: &Value) -> Result<STDPParameters> {
     )?; 
     println!("tau_minus: {}", stdp_params.tau_minus);
 
-    stdp_params.weight_bayesian_params.mean = parse_value_with_default(
-        table, 
-        "weight_init", 
-        parse_f64, 
-        stdp_params.weight_bayesian_params.mean
-    )?;
-    println!("weight_init: {}", stdp_params.weight_bayesian_params.mean);
-
-    stdp_params.weight_bayesian_params.std = parse_value_with_default(
-        table, 
-        "weight_std", 
-        parse_f64, 
-        stdp_params.weight_bayesian_params.std
-    )?;
-    println!("weight_std: {}", stdp_params.weight_bayesian_params.std);
-
-    stdp_params.weight_bayesian_params.min = parse_value_with_default(
-        table, 
-        "weight_min", 
-        parse_f64, 
-        stdp_params.weight_bayesian_params.min
-    )?;
-    println!("weight_min: {}", stdp_params.weight_bayesian_params.min);
-
-    stdp_params.weight_bayesian_params.max = parse_value_with_default(
-        table, 
-        "weight_max", 
-        parse_f64, 
-        stdp_params.weight_bayesian_params.max
-    )?;
-    println!("weight_max: {}", stdp_params.weight_bayesian_params.max);
-
     Ok(stdp_params)
 }
 
 fn get_bayesian_params(
-    bayesian_params: &mut BayesianParameters, 
     table: &Value, 
     prefix: Option<&str>
-) -> Result<()> {
-    let (mean_string, std_string, min_string, max_string) = match prefix {
-        Some(prefix_value) => (
-            format!("{}_bayesian_mean", prefix_value),
-            format!("{}_bayesian_std", prefix_value),
-            format!("{}_bayesian_min", prefix_value),
-            format!("{}_bayesian_max", prefix_value),
-        ),
-        None => (
-            String::from("bayesian_mean"),
-            String::from("bayesian_std"), 
-            String::from("bayesian_min"), 
-            String::from("bayesian_max"),
-        )
+) -> Result<BayesianParameters> {
+    let prefix_value = match prefix {
+        Some(value) => String::from(format!("{}_", value)),
+        None => String::from(""),
     };
+
+    let mut bayesian_params = BayesianParameters::default();
 
     bayesian_params.mean = parse_value_with_default(
         table, 
-        &mean_string, 
+        &format!("{}mean", prefix_value), 
         parse_f64, 
         bayesian_params.mean
     )?;
-    println!("{}: {}", mean_string, bayesian_params.mean);
+    println!("{}mean: {}", prefix_value, bayesian_params.mean);
 
     bayesian_params.std = parse_value_with_default(
         table, 
-        &std_string, 
+        &format!("{}std", prefix_value), 
         parse_f64, 
         bayesian_params.std
     )?;
-    println!("{}: {}", std_string, bayesian_params.std);
+    println!("{}: {}", prefix_value, bayesian_params.std);
 
     bayesian_params.min = parse_value_with_default(
         table, 
-        &min_string, 
+        &format!("{}min", prefix_value), 
         parse_f64, 
         bayesian_params.min
     )?;
-    println!("{}: {}", min_string, bayesian_params.min);
+    println!("{}: {}", prefix_value, bayesian_params.min);
 
     bayesian_params.max = parse_value_with_default(
         table, 
-        &max_string, 
+        &format!("{}max", prefix_value), 
         parse_f64, 
         bayesian_params.max
     )?;
-    println!("{}: {}", max_string, bayesian_params.max);
+    println!("{}: {}", prefix_value, bayesian_params.max);
 
-    Ok(())
+    Ok(bayesian_params)
 }
 
 fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
@@ -745,8 +704,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     let do_stdp: bool = parse_value_with_default(&table, "do_stdp", parse_bool, false)?;
     println!("do_stdp: {}", do_stdp);
 
-    let stdp_params = get_stdp_params(&table)?;
-
     let graph_type: String = parse_value_with_default(&table, "graph_type", parse_string, String::from("list"))?;
 
     let graph_type = match Graph::from_str(&graph_type) {
@@ -769,6 +726,11 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 
     let bayesian = parse_value_with_default(&table, "bayesian", parse_bool, false)?;
     println!("bayesian: {}", bayesian);
+
+    let weight_params = match do_stdp {
+        true => Some(get_bayesian_params(&table, Some("weight_initialization"))?),
+        false => None, 
+    };
 
     let if_neuron = get_integrate_and_fire_cell(if_type, None, table)?;
     println!("{:#?}", if_neuron);
@@ -801,22 +763,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         .map(|_| {
             (0..num_cols)
                 .map(|_| {
-                    // IntegrateAndFireCell { 
-                    // if_type: if_type,
-                    // current_voltage: if_params.v_init, 
-                    // refractory_count: 0.0,
-                    // leak_constant: -1.,
-                    // integration_constant: 1.,
-                    // gap_conductance: if_params.gap_conductance_init,
-                    // potentiation_type: PotentiationType::weighted_random_type(excitatory_chance),
-                    // w_value: if_params.w_init,
-                    // stdp_params: stdp_params.clone(),
-                    // last_firing_time: None,
-                    // alpha: if_params.alpha_init,
-                    // beta: if_params.beta_init,
-                    // c: if_params.v_reset,
-                    // d: if_params.d_init,
-                    // ligand_gates: if_params.ligand_gates_init.clone(),
                     let mut current_neuron = if_neuron.clone();
                     current_neuron.potentiation_type = PotentiationType::weighted_random_type(excitatory_chance);
 
@@ -845,9 +791,9 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         averaged: averaged,
         bayesian: bayesian,
         do_stdp: do_stdp,
-        stdp_params: stdp_params,
         graph_params: graph_params,
         cell_grid: cell_grid,
+        weight_params: weight_params,
     });
 }
 
@@ -914,107 +860,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 //         return Ok(score);
 //     }
 // }
-
-fn test_coupled_neurons(
-    presynaptic_neuron: &mut IntegrateAndFireCell,
-    postsynaptic_neuron: &mut IntegrateAndFireCell,
-    iterations: usize,
-    input_current: f64,
-    // do_receptor_kinetics: bool,
-    // verbose: bool,
-    filename: &str,
-) {
-    // if !do_receptor_kinetics {
-    //     presynaptic_neuron.ligand_gates.iter_mut().for_each(|i| {
-    //         i.neurotransmitter.r = 0.8;
-    //     });
-    //     postsynaptic_neuron.ligand_gates.iter_mut().for_each(|i| {
-    //         i.neurotransmitter.r = 0.8;
-    //     });
-    // }
-
-    let mut file = BufWriter::new(File::create(filename)
-        .expect("Unable to create file"));
-    write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
-    // if verbose && postsynaptic_neuron.ligand_gates.len() != 0{
-    //     for i in postsynaptic_neuron.ligand_gates.iter() {
-    //         let name = i.to_str();
-    //         write!(file, ",g_{},r_{},T_{}", name, name, name).expect("Unable to write to file");
-    //     }
-    // }
-    write!(file, "\n").expect("Unable to write to file");
-
-    let pre_mean_change = &presynaptic_neuron.bayesian_params.mean != &BayesianParameters::default().mean;
-    let pre_std_change = &presynaptic_neuron.bayesian_params.std != &BayesianParameters::default().std;
-    let pre_bayesian = if pre_mean_change || pre_std_change {
-        true
-    } else { 
-        false
-    };
-
-    let post_mean_change = &postsynaptic_neuron.bayesian_params.mean != &BayesianParameters::default().mean;
-    let post_std_change = &postsynaptic_neuron.bayesian_params.std != &BayesianParameters::default().std;
-    let post_bayesian = if post_mean_change || post_std_change {
-        true
-    } else { 
-        false
-    };
-
-    for _ in 0..iterations {
-        let presynaptic_input = if pre_bayesian {
-            let pre_bayesian_factor = limited_distr(presynaptic_neuron.bayesian_params.mean, presynaptic_neuron.bayesian_params.std, 0., 1.);
-            let pre_bayesian_input = input_current * pre_bayesian_factor;
-
-            pre_bayesian_input
-        } else {
-            input_current
-        };
-
-        let gap_junction_input = signed_gap_junction(&*presynaptic_neuron, &*postsynaptic_neuron);
-
-        let postsynaptic_input = if post_bayesian {
-            let post_bayesian_factor = limited_distr(postsynaptic_neuron.bayesian_params.mean, postsynaptic_neuron.bayesian_params.std, 0., 1.);
-            let post_bayesian_input = gap_junction_input * post_bayesian_factor;
-
-            post_bayesian_input
-        } else {
-            gap_junction_input
-        };
-            
-        // handle_receptor_kinetics(presynaptic_neuron, presynaptic_input, do_receptor_kinetics);
-        // handle_receptor_kinetics(postsynaptic_neuron, postsynaptic_input, do_receptor_kinetics);
-
-        let _pre_is_spiking = presynaptic_neuron.iterate_and_spike(presynaptic_input);
-
-        let _post_is_spiking = postsynaptic_neuron.iterate_and_spike(postsynaptic_input);
-
-        // presynaptic_neuron.update_based_on_neurotransmitter_currents();
-        // postsynaptic_neuron.update_based_on_neurotransmitter_currents();
-   
-        // if !verbose || postsynaptic_neuron.ligand_gates.len() == 0 {
-        // if !verbose {
-        //     writeln!(file, "{}, {}", 
-        //         presynaptic_neuron.current_voltage,
-        //         postsynaptic_neuron.current_voltage,
-        //     ).expect("Unable to write to file");
-        // } else {
-        //     write!(file, "{}, {}", 
-        //         presynaptic_neuron.current_voltage, 
-        //         postsynaptic_neuron.current_voltage,
-        //     ).expect("Unable to write to file");
-
-        //     // for i in postsynaptic_neuron.ligand_gates.iter() {
-        //     //     write!(file, ", {}, {}, {}", 
-        //     //         i.current,
-        //     //         i.neurotransmitter.r,
-        //     //         i.neurotransmitter.t,
-        //     //     ).expect("Unable to write to file");
-        //     // }
-
-        //     write!(file, "\n").expect("Unable to write to file");
-        // }
-   }
-}
 
 fn write_row(
     file: &mut File, 
@@ -1093,17 +938,19 @@ fn write_row(
 
 // weight change = weight * dopamine
 
-fn update_weight(presynaptic_neuron: &IntegrateAndFireCell, postsynaptic_neuron: &IntegrateAndFireCell) -> f64 {
+fn update_weight<T: IterateAndSpike>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
     let mut delta_w: f64 = 0.;
 
-    match (presynaptic_neuron.last_firing_time, postsynaptic_neuron.last_firing_time) {
+    match (presynaptic_neuron.get_last_spiking_time(), postsynaptic_neuron.get_last_spiking_time()) {
         (Some(t_pre), Some(t_post)) => {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
             if t_pre < t_post {
-                delta_w = postsynaptic_neuron.stdp_params.a_plus * (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.stdp_params.tau_plus).exp();
+                delta_w = postsynaptic_neuron.get_stdp_params().a_plus * 
+                    (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.get_stdp_params().tau_plus).exp();
             } else if t_pre > t_post {
-                delta_w = -1. * postsynaptic_neuron.stdp_params.a_minus * (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.stdp_params.tau_minus).exp();
+                delta_w = -1. * postsynaptic_neuron.get_stdp_params().a_minus * 
+                    (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.get_stdp_params().tau_minus).exp();
             }
         },
         _ => {}
@@ -1112,9 +959,9 @@ fn update_weight(presynaptic_neuron: &IntegrateAndFireCell, postsynaptic_neuron:
     return delta_w;
 }
 
-fn update_isolated_presynaptic_neuron_weights(
-    neurons: &mut Vec<IntegrateAndFireCell>,
-    neuron: &IntegrateAndFireCell,
+fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
+    neurons: &mut Vec<T>,
+    neuron: &T,
     weights: &mut Vec<f64>,
     delta_ws: &mut Vec<f64>,
     timestep: usize,
@@ -1122,15 +969,16 @@ fn update_isolated_presynaptic_neuron_weights(
 ) {
     for (n, i) in is_spikings.iter().enumerate() {
         if *i {
-            neurons[n].last_firing_time = Some(timestep);
+            neurons[n].set_last_firing_time(Some(timestep));
             delta_ws[n] = update_weight(&neurons[n], &neuron);
             weights[n] += delta_ws[n];
         }
     }
 }
 
+// bayesian factor refactored without testing, may have some unintended consequences
 fn test_isolated_stdp(
-    stdp_params: &STDPParameters,
+    weight_params: &BayesianParameters,
     presynaptic_neurons: &mut Vec<IntegrateAndFireCell>,
     postsynaptic_neuron: &mut IntegrateAndFireCell,
     iterations: usize,
@@ -1144,10 +992,10 @@ fn test_isolated_stdp(
 
     let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
         |_| limited_distr(
-            stdp_params.weight_bayesian_params.mean, 
-            stdp_params.weight_bayesian_params.std, 
-            stdp_params.weight_bayesian_params.min, 
-            stdp_params.weight_bayesian_params.max,
+            weight_params.mean, 
+            weight_params.std, 
+            weight_params.min, 
+            weight_params.max,
         )
     ).collect();
 
@@ -1177,14 +1025,9 @@ fn test_isolated_stdp(
             .iter()
             .sum();
         
-        let noise_factor = limited_distr(postsynaptic_neuron.bayesian_params.mean, postsynaptic_neuron.bayesian_params.std, 0., 1.);
+        let noise_factor = postsynaptic_neuron.get_bayesian_factor();
         let presynaptic_inputs: Vec<f64> = (0..n)
-            .map(|i| input_currents[i] * limited_distr(
-                presynaptic_neurons[i].bayesian_params.mean, 
-                presynaptic_neurons[i].bayesian_params.std, 
-                0., 
-                1.
-            ))
+            .map(|i| input_currents[i] * presynaptic_neurons[i].get_bayesian_factor())
             .collect();
         let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
             .map(|(presynaptic_neuron, input_value)| {
@@ -1205,7 +1048,7 @@ fn test_isolated_stdp(
         if is_spiking {
             postsynaptic_neuron.last_firing_time = Some(timestep);
             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-                delta_ws[n_neuron] = update_weight(&i, &postsynaptic_neuron);
+                delta_ws[n_neuron] = update_weight(i, postsynaptic_neuron);
                 weights[n_neuron] += delta_ws[n_neuron];
             }
         }
@@ -1502,8 +1345,9 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     )?;
     println!("{}v_th: {}", prefix, v_th);
 
-    let mut bayesian_params = BayesianParameters::default();
-    get_bayesian_params(&mut bayesian_params, hodgkin_huxley_table, None)?;
+    let stdp_params = get_stdp_params(hodgkin_huxley_table)?;
+
+    let bayesian_params = get_bayesian_params(hodgkin_huxley_table, None)?;
 
     let gate = Gate { 
         alpha: alpha_init, 
@@ -1531,20 +1375,21 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
             n: gate.clone(),
             h: gate,
             v_th: v_th,
+            last_firing_time: None,
             is_spiking: false,
             was_increasing: false,
-            last_spiking_time: None,
             synaptic_neurotransmitters: neurotransmitters,
             ligand_gates: ligand_gates,
             additional_gates: additional_gates,
             bayesian_params: bayesian_params,
+            stdp_params: stdp_params,
         }
     )
 }
 
-fn coupled_hodgkin_huxley<'a>(
-    presynaptic_neuron: &'a mut HodgkinHuxleyCell, 
-    postsynaptic_neuron: &'a mut HodgkinHuxleyCell,
+fn test_coupled_neurons<'a, T: IterateAndSpike>(
+    presynaptic_neuron: &'a mut T, 
+    postsynaptic_neuron: &'a mut T,
     input_current: f64,
     iterations: usize,
     do_receptor_kinetics: bool,
@@ -1552,23 +1397,22 @@ fn coupled_hodgkin_huxley<'a>(
     verbose: bool,
     filename: &str,
 ) -> Result<()> {
-    let mut file = BufWriter::new(File::create(filename)
-            .expect("Unable to create file"));
+    let mut file = BufWriter::new(File::create(filename)?);
 
-    write!(file, "pre_voltage,post_voltage").expect("Unable to write to file");
+    write!(file, "pre_voltage,post_voltage")?;
 
     let has_full_neurotransmission = 
-        presynaptic_neuron.synaptic_neurotransmitters.len() != 0 &&
-        postsynaptic_neuron.ligand_gates.len() != 0;
+        presynaptic_neuron.get_neurotransmitters().len() != 0 &&
+        postsynaptic_neuron.get_ligand_gates().len() != 0;
     
     if verbose && has_full_neurotransmission {
-        for i in postsynaptic_neuron.ligand_gates.values() {
+        for i in postsynaptic_neuron.get_ligand_gates().values() {
             let name = i.to_str();
             write!(file, ",g_{},r_{},T_{}", name, name, name)?;
         }
     } 
     
-    write!(file, "\n").expect("Unable to write to file");
+    write!(file, "\n")?;
         
     for _ in 0..iterations {
         iterate_coupled_spiking_neurons(
@@ -1581,20 +1425,20 @@ fn coupled_hodgkin_huxley<'a>(
 
         if !verbose || !has_full_neurotransmission {
             writeln!(file, "{}, {}", 
-                presynaptic_neuron.current_voltage,
-                postsynaptic_neuron.current_voltage,
-            ).expect("Unable to write to file");
+                presynaptic_neuron.get_current_voltage(),
+                postsynaptic_neuron.get_current_voltage(),
+            )?;
         } else {
             write!(file, "{}, {}", 
-                presynaptic_neuron.current_voltage, 
-                postsynaptic_neuron.current_voltage,
-            ).expect("Unable to write to file");
+                presynaptic_neuron.get_current_voltage(), 
+                postsynaptic_neuron.get_current_voltage(),
+            )?;
 
             let ligand_gates = postsynaptic_neuron.get_ligand_gates();
 
             for (ligand_gate, neurotransmitter) in ligand_gates
                 .values().zip(
-                    presynaptic_neuron.synaptic_neurotransmitters.values()
+                    presynaptic_neuron.get_neurotransmitters().values()
                 ) 
             {
                 write!(file, ", {}, {}, {}", 
@@ -1685,7 +1529,7 @@ fn main() -> Result<()> {
             sim_params.bayesian,
             sim_params.do_stdp,
             &sim_params.graph_params,
-            &sim_params.stdp_params,
+            &sim_params.weight_params,
             output_type,
         )?;
 
@@ -1879,84 +1723,45 @@ fn main() -> Result<()> {
         };
         println!("input_current: {}", input_current);
 
-        // let verbose: bool = parse_value_with_default(
-        //     &coupled_table, 
-        //     "verbose", 
-        //     parse_bool, 
-        //     false
-        // )?;
-        // println!("verbose: {}", verbose);
+        let do_receptor_kinetics: bool = parse_value_with_default(
+            &coupled_table, 
+            "do_receptor_kinetics", 
+            parse_bool, 
+            false
+        )?;
+        println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
-        // let do_receptor_kinetics: bool = parse_value_with_default(
-        //     &coupled_table, 
-        //     "do_receptor_kinetics", 
-        //     parse_bool, 
-        //     false
-        // )?;
-        // println!("do_receptor_kinetics: {}", do_receptor_kinetics);
+        let bayesian: bool = parse_value_with_default(
+            &coupled_table, 
+            "bayesian", 
+            parse_bool, 
+            false
+        )?;
+        println!("bayesian: {}", bayesian);
+
+        let verbose: bool = parse_value_with_default(
+            &coupled_table, 
+            "verbose", 
+            parse_bool, 
+            false
+        )?;
+        println!("verbose: {}", verbose);
 
         let mut presynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("pre"), coupled_table)?;
         let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("post"), coupled_table)?;
         println!("presynaptic: {:#?}", presynaptic_neuron);
         println!("postsynaptic: {:#?}", postsynaptic_neuron);
 
-        // let pre_potentiation_type = parse_value_with_default(
-        //     coupled_table, 
-        //     "pre_potentiation_type", 
-        //     parse_string, 
-        //     String::from("excitatory")
-        // )?;
-        // let pre_potentiation_type = match pre_potentiation_type.to_ascii_lowercase().as_str() {
-        //     "excitatory" => PotentiationType::Excitatory,
-        //     "inhibitory" => PotentiationType::Inhibitory,
-        //     _ => { return Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")) }
-        // };     
-
-        // let mut presynaptic_neuron = IntegrateAndFireCell { 
-        //     if_type: if_type,
-        //     current_voltage: pre_if_params.v_init, 
-        //     refractory_count: 0.0,
-        //     leak_constant: -1.,
-        //     integration_constant: 1.,
-        //     gap_conductance: pre_if_params.gap_conductance_init,
-        //     potentiation_type: pre_potentiation_type,
-        //     w_value: pre_if_params.w_init,
-        //     stdp_params: STDPParameters::default(),
-        //     last_firing_time: None,
-        //     alpha: pre_if_params.alpha_init,
-        //     beta: pre_if_params.beta_init,
-        //     c: pre_if_params.v_reset,
-        //     d: pre_if_params.d_init,
-        //     ligand_gates: pre_if_params.ligand_gates_init.clone(),
-        // };
-    
-        // let mut postsynaptic_neuron = IntegrateAndFireCell { 
-        //     if_type: if_type,
-        //     current_voltage: post_if_params.v_init, 
-        //     refractory_count: 0.0,
-        //     leak_constant: -1.,
-        //     integration_constant: 1.,
-        //     gap_conductance: post_if_params.gap_conductance_init,
-        //     potentiation_type: PotentiationType::Excitatory,
-        //     w_value: post_if_params.w_init,
-        //     stdp_params: STDPParameters::default(),
-        //     last_firing_time: None,
-        //     alpha: post_if_params.alpha_init,
-        //     beta: post_if_params.beta_init,
-        //     c: post_if_params.v_reset,
-        //     d: post_if_params.d_init,
-        //     ligand_gates: post_if_params.ligand_gates_init.clone(),
-        // };
-
         test_coupled_neurons(
             &mut presynaptic_neuron,
             &mut postsynaptic_neuron,
-            iterations,
             input_current,
-            // do_receptor_kinetics,
-            // verbose,
+            iterations,
+            do_receptor_kinetics,
+            bayesian, 
+            verbose,
             &filename,
-        );   
+        )?;   
         
         println!("Finished coupling test");
     } else if let Some(stdp_table) = config.get("stdp_test") {
@@ -2000,35 +1805,10 @@ fn main() -> Result<()> {
         let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
         println!("averaged: {}", averaged);
 
-        let stdp_params = get_stdp_params(&stdp_table)?;
-
-        // let mut postsynaptic_neuron = match if_type {
-        //     IFType::Basic | IFType::Adaptive |
-        //     IFType::AdaptiveExponential => {
-        //         IntegrateAndFireCell {
-        //             if_type: if_type,
-        //             ..IntegrateAndFireCell::default()
-        //         }
-        //     },
-        //     IFType::Izhikevich | IFType::IzhikevichLeaky => {
-        //         IntegrateAndFireCell {
-        //             if_type: if_type,
-        //             ..IntegrateAndFireCell::izhikevich_default()
-        //         }
-        //     }
-        // };
+        let weight_params = get_bayesian_params(&stdp_table, Some("weight_initialization"))?;
 
         let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, None, &stdp_table)?;
         println!("{:#?}", postsynaptic_neuron);
-    
-        // postsynaptic_neuron.gap_conductance = if_params.gap_conductance_init;
-        // postsynaptic_neuron.w_value = if_params.v_init;
-        // postsynaptic_neuron.w_value = if_params.w_init;
-        // postsynaptic_neuron.stdp_params = stdp_params.clone();
-        // postsynaptic_neuron.alpha = if_params.alpha_init;
-        // postsynaptic_neuron.beta = if_params.beta_init;
-        // postsynaptic_neuron.c = if_params.v_reset;
-        // postsynaptic_neuron.d = if_params.d_init;
     
         let mut presynaptic_neurons: Vec<IntegrateAndFireCell> = (0..n).map(|_| postsynaptic_neuron.clone())
             .collect();
@@ -2042,7 +1822,7 @@ fn main() -> Result<()> {
         }
 
         test_isolated_stdp(
-            &stdp_params,
+            &weight_params,
             &mut presynaptic_neurons,
             &mut postsynaptic_neuron,
             iterations,
@@ -2188,7 +1968,7 @@ fn main() -> Result<()> {
         presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
         postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
 
-        coupled_hodgkin_huxley(
+        test_coupled_neurons(
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron,
             input_current,
