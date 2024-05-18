@@ -8,13 +8,18 @@ use serde_json;
 #[path = "../distribution/mod.rs"]
 mod distribution;
 use distribution::limited_distr;
-use crate::neuron::STDPParameters;
+use crate::neuron::BayesianParameters;
 
 
 pub type Position = (usize, usize);
 
 pub trait GraphFunctionality {
-    fn initialize_connections(&mut self, postsynaptic: Position, connections: Vec<Position>, do_stdp: bool, stdp_params: &STDPParameters);
+    fn initialize_connections(
+        &mut self, 
+        postsynaptic: Position, 
+        connections: Vec<Position>, 
+        weight_params: &Option<BayesianParameters>,
+    );
     fn get_every_node(&self) -> Vec<Position>;
     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; 
     fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>);
@@ -81,8 +86,7 @@ impl GraphFunctionality for AdjacencyMatrix {
         &mut self, 
         postsynaptic: Position, 
         connections: Vec<Position>, 
-        do_stdp: bool,
-        stdp_params: &STDPParameters,
+        weight_params: &Option<BayesianParameters>,
     ) {
         if !self.position_to_index.contains_key(&postsynaptic) {
             self.add_vertex(postsynaptic)
@@ -92,18 +96,21 @@ impl GraphFunctionality for AdjacencyMatrix {
                 self.add_vertex(*i);
             }
 
-            if do_stdp {
-                self.edit_weight(i, &postsynaptic, Some(
-                    limited_distr(
-                        stdp_params.weight_bayesian_params.mean, 
-                        stdp_params.weight_bayesian_params.std, 
-                        stdp_params.weight_bayesian_params.min, 
-                        stdp_params.weight_bayesian_params.max,
+            let weight = match weight_params {
+                Some(value) => {
+                    Some(
+                        limited_distr(
+                            value.mean, 
+                            value.std, 
+                            value.min, 
+                            value.max,
+                        )
                     )
-                ));
-            } else {
-                self.edit_weight(i, &postsynaptic, Some(1.0));
-            }
+                },
+                None => Some(1.0),
+            };
+
+            self.edit_weight(i, &postsynaptic, weight);
         }
     }
 
@@ -219,21 +226,21 @@ impl GraphFunctionality for AdjacencyList {
         &mut self, 
         postsynaptic: Position, 
         connections: Vec<Position>, 
-        do_stdp: bool,
-        stdp_params: &STDPParameters,
+        weight_params: &Option<BayesianParameters>,
     ) {
         for i in connections.iter() {
-            let weight = if do_stdp {
-                Some(
-                    limited_distr(
-                        stdp_params.weight_bayesian_params.mean, 
-                        stdp_params.weight_bayesian_params.std, 
-                        stdp_params.weight_bayesian_params.min, 
-                        stdp_params.weight_bayesian_params.max,
+            let weight = match weight_params {
+                Some(value) => {
+                    Some(
+                        limited_distr(
+                            value.mean, 
+                            value.std, 
+                            value.min, 
+                            value.max,
+                        )
                     )
-                )
-            } else {
-                Some(1.0)
+                },
+                None => Some(1.0),
             };
 
             if !self.incoming_connections.contains_key(&postsynaptic) {
