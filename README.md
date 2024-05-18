@@ -55,14 +55,17 @@ EEG processing with fourier transforms, and power spectral density calculations
     - In lattice, return `(f64, Option<HashMap<NeurotransmitterType, f64>>)`, if `receptor_kinetics` is `false`, return `(f64, None)`
   - Old update neurotransmitter function should be removed in favor of this
 
+- When neurotransmitter refactor done, refactor fitting neurons have the option to only consider the postsynaptic neuron when implementing neurotransmission schemes
+
+- **Redo obsidian notes with new code**
+
 - **When neurotransmitter refactor done, move to Hopfield network or lixirnet or Poisson/spike train or FitzHugh-Nagumo**
 
 - Add $\tau_m$ and $C_m$ to fitting parameters
 - Add option to subtract 70 mV to set resting potential for Hodgkin Huxley model in fitting
 
 - Have a set of bayesian parameters for ensemble of neurons to use
-- Seperate STDP parameters into STDP parameters and weight initialization parameters
-  - Obsidian notes on STDP equations
+- Obsidian notes on STDP equations
 - Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
 - Update code in obsidian when refactor is done, maybe update results
 
@@ -141,6 +144,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
   - Can also check for time until convergence as a measure of learning
   - Can also check the stability of liquid as metric
+  - Could also check EEG to see if processing is similar to focused brain activity
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
 
