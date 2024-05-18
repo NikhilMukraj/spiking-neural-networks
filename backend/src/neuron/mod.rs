@@ -40,7 +40,6 @@ pub struct STDPParameters {
     pub a_minus: f64, // negative stdp modifier 
     pub tau_plus: f64, // postitive stdp decay modifier 
     pub tau_minus: f64, // negative stdp decay modifier 
-    pub weight_bayesian_params: BayesianParameters, // weight initialization parameters
 }
 
 impl Default for STDPParameters {
@@ -50,15 +49,16 @@ impl Default for STDPParameters {
             a_minus: 2., 
             tau_plus: 45., 
             tau_minus: 45., 
-            weight_bayesian_params: BayesianParameters {
-                mean: 3.5,
-                std: 1.0,
-                min: 1.75,
-                max: 1.75,
-            },
         }
     }
 }
+
+// weight_bayesian_params: BayesianParameters {
+//     mean: 3.5,
+//     std: 1.0,
+//     min: 1.75,
+//     max: 1.75,
+// },
 
 #[derive(Clone, Copy, Debug)]
 pub enum IFType {
@@ -136,7 +136,8 @@ pub struct IntegrateAndFireCell {
     pub dt: f64, // time step
     pub bayesian_params: BayesianParameters, // bayesian parameters
     pub stdp_params: STDPParameters, // stdp parameters
-    // pub ligand_gates: Vec<GeneralLigandGatedChannel>, // ligand gates
+    pub synaptic_neurotransmitters: Neurotransmitters,
+    pub ligand_gates: LigandGatedChannels, // ligand gates
 }
 
 pub trait CurrentVoltage {
@@ -155,8 +156,14 @@ pub trait BayesianFactor {
     fn get_bayesian_factor(&self) -> f64;
 }
 
-pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation + BayesianFactor {
+pub trait STDP {
+    fn get_stdp_params(&self) -> &STDPParameters;
+    fn get_last_spiking_time(&self) -> Option<usize>;
+}
+
+pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
+    fn set_last_firing_time(&mut self, timestep: Option<usize>);
     fn get_ligand_gates(&self) -> &LigandGatedChannels;
     fn get_neurotransmitters(&self) -> &Neurotransmitters;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
@@ -196,7 +203,8 @@ impl Default for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            // ligand_gates: vec![],
+            synaptic_neurotransmitters: Neurotransmitters::default(),
+            ligand_gates: LigandGatedChannels::default(),
         }
     }
 }
@@ -230,7 +238,8 @@ impl IzhikevichDefault for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            // ligand_gates: vec![],
+            synaptic_neurotransmitters: Neurotransmitters::default(),
+            ligand_gates: LigandGatedChannels::default(),
         }
     }
 }
@@ -250,6 +259,27 @@ impl GapConductance for IntegrateAndFireCell {
 impl Potentiation for IntegrateAndFireCell {
     fn get_potentiation_type(&self) -> PotentiationType {
         self.potentiation_type
+    }
+}
+
+impl BayesianFactor for IntegrateAndFireCell {
+    fn get_bayesian_factor(&self) -> f64 {
+        limited_distr(
+            self.bayesian_params.mean, 
+            self.bayesian_params.std, 
+            self.bayesian_params.min, 
+            self.bayesian_params.max,
+        )
+    }
+}
+
+impl STDP for IntegrateAndFireCell {
+    fn get_stdp_params(&self) -> &STDPParameters {
+        &self.stdp_params
+    }
+
+    fn get_last_spiking_time(&self) -> Option<usize> {
+        self.last_firing_time
     }
 }
 
@@ -410,26 +440,6 @@ impl IntegrateAndFireCell {
         self.izhikevich_handle_spiking()
     }
 
-    pub fn iterate_and_spike(&mut self, i: f64) -> bool  {
-        match self.if_type {
-            IFType::Basic => {
-                self.basic_iterate_and_spike(i)
-            },
-            IFType::Adaptive => {
-                self.adaptive_iterate_and_spike(i)
-            },
-            IFType::AdaptiveExponential => {
-                self.exp_adaptive_iterate_and_spike(i)
-            },
-            IFType::Izhikevich => {
-                self.izhikevich_iterate_and_spike(i)
-            },
-            IFType::IzhikevichLeaky => {
-                self.izhikevich_leaky_iterate_and_spike(i)
-            }
-        }
-    }
-
     pub fn bayesian_iterate_and_spike(&mut self, i: f64, bayesian: bool) -> bool {
         if bayesian {
             self.iterate_and_spike(i * limited_distr(self.bayesian_params.mean, self.bayesian_params.std, 0., 1.))
@@ -471,67 +481,62 @@ impl IntegrateAndFireCell {
             }
         }
     }
-
-    // pub fn update_neurotransmitter_concentration(&mut self, presynaptic_voltage: f64) {
-    //     self.ligand_gates
-    //         .iter_mut()
-    //         .for_each(|i| {
-    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
-    //         });
-    // }
-
-    // pub fn update_conc_and_receptor_kinetics(&mut self, presynaptic_voltage: f64) {
-    //     self.ligand_gates
-    //         .iter_mut()
-    //         .for_each(|i| {
-    //             i.neurotransmitter.apply_t_change(presynaptic_voltage);
-    //             i.neurotransmitter.apply_r_change(self.dt);
-    //         });
-    // }
-
-    // pub fn set_neurotransmitter_currents(&mut self) {
-    //     self.ligand_gates
-    //         .iter_mut()
-    //         .for_each(|i| {
-    //             i.calculate_g(self.current_voltage, i.neurotransmitter.r, self.dt);
-    //     });
-    // }
-
-    // pub fn get_neurotransmitter_currents(&self) -> f64 {
-    //     self.ligand_gates
-    //         .iter()
-    //         .map(|i| i.current * i.neurotransmitter.r)
-    //         .sum::<f64>() * (self.dt / self.c_m)
-    // }
-
-    // pub fn update_based_on_neurotransmitter_currents(&mut self) {
-    //     self.current_voltage += self.get_neurotransmitter_currents()
-    // }
 }
 
-// trait IterateAndSpike {
-//     pub fn iterate_and_spike(&mut self, i: f64);
-// }
+impl IterateAndSpike for IntegrateAndFireCell {
+    fn iterate_and_spike(&mut self, input_current: f64) -> bool  {
+        let is_spiking = match self.if_type {
+            IFType::Basic => {
+                self.basic_iterate_and_spike(input_current)
+            },
+            IFType::Adaptive => {
+                self.adaptive_iterate_and_spike(input_current)
+            },
+            IFType::AdaptiveExponential => {
+                self.exp_adaptive_iterate_and_spike(input_current)
+            },
+            IFType::Izhikevich => {
+                self.izhikevich_iterate_and_spike(input_current)
+            },
+            IFType::IzhikevichLeaky => {
+                self.izhikevich_leaky_iterate_and_spike(input_current)
+            }
+        };
 
-// trait UpdateNeurotransmitter {
-//     pub fn update_neurotransmitter_concentration(&mut self);
-//     pub fn update_receptor_kinetics(&mut self, t_total: f64);
-//     pub fn set_neurotransmitter_currents(&mut self);
-//     pub fn get_neurotransmitter_currents(&self) -> f64;
-//     pub fn update_based_on_neurotransmitter_currents(&self);
-//     pub fn get_ligand_gated_channels(&self) -> &[GeneralLigandGatedChannel];
-// }
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+
+        is_spiking
+    }
+
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.last_firing_time = timestep;
+    }
+
+    fn get_ligand_gates(&self) -> &LigandGatedChannels {
+        &self.ligand_gates
+    }
+
+    fn get_neurotransmitters(&self) -> &Neurotransmitters {
+        &self.synaptic_neurotransmitters
+    }
+
+    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+        self.synaptic_neurotransmitters.get_concentrations()
+    }
+
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f64, 
+        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+    ) -> bool {
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+
+        self.iterate_and_spike(input_current)
+    }
+}
 
 pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
-
-// pub fn handle_receptor_kinetics(cell: &mut IntegrateAndFireCell, input_current: f64, do_receptor_kinetics: bool) {
-//     if do_receptor_kinetics {
-//         cell.update_conc_and_receptor_kinetics(input_current);
-//     } else {
-//         cell.update_neurotransmitter_concentration(input_current);
-//     }
-//     cell.set_neurotransmitter_currents();
-// }
 
 // fn heaviside(x: f64) -> f64 {
 //     if (x > 0) {
@@ -1258,13 +1263,14 @@ pub struct HodgkinHuxleyCell {
     pub n: Gate,
     pub h: Gate,
     pub v_th: f64,
+    pub last_firing_time: Option<usize>,
     pub was_increasing: bool,
-    pub last_spiking_time: Option<f64>,
     pub is_spiking: bool,
     pub additional_gates: Vec<AdditionalGates>,
     pub synaptic_neurotransmitters: Neurotransmitters,
     pub ligand_gates: LigandGatedChannels,
     pub bayesian_params: BayesianParameters,
+    pub stdp_params: STDPParameters,
 }
 
 impl CurrentVoltage for HodgkinHuxleyCell {
@@ -1296,6 +1302,16 @@ impl BayesianFactor for HodgkinHuxleyCell {
     }
 }
 
+impl STDP for HodgkinHuxleyCell {
+    fn get_stdp_params(&self) -> &STDPParameters {
+        &self.stdp_params
+    }
+
+    fn get_last_spiking_time(&self) -> Option<usize> {
+        self.last_firing_time
+    }
+}
+
 impl Default for HodgkinHuxleyCell {
     fn default() -> Self {
         let default_gate = Gate {
@@ -1320,13 +1336,14 @@ impl Default for HodgkinHuxleyCell {
             n: default_gate.clone(), 
             h: default_gate,  
             v_th: 60.,
+            last_firing_time: None,
             is_spiking: false,
             was_increasing: false,
-            last_spiking_time: None,
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
-            bayesian_params: BayesianParameters::default() 
+            bayesian_params: BayesianParameters::default(),
+            stdp_params: STDPParameters::default(),
         }
     }
 }
@@ -1587,6 +1604,10 @@ impl IterateAndSpike for HodgkinHuxleyCell {
         is_spiking
     }
 
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.last_firing_time = timestep;
+    }
+
     fn get_ligand_gates(&self) -> &LigandGatedChannels {
         &self.ligand_gates
     }
@@ -1675,7 +1696,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     } else {
         let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
 
-        let current = gap_junction(
+        let current = signed_gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
