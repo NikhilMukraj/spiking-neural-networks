@@ -488,7 +488,7 @@ impl IntegrateAndFireCell {
 }
 
 impl IterateAndSpike for IntegrateAndFireCell {
-    fn iterate_and_spike(&mut self, input_current: f64) -> bool  {
+    fn iterate_and_spike(&mut self, input_current: f64) -> bool {
         let is_spiking = match self.if_type {
             IFType::Basic => {
                 self.basic_iterate_and_spike(input_current)
