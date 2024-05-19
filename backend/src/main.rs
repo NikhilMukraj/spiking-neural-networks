@@ -5,7 +5,6 @@ use std::{
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
-use neuron::BayesianFactor;
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
@@ -987,10 +986,10 @@ fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
 }
 
 // bayesian factor refactored without testing, may have some unintended consequences
-fn test_isolated_stdp(
+fn test_isolated_stdp<T: IterateAndSpike>(
     weight_params: &BayesianParameters,
-    presynaptic_neurons: &mut Vec<IntegrateAndFireCell>,
-    postsynaptic_neuron: &mut IntegrateAndFireCell,
+    presynaptic_neurons: &mut Vec<T>,
+    postsynaptic_neuron: &mut T,
     iterations: usize,
     n: usize,
     input_current: f64,
@@ -1089,7 +1088,7 @@ fn test_isolated_stdp(
         );
 
         if is_spiking {
-            postsynaptic_neuron.last_firing_time = Some(timestep);
+            postsynaptic_neuron.set_last_firing_time(Some(timestep));
             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
                 delta_ws[n_neuron] = update_weight(i, postsynaptic_neuron);
                 weights[n_neuron] += delta_ws[n_neuron];
