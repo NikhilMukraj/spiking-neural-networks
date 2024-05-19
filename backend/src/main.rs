@@ -15,7 +15,9 @@ mod neuron;
 use crate::neuron::{
     IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, 
     CellGrid, IzhikevichDefault, BayesianParameters, STDPParameters, 
-    signed_gap_junction, iterate_coupled_spiking_neurons,
+    NeurotransmitterConcentrations, 
+    signed_gap_junction, weight_neurotransmitter_concentration, 
+    sum_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
     NeurotransmitterType, Neurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
@@ -861,24 +863,24 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 //     }
 // }
 
-fn write_row(
+fn write_stdp_row<T: IterateAndSpike>(
     file: &mut File, 
-    presynaptic_neurons: &Vec<IntegrateAndFireCell>, 
-    postsynaptic_neuron: &IntegrateAndFireCell, 
+    presynaptic_neurons: &Vec<T>, 
+    postsynaptic_neuron: &T, 
     weights: &Vec<f64>,
 ) {
     write!(
         file, 
         "{}, ", 
         presynaptic_neurons.iter()
-            .map(|i| i.current_voltage)
+            .map(|i| i.get_current_voltage())
             .collect::<Vec<f64>>()
             .iter()
             .map(|&x| x.to_string())
             .collect::<Vec<String>>()
             .join(", ")
     ).expect("Cannot write to file");
-    write!(file, "{}, ", postsynaptic_neuron.current_voltage)
+    write!(file, "{}, ", postsynaptic_neuron.get_current_voltage())
         .expect("Cannot write to file");
     write!(
         file, 
@@ -893,7 +895,7 @@ fn write_row(
         "{}, ", 
         presynaptic_neurons.iter()
             .map(|x| {
-                match x.last_firing_time {
+                match x.get_last_firing_time() {
                     Some(value) => value.to_string(),
                     None => String::from("None"),
                 }
@@ -904,7 +906,7 @@ fn write_row(
     writeln!(
         file, 
         "{}", 
-        match postsynaptic_neuron.last_firing_time {
+        match postsynaptic_neuron.get_last_firing_time() {
             Some(value) => value.to_string(),
             None => String::from("None"),
         }
@@ -941,7 +943,7 @@ fn write_row(
 fn update_weight<T: IterateAndSpike>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
     let mut delta_w: f64 = 0.;
 
-    match (presynaptic_neuron.get_last_spiking_time(), postsynaptic_neuron.get_last_spiking_time()) {
+    match (presynaptic_neuron.get_last_firing_time(), postsynaptic_neuron.get_last_firing_time()) {
         (Some(t_pre), Some(t_post)) => {
             let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
 
@@ -984,6 +986,7 @@ fn test_isolated_stdp(
     iterations: usize,
     n: usize,
     input_current: f64,
+    do_receptor_kinetics: bool,
     averaged: bool,
     filename: &str,
 ) -> Result<()> {
@@ -1006,7 +1009,7 @@ fn test_isolated_stdp(
     let mut file = File::create(&filename)
         .expect("Unable to create file");
 
-    write_row(&mut file, &presynaptic_neurons, &postsynaptic_neuron, &weights);
+    write_stdp_row(&mut file, &presynaptic_neurons, &postsynaptic_neuron, &weights);
 
     for timestep in 0..iterations {
         let calculated_voltage: f64 = (0..n)
@@ -1024,6 +1027,27 @@ fn test_isolated_stdp(
             .collect::<Vec<f64>>()
             .iter()
             .sum();
+        let presynaptic_neurotransmitters: Option<NeurotransmitterConcentrations> = match do_receptor_kinetics {
+            true => Some({
+                let neurotransmitters_vec = (0..n) 
+                    .map(|i| {
+                        let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
+                        weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
+
+                        if averaged {
+                            weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, (1 / n) as f64);
+                        } 
+
+                        presynaptic_neurotransmitter
+                    }
+                ).collect::<Vec<NeurotransmitterConcentrations>>();
+
+                let neurotransmitters = sum_neurotransmitter_concentrations(&neurotransmitters_vec);
+
+                neurotransmitters
+            }),
+            false => None
+        };
         
         let noise_factor = postsynaptic_neuron.get_bayesian_factor();
         let presynaptic_inputs: Vec<f64> = (0..n)
@@ -1034,7 +1058,10 @@ fn test_isolated_stdp(
                 presynaptic_neuron.iterate_and_spike(*input_value)
             })
             .collect();
-        let is_spiking = postsynaptic_neuron.iterate_and_spike(noise_factor * calculated_voltage);
+        let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+            noise_factor * calculated_voltage,
+            presynaptic_neurotransmitters,
+        );
 
         update_isolated_presynaptic_neuron_weights(
             presynaptic_neurons, 
@@ -1053,7 +1080,7 @@ fn test_isolated_stdp(
             }
         }
 
-        write_row(&mut file, &presynaptic_neurons, &postsynaptic_neuron, &weights);
+        write_stdp_row(&mut file, &presynaptic_neurons, &postsynaptic_neuron, &weights);
     }
 
     Ok(())
@@ -1802,6 +1829,14 @@ fn main() -> Result<()> {
         let excitatory_chance = parse_value_with_default(stdp_table, "excitatory_chance", parse_f64, 1.0)?;
         println!("excitatory_chance: {}", excitatory_chance);
 
+        let do_receptor_kinetics: bool = parse_value_with_default(
+            stdp_table, 
+            "do_receptor_kinetics", 
+            parse_bool, 
+            true
+        )?;
+        println!("do_receptor_kinetics: {}", do_receptor_kinetics);
+
         let averaged: bool = parse_value_with_default(stdp_table, "averaged", parse_bool, false)?;
         println!("averaged: {}", averaged);
 
@@ -1828,6 +1863,7 @@ fn main() -> Result<()> {
             iterations,
             n,
             input_current,
+            do_receptor_kinetics,
             averaged,
             &filename,
         )?;
