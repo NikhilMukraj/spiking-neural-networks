@@ -863,6 +863,14 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 //     }
 // }
 
+
+fn generate_columns(n: usize, column_prefix: &str) -> String {
+    (0..n)
+        .map(|i| format!("{}_{}", column_prefix, (i + 1).to_string()))
+        .collect::<Vec<String>>()
+        .join(",")
+}
+
 fn write_stdp_row<T: IterateAndSpike>(
     file: &mut File, 
     presynaptic_neurons: &Vec<T>, 
@@ -1009,6 +1017,14 @@ fn test_isolated_stdp(
     let mut file = File::create(&filename)
         .expect("Unable to create file");
 
+    let mut voltage_columns = generate_columns(presynaptic_neurons.len(), "presynaptic_voltage");
+    voltage_columns += "postsynaptic_voltage";
+    let weight_columns = generate_columns(weights.len(), "weight");
+    let mut firing_times_columns = generate_columns(presynaptic_neurons.len(), "presynaptic_firing_time");
+    firing_times_columns += "postsynaptic_firing_time";
+
+    writeln!(file, "{}", voltage_columns + &weight_columns + &firing_times_columns)?;
+    
     write_stdp_row(&mut file, &presynaptic_neurons, &postsynaptic_neuron, &weights);
 
     for timestep in 0..iterations {
