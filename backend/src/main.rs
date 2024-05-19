@@ -1001,7 +1001,7 @@ fn test_isolated_stdp(
     let input_currents: Vec<f64> = (0..n).map(|_| input_current * limited_distr(1.0, 0.1, 0., 2.))
         .collect();
 
-    let mut weights: Vec<f64> = (0..n).map( // get weights from toml and set them higher
+    let mut weights: Vec<f64> = (0..n).map(
         |_| limited_distr(
             weight_params.mean, 
             weight_params.std, 
