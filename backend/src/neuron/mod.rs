@@ -158,12 +158,12 @@ pub trait BayesianFactor {
 
 pub trait STDP {
     fn get_stdp_params(&self) -> &STDPParameters;
-    fn get_last_spiking_time(&self) -> Option<usize>;
+    fn get_last_firing_time(&self) -> Option<usize>;
+    fn set_last_firing_time(&mut self, timestep: Option<usize>);
 }
 
 pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
-    fn set_last_firing_time(&mut self, timestep: Option<usize>);
     fn get_ligand_gates(&self) -> &LigandGatedChannels;
     fn get_neurotransmitters(&self) -> &Neurotransmitters;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
@@ -278,8 +278,12 @@ impl STDP for IntegrateAndFireCell {
         &self.stdp_params
     }
 
-    fn get_last_spiking_time(&self) -> Option<usize> {
+    fn get_last_firing_time(&self) -> Option<usize> {
         self.last_firing_time
+    }
+
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.last_firing_time = timestep;
     }
 }
 
@@ -508,10 +512,6 @@ impl IterateAndSpike for IntegrateAndFireCell {
         is_spiking
     }
 
-    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-        self.last_firing_time = timestep;
-    }
-
     fn get_ligand_gates(&self) -> &LigandGatedChannels {
         &self.ligand_gates
     }
@@ -531,6 +531,8 @@ impl IterateAndSpike for IntegrateAndFireCell {
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+
+        self.current_voltage += self.ligand_gates.get_neurotransmitter_currents(self.dt, self.c_m);
 
         self.iterate_and_spike(input_current)
     }
@@ -907,6 +909,8 @@ pub struct Neurotransmitters {
     pub neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter>
 }
 
+pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f64>;
+
 impl Default for Neurotransmitters {
     fn default() -> Self {
         Neurotransmitters {
@@ -928,10 +932,10 @@ impl Neurotransmitters {
         self.neurotransmitters.values()
     }
 
-    fn get_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+    fn get_concentrations(&self) -> NeurotransmitterConcentrations {
         self.neurotransmitters.iter()
             .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
-            .collect::<HashMap<NeurotransmitterType, f64>>()
+            .collect::<NeurotransmitterConcentrations>()
     }
 
     fn apply_t_changes(&mut self, voltage: f64) {
@@ -940,24 +944,26 @@ impl Neurotransmitters {
     }
 }
 
-fn weight_neurotransmitter_concentration(
-    neurotransmitter_hashmap: &mut HashMap<NeurotransmitterType, f64>, 
+pub fn weight_neurotransmitter_concentration(
+    neurotransmitter_hashmap: &mut NeurotransmitterConcentrations, 
     weight: f64
 ) {
     neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
 
-// fn sum_neurotransmitter_concentrations(
-//     neurotransmitter_hashmaps: &Vec<HashMap<NeurotransmitterType, f64>>
-// ) -> HashMap<NeurotransmitterType, f64> {
-//     let mut cumulative_map: HashMap<NeurotransmitterType, f64> = HashMap::new();
+pub fn sum_neurotransmitter_concentrations(
+    neurotransmitter_hashmaps: &Vec<NeurotransmitterConcentrations>
+) -> NeurotransmitterConcentrations {
+    let mut cumulative_map: NeurotransmitterConcentrations = HashMap::new();
 
-//     for map in vec_of_maps {
-//         for (key, value) in map {
-//             *cumulative_map.entry(key).or_insert(0.0) += value;
-//         }
-//     }
-// }
+    for map in neurotransmitter_hashmaps {
+        for (key, value) in map {
+            *cumulative_map.entry(*key).or_insert(0.0) += value;
+        }
+    }
+
+    cumulative_map
+}
 
 // NMDA
 // alpha: 7.2 * 10^4 M^-1 * sec^-1, beta: 6.6 sec^-1
@@ -1307,8 +1313,12 @@ impl STDP for HodgkinHuxleyCell {
         &self.stdp_params
     }
 
-    fn get_last_spiking_time(&self) -> Option<usize> {
+    fn get_last_firing_time(&self) -> Option<usize> {
         self.last_firing_time
+    }
+
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.last_firing_time = timestep;
     }
 }
 
@@ -1602,10 +1612,6 @@ impl IterateAndSpike for HodgkinHuxleyCell {
         self.was_increasing = increasing_right_now;
 
         is_spiking
-    }
-
-    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-        self.last_firing_time = timestep;
     }
 
     fn get_ligand_gates(&self) -> &LigandGatedChannels {
