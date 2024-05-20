@@ -208,6 +208,7 @@ fn convert_to_eeg<T: IterateAndSpike>(cell_grid: &CellGrid<T>, distance: f64, co
 //     (voltage_file, neurotransmitter_file)
 // }
 
+// could change grid to take in a vec<vec<f64>> of voltages rather than the entire cell grid
 enum Output<T: IterateAndSpike> {
     Grid(Vec<CellGrid<T>>),
     GridBinary(Vec<CellGrid<T>>),
