@@ -162,7 +162,7 @@ pub trait STDP {
     fn set_last_firing_time(&mut self, timestep: Option<usize>);
 }
 
-pub trait IterateAndSpike: CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
+pub trait IterateAndSpike: Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
     fn get_ligand_gates(&self) -> &LigandGatedChannels;
     fn get_neurotransmitters(&self) -> &Neurotransmitters;
@@ -538,7 +538,7 @@ impl IterateAndSpike for IntegrateAndFireCell {
     }
 }
 
-pub type CellGrid = Vec<Vec<IntegrateAndFireCell>>;
+pub type CellGrid<T> = Vec<Vec<T>>;
 
 // fn heaviside(x: f64) -> f64 {
 //     if (x > 0) {
