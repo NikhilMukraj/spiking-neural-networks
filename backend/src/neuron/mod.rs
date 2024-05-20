@@ -640,7 +640,7 @@ impl NeurotransmitterType {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Neurotransmitter {
+pub struct DestexheNeurotransmitter {
     pub t_max: f64,
     pub t: f64,
     pub v_p: f64,
@@ -649,9 +649,9 @@ pub struct Neurotransmitter {
 
 macro_rules! impl_neurotransmitter_default {
     ($trait:ident, $method:ident, $t_max:expr) => {
-        impl $trait for Neurotransmitter {
+        impl $trait for DestexheNeurotransmitter {
             fn $method() -> Self {
-                Neurotransmitter {
+                DestexheNeurotransmitter {
                     t_max: $t_max,
                     t: 0.,
                     v_p: 2., // 2 mV
@@ -662,7 +662,7 @@ macro_rules! impl_neurotransmitter_default {
     };
 }
 
-impl Neurotransmitter {
+impl DestexheNeurotransmitter {
     fn apply_t_change(&mut self, voltage: f64) {
         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
     }
@@ -906,7 +906,7 @@ impl LigandGatedChannels {
 
 #[derive(Clone, Debug)]
 pub struct Neurotransmitters {
-    pub neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter>
+    pub neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter>
 }
 
 pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f64>;
@@ -928,7 +928,7 @@ impl Neurotransmitters {
     //     self.neurotransmitters.keys()
     // }
 
-    pub fn values(&self) -> Values<NeurotransmitterType, Neurotransmitter> {
+    pub fn values(&self) -> Values<NeurotransmitterType, DestexheNeurotransmitter> {
         self.neurotransmitters.values()
     }
 

@@ -19,7 +19,7 @@ use crate::neuron::{
     signed_gap_junction, weight_neurotransmitter_concentration, 
     sum_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
-    NeurotransmitterType, Neurotransmitter, Neurotransmitters,
+    NeurotransmitterType, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
     AdditionalGates, HighThresholdCalciumChannel,HighVoltageActivatedCalciumChannel,
 };
@@ -1174,7 +1174,7 @@ fn get_ligand_gates_and_neurotransmitters(
     prefix_value: &str
 ) -> Result<(Neurotransmitters, LigandGatedChannels)> {
     let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> = HashMap::new();
-    let mut neurotransmitters: HashMap<NeurotransmitterType, Neurotransmitter> = HashMap::new();
+    let mut neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
 
     let ampa: bool = parse_value_with_default(
         table,
@@ -1233,19 +1233,19 @@ fn get_ligand_gates_and_neurotransmitters(
 
     if ampa {
         ligand_gates.insert(NeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
-        neurotransmitters.insert(NeurotransmitterType::AMPA, Neurotransmitter::ampa_default());
+        neurotransmitters.insert(NeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
     }
     if gabaa {
         ligand_gates.insert(NeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default());
-        neurotransmitters.insert(NeurotransmitterType::GABAa, Neurotransmitter::gabaa_default());
+        neurotransmitters.insert(NeurotransmitterType::GABAa, DestexheNeurotransmitter::gabaa_default());
     }
     if gabab {
         ligand_gates.insert(NeurotransmitterType::GABAb, LigandGatedChannel::gabab_default());
-        neurotransmitters.insert(NeurotransmitterType::GABAb, Neurotransmitter::gabab_default());
+        neurotransmitters.insert(NeurotransmitterType::GABAb, DestexheNeurotransmitter::gabab_default());
     }
     if gabab_2 {
         ligand_gates.insert(NeurotransmitterType::GABAb, LigandGatedChannel::gabab_default2());
-        neurotransmitters.insert(NeurotransmitterType::GABAb, Neurotransmitter::gabab_default2());
+        neurotransmitters.insert(NeurotransmitterType::GABAb, DestexheNeurotransmitter::gabab_default2());
     }
     if nmda {
         let mg_conc: f64 = parse_value_with_default(
@@ -1256,7 +1256,7 @@ fn get_ligand_gates_and_neurotransmitters(
         )?;
 
         ligand_gates.insert(NeurotransmitterType::NMDA, LigandGatedChannel::nmda_with_bv(BV { mg_conc: mg_conc }));
-        neurotransmitters.insert(NeurotransmitterType::NMDA, Neurotransmitter::nmda_default());
+        neurotransmitters.insert(NeurotransmitterType::NMDA, DestexheNeurotransmitter::nmda_default());
     }
 
     neurotransmitters.values_mut()
