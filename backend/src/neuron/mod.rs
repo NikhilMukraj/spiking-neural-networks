@@ -676,7 +676,7 @@ impl_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 impl_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
 
 #[derive(Debug, Clone, Copy)]
-pub struct Receptor {
+pub struct DestexheReceptor {
     pub r: f64,
     pub alpha: f64,
     pub beta: f64,
@@ -684,9 +684,9 @@ pub struct Receptor {
 
 macro_rules! impl_receptor_default {
     ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
-        impl $trait for Receptor {
+        impl $trait for DestexheReceptor {
             fn $method() -> Self {
-                Receptor {
+                DestexheReceptor {
                     r: 0.,
                     alpha: $alpha, // mM^-1 * ms^-1
                     beta: $beta, // ms^-1
@@ -696,7 +696,7 @@ macro_rules! impl_receptor_default {
     };
 }
 
-impl Receptor {
+impl DestexheReceptor {
     fn apply_r_change(&mut self, t: f64, dt: f64) {
         self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
     }
@@ -722,7 +722,7 @@ pub enum IonotropicReceptorType {
 pub struct LigandGatedChannel {
     pub g: f64,
     pub reversal: f64,
-    pub receptor: Receptor,
+    pub receptor: DestexheReceptor,
     pub receptor_type: IonotropicReceptorType,
     pub current: f64,
 }
@@ -732,7 +732,7 @@ impl Default for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: Receptor::default(),
+            receptor: DestexheReceptor::default(),
             receptor_type: IonotropicReceptorType::Basic(1.0),
             current: 0.,
         }
@@ -744,7 +744,7 @@ impl AMPADefault for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: Receptor::ampa_default(),
+            receptor: DestexheReceptor::ampa_default(),
             receptor_type: IonotropicReceptorType::AMPA(1.0),
             current: 0.,
         }
@@ -756,7 +756,7 @@ impl GABAaDefault for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -80., // -80 mV
-            receptor: Receptor::gabaa_default(),
+            receptor: DestexheReceptor::gabaa_default(),
             receptor_type: IonotropicReceptorType::GABAa(1.0),
             current: 0.,
         }
@@ -768,7 +768,7 @@ impl GABAbDefault for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
-            receptor: Receptor::gabab_default(),
+            receptor: DestexheReceptor::gabab_default(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
@@ -780,7 +780,7 @@ impl GABAbDefault2 for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: -95., // -95 mV
-            receptor: Receptor::gabab_default2(),
+            receptor: DestexheReceptor::gabab_default2(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
@@ -792,7 +792,7 @@ impl NMDADefault for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: Receptor::nmda_default(),
+            receptor: DestexheReceptor::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(BV::default()),
             current: 0.,
         }
@@ -808,7 +808,7 @@ impl NMDAWithBV for LigandGatedChannel {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: Receptor::nmda_default(),
+            receptor: DestexheReceptor::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(bv),
             current: 0.,
         }
