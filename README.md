@@ -57,6 +57,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - When neurotransmitter refactor done, refactor fitting neurons have the option to only consider the postsynaptic neuron when implementing neurotransmission schemes
 
+- Another refactor for neurotransmission, neurotransmitter and receptors should be a trait that structs can implement
+  - Approximation of neurotransmission for integrate and fire cells
+    - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
+
 - **Redo obsidian notes with new code**
 
 - **When neurotransmitter refactor done, move to Hopfield network or lixirnet or Poisson/spike train or FitzHugh-Nagumo**
