@@ -107,12 +107,15 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - Update by copying over backend
+    - Should have methods that iterate one timestep for each kind of simulation
+    - That way when exposed to Python there can be tqdm stuff
   - Use macros to generate getter and setter methods given the argument name
     - For integrate and fire cell and Hodgkin Huxley model
     - **Enable multiple-pymethods so the macro can be written**
     - [Reference for macro](https://github.com/PyO3/pyo3/discussions/3628)
   - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
+  - **Lixirnet should expose EEG processing tools**
 
 - Should also be adapted for a cargo package
 
