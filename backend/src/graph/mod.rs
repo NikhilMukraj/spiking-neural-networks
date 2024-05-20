@@ -363,7 +363,6 @@ impl Graph {
 
 #[derive(Clone)]
 pub struct GraphParameters {
-    pub graph_type: Graph,
     pub write_weights: bool,
     pub write_history: bool,
 }
