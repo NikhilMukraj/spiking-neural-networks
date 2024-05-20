@@ -951,7 +951,7 @@ pub fn weight_neurotransmitter_concentration(
     neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
 
-pub fn sum_neurotransmitter_concentrations(
+pub fn aggregate_neurotransmitter_concentrations(
     neurotransmitter_hashmaps: &Vec<NeurotransmitterConcentrations>
 ) -> NeurotransmitterConcentrations {
     let mut cumulative_map: NeurotransmitterConcentrations = HashMap::new();

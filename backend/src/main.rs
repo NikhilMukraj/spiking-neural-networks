@@ -17,7 +17,7 @@ use crate::neuron::{
     CellGrid, IzhikevichDefault, BayesianParameters, STDPParameters, 
     NeurotransmitterConcentrations, 
     signed_gap_junction, weight_neurotransmitter_concentration, 
-    sum_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
+    aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
     NeurotransmitterType, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
@@ -148,7 +148,7 @@ fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctio
         })
         .collect::<Vec<NeurotransmitterConcentrations>>();
 
-    let mut input_val = sum_neurotransmitter_concentrations(&input_vals);
+    let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
     if averaged {
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
@@ -1125,7 +1125,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
                     }
                 ).collect::<Vec<NeurotransmitterConcentrations>>();
 
-                let neurotransmitters = sum_neurotransmitter_concentrations(&neurotransmitters_vec);
+                let neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 
                 neurotransmitters
             }),
