@@ -97,9 +97,9 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
 //     return input_val;
 // }
 
-fn get_input_from_positions<T: GraphFunctionality>(
-    cell_grid: &CellGrid, 
-    graph: &T,
+fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+    cell_grid: &CellGrid<T>, 
+    graph: &U,
     position: &Position,
     input_positions: &Vec<Position>, 
     averaged: bool,
@@ -126,9 +126,9 @@ fn get_input_from_positions<T: GraphFunctionality>(
     return input_val;
 }
 
-fn get_neurotransmitter_input_from_positions<T: GraphFunctionality>(
-    cell_grid: &CellGrid, 
-    graph: &T,
+fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+    cell_grid: &CellGrid<T>, 
+    graph: &U,
     position: &Position,
     input_positions: &Vec<Position>, 
     averaged: bool,
@@ -157,11 +157,11 @@ fn get_neurotransmitter_input_from_positions<T: GraphFunctionality>(
     return input_val;
 }
 
-fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
+fn get_volt_avg<T: IterateAndSpike>(cell_grid: &CellGrid<T>) -> f64 {
     let volt_mean: f64 = cell_grid
         .iter()
         .flatten()
-        .map(|x| x.current_voltage)
+        .map(|x| x.get_current_voltage())
         .sum();
 
     volt_mean / ((cell_grid[0].len() * cell_grid.len()) as f64)
@@ -187,12 +187,12 @@ fn get_volt_avg(cell_grid: &CellGrid) -> f64 {
 // refence voltage: 7 uV (microvolt)
 // either convert dist to m, or conductivity to S/mm
 // should be inputtable from user as well
-fn convert_to_eeg(cell_grid: &CellGrid, distance: f64, conductivity: f64, reference_voltage: f64) -> f64 {
+fn convert_to_eeg<T: IterateAndSpike>(cell_grid: &CellGrid<T>, distance: f64, conductivity: f64, reference_voltage: f64) -> f64 {
     let mut total_current: f64 = 0.;
 
     for row in cell_grid {
         for value in row {
-            total_current += value.current_voltage - reference_voltage;
+            total_current += value.get_current_voltage() - reference_voltage;
         }
     }
 
@@ -208,16 +208,16 @@ fn convert_to_eeg(cell_grid: &CellGrid, distance: f64, conductivity: f64, refere
 //     (voltage_file, neurotransmitter_file)
 // }
 
-enum Output {
-    Grid(Vec<CellGrid>),
-    GridBinary(Vec<CellGrid>),
+enum Output<T: IterateAndSpike> {
+    Grid(Vec<CellGrid<T>>),
+    GridBinary(Vec<CellGrid<T>>),
     Averaged(Vec<f64>), // NeuroAndVolts
     AveragedBinary(Vec<f64>), // NeuroAndVolts
     EEG(Vec<f64>, f64, f64, f64), // Vec<(f64, f64)>, f64, f64, f64
 }
 
-impl Output {
-    fn add(&mut self, cell_grid: &CellGrid) {
+impl<T: IterateAndSpike> Output<T> {
+    fn add(&mut self, cell_grid: &CellGrid<T>) {
         match self {
             Output::Grid(grids) | Output::GridBinary(grids) => { grids.push(cell_grid.clone()) }
             Output::Averaged(averages) | Output::AveragedBinary(averages) => { 
@@ -238,10 +238,10 @@ impl Output {
         }
     }
 
-    fn from_str(string: &str, distance: f64, conductivity: f64, reference_voltage: f64) -> Result<Output> {
+    fn from_str(string: &str, distance: f64, conductivity: f64, reference_voltage: f64) -> Result<Output<T>> {
         match string.to_ascii_lowercase().as_str() {
-            "grid" => { Ok(Output::Grid(Vec::<CellGrid>::new())) },
-            "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid>::new())) },
+            "grid" => { Ok(Output::Grid(Vec::<CellGrid<T>>::new())) },
+            "grid binary" => { Ok(Output::GridBinary(Vec::<CellGrid<T>>::new())) },
             "averaged" => { Ok(Output::Averaged(Vec::<f64>::new())) },
             "averaged binary" => { Ok(Output::AveragedBinary(Vec::<f64>::new())) },
             "eeg" => { Ok(Output::EEG(Vec::<f64>::new(), distance, conductivity, reference_voltage)) }
@@ -259,7 +259,7 @@ impl Output {
                 for grid in grids {
                     for row in grid {
                         for value in row {
-                            write!(voltage_file, "{} ", value.current_voltage)
+                            write!(voltage_file, "{} ", value.get_current_voltage())
                                 .expect("Could not write to file");
                             // write!(neurotransmitter_file, "{} ", value.neurotransmission_concentration)
                             //     .expect("Could not write to file");
@@ -283,7 +283,7 @@ impl Output {
                 for grid in grids {
                     for row in grid {
                         for value in row {
-                            let bytes = value.current_voltage.to_le_bytes();
+                            let bytes = value.get_current_voltage().to_le_bytes();
                             voltage_file
                                 .write_all(&bytes)
                                 .expect("Could not write to file");
@@ -341,10 +341,10 @@ impl Output {
 //     }
 // }
 
-fn run_lattice<T: GraphFunctionality>(
-    cell_grid: &mut CellGrid,
-    graph: &mut T,
-    output_val: &mut Output,
+fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
+    cell_grid: &mut CellGrid<T>,
+    graph: &mut U,
+    output_val: &mut Output<T>,
     iterations: usize, 
     averaged: bool,
     bayesian: bool,
@@ -462,12 +462,7 @@ fn run_lattice<T: GraphFunctionality>(
             };
 
             let processed_input = if bayesian {
-                let noise_factor = limited_distr(
-                    cell_grid[x][y].bayesian_params.mean, 
-                    cell_grid[x][y].bayesian_params.std, 
-                    0., 
-                    1.
-                );
+                let noise_factor = cell_grid[x][y].get_bayesian_factor();
 
                 if let Some(value) = input_neurotransmitter.as_mut() {
                     weight_neurotransmitter_concentration(value, noise_factor)
@@ -486,7 +481,7 @@ fn run_lattice<T: GraphFunctionality>(
             );
 
             if is_spiking {
-                cell_grid[x][y].last_firing_time = Some(timestep);
+                cell_grid[x][y].set_last_firing_time(Some(timestep));
             }
 
             if do_stdp && is_spiking {
@@ -567,15 +562,15 @@ fn parse_value_with_default<T>(
         .map_or(Ok(default), |value| parser(value, key))
 }
 
-struct SimulationParameters<T: GraphFunctionality> {
+struct SimulationParameters<T: IterateAndSpike, U: GraphFunctionality> {
     iterations: usize, 
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
     do_receptor_kinetics: bool,
     graph_params: GraphParameters,
-    graph: T,
-    cell_grid: CellGrid,
+    graph: U,
+    cell_grid: CellGrid<T>,
 }
 
 macro_rules! get_integrate_and_fire_params_with_default {
@@ -730,7 +725,7 @@ fn get_bayesian_params(
     Ok(bayesian_params)
 }
 
-fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> Result<SimulationParameters<T>> {
+fn get_simulation_parameters<U: GraphFunctionality + Default>(table: &Value) -> Result<SimulationParameters<IntegrateAndFireCell, U>> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
 
@@ -822,7 +817,7 @@ fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> 
     };
     println!("iterations: {}", iterations);
 
-    let mut cell_grid: CellGrid = (0..num_rows)
+    let mut cell_grid: CellGrid<IntegrateAndFireCell> = (0..num_rows)
         .map(|_| {
             (0..num_cols)
                 .map(|_| {
@@ -833,7 +828,7 @@ fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> 
                 })
                 .collect::<Vec<IntegrateAndFireCell>>()
         })
-        .collect::<CellGrid>();
+        .collect::<CellGrid<IntegrateAndFireCell>>();
 
     let mut rng = rand::thread_rng();
 
@@ -846,7 +841,7 @@ fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> 
         }
     }
 
-    let mut init_graph = T::default();
+    let mut init_graph = U::default();
 
     for row in 0..num_rows {
         for col in 0..num_cols {
