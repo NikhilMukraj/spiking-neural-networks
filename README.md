@@ -57,9 +57,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - When neurotransmitter refactor done, refactor fitting neurons have the option to only consider the postsynaptic neuron when implementing neurotransmission schemes
 
-- Another refactor for neurotransmission, neurotransmitter and receptors should be a trait that structs can implement
+- **Another refactor for neurotransmission**, neurotransmitter and receptors should be a trait that structs can implement
   - Approximation of neurotransmission for integrate and fire cells
     - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
+      - Neurotransmitter input should be maximum neurotransmitter concentrate, summing of neurotransmitter function should be modified such that it can take in a bool to check whether or not it will just find the maximal concentration or will just sum
     - Modifier from receptor type (GABAb modifier and NMDA modifier) should still be applied to currents
 
 - **Redo obsidian notes with new code**
