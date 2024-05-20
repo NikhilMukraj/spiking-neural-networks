@@ -2,6 +2,7 @@ use std::{
     collections::HashMap, 
     env, 
     f64::consts::PI, 
+    mem::take,
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
@@ -477,7 +478,12 @@ fn run_lattice<T: GraphFunctionality>(
                 input_value
             };
 
-            let is_spiking = cell_grid[x][y].iterate_and_spike(processed_input);
+            // takes neurotransmitter input since input is not needed after this statement
+            // if neurotransmitter needs to be read for some reason other than this
+            // read neurotransmitter concentration directly from the given neuron
+            let is_spiking = cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+                processed_input, input_neurotransmitter.take().map(|r| take(r)),
+            );
 
             if is_spiking {
                 cell_grid[x][y].last_firing_time = Some(timestep);
