@@ -96,9 +96,9 @@ fn randomly_select_positions(mut positions: Vec<Position>, num_to_select: usize)
 //     return input_val;
 // }
 
-fn get_input_from_positions(
+fn get_input_from_positions<T: GraphFunctionality>(
     cell_grid: &CellGrid, 
-    graph: &dyn GraphFunctionality,
+    graph: &T,
     position: &Position,
     input_positions: &Vec<Position>, 
     bayesian: bool,
@@ -313,41 +313,33 @@ impl Output {
     }
 }
 
-fn run_lattice(
-    num_rows: usize, 
-    num_cols: usize, 
-    iterations: usize, 
-    radius: usize, 
+// fn generate_graph(graph_params: &GraphParameters) -> GraphFunctionality {
+//     match graph_params.graph_type {
+//         Graph::Matrix => AdjacencyMatrix::default(),
+//         Graph::List => AdjacencyMatrix::default(),
+//     }
+// }
+
+fn run_lattice<T: GraphFunctionality>(
     cell_grid: &mut CellGrid,
+    graph: &mut T,
+    output_val: &mut Output,
+    iterations: usize, 
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
     graph_params: &GraphParameters,
-    weight_params: &Option<BayesianParameters>,
-    mut output_val: Output,
-) -> Result<(Output, Box<dyn GraphFunctionality>)> {
-    let mut rng = rand::thread_rng();
-
-    let mut graph: Box<dyn GraphFunctionality> = match graph_params.graph_type {
-        Graph::Matrix => {
-            let matrix = AdjacencyMatrix::default();
-            Box::new(matrix)
-        },
-        Graph::List => {
-            let list = AdjacencyList::default();
-            Box::new(list)
-        },
-    };
-    
-    for row in 0..num_rows {
-        for col in 0..num_cols {
-            let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
-            let num_to_select = rng.gen_range(1..positions.len());
-            let positions = randomly_select_positions(positions, num_to_select);
-
-            graph.initialize_connections((row, col), positions, weight_params);
-        }
-    }
+) -> Result<()> { //Result<(Output, Box<dyn GraphFunctionality>)>
+    // let mut graph: Box<dyn GraphFunctionality> = match graph_params.graph_type {
+    //     Graph::Matrix => {
+    //         let matrix = AdjacencyMatrix::default();
+    //         Box::new(matrix)
+    //     },
+    //     Graph::List => {
+    //         let list = AdjacencyList::default();
+    //         Box::new(list)
+    //     },
+    // };
 
     if do_stdp && graph_params.write_history {
         graph.update_history();
@@ -459,7 +451,7 @@ fn run_lattice(
         }
     }
 
-    return Ok((output_val, graph));
+    Ok(())
 }
 
 fn parse_bool(value: &Value, field_name: &str) -> Result<bool> {
@@ -501,17 +493,13 @@ fn parse_value_with_default<T>(
         .map_or(Ok(default), |value| parser(value, key))
 }
 
-#[derive(Clone)]
-struct SimulationParameters {
-    num_rows: usize, 
-    num_cols: usize, 
+struct SimulationParameters<T: GraphFunctionality> {
     iterations: usize, 
-    radius: usize, 
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
     graph_params: GraphParameters,
-    weight_params: Option<BayesianParameters>,
+    graph: T,
     cell_grid: CellGrid,
 }
 
@@ -667,7 +655,7 @@ fn get_bayesian_params(
     Ok(bayesian_params)
 }
 
-fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
+fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> Result<SimulationParameters<T>> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
 
@@ -704,14 +692,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
 
     let do_stdp: bool = parse_value_with_default(&table, "do_stdp", parse_bool, false)?;
     println!("do_stdp: {}", do_stdp);
-
-    let graph_type: String = parse_value_with_default(&table, "graph_type", parse_string, String::from("list"))?;
-
-    let graph_type = match Graph::from_str(&graph_type) {
-        Ok(graph_type_val) => graph_type_val,
-        Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'graph_type' as one of the valid types")) }
-    };
-    println!("graph_type: {:#?}", graph_type);
     
     let write_weights = parse_value_with_default(&table, "write_weights", parse_bool, false)?;
     println!("write_weights: {}", write_weights);    
@@ -720,7 +700,6 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
     println!("write_history: {}", write_history);
 
     let graph_params = GraphParameters {
-        graph_type: graph_type,
         write_weights: write_weights,
         write_history: write_history,
     };
@@ -784,17 +763,26 @@ fn get_simulation_parameters(table: &Value) -> Result<SimulationParameters> {
         }
     }
 
+    let mut init_graph = T::default();
+
+    for row in 0..num_rows {
+        for col in 0..num_cols {
+            let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
+            let num_to_select = rng.gen_range(1..positions.len());
+            let positions = randomly_select_positions(positions, num_to_select);
+
+            init_graph.initialize_connections((row, col), positions, &weight_params);
+        }
+    }
+
     return Ok(SimulationParameters {
-        num_rows: num_rows, 
-        num_cols: num_cols, 
         iterations: iterations, 
-        radius: radius, 
         averaged: averaged,
         bayesian: bayesian,
         do_stdp: do_stdp,
         graph_params: graph_params,
+        graph: init_graph,
         cell_grid: cell_grid,
-        weight_params: weight_params,
     });
 }
 
@@ -1497,6 +1485,29 @@ fn test_coupled_neurons<'a, T: IterateAndSpike>(
     Ok(())
 }
 
+macro_rules! run_lattice_from_simulation_params {
+    ($sim_params:expr, $output:expr, $tag:expr) => {
+        run_lattice(
+            &mut $sim_params.cell_grid.clone(),
+            &mut $sim_params.graph,
+            &mut $output,
+            $sim_params.iterations, 
+            $sim_params.averaged,
+            $sim_params.bayesian,
+            $sim_params.do_stdp,
+            &$sim_params.graph_params,
+        )?;
+
+        $output.write_to_file($tag);
+
+        if $sim_params.graph_params.write_history {
+            $sim_params.graph.write_history(&$tag);
+        } else if $sim_params.graph_params.write_weights {
+            $sim_params.graph.write_current_weights(&$tag);
+        }
+    };
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -1519,8 +1530,6 @@ fn main() -> Result<()> {
             None => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'tag'")) },
         };
         println!("tag: {}", tag);
-
-        let sim_params = get_simulation_parameters(&simulation_table)?;
 
         let output_type: String = parse_value_with_default(
             &simulation_table, 
@@ -1554,34 +1563,33 @@ fn main() -> Result<()> {
         )?;
         println!("eeg_reference_voltage: {}", reference_voltage);
 
-        let output_type = Output::from_str(
+        let mut output = Output::from_str(
             &output_type, 
             distance, 
             conductivity,
             reference_voltage,
         )?;
 
-        let (output_value, output_graph) = run_lattice(
-            sim_params.num_rows, 
-            sim_params.num_cols, 
-            sim_params.iterations, 
-            sim_params.radius, 
-            &mut sim_params.cell_grid.clone(),
-            sim_params.averaged,
-            sim_params.bayesian,
-            sim_params.do_stdp,
-            &sim_params.graph_params,
-            &sim_params.weight_params,
-            output_type,
-        )?;
+        let graph_type: String = parse_value_with_default(&simulation_table, "graph_type", parse_string, String::from("list"))?;
 
-        output_value.write_to_file(tag);
+        let graph_type = match Graph::from_str(&graph_type) {
+            Ok(graph_type_val) => graph_type_val,
+            Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'graph_type' as one of the valid types")) }
+        };
+        println!("graph_type: {:#?}", graph_type);
 
-        if sim_params.graph_params.write_history {
-            output_graph.write_history(&tag);
-        } else if sim_params.graph_params.write_weights {
-            output_graph.write_current_weights(&tag);
-        }
+        match graph_type {
+            Graph::List => {
+                let mut sim_params = get_simulation_parameters::<AdjacencyList>(&simulation_table)?;
+
+                run_lattice_from_simulation_params!(sim_params, output, tag);
+            },
+            Graph::Matrix => {
+                let mut sim_params = get_simulation_parameters::<AdjacencyMatrix>(&simulation_table)?;
+
+                run_lattice_from_simulation_params!(sim_params, output, tag);
+            },
+        };
 
         println!("Finished lattice simulation");
     // } else if let Some(ga_table) = config.get("ga") {
