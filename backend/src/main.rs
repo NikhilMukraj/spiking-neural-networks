@@ -101,7 +101,6 @@ fn get_input_from_positions<T: GraphFunctionality>(
     graph: &T,
     position: &Position,
     input_positions: &Vec<Position>, 
-    bayesian: bool,
     averaged: bool,
 ) -> f64 {
     let (x, y) = position;
@@ -116,21 +115,42 @@ fn get_input_from_positions<T: GraphFunctionality>(
             let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
             
             final_input * graph.lookup_weight(&input_position, position).unwrap()
-
         })
         .sum();
 
-    if bayesian {
-        input_val *= limited_distr(
-            postsynaptic_neuron.bayesian_params.mean, 
-            postsynaptic_neuron.bayesian_params.std, 
-            0., 
-            1.
-        );
-    }
-
     if averaged {
         input_val /= input_positions.len() as f64;
+    }
+
+    return input_val;
+}
+
+fn get_neurotransmitter_input_from_positions<T: GraphFunctionality>(
+    cell_grid: &CellGrid, 
+    graph: &T,
+    position: &Position,
+    input_positions: &Vec<Position>, 
+    averaged: bool,
+) -> NeurotransmitterConcentrations {
+    let input_vals = input_positions
+        .iter()
+        .map(|input_position| {
+            let (pos_x, pos_y) = input_position;
+            let input_cell = &cell_grid[*pos_x][*pos_y];
+
+            let mut final_input = input_cell.get_neurotransmitter_concentrations();
+            let weight = graph.lookup_weight(&input_position, position).unwrap();
+            
+            weight_neurotransmitter_concentration(&mut final_input, weight);
+
+            final_input
+        })
+        .collect::<Vec<NeurotransmitterConcentrations>>();
+
+    let mut input_val = sum_neurotransmitter_concentrations(&input_vals);
+
+    if averaged {
+        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
     }
 
     return input_val;
@@ -328,6 +348,7 @@ fn run_lattice<T: GraphFunctionality>(
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
+    do_receptor_kinetics: bool,
     graph_params: &GraphParameters,
 ) -> Result<()> { //Result<(Output, Box<dyn GraphFunctionality>)>
     // let mut graph: Box<dyn GraphFunctionality> = match graph_params.graph_type {
@@ -366,6 +387,30 @@ fn run_lattice<T: GraphFunctionality>(
         //     });
         //     .collect();
 
+        let mut neurotransmitter_inputs = match do_receptor_kinetics {
+            true => {
+                let neurotransmitters: HashMap<Position, NeurotransmitterConcentrations> = graph.get_every_node()
+                    .iter()
+                    .map(|&pos| {
+                        let input_positions = graph.get_incoming_connections(&pos);
+
+                        let neurotransmitter_input = get_neurotransmitter_input_from_positions(
+                            &cell_grid,
+                            &*graph,
+                            &pos,
+                            &input_positions,
+                            averaged,
+                        );
+
+                        (pos, neurotransmitter_input)
+                    })
+                    .collect();
+                    
+                Some(neurotransmitters)
+            },
+            false => None,
+        };
+
         for pos in graph.get_every_node() {
             // let (x, y) = pos;
 
@@ -395,21 +440,44 @@ fn run_lattice<T: GraphFunctionality>(
                 &*graph,
                 &pos,
                 &input_positions,
-                bayesian,
                 averaged,
             );
 
             inputs.insert(pos, input);
         }
 
+        // weight_neurotransmitter_concentration(&mut input_val, noise_factor);
+
         // loop through every cell
         // modify the voltage and handle stdp
         // end loop
 
-        for (pos, input_value) in inputs {
-            let (x, y) = pos;
+        for pos in inputs.keys() {
+            let (x, y) = *pos;
+            let input_value = *inputs.get(&pos).unwrap();
+            let mut input_neurotransmitter = match neurotransmitter_inputs {
+                Some(ref mut neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get_mut(&pos).unwrap()),
+                None => None,
+            };
 
-            let is_spiking = cell_grid[x][y].iterate_and_spike(input_value);
+            let processed_input = if bayesian {
+                let noise_factor = limited_distr(
+                    cell_grid[x][y].bayesian_params.mean, 
+                    cell_grid[x][y].bayesian_params.std, 
+                    0., 
+                    1.
+                );
+
+                if let Some(value) = input_neurotransmitter.as_mut() {
+                    weight_neurotransmitter_concentration(value, noise_factor)
+                }
+
+                input_value * noise_factor
+            } else {
+                input_value
+            };
+
+            let is_spiking = cell_grid[x][y].iterate_and_spike(processed_input);
 
             if is_spiking {
                 cell_grid[x][y].last_firing_time = Some(timestep);
@@ -498,6 +566,7 @@ struct SimulationParameters<T: GraphFunctionality> {
     averaged: bool,
     bayesian: bool,
     do_stdp: bool,
+    do_receptor_kinetics: bool,
     graph_params: GraphParameters,
     graph: T,
     cell_grid: CellGrid,
@@ -707,6 +776,14 @@ fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> 
     let bayesian = parse_value_with_default(&table, "bayesian", parse_bool, false)?;
     println!("bayesian: {}", bayesian);
 
+    let do_receptor_kinetics: bool = parse_value_with_default(
+        &table, 
+        "do_receptor_kinetics", 
+        parse_bool, 
+        false
+    )?;
+    println!("do_receptor_kinetics: {}", do_receptor_kinetics);
+
     let weight_params = match do_stdp {
         true => Some(get_bayesian_params(&table, Some("weight_initialization"))?),
         false => None, 
@@ -780,6 +857,7 @@ fn get_simulation_parameters<T: GraphFunctionality + Default>(table: &Value) -> 
         averaged: averaged,
         bayesian: bayesian,
         do_stdp: do_stdp,
+        do_receptor_kinetics: do_receptor_kinetics,
         graph_params: graph_params,
         graph: init_graph,
         cell_grid: cell_grid,
@@ -1495,6 +1573,7 @@ macro_rules! run_lattice_from_simulation_params {
             $sim_params.averaged,
             $sim_params.bayesian,
             $sim_params.do_stdp,
+            $sim_params.do_receptor_kinetics,
             &$sim_params.graph_params,
         )?;
 
@@ -1856,7 +1935,7 @@ fn main() -> Result<()> {
             stdp_table, 
             "do_receptor_kinetics", 
             parse_bool, 
-            true
+            false
         )?;
         println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
@@ -2094,7 +2173,7 @@ fn main() -> Result<()> {
         let bayesian: bool = parse_value_with_default(fit_neuron_models_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian); 
 
-        let reference_do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "reference_do_receptor_kinetics", parse_bool, false)?;
+        let reference_do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "reference_do_receptor_kinetics", parse_bool, true)?;
         println!("reference_do_receptor_kinetics: {}", reference_do_receptor_kinetics);
 
         let do_receptor_kinetics: bool = parse_value_with_default(&fit_neuron_models_table, "do_receptor_kinetics", parse_bool, false)?;
