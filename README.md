@@ -60,6 +60,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Another refactor for neurotransmission, neurotransmitter and receptors should be a trait that structs can implement
   - Approximation of neurotransmission for integrate and fire cells
     - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
+    - Modifier from receptor type (GABAb modifier and NMDA modifier) should still be applied to currents
 
 - **Redo obsidian notes with new code**
 
