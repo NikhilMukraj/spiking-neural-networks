@@ -46,11 +46,11 @@ pub struct AdjacencyMatrix {
 }
 
 impl AdjacencyMatrix {
-    fn nodes_len(&self) -> usize {
+    pub fn nodes_len(&self) -> usize {
         self.position_to_index.len()
     }
 
-    fn add_vertex(&mut self, position: Position) {
+    pub fn add_vertex(&mut self, position: Position) {
         let index = self.nodes_len();
     
         self.position_to_index.insert(position, index);
