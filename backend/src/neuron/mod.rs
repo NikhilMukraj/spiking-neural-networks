@@ -1718,3 +1718,100 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
         );
     }
 }
+
+// enum DiscreteNeuronState {
+//     Active,
+//     Inactive,
+// }
+
+// struct DiscreteNeuron {
+//     state: DiscreteNeuronState
+// }
+
+// impl DiscreteNeuron {
+//     fn update(&mut self, input: f64) {
+//         match input > 0. {
+//             true => self.state = DiscreteNeuronState::Active,
+//             false => self.state = DiscreteNeuronState::Inactive,
+//         }
+//     }
+// }
+
+// fn outer_product(a: &Vec<usize>, b: &Vec<usize>) -> Vec<Vec<usize>> {
+//     let mut output: Vec<Vec<usize>> = Vec::new();
+
+//     for i in a {
+//         let mut vector: Vec<usize> = Vec::new();
+//         for j in b {
+//             vector.push(i * j);
+//         }
+
+//         output.push(vector);
+//     }
+
+//     output
+// }
+
+// fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usize) {
+//     ((i / num_cols), (i % num_cols))
+// }
+
+// *********************************************************************************
+// CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
+// *********************************************************************************
+// if index != 0 {
+//     self.matrix.push(vec![None; index]);
+//     for row in self.matrix.iter_mut() {
+//         row.push(None);
+//     }
+// } else {
+//     self.matrix = vec![vec![None]];
+// }
+
+// fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: Vec<Vec<usize>>) -> AdjacencyMatrix {
+//     let mut weights = AdjacencyMatrix::default();
+
+//     for i in 0..num_rows {
+//         for j in 0..num_cols {
+//             weights.add_vertex((i, j));
+//         }
+//     }
+
+//     for pattern in data {
+//         let weight_changes = outer_product(&pattern, &pattern);
+
+//         for (i, weight_vec) in weight_changes.iter().enumerate() {
+//             for (j, value) in weight_vec.iter().enumerate() {
+//                 // coming and going may not be correct
+//                 let coming = first_dimensional_index_to_position(i, num_cols);
+//                 let going = first_dimensional_index_to_position(j, num_cols);
+
+//                 //   1 2 3 ...
+//                 // 1 . . .
+//                 // 2 . . .
+//                 // 3 . . .
+//                 // ...
+                
+//                 //       (0, 0) (0, 1) (0, 2) ...
+//                 // (0, 0)   .      .      .
+//                 // (0, 1)   .      .      .
+//                 // (0, 2)   .      .      .
+//                 // ...
+
+//                 if coming == going {
+//                     weights.edit_weight(&coming, &going, Some(0.0));
+//                     continue;
+//                 }
+
+//                 let current_weight = match weights.lookup_weight(&coming, &going) {
+//                     Some(w) => w,
+//                     None => 0.
+//                 };
+
+//                 weights.edit_weight(&coming, &going, Some(current_weight + *value as f64));
+//             }
+//         }  
+//     } 
+
+//     weights
+// }
