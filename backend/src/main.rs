@@ -454,6 +454,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
         // modify the voltage and handle stdp
         // end loop
 
+        // could be changed to graph.get_every_node()
         for pos in inputs.keys() {
             let (x, y) = *pos;
             let input_value = *inputs.get(&pos).unwrap();
