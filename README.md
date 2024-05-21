@@ -29,6 +29,8 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Then comparing the distance between burst groups and the intervals of the burst groups
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
+- **Subtract 70 mv (or n) from Hodgkin Huxley in fitting** for peak amplitudes
+
 - Eventually remove old neurotransmitter system and replace it with new one
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
@@ -60,7 +62,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Another refactor for neurotransmission**, neurotransmitter and receptors should be a trait that structs can implement
   - Approximation of neurotransmission for integrate and fire cells
     - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
-      - Neurotransmitter input should be maximum neurotransmitter concentrate, summing of neurotransmitter function should be modified such that it can take in a bool to check whether or not it will just find the maximal concentration or will just sum
+      - Spike detection could be done in same manner as Hodgkin Huxley spike detection where neurotrasmitter struct will keep track of the last voltage and whether it was increasing or not
     - Modifier from receptor type (GABAb modifier and NMDA modifier) should still be applied to currents
 
 - **Redo obsidian notes with new code**
@@ -70,15 +72,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Add $\tau_m$ and $C_m$ to fitting parameters
 - Add option to subtract 70 mV to set resting potential for Hodgkin Huxley model in fitting
 
-- Have a set of bayesian parameters for ensemble of neurons to use
 - Obsidian notes on STDP equations
-- Graph should be able to be inputted into `run_lattice`, run lattice should not return graph as it is being mutated
 - Update code in obsidian when refactor is done, maybe update results
-
-- **Get coupled neuron test to work with IterateAndSpike trait**
-  - Get it to work with Hodgkin Huxley model with IterateAndSpike trait
-  - Can ignore neurotransmission for now
-    - Iterate and spike trait could be modified to take in a `Option<f64>` for additional $dv$ changes where the additional change in voltage is the neurotransmission current
 
 - Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
 
@@ -90,9 +85,19 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
 
-- FitzHugh–Nagumo model (FHN)
+- FitzHugh–Nagumo model (FHN) (with bursting)
 
-- Should create a CellType enum to store IFType and Hodgkin Huxley type for later use in lattice simulation function
+- Spike trains and multiple lattices
+  - Spike train trait should return a voltage and iterate with no given input
+    - Should implement potentation trait
+  - Poisson neuron could be configured to spike with a Poisson distribution, ie it has some random element but over time conforms to some frequency
+  - A spike train struct should have a hashmap that contains when the neuron will spike and to what mangitude
+    - Spike train will have internal counter that determines when it spikes that resets when it reaches the end of its period
+  - Spike train trait should eventually also have the option to return a neurotransmitter concentration to be used
+  - Spike train input should be able to be fed into lattices, multiple lattices function should be able to simulate multiple lattices that are connected with one another with different parameters (different plasticity settings, different neuron types etc)
+    - Input hashmap (in lattices) could be modified to have inputs added from other lattices (or spiketrains), input may have to be scaled down or modified such that multiple position input keys exist as vectors, inputs going to the same position could then be summed, bayesian factor could be applied after summation
+    - Lattice calculation might want to randomly select certain neurons to be read and updated first
+    - **Bayesian factor could be used in place of this but bayesian factor should be reduced to +/- 10-5%**
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
   - Inputs should be calculated in parallel
