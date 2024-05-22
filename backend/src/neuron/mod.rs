@@ -1735,13 +1735,20 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //             false => self.state = DiscreteNeuronState::Inactive,
 //         }
 //     }
+
+//     fn state_to_numeric(&self) -> f64 {
+//         match &self.state {
+//             DiscreteNeuronState::Active => 1.,
+//             DiscreteNeuronState::Inactive => -1.,
+//         }
+//     }
 // }
 
-// fn outer_product(a: &Vec<usize>, b: &Vec<usize>) -> Vec<Vec<usize>> {
-//     let mut output: Vec<Vec<usize>> = Vec::new();
+// fn outer_product(a: &Vec<isize>, b: &Vec<isize>) -> Vec<Vec<isize>> {
+//     let mut output: Vec<Vec<isize>> = Vec::new();
 
 //     for i in a {
-//         let mut vector: Vec<usize> = Vec::new();
+//         let mut vector: Vec<isize> = Vec::new();
 //         for j in b {
 //             vector.push(i * j);
 //         }
@@ -1752,23 +1759,42 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //     output
 // }
 
+// // fn dot_product(a: &Vec<usize>, b: &Vec<usize>) -> usize {
+// //     let mut out = 0;
+
+// //     for i in a {
+// //         for j in b {
+// //             out += i * j
+// //         }
+// //     }
+
+// //     out
+// // }
+
 // fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usize) {
 //     ((i / num_cols), (i % num_cols))
 // }
 
-// *********************************************************************************
-// CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
-// *********************************************************************************
-// if index != 0 {
-//     self.matrix.push(vec![None; index]);
-//     for row in self.matrix.iter_mut() {
-//         row.push(None);
-//     }
-// } else {
-//     self.matrix = vec![vec![None]];
-// }
+// // *********************************************************************************
+// // CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
+// // *********************************************************************************
+// // if index != 0 {
+// //     self.matrix.push(vec![None; index]);
+// //     for row in self.matrix.iter_mut() {
+// //         row.push(None);
+// //     }
+// // } else {
+// //     self.matrix = vec![vec![None]];
+// // }
+// // self.lookup_weight on adjacencylist may not have the same behavior as matrix
+// // it should error if either one of the positions given are not in the network
+// // (check if incoming and outgoing pos in incoming connections keys)
+// // (initialize connections should add all neurons (pre/post) to incoming map)
+// // consider add_vertex added to trait
+// // additionally if the postsynaptic position is in the network but not connected
+// // it should not error it should return none
 
-// fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: Vec<Vec<usize>>) -> AdjacencyMatrix {
+// fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: Vec<Vec<isize>>) -> AdjacencyMatrix {
 //     let mut weights = AdjacencyMatrix::default();
 
 //     for i in 0..num_rows {
@@ -1799,7 +1825,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //                 // ...
 
 //                 if coming == going {
-//                     weights.edit_weight(&coming, &going, Some(0.0));
+//                     weights.edit_weight(&coming, &going, None);
 //                     continue;
 //                 }
 
@@ -1814,4 +1840,44 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //     } 
 
 //     weights
+// }
+
+// fn run_hopfield_network(
+//     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
+//     weights: &AdjacencyMatrix, 
+//     cue: Vec<Vec<isize>>,
+//     iterations: usize,
+// ) -> Vec<Vec<isize>> {
+//     for (i, cue_vec) in cue.iter().enumerate() {
+//         for (j, value) in cue_vec.iter().enumerate() {
+//             cell_grid[i][j].update(*value as f64);
+//         }
+//     }
+
+//     for _ in 0..iterations {
+//         for (i, cue_vec) in cue.iter().enumerate() {
+//             for (j, value) in cue_vec.iter().enumerate() {
+//                 let input_positions = weights.get_incoming_connections((i, j)).unwrap();
+
+//                 let input_value: f64 = input_positions.iter()
+//                     .map(|(pos_i, pos_j)| 
+//                         weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j]
+//                     )
+//                     .sum();
+
+//                 cell_grid[i][j].update(input_value);
+//             }
+//         }
+//     }
+
+//     let mut output: Vec<Vec<isize>> = Vec::new();
+
+//     for i in cell_grid.iter() {
+//         let mut output_vec: Vec<isize> = Vec::new();
+//         for j in i.iter() {
+//             output_vec.push(j.state_to_numeric() as isize);
+//         }
+//     }
+
+//     output
 // }
