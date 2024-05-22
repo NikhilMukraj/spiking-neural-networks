@@ -1859,9 +1859,10 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //             for (j, value) in cue_vec.iter().enumerate() {
 //                 let input_positions = weights.get_incoming_connections((i, j)).unwrap();
 
+                // if there is problem with convergence it is likely this calculation
 //                 let input_value: f64 = input_positions.iter()
 //                     .map(|(pos_i, pos_j)| 
-//                         weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j]
+//                         weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j].state_to_numeric()
 //                     )
 //                     .sum();
 
