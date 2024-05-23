@@ -6,9 +6,10 @@ use std::{
     ops::Sub,
 };
 use rand::Rng;
-#[path = "../distribution/mod.rs"]
-mod distribution;
+use crate::distribution;
 use distribution::limited_distr;
+// use crate::graph;
+// use graph::AdjacencyMatrix;
 
 
 #[derive(Debug, Clone)]
@@ -1759,40 +1760,40 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //     output
 // }
 
-// // fn dot_product(a: &Vec<usize>, b: &Vec<usize>) -> usize {
-// //     let mut out = 0;
+// fn dot_product(a: &Vec<usize>, b: &Vec<usize>) -> usize {
+//     let mut out = 0;
 
-// //     for i in a {
-// //         for j in b {
-// //             out += i * j
-// //         }
-// //     }
+//     for i in a {
+//         for j in b {
+//             out += i * j
+//         }
+//     }
 
-// //     out
-// // }
+//     out
+// }
 
 // fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usize) {
 //     ((i / num_cols), (i % num_cols))
 // }
 
-// // *********************************************************************************
-// // CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
-// // *********************************************************************************
-// // if index != 0 {
-// //     self.matrix.push(vec![None; index]);
-// //     for row in self.matrix.iter_mut() {
-// //         row.push(None);
-// //     }
-// // } else {
-// //     self.matrix = vec![vec![None]];
-// // }
-// // self.lookup_weight on adjacencylist may not have the same behavior as matrix
-// // it should error if either one of the positions given are not in the network
-// // (check if incoming and outgoing pos in incoming connections keys)
-// // (initialize connections should add all neurons (pre/post) to incoming map)
-// // consider add_vertex added to trait
-// // additionally if the postsynaptic position is in the network but not connected
-// // it should not error it should return none
+// // // *********************************************************************************
+// // // CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
+// // // *********************************************************************************
+// // // if index != 0 {
+// // //     self.matrix.push(vec![None; index]);
+// // //     for row in self.matrix.iter_mut() {
+// // //         row.push(None);
+// // //     }
+// // // } else {
+// // //     self.matrix = vec![vec![None]];
+// // // }
+// // // self.lookup_weight on adjacencylist may not have the same behavior as matrix
+// // // it should error if either one of the positions given are not in the network
+// // // (check if incoming and outgoing pos in incoming connections keys)
+// // // (initialize connections should add all neurons (pre/post) to incoming map)
+// // // consider add_vertex added to trait
+// // // additionally if the postsynaptic position is in the network but not connected
+// // // it should not error it should return none
 
 // fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: Vec<Vec<isize>>) -> AdjacencyMatrix {
 //     let mut weights = AdjacencyMatrix::default();
@@ -1842,41 +1843,63 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //     weights
 // }
 
-// fn run_hopfield_network(
-//     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
-//     weights: &AdjacencyMatrix, 
-//     cue: Vec<Vec<isize>>,
-//     iterations: usize,
-// ) -> Vec<Vec<isize>> {
+// fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern: Vec<Vec<isize>>) {
 //     for (i, cue_vec) in cue.iter().enumerate() {
 //         for (j, value) in cue_vec.iter().enumerate() {
 //             cell_grid[i][j].update(*value as f64);
 //         }
 //     }
+// }
 
-//     for _ in 0..iterations {
-//         for (i, cue_vec) in cue.iter().enumerate() {
-//             for (j, value) in cue_vec.iter().enumerate() {
-//                 let input_positions = weights.get_incoming_connections((i, j)).unwrap();
+// fn iterate_hopfield_network(
+//     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
+//     weights: &AdjacencyMatrix, 
+//     cue: Vec<Vec<isize>>,
+// ) {
+//     for (i, cue_vec) in cue.iter().enumerate() {
+//         for (j, value) in cue_vec.iter().enumerate() {
+//             let input_positions = weights.get_incoming_connections((i, j)).unwrap();
 
-                // if there is problem with convergence it is likely this calculation
-//                 let input_value: f64 = input_positions.iter()
-//                     .map(|(pos_i, pos_j)| 
-//                         weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j].state_to_numeric()
-//                     )
-//                     .sum();
+//             // if there is problem with convergence it is likely this calculation
+//             let input_value: f64 = input_positions.iter()
+//                 .map(|(pos_i, pos_j)| 
+//                     weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j].state_to_numeric()
+//                 )
+//                 .sum();
 
-//                 cell_grid[i][j].update(input_value);
-//             }
+//             cell_grid[i][j].update(input_value);
 //         }
 //     }
+// }
 
+// fn convert_hopfield_network(cell_grid: &Vec<Vec<DiscreteNeuron>>) -> Vec<Vec<isize>> {
 //     let mut output: Vec<Vec<isize>> = Vec::new();
 
 //     for i in cell_grid.iter() {
 //         let mut output_vec: Vec<isize> = Vec::new();
 //         for j in i.iter() {
 //             output_vec.push(j.state_to_numeric() as isize);
+//         }
+//     }
+
+//     output
+// }
+
+// fn distort_pattern(pattern: Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<isize>> {
+//     let mut output: Vec<Vec<isize>> = Vec::new();
+
+//     for i in pattern.iter() {
+//         let mut output_vec: Vec<isize> = Vec::new();
+//         for j in i.iter() {
+//             if rand::thread_rng().gen_range(0.0..=1.0) <= noise_level {
+//                 if j > 0 {
+//                     output_vec.push(-1);
+//                 } else {
+//                     output_vec.push(1);
+//                 }
+//             } else {
+//                 output_vec.push(j)
+//             }
 //         }
 //     }
 
