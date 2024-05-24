@@ -2,7 +2,6 @@ use std::{
     collections::HashMap, 
     env, 
     f64::consts::PI, 
-    mem::take,
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
@@ -389,7 +388,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
         //     });
         //     .collect();
 
-        let mut neurotransmitter_inputs = match do_receptor_kinetics {
+        let neurotransmitter_inputs = match do_receptor_kinetics {
             true => {
                 let neurotransmitters: HashMap<Position, NeurotransmitterConcentrations> = graph.get_every_node()
                     .iter()
@@ -458,8 +457,13 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
         for pos in inputs.keys() {
             let (x, y) = *pos;
             let input_value = *inputs.get(&pos).unwrap();
+
+            // if cloning becomes performance bottleneck
+            // calculate bayesian factor within iterate function
+            // apply bayesian there and to each part of neurotransmitter in update receptor kinetics
+            // necessary to keep input hashmaps immutable for the sake of simplicity and interfacing
             let mut input_neurotransmitter = match neurotransmitter_inputs {
-                Some(ref mut neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get_mut(&pos).unwrap()),
+                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap().clone()),
                 None => None,
             };
 
@@ -479,7 +483,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
             // if neurotransmitter needs to be read for some reason other than this
             // read neurotransmitter concentration directly from the given neuron
             let is_spiking = cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
-                processed_input, input_neurotransmitter.take().map(|r| take(r)),
+                processed_input, input_neurotransmitter,
             );
 
             if is_spiking {
