@@ -101,6 +101,7 @@ fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
     graph: &U,
     position: &Position,
     input_positions: &Vec<Position>, 
+    bayesian: bool,
     averaged: bool,
 ) -> f64 {
     let (x, y) = position;
@@ -118,6 +119,10 @@ fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
         })
         .sum();
 
+    if bayesian {
+        input_val *= cell_grid[*x][*y].get_bayesian_factor();
+    }
+
     if averaged {
         input_val /= input_positions.len() as f64;
     }
@@ -130,6 +135,7 @@ fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctio
     graph: &U,
     position: &Position,
     input_positions: &Vec<Position>, 
+    bayesian: bool,
     averaged: bool,
 ) -> NeurotransmitterConcentrations {
     let input_vals = input_positions
@@ -148,6 +154,11 @@ fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctio
         .collect::<Vec<NeurotransmitterConcentrations>>();
 
     let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+
+    if bayesian {
+        let (x, y) = position;
+        weight_neurotransmitter_concentration(&mut input_val, cell_grid[*x][*y].get_bayesian_factor());
+    }
 
     if averaged {
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
@@ -400,6 +411,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
                             &*graph,
                             &pos,
                             &input_positions,
+                            bayesian,
                             averaged,
                         );
 
@@ -441,6 +453,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
                 &*graph,
                 &pos,
                 &input_positions,
+                bayesian,
                 averaged,
             );
 
@@ -462,28 +475,28 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
             // calculate bayesian factor within iterate function
             // apply bayesian there and to each part of neurotransmitter in update receptor kinetics
             // necessary to keep input hashmaps immutable for the sake of simplicity and interfacing
-            let mut input_neurotransmitter = match neurotransmitter_inputs {
-                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap().clone()),
+            let input_neurotransmitter = match neurotransmitter_inputs {
+                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
                 None => None,
             };
 
-            let processed_input = if bayesian {
-                let noise_factor = cell_grid[x][y].get_bayesian_factor();
+            // let processed_input = if bayesian {
+            //     let noise_factor = cell_grid[x][y].get_bayesian_factor();
 
-                if let Some(value) = input_neurotransmitter.as_mut() {
-                    weight_neurotransmitter_concentration(value, noise_factor)
-                }
+            //     if let Some(value) = input_neurotransmitter.as_mut() {
+            //         weight_neurotransmitter_concentration(value, noise_factor)
+            //     }
 
-                input_value * noise_factor
-            } else {
-                input_value
-            };
+            //     input_value * noise_factor
+            // } else {
+            //     input_value
+            // };
 
             // takes neurotransmitter input since input is not needed after this statement
             // if neurotransmitter needs to be read for some reason other than this
             // read neurotransmitter concentration directly from the given neuron
             let is_spiking = cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
-                processed_input, input_neurotransmitter,
+                input_value, input_neurotransmitter,
             );
 
             if is_spiking {
@@ -1148,7 +1161,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
             .collect();
         let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
             noise_factor * calculated_voltage,
-            presynaptic_neurotransmitters,
+            presynaptic_neurotransmitters.as_ref(),
         );
 
         update_isolated_presynaptic_neuron_weights(
