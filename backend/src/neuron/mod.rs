@@ -171,7 +171,7 @@ pub trait IterateAndSpike: Clone + CurrentVoltage + GapConductance + Potentiatio
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
     ) -> bool;
 }
 
@@ -528,7 +528,7 @@ impl IterateAndSpike for IntegrateAndFireCell {
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
@@ -890,10 +890,10 @@ impl LigandGatedChannels {
             .sum::<f64>() * (dt / c_m)
     }
 
-    pub fn update_receptor_kinetics(&mut self, t_total: Option<HashMap<NeurotransmitterType, f64>>, dt: f64) {
+    pub fn update_receptor_kinetics(&mut self, t_total: Option<&HashMap<NeurotransmitterType, f64>>, dt: f64) {
         match t_total {
-            Some(mut t_hashmap) => {
-                t_hashmap.iter_mut()
+            Some(t_hashmap) => {
+                t_hashmap.iter()
                     .for_each(|(key, value)| {
                         if let Some(gate) = self.ligand_gates.get_mut(key) {
                             gate.receptor.apply_r_change(*value, dt);
@@ -1451,7 +1451,7 @@ impl HodgkinHuxleyCell {
 
     pub fn update_receptors(
         &mut self, 
-        t_total: Option<HashMap<NeurotransmitterType, f64>>
+        t_total: Option<&HashMap<NeurotransmitterType, f64>>
     ) {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt)
@@ -1473,7 +1473,7 @@ impl HodgkinHuxleyCell {
     pub fn iterate_with_neurotransmitter(
         &mut self, 
         input: f64, 
-        t_total: Option<HashMap<NeurotransmitterType, f64>>
+        t_total: Option<&HashMap<NeurotransmitterType, f64>>
     ) {
         self.update_receptors(t_total);
         self.iterate(input);
@@ -1630,7 +1630,7 @@ impl IterateAndSpike for HodgkinHuxleyCell {
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
     ) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate_with_neurotransmitter(input_current, t_total);
@@ -1686,19 +1686,18 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             &*postsynaptic_neuron,
         );
 
-        let t_total = match do_receptor_kinetics {
-            true => {
-                let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-                weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
+        let t_total = if do_receptor_kinetics {
+            let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
+            weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
 
-                Some(t)
-            },
-            false => None,
+            Some(t)
+        } else {
+            None
         };
 
         let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
             current * post_bayesian_factor,
-            t_total,
+            t_total.as_ref(),
         );
     } else {
         let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
@@ -1708,14 +1707,16 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             &*postsynaptic_neuron,
         );
 
-        let t_total = match do_receptor_kinetics {
-            true => Some(presynaptic_neuron.get_neurotransmitter_concentrations()),
-            false => None,
+        let t_total = if do_receptor_kinetics {
+            let t = presynaptic_neuron.get_neurotransmitter_concentrations();
+            Some(t)
+        } else {
+            None
         };
 
         let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
             current,
-            t_total,
+            t_total.as_ref(),
         );
     }
 }
