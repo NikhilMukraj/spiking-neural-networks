@@ -1607,25 +1607,23 @@ macro_rules! run_lattice_from_simulation_params {
     };
 }
 
-// fn read_pattern(file: BufWriter<File>) -> Result<Vec<Vec<isize>>> {
-//     let reader = io::BufReader::new(file);
+fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
+    let mut matrix = Vec::new();
 
-//     let mut matrix = Vec::new();
+    for line in file_contents.split("\n") {
+        let row: Vec<isize> = line.split(',')
+            .map(|s| s.trim().parse().expect("Could not parse"))
+            .collect();
 
-//     for line in reader.lines() {
-//         let row: Vec<isize> = line?.split(',')
-//             .map(|s| s.trim().parse().expect("Could not parse"))
-//             .collect();
+        if row.iter().any(|i| *i != -1 && *i != 1) {
+            return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
+        }
 
-//         if row.any(|i| i != 1 && i -= 1) {
-//             return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
-//         }
+        matrix.push(row);
+    }
 
-//         matrix.push(row);
-//     }
-
-//     Ok(matrix)
-// }
+    Ok(matrix)
+}
 
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
@@ -2481,8 +2479,40 @@ fn main() -> Result<()> {
         // };
 
         println!("Finished fitting");
-    // } else if let Some(hopfield_table) = config.get("hopfield_network") {
+    } else if let Some(hopfield_table) = config.get("hopfield_network") {
+        let filename: String = match hopfield_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
 
+        let noise_level: f64 = parse_value_with_default(
+            &hopfield_table,
+            "noise_level",
+            parse_f64,
+            0.2
+        )?;
+
+        if noise_level > 1.0 && noise_level < 0.0 {
+            return Err(Error::new(ErrorKind::InvalidInput, "'noise_level' must be between 0 and 1"));
+        }
+
+        println!("noise_level: {}", noise_level);
+
+        let contents = read_to_string(filename)
+            .expect("Should have been able to read the file");
+        
+        let pattern = read_pattern(&contents)?;
+
+        println!("{:#?}", pattern);
+
+        // distort pattern
+        // input pattern into grid
+        // iterate
+        // save
+        // repeat
+
+        println!("Finished Hopfield test")
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
