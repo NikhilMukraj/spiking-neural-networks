@@ -1607,6 +1607,26 @@ macro_rules! run_lattice_from_simulation_params {
     };
 }
 
+// fn read_pattern(file: BufWriter<File>) -> Result<Vec<Vec<isize>>> {
+//     let reader = io::BufReader::new(file);
+
+//     let mut matrix = Vec::new();
+
+//     for line in reader.lines() {
+//         let row: Vec<isize> = line?.split(',')
+//             .map(|s| s.trim().parse().expect("Could not parse"))
+//             .collect();
+
+//         if row.any(|i| i != 1 && i -= 1) {
+//             return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
+//         }
+
+//         matrix.push(row);
+//     }
+
+//     Ok(matrix)
+// }
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -2461,6 +2481,8 @@ fn main() -> Result<()> {
         // };
 
         println!("Finished fitting");
+    // } else if let Some(hopfield_table) = config.get("hopfield_network") {
+
     } else {
         return Err(Error::new(ErrorKind::InvalidInput, "Simulation config not found"));
     }
