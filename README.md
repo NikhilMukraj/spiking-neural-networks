@@ -82,6 +82,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Have system to generate new neurotransmitter and receptors from TOML
 
 - Split `main.rs` functions into a few different files for readability
+- Printing should have colors
 
 - Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
 
