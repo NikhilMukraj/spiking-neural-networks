@@ -9,7 +9,7 @@ use rand::Rng;
 use crate::distribution;
 use distribution::limited_distr;
 // use crate::graph;
-// use graph::AdjacencyMatrix;
+// use graph::{AdjacencyMatrix, GraphFunctionality};
 
 
 #[derive(Debug, Clone)]
@@ -1845,8 +1845,8 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 // }
 
 // fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern: Vec<Vec<isize>>) {
-//     for (i, cue_vec) in cue.iter().enumerate() {
-//         for (j, value) in cue_vec.iter().enumerate() {
+//     for (i, pattern_vec) in pattern.iter().enumerate() {
+//         for (j, value) in pattern_vec.iter().enumerate() {
 //             cell_grid[i][j].update(*value as f64);
 //         }
 //     }
@@ -1859,12 +1859,13 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 // ) {
 //     for (i, cue_vec) in cue.iter().enumerate() {
 //         for (j, value) in cue_vec.iter().enumerate() {
-//             let input_positions = weights.get_incoming_connections((i, j)).unwrap();
+//             let input_positions = weights.get_incoming_connections(&(i, j));
 
 //             // if there is problem with convergence it is likely this calculation
 //             let input_value: f64 = input_positions.iter()
 //                 .map(|(pos_i, pos_j)| 
-//                     weights.lookup_weight(&(pos_i, pos_j), &(i, j)) * cell_grid[pos_i][pos_j].state_to_numeric()
+//                     weights.lookup_weight(&(*pos_i, *pos_j), &(i, j)).unwrap() 
+//                     * cell_grid[*pos_i][*pos_j].state_to_numeric()
 //                 )
 //                 .sum();
 
@@ -1893,13 +1894,13 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //         let mut output_vec: Vec<isize> = Vec::new();
 //         for j in i.iter() {
 //             if rand::thread_rng().gen_range(0.0..=1.0) <= noise_level {
-//                 if j > 0 {
+//                 if *j > 0 {
 //                     output_vec.push(-1);
 //                 } else {
 //                     output_vec.push(1);
 //                 }
 //             } else {
-//                 output_vec.push(j)
+//                 output_vec.push(*j)
 //             }
 //         }
 //     }
