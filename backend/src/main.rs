@@ -2493,7 +2493,7 @@ fn main() -> Result<()> {
             0.2
         )?;
 
-        if noise_level > 1.0 && noise_level < 0.0 {
+        if noise_level > 1.0 || noise_level < 0.0 {
             return Err(Error::new(ErrorKind::InvalidInput, "'noise_level' must be between 0 and 1"));
         }
 
