@@ -1,3 +1,5 @@
 [hopfield_network]
-filename = "args/pattern.txt"
+pattern = "args/pattern.txt"
 noise_level = 0.25
+iterations = 10
+filename = "output/hopfield.txt"
