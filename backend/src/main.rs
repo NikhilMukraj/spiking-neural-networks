@@ -9,7 +9,7 @@ use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
 mod distribution;
-use crate::distribution::limited_distr;
+use crate::{distribution::limited_distr, neuron::convert_hopfield_network};
 mod neuron;
 use crate::neuron::{
     IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, 
@@ -21,6 +21,8 @@ use crate::neuron::{
     NeurotransmitterType, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
     AdditionalGates, HighThresholdCalciumChannel,HighVoltageActivatedCalciumChannel,
+    DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network,
+    input_pattern_into_grid, distort_pattern,
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -2480,6 +2482,12 @@ fn main() -> Result<()> {
 
         println!("Finished fitting");
     } else if let Some(hopfield_table) = config.get("hopfield_network") {
+        let pattern: String = match hopfield_table.get("pattern") {
+            Some(value) => parse_string(value, "pattern")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'pattern' value not found")); },
+        };
+        println!("pattern: {}", pattern);
+
         let filename: String = match hopfield_table.get("filename") {
             Some(value) => parse_string(value, "filename")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
@@ -2499,18 +2507,67 @@ fn main() -> Result<()> {
 
         println!("noise_level: {}", noise_level);
 
-        let contents = read_to_string(filename)
+        let iterations: usize = match hopfield_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
+
+        let contents = read_to_string(pattern)
             .expect("Should have been able to read the file");
         
         let pattern = read_pattern(&contents)?;
 
-        println!("{:#?}", pattern);
+        let num_rows = pattern.len();
+        let num_cols = pattern[0].len();
 
+        // flatten pattern
+        // generate weights
         // distort pattern
         // input pattern into grid
         // iterate
         // save
         // repeat
+
+        let weights = generate_hopfield_network(num_rows, num_cols, &vec![pattern.clone()]);
+
+        let distorted_pattern = distort_pattern(&pattern, noise_level);
+
+        let mut cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        DiscreteNeuron::default()
+                    })
+                    .collect::<Vec<DiscreteNeuron>>()
+            })
+            .collect::<Vec<Vec<DiscreteNeuron>>>();
+
+        let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
+
+        input_pattern_into_grid(&mut cell_grid, distorted_pattern);
+        hopfield_history.push(convert_hopfield_network(&cell_grid));
+
+        for _ in 0..iterations {
+            iterate_hopfield_network(&mut cell_grid, &weights);
+            hopfield_history.push(convert_hopfield_network(&cell_grid));
+        } 
+
+        let mut hopfield_file = BufWriter::new(File::create(filename)
+            .expect("Could not create file"));
+
+        for grid in hopfield_history {
+            for row in grid {
+                for value in row {
+                    write!(hopfield_file, "{} ", value)
+                        .expect("Could not write to file");
+                }
+                writeln!(hopfield_file)
+                    .expect("Could not write to file");
+            }
+            writeln!(hopfield_file, "-----")
+                .expect("Could not write to file"); 
+        }
 
         println!("Finished Hopfield test")
     } else {
