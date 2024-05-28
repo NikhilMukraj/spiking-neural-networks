@@ -1808,7 +1808,6 @@ pub fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: &Vec<Ve
 
         for (i, weight_vec) in weight_changes.iter().enumerate() {
             for (j, value) in weight_vec.iter().enumerate() {
-                // coming and going may not be correct
                 let coming = first_dimensional_index_to_position(i, num_cols);
                 let going = first_dimensional_index_to_position(j, num_cols);
 
