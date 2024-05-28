@@ -2482,17 +2482,29 @@ fn main() -> Result<()> {
 
         println!("Finished fitting");
     } else if let Some(hopfield_table) = config.get("hopfield_network") {
-        let pattern: String = match hopfield_table.get("pattern") {
-            Some(value) => parse_string(value, "pattern")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'pattern' value not found")); },
-        };
-        println!("pattern: {}", pattern);
+        let pattern_files: Vec<&str> = match hopfield_table.get("patterns") {
+            Some(value) => match value.as_array() {
+                Some(array) => {
+                    let mut vec = Vec::new();
+                    for value in array {
+                        match value.as_str() {
+                            Some(string) => vec.push(string),
+                            None => return Err(Error::new(ErrorKind::InvalidInput, "'patterns' value is not an array of strings")),
+                        }
+                    }
+                    Ok(vec)
+                }
+                None => Err(Error::new(ErrorKind::InvalidInput, "'patterns' value is not an array of strings")),
+            },
+            None => Err(Error::new(ErrorKind::InvalidInput, "'patterns' value not found")),
+        }?;
+        println!("patterns: {:#?}", pattern_files);
 
-        let filename: String = match hopfield_table.get("filename") {
-            Some(value) => parse_string(value, "filename")?,
-            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        let tag: String = match hopfield_table.get("tag") {
+            Some(value) => parse_string(value, "tag")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'tag' value not found")); },
         };
-        println!("filename: {}", filename);
+        println!("tag: {}", tag);
 
         let noise_level: f64 = parse_value_with_default(
             &hopfield_table,
@@ -2512,16 +2524,28 @@ fn main() -> Result<()> {
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
         };
         println!("iterations: {}", iterations);
-
-        let contents = read_to_string(pattern)
-            .expect("Should have been able to read the file");
         
-        let pattern = read_pattern(&contents)?;
+        let patterns: Vec<Vec<Vec<isize>>> = pattern_files.iter()
+            .map(|i| 
+                read_pattern(
+                    &(read_to_string(i).expect("Could not read file"))
+                ).expect("Pattern could not be read, must be bipolar (-1 or 1 for every value)")
+            )
+            .collect();
 
-        let num_rows = pattern.len();
-        let num_cols = pattern[0].len();
+        let num_rows = patterns[0].len();
+        let num_cols = patterns[0][0].len();
 
-        // flatten pattern
+        for pattern in patterns.iter() {
+            if pattern.len() != num_rows {
+                return Err(Error::new(ErrorKind::InvalidInput, "Patterns must have the same size"));
+            }
+
+            if pattern.iter().any(|row| row.len() != num_cols) {
+                return Err(Error::new(ErrorKind::InvalidInput, "Patterns must have the same size"));
+            }
+        }
+
         // generate weights
         // distort pattern
         // input pattern into grid
@@ -2529,44 +2553,46 @@ fn main() -> Result<()> {
         // save
         // repeat
 
-        let weights = generate_hopfield_network(num_rows, num_cols, &vec![pattern.clone()]);
+        let weights = generate_hopfield_network(num_rows, num_cols, &patterns);
 
-        let distorted_pattern = distort_pattern(&pattern, noise_level);
+        for (n, pattern) in patterns.iter().enumerate() {
+            let distorted_pattern = distort_pattern(&pattern, noise_level);
 
-        let mut cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
-            .map(|_| {
-                (0..num_cols)
-                    .map(|_| {
-                        DiscreteNeuron::default()
-                    })
-                    .collect::<Vec<DiscreteNeuron>>()
-            })
-            .collect::<Vec<Vec<DiscreteNeuron>>>();
+            let mut cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
+                .map(|_| {
+                    (0..num_cols)
+                        .map(|_| {
+                            DiscreteNeuron::default()
+                        })
+                        .collect::<Vec<DiscreteNeuron>>()
+                })
+                .collect::<Vec<Vec<DiscreteNeuron>>>();
 
-        let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
+            let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
 
-        input_pattern_into_grid(&mut cell_grid, distorted_pattern);
-        hopfield_history.push(convert_hopfield_network(&cell_grid));
-
-        for _ in 0..iterations {
-            iterate_hopfield_network(&mut cell_grid, &weights);
+            input_pattern_into_grid(&mut cell_grid, distorted_pattern);
             hopfield_history.push(convert_hopfield_network(&cell_grid));
-        } 
 
-        let mut hopfield_file = BufWriter::new(File::create(filename)
-            .expect("Could not create file"));
+            for _ in 0..iterations {
+                iterate_hopfield_network(&mut cell_grid, &weights);
+                hopfield_history.push(convert_hopfield_network(&cell_grid));
+            } 
 
-        for grid in hopfield_history {
-            for row in grid {
-                for value in row {
-                    write!(hopfield_file, "{} ", value)
+            let mut hopfield_file = BufWriter::new(File::create(format!("{}_{}_hopfield.txt", tag, n))
+                .expect("Could not create file"));
+
+            for grid in hopfield_history {
+                for row in grid {
+                    for value in row {
+                        write!(hopfield_file, "{} ", value)
+                            .expect("Could not write to file");
+                    }
+                    writeln!(hopfield_file)
                         .expect("Could not write to file");
                 }
-                writeln!(hopfield_file)
-                    .expect("Could not write to file");
+                writeln!(hopfield_file, "-----")
+                    .expect("Could not write to file"); 
             }
-            writeln!(hopfield_file, "-----")
-                .expect("Could not write to file"); 
         }
 
         println!("Finished Hopfield test")
