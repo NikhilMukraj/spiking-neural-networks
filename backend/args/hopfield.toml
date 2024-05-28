@@ -1,5 +1,7 @@
 [hopfield_network]
-pattern = "args/pattern.txt"
-noise_level = 0.25
+patterns = ["args/pattern1.txt", "args/pattern2.txt"]
+noise_level = 0.1
 iterations = 10
-filename = "output/hopfield.txt"
+tag = "output/test"
+
+# try with larger patterns
