@@ -117,7 +117,7 @@ fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
 
             let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
             
-            final_input * graph.lookup_weight(&input_position, position).unwrap()
+            final_input * graph.lookup_weight(&input_position, position).unwrap().unwrap()
         })
         .sum();
 
@@ -147,7 +147,7 @@ fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctio
             let input_cell = &cell_grid[*pos_x][*pos_y];
 
             let mut final_input = input_cell.get_neurotransmitter_concentrations();
-            let weight = graph.lookup_weight(&input_position, position).unwrap();
+            let weight = graph.lookup_weight(&input_position, position).unwrap().unwrap();
             
             weight_neurotransmitter_concentration(&mut final_input, weight);
 
@@ -406,7 +406,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
                 let neurotransmitters: HashMap<Position, NeurotransmitterConcentrations> = graph.get_every_node()
                     .iter()
                     .map(|&pos| {
-                        let input_positions = graph.get_incoming_connections(&pos);
+                        let input_positions = graph.get_incoming_connections(&pos).expect("Cannot find position");
 
                         let neurotransmitter_input = get_neurotransmitter_input_from_positions(
                             &cell_grid,
@@ -429,7 +429,7 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
         for pos in graph.get_every_node() {
             // let (x, y) = pos;
 
-            let input_positions = graph.get_incoming_connections(&pos);
+            let input_positions = graph.get_incoming_connections(&pos).expect("Cannot find position");
 
             // let input = if do_stdp {
             //     weighted_get_input_from_positions(
@@ -506,29 +506,29 @@ fn run_lattice<T: IterateAndSpike, U: GraphFunctionality>(
             }
 
             if do_stdp && is_spiking {
-                let input_positions = graph.get_incoming_connections(&pos);
+                let input_positions = graph.get_incoming_connections(&pos)?;
                 for i in input_positions {
                     let (x_in, y_in) = i;
-                    let current_weight = graph.lookup_weight(&(x_in, y_in), &pos).expect("Could not find weight");
+                    let current_weight = graph.lookup_weight(&(x_in, y_in), &pos)?.unwrap();
                                                 
                     graph.edit_weight(
                         &(x_in, y_in), 
                         &pos, 
                         Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
-                    );
+                    )?;
                 }
 
-                let out_going_connections = graph.get_outgoing_connections(&pos);
+                let out_going_connections = graph.get_outgoing_connections(&pos)?;
 
                 for i in out_going_connections {
                     let (x_out, y_out) = i;
-                    let current_weight = graph.lookup_weight(&pos, &(x_out, y_out)).expect("Could not find weight");
+                    let current_weight = graph.lookup_weight(&pos, &(x_out, y_out))?.unwrap();
 
                     graph.edit_weight(
                         &pos, 
                         &(x_out, y_out), 
                         Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
-                    ); 
+                    )?; 
                 }
             } 
         }
@@ -2553,7 +2553,7 @@ fn main() -> Result<()> {
         // save
         // repeat
 
-        let weights = generate_hopfield_network(num_rows, num_cols, &patterns);
+        let weights = generate_hopfield_network(num_rows, num_cols, &patterns)?;
 
         for (n, pattern) in patterns.iter().enumerate() {
             let distorted_pattern = distort_pattern(&pattern, noise_level);
@@ -2574,7 +2574,7 @@ fn main() -> Result<()> {
             hopfield_history.push(convert_hopfield_network(&cell_grid));
 
             for _ in 0..iterations {
-                iterate_hopfield_network(&mut cell_grid, &weights);
+                iterate_hopfield_network(&mut cell_grid, &weights)?;
                 hopfield_history.push(convert_hopfield_network(&cell_grid));
             } 
 
