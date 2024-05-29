@@ -1771,17 +1771,6 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
     ((i / num_cols), (i % num_cols))
 }
 
-// // *********************************************************************************
-// // CHECK IF LATTICE CALCULATION IS FINE WITH THIS MODIFICATION ON MATRIX CALCULATION
-// // *********************************************************************************
-// // if index != 0 {
-// //     self.matrix.push(vec![None; index]);
-// //     for row in self.matrix.iter_mut() {
-// //         row.push(None);
-// //     }
-// // } else {
-// //     self.matrix = vec![vec![None]];
-// // }
 // // self.lookup_weight on adjacencylist may not have the same behavior as matrix
 // // it should error if either one of the positions given are not in the network
 // // (modify methods so they can return errors for weight lookups and edits)
