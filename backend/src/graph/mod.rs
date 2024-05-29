@@ -14,6 +14,7 @@ use crate::neuron::BayesianParameters;
 pub type Position = (usize, usize);
 
 pub trait GraphFunctionality {
+    fn add_vertex(&mut self, position: Position);
     fn initialize_connections(
         &mut self, 
         postsynaptic: Position, 
@@ -21,47 +22,22 @@ pub trait GraphFunctionality {
         weight_params: &Option<BayesianParameters>,
     );
     fn get_every_node(&self) -> Vec<Position>;
-    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; 
-    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>);
-    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>; 
-    fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Result<Option<f64>>; 
+    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) -> Result<()>;
+    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>>; 
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>>;
     fn update_history(&mut self);
     fn write_current_weights(&self, tag: &str);
     fn write_history(&self, tag: &str);
 }
 
+// may not be necessary
 // pub trait GraphFunctionalitySynced: Sync {
 //     fn get_every_node(&self) -> Vec<Position>;
 //     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64>; 
 //     fn get_incoming_connections(&self, pos: &Position) -> Vec<Position>; 
 //     fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position>;
 // }
-
-#[derive(Clone, Debug)]
-pub struct AdjacencyMatrix {
-    pub position_to_index: HashMap<Position, usize>,
-    pub index_to_position: HashMap<usize, Position>,
-    pub matrix: Vec<Vec<Option<f64>>>,
-    pub history: Vec<Vec<Vec<Option<f64>>>>,
-}
-
-impl AdjacencyMatrix {
-    pub fn nodes_len(&self) -> usize {
-        self.position_to_index.len()
-    }
-
-    pub fn add_vertex(&mut self, position: Position) {
-        let index = self.nodes_len();
-    
-        self.position_to_index.insert(position, index);
-        self.index_to_position.insert(index, position);
-
-        self.matrix.push(vec![None; index]);
-        for row in self.matrix.iter_mut() {
-            row.push(None);
-        }
-    }
-}
 
 fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) {
     for row in grid {
@@ -79,9 +55,43 @@ fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T
         }
         writeln!(csv_file).expect("Could not write to file");
     }
+} 
+
+#[derive(Clone, Debug)]
+pub struct AdjacencyMatrix {
+    pub position_to_index: HashMap<Position, usize>,
+    pub index_to_position: HashMap<usize, Position>,
+    pub matrix: Vec<Vec<Option<f64>>>,
+    pub history: Vec<Vec<Vec<Option<f64>>>>,
+}
+
+impl AdjacencyMatrix {
+    pub fn nodes_len(&self) -> usize {
+        self.position_to_index.len()
+    }
 }
 
 impl GraphFunctionality for AdjacencyMatrix {
+    fn add_vertex(&mut self, position: Position) {
+        if self.position_to_index.contains_key(&position) {
+            return;
+        }
+
+        let index = self.nodes_len();
+    
+        self.position_to_index.insert(position, index);
+        self.index_to_position.insert(index, position);
+
+        if index != 0 {
+            self.matrix.push(vec![None; index]);
+            for row in self.matrix.iter_mut() {
+                row.push(None);
+            }
+        } else {
+            self.matrix = vec![vec![None]];
+        }
+    }
+
     fn initialize_connections(
         &mut self, 
         postsynaptic: Position, 
@@ -110,7 +120,7 @@ impl GraphFunctionality for AdjacencyMatrix {
                 None => Some(1.0),
             };
 
-            self.edit_weight(i, &postsynaptic, weight);
+            self.edit_weight(i, &postsynaptic, weight).unwrap();
         }
     }
 
@@ -118,25 +128,45 @@ impl GraphFunctionality for AdjacencyMatrix {
         self.position_to_index.keys().cloned().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
-        self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]]
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Result<Option<f64>> {
+        if !self.position_to_index.contains_key(postsynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+        }
+        if !self.position_to_index.contains_key(presynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+        }
+
+        Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
     }
 
-    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) {
+    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) -> Result<()> {
+        if !self.position_to_index.contains_key(postsynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+        }
+        if !self.position_to_index.contains_key(presynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+        }
+        
         self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]] = weight;
+
+        Ok(())
     }
 
     // to be cached
-    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
+    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+        if !self.position_to_index.contains_key(pos) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+        }
+
         let mut connections: Vec<Position> = Vec::new();
         for i in self.position_to_index.keys() {
-            match self.lookup_weight(i, &pos) {
+            match self.lookup_weight(i, &pos).unwrap() {
                 Some(_) => { connections.push(*i); },
                 None => {}
             };
         }
 
-        return connections;
+        Ok(connections)
     }
 
     // #[cache]
@@ -153,7 +183,11 @@ impl GraphFunctionality for AdjacencyMatrix {
     // }
 
     // to be cached
-    fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+        if !self.position_to_index.contains_key(pos) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+        }
+
         let node = self.position_to_index[pos];
         let out_going_connections = self.matrix[node]
             .iter()
@@ -162,7 +196,7 @@ impl GraphFunctionality for AdjacencyMatrix {
             .map(|(n, _)| self.index_to_position[&n])
             .collect::<Vec<Position>>();
             
-        return out_going_connections;
+        Ok(out_going_connections)
     }
 
     fn update_history(&mut self) {
@@ -214,14 +248,23 @@ impl Default for AdjacencyMatrix {
 
 #[derive(Clone, Debug)]
 pub struct AdjacencyList {
-    pub incoming_connections: HashMap<Position, HashMap<Position, Option<f64>>>,
+    pub incoming_connections: HashMap<Position, HashMap<Position, f64>>,
     pub outgoing_connections: HashMap<Position, Vec<Position>>,
-    pub history: Vec<HashMap<Position, HashMap<Position, Option<f64>>>>,
+    pub history: Vec<HashMap<Position, HashMap<Position, f64>>>,
 }
 
-type KeyWeightPair = HashMap<String, Option<f64>>;
+type KeyWeightPair = HashMap<String, f64>;
 
 impl GraphFunctionality for AdjacencyList {
+    fn add_vertex(&mut self, position: Position) {
+        if self.incoming_connections.contains_key(&position) {
+            return;
+        }
+
+        self.incoming_connections.entry(position)
+            .or_insert_with(HashMap::new);
+    }
+
     fn initialize_connections(
         &mut self, 
         postsynaptic: Position, 
@@ -231,16 +274,14 @@ impl GraphFunctionality for AdjacencyList {
         for i in connections.iter() {
             let weight = match weight_params {
                 Some(value) => {
-                    Some(
-                        limited_distr(
-                            value.mean, 
-                            value.std, 
-                            value.min, 
-                            value.max,
-                        )
+                    limited_distr(
+                        value.mean, 
+                        value.std, 
+                        value.min, 
+                        value.max,
                     )
                 },
-                None => Some(1.0),
+                None => 1.0,
             };
 
             if !self.incoming_connections.contains_key(&postsynaptic) {
@@ -265,30 +306,79 @@ impl GraphFunctionality for AdjacencyList {
         self.incoming_connections.keys().cloned().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Option<f64> {
+    fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Result<Option<f64>> {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
-        self.incoming_connections[postsynaptic][presynaptic]
+
+        if !self.incoming_connections.contains_key(postsynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+        }
+        if !self.incoming_connections.contains_key(presynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+        }
+
+        Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
     }
 
-    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) {
+    fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) -> Result<()> {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
-        if let Some(positions_and_weights) = self.incoming_connections.get_mut(postsynaptic) {
-            positions_and_weights.insert(*presynaptic, weight);
+        if !self.incoming_connections.contains_key(postsynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
         }
+        if !self.incoming_connections.contains_key(presynaptic) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+        }
+        
+        match weight {
+            Some(value) => {
+                self.incoming_connections.entry(*postsynaptic)
+                    .or_insert_with(HashMap::new)
+                    .insert(*presynaptic, value);
+    
+                if let Some(vector) = self.outgoing_connections.get_mut(&presynaptic) {
+                    vector.push(*postsynaptic);
+                } else {
+                    self.outgoing_connections.insert(*presynaptic, vec![*postsynaptic]);
+                }
+            },
+            None => {
+                if let Some(inner_map) = self.incoming_connections.get_mut(&postsynaptic) {
+                    inner_map.remove(&presynaptic);
+                }
+                if let Some(connections) = self.outgoing_connections.get_mut(&presynaptic) {
+                    if let Some(pos) = connections.iter().position(|x| *x == *postsynaptic) {
+                        connections.remove(pos);
+                    }
+                }
+            },
+        }
+
+        // if let Some(positions_and_weights) = self.incoming_connections.get_mut(postsynaptic) {
+        //     positions_and_weights.insert(*presynaptic, weight);
+        // }
+
+        Ok(())
     }
 
     // to be cached
     // or point to reference
-    fn get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
-        self.incoming_connections[pos].keys().cloned().collect::<Vec<Position>>()
+    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+        if !self.incoming_connections.contains_key(pos) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+        }
+
+        Ok(self.incoming_connections[pos].keys().cloned().collect::<Vec<Position>>())
     }
 
     // to be cached
     // or point to reference
-    fn get_outgoing_connections(&self, pos: &Position) -> Vec<Position> {
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+        if !self.incoming_connections.contains_key(pos) {
+            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+        }
+
         // self.outgoing_connections[pos].clone()
-        self.outgoing_connections.get(pos).unwrap_or(&vec![]).clone()
+        Ok(self.outgoing_connections.get(pos).unwrap_or(&vec![]).clone())
     }
 
     fn update_history(&mut self) {
