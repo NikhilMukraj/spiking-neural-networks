@@ -100,6 +100,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Lattice calculation might want to randomly select certain neurons to be read and updated first
     - **Bayesian factor could be used in place of this but bayesian factor should be reduced to +/- 10-5%**
 
+- Refactor fitting to use spike trains with neurotransmission
+- Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
+- Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
+
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
   - Inputs should be calculated in parallel
     - There should be a GraphFunctionalitySynced trait for the lookup weight function, get incoming connections, get outgoing connections, and get every node function, the rest can be under the regular GraphFunctionality trait, the weighted input function should have a `&dyn GraphFunctionalitySynced` argument
@@ -109,6 +113,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   <!-- - Calculations could be chunked (a section of neurons to operate on instead of just one at a time)
     - Weight changes do not need to be parallelized immediately if many spikes do not occur at once -->
   - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
+    - **Update cells by looping over grid**
     - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
   - Parallel functionality should also be benchmarked
 
