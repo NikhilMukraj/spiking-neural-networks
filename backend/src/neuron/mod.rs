@@ -1784,13 +1784,19 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 // // }
 // // self.lookup_weight on adjacencylist may not have the same behavior as matrix
 // // it should error if either one of the positions given are not in the network
+// // (modify methods so they can return errors for weight lookups and edits)
 // // (check if incoming and outgoing pos in incoming connections keys)
+// // (replace self.incoming_connections[postsynaptic][presynaptic] so it uses get and returns option<f64>)
+// // (edit weight should cut off connection if input weight is None)
+// // ***** BASICALLY REPLACE CURRENT ADJ LIST EDIT LOGIC WITH INIT CONNECTION LOGIC IF SOME *****
+// // if none then cut appropriate connections (if in outgoing, remove respective node)
+// // (if edit weight is creating a new connection, update outgoing accordingly)
 // // (initialize connections should add all neurons (pre/post) to incoming map)
-// // consider add_vertex added to trait
+// // add_vertex added to trait
 // // additionally if the postsynaptic position is in the network but not connected
 // // it should not error it should return none
 
-pub fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: &Vec<Vec<Vec<isize>>>) -> AdjacencyMatrix {
+pub fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: &Vec<Vec<Vec<isize>>>) -> Result<AdjacencyMatrix> {
     let mut weights = AdjacencyMatrix::default();
 
     for i in 0..num_rows {
@@ -1824,21 +1830,21 @@ pub fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: &Vec<Ve
                 // ...
 
                 if coming == going {
-                    weights.edit_weight(&coming, &going, None);
+                    weights.edit_weight(&coming, &going, None)?;
                     continue;
                 }
 
-                let current_weight = match weights.lookup_weight(&coming, &going) {
+                let current_weight = match weights.lookup_weight(&coming, &going)? {
                     Some(w) => w,
                     None => 0.
                 };
 
-                weights.edit_weight(&coming, &going, Some(current_weight + *value as f64));
+                weights.edit_weight(&coming, &going, Some(current_weight + *value as f64))?;
             }
         }  
     } 
 
-    weights
+    Ok(weights)
 }
 
 pub fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern: Vec<Vec<isize>>) {
@@ -1852,15 +1858,15 @@ pub fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern
 pub fn iterate_hopfield_network(
     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
     weights: &AdjacencyMatrix, 
-) {
+) -> Result<()> {
     for i in 0..cell_grid.len() {
         for j in 0..cell_grid[0].len() {
-            let input_positions = weights.get_incoming_connections(&(i, j));
+            let input_positions = weights.get_incoming_connections(&(i, j))?;
 
             // if there is problem with convergence it is likely this calculation
             let input_value: f64 = input_positions.iter()
                 .map(|(pos_i, pos_j)| 
-                    weights.lookup_weight(&(*pos_i, *pos_j), &(i, j)).unwrap() 
+                    weights.lookup_weight(&(*pos_i, *pos_j), &(i, j)).unwrap().unwrap() 
                     * cell_grid[*pos_i][*pos_j].state_to_numeric()
                 )
                 .sum();
@@ -1868,6 +1874,8 @@ pub fn iterate_hopfield_network(
             cell_grid[i][j].update(input_value);
         }
     }
+
+    Ok(())
 }
 
 pub fn convert_hopfield_network(cell_grid: &Vec<Vec<DiscreteNeuron>>) -> Vec<Vec<isize>> {
