@@ -9,7 +9,7 @@ use rand::Rng;
 use crate::distribution;
 use distribution::limited_distr;
 use crate::graph;
-use graph::{AdjacencyMatrix, GraphFunctionality};
+use graph::GraphFunctionality;
 
 
 #[derive(Debug, Clone)]
@@ -1785,8 +1785,12 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 // // additionally if the postsynaptic position is in the network but not connected
 // // it should not error it should return none
 
-pub fn generate_hopfield_network(num_rows: usize, num_cols: usize, data: &Vec<Vec<Vec<isize>>>) -> Result<AdjacencyMatrix> {
-    let mut weights = AdjacencyMatrix::default();
+pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
+    num_rows: usize, 
+    num_cols: usize, 
+    data: &Vec<Vec<Vec<isize>>>
+) -> Result<T> {
+    let mut weights = T::default();
 
     for i in 0..num_rows {
         for j in 0..num_cols {
@@ -1844,9 +1848,9 @@ pub fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern
     }
 }
 
-pub fn iterate_hopfield_network(
+pub fn iterate_hopfield_network<T: GraphFunctionality>(
     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
-    weights: &AdjacencyMatrix, 
+    weights: &T, 
 ) -> Result<()> {
     for i in 0..cell_grid.len() {
         for j in 0..cell_grid[0].len() {
