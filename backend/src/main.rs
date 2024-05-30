@@ -1627,6 +1627,60 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
     Ok(matrix)
 }
 
+fn test_hopfield_network<T: GraphFunctionality + Default>(
+    patterns: &Vec<Vec<Vec<isize>>>,
+    noise_level: f64,
+    iterations: usize,
+    tag: &str,
+) -> Result<()> {
+    let num_rows = patterns[0].len();
+    let num_cols = patterns[0][0].len();
+
+    let weights = generate_hopfield_network::<T>(num_rows, num_cols, &patterns)?;
+
+    for (n, pattern) in patterns.iter().enumerate() {
+        let distorted_pattern = distort_pattern(&pattern, noise_level);
+
+        let mut cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        DiscreteNeuron::default()
+                    })
+                    .collect::<Vec<DiscreteNeuron>>()
+            })
+            .collect::<Vec<Vec<DiscreteNeuron>>>();
+
+        let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
+
+        input_pattern_into_grid(&mut cell_grid, distorted_pattern);
+        hopfield_history.push(convert_hopfield_network(&cell_grid));
+
+        for _ in 0..iterations {
+            iterate_hopfield_network(&mut cell_grid, &weights)?;
+            hopfield_history.push(convert_hopfield_network(&cell_grid));
+        } 
+
+        let mut hopfield_file = BufWriter::new(File::create(format!("{}_{}_hopfield.txt", tag, n))
+            .expect("Could not create file"));
+
+        for grid in hopfield_history {
+            for row in grid {
+                for value in row {
+                    write!(hopfield_file, "{} ", value)
+                        .expect("Could not write to file");
+                }
+                writeln!(hopfield_file)
+                    .expect("Could not write to file");
+            }
+            writeln!(hopfield_file, "-----")
+                .expect("Could not write to file"); 
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
 
@@ -2524,6 +2578,18 @@ fn main() -> Result<()> {
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
         };
         println!("iterations: {}", iterations);
+
+        let graph_type: String = parse_value_with_default(
+            &hopfield_table,
+            "graph_type",
+            parse_string,
+            String::from("matrix"),
+        )?;
+        let graph_type = match Graph::from_str(&graph_type) {
+            Ok(graph_type_val) => graph_type_val,
+            Err(_e) => { return Err(Error::new(ErrorKind::InvalidInput, "Cannot parse 'graph_type' as one of the valid types")) }
+        };
+        println!("graph_type: {:#?}", graph_type);
         
         let patterns: Vec<Vec<Vec<isize>>> = pattern_files.iter()
             .map(|i| 
@@ -2553,47 +2619,14 @@ fn main() -> Result<()> {
         // save
         // repeat
 
-        let weights = generate_hopfield_network(num_rows, num_cols, &patterns)?;
-
-        for (n, pattern) in patterns.iter().enumerate() {
-            let distorted_pattern = distort_pattern(&pattern, noise_level);
-
-            let mut cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
-                .map(|_| {
-                    (0..num_cols)
-                        .map(|_| {
-                            DiscreteNeuron::default()
-                        })
-                        .collect::<Vec<DiscreteNeuron>>()
-                })
-                .collect::<Vec<Vec<DiscreteNeuron>>>();
-
-            let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
-
-            input_pattern_into_grid(&mut cell_grid, distorted_pattern);
-            hopfield_history.push(convert_hopfield_network(&cell_grid));
-
-            for _ in 0..iterations {
-                iterate_hopfield_network(&mut cell_grid, &weights)?;
-                hopfield_history.push(convert_hopfield_network(&cell_grid));
-            } 
-
-            let mut hopfield_file = BufWriter::new(File::create(format!("{}_{}_hopfield.txt", tag, n))
-                .expect("Could not create file"));
-
-            for grid in hopfield_history {
-                for row in grid {
-                    for value in row {
-                        write!(hopfield_file, "{} ", value)
-                            .expect("Could not write to file");
-                    }
-                    writeln!(hopfield_file)
-                        .expect("Could not write to file");
-                }
-                writeln!(hopfield_file, "-----")
-                    .expect("Could not write to file"); 
+        match graph_type {
+            Graph::Matrix => {
+                test_hopfield_network::<AdjacencyMatrix>(&patterns, noise_level, iterations, &tag)?;
+            },
+            Graph::List => {
+                test_hopfield_network::<AdjacencyList>(&patterns, noise_level, iterations, &tag)?;    
             }
-        }
+        };
 
         println!("Finished Hopfield test")
     } else {
