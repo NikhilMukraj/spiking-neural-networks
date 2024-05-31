@@ -1614,7 +1614,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
 
     for line in file_contents.split("\n") {
         let row: Vec<isize> = line.split(',')
-            .map(|s| s.trim().parse().expect("Could not parse"))
+            .map(|s| s.trim().parse().expect("Could not parse pattern"))
             .collect();
 
         if row.iter().any(|i| *i != -1 && *i != 1) {
