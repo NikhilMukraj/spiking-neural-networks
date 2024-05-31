@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, 
+    collections::{HashMap, HashSet}, 
     fs::File, 
     io::{Write, BufWriter, Result, Error, ErrorKind}, 
     fmt::Display,
@@ -249,7 +249,7 @@ impl Default for AdjacencyMatrix {
 #[derive(Clone, Debug)]
 pub struct AdjacencyList {
     pub incoming_connections: HashMap<Position, HashMap<Position, f64>>,
-    pub outgoing_connections: HashMap<Position, Vec<Position>>,
+    pub outgoing_connections: HashMap<Position, HashSet<Position>>,
     pub history: Vec<HashMap<Position, HashMap<Position, f64>>>,
 }
 
@@ -295,9 +295,9 @@ impl GraphFunctionality for AdjacencyList {
             }
 
             if let Some(vector) = self.outgoing_connections.get_mut(&i) {
-                vector.push(postsynaptic);
+                vector.insert(postsynaptic);
             } else {
-                self.outgoing_connections.insert(*i, vec![postsynaptic]);
+                self.outgoing_connections.insert(*i, HashSet::from([postsynaptic]));
             }
         }
     }
@@ -336,9 +336,9 @@ impl GraphFunctionality for AdjacencyList {
                     .insert(*presynaptic, value);
     
                 if let Some(vector) = self.outgoing_connections.get_mut(&presynaptic) {
-                    vector.push(*postsynaptic);
+                    vector.insert(*postsynaptic);
                 } else {
-                    self.outgoing_connections.insert(*presynaptic, vec![*postsynaptic]);
+                    self.outgoing_connections.insert(*presynaptic, HashSet::from([*postsynaptic]));
                 }
             },
             None => {
@@ -346,8 +346,8 @@ impl GraphFunctionality for AdjacencyList {
                     inner_map.remove(&presynaptic);
                 }
                 if let Some(connections) = self.outgoing_connections.get_mut(&presynaptic) {
-                    if let Some(pos) = connections.iter().position(|x| *x == *postsynaptic) {
-                        connections.remove(pos);
+                    if connections.contains(&postsynaptic) {
+                        connections.remove(&postsynaptic);
                     }
                 }
             },
@@ -378,7 +378,13 @@ impl GraphFunctionality for AdjacencyList {
         }
 
         // self.outgoing_connections[pos].clone()
-        Ok(self.outgoing_connections.get(pos).unwrap_or(&vec![]).clone())
+        Ok(
+            self.outgoing_connections.get(pos)
+                .unwrap_or(&HashSet::from([]))
+                .clone()
+                .into_iter()
+                .collect()
+        )
     }
 
     fn update_history(&mut self) {
