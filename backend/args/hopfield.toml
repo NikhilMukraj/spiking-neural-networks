@@ -4,5 +4,3 @@ noise_level = 0.1
 graph_type = "list"
 iterations = 10
 tag = "output/test"
-
-# try with larger patterns
