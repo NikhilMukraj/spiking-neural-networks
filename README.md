@@ -95,6 +95,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - A spike train struct should have a hashmap that contains when the neuron will spike and to what mangitude
     - Spike train will have internal counter that determines when it spikes that resets when it reaches the end of its period
   - Spike train trait should eventually also have the option to return a neurotransmitter concentration to be used
+  - **Spike train with coupled input**
+    - Redo Hodgkin Huxley results with spike train coupling
   - Spike train input should be able to be fed into lattices, multiple lattices function should be able to simulate multiple lattices that are connected with one another with different parameters (different plasticity settings, different neuron types etc)
     - Input hashmap (in lattices) could be modified to have inputs added from other lattices (or spiketrains), input may have to be scaled down or modified such that multiple position input keys exist as vectors, inputs going to the same position could then be summed, bayesian factor could be applied after summation
     - Lattice calculation might want to randomly select certain neurons to be read and updated first
@@ -147,6 +149,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
   - **Hopfield spiking neural network prototype**
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
+  - Try to create a system where input eventually fades away after input is no longer being applied (fading memory)
+  - Can decay gap conductance over time after a spike until a small enough value is reached or another spike occurs
+  - Could use STDP to see if that slowly eliminates input over time
 - [Cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
   - Cue input is fed into working memory neurons
     - Cue is -1 or 1
@@ -168,6 +173,19 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Could also check EEG to see if processing is similar to focused brain activity
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
+
+- Modeling hallucinations
+  - Testing of effect of noise in liquid state machine or Hopfield network and convergence, testing of pruning neuronal connections on convergence
+  - Hallucinations are mischaracterization of sensory stimuli (generally the absence of stimuli being mischaracterized as present stimuli) (may need visual or auditory/speech model for lsm) while memory issues are misrecall over time (temporal mischaracterization)
+    - (could train model on whether word is detected or not, test what it detects on absence of words and then induce hallucinations conditions)
+  - Noise could either be direct bayesian modulation of input or input noise from surrounding poisson neurons (latter may be more accurate)
+  - Testing how different converging states are from one another, seeing how different signal to noise ratio is
+  - Small world architecture in liquid state machine (various interconnected hubs, ie different connected liquids) effect of cutting off hubs and increasing path size between hubs
+  - Liquid state machine could be used to test this as well as spiking Hopfield networks
+    - Liquid state machine could either be used to classify a given stimulus (visual or auditory)
+    - Hallicunation could be considered when absence of stimuli generate readouts that say there exists auditory stimuli
+    - Could also be considered a general misclassification
+    - Could also have a liquid state machine generate a grid pattern on readout given an input similar to a Hopfield network
 
 - [Gap junction equation and various models for different currents](https://www.maths.nottingham.ac.uk/plp/pmzsc/cnn/CNN4.pdf)
 
@@ -423,6 +441,10 @@ EEG processing with fourier transforms, and power spectral density calculations
 #### Additional Gates
 
 <!-- ![L-Type Calcium]() -->
+
+#### Hopfield Reconstruction
+
+![Hopfield Reconstruction of Input Patterns](backend/results/hopfield_reconstructions.jpg)
 
 ## Sources
 
