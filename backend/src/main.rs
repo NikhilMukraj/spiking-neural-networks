@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, 
+    collections::{HashMap, HashSet}, 
     env, 
     f64::consts::PI, 
     fs::{read_to_string, File}, 
@@ -102,7 +102,7 @@ fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
     cell_grid: &CellGrid<T>, 
     graph: &U,
     position: &Position,
-    input_positions: &Vec<Position>, 
+    input_positions: &HashSet<Position>, 
     bayesian: bool,
     averaged: bool,
 ) -> f64 {
@@ -136,7 +136,7 @@ fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctio
     cell_grid: &CellGrid<T>, 
     graph: &U,
     position: &Position,
-    input_positions: &Vec<Position>, 
+    input_positions: &HashSet<Position>, 
     bayesian: bool,
     averaged: bool,
 ) -> NeurotransmitterConcentrations {
