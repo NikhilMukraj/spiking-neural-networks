@@ -1908,3 +1908,25 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 
     output
 }
+
+// could try random turing patterns as well
+// pub fn generate_random_patterns(
+//     num_rows: usize, 
+//     num_cols: usize, 
+//     num_patterns: usize, 
+//     noise_level: f64
+// ) -> Vec<Vec<Vec<isize>>> {
+//     let base_pattern = (0..num_rows).map(|_| {
+//         (0..num_cols)
+//             .map(|_| {
+//                 -1
+//             })
+//             .collect::<Vec<isize>>()
+//     })
+//     .collect::<Vec<Vec<isize>>>();
+
+//     (0..num_patterns).map(|_| {
+//         distort_pattern(&base_pattern, noise_level)
+//     })
+//     .collect()
+// }
