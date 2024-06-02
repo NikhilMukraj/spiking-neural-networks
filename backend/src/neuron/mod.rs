@@ -1930,3 +1930,15 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //     })
 //     .collect()
 // }
+
+// trait SpikeTrain: CurrentVoltage + Potentiation {
+    // fn iterate(&mut self);
+// }
+
+// struct PoissonNeuron {
+
+// }
+
+// struct PresetSpikeTrain {
+
+// }
