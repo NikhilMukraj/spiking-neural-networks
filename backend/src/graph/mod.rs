@@ -24,8 +24,8 @@ pub trait GraphFunctionality {
     fn get_every_node(&self) -> Vec<Position>;
     fn lookup_weight(&self, presynaptic: &Position, postsynaptic: &Position) -> Result<Option<f64>>; 
     fn edit_weight(&mut self, presynaptic: &Position, postsynaptic: &Position, weight: Option<f64>) -> Result<()>;
-    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>>; 
-    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>>;
+    fn get_incoming_connections(&self, pos: &Position) -> Result<HashSet<Position>>; 
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<HashSet<Position>>;
     fn update_history(&mut self);
     fn write_current_weights(&self, tag: &str);
     fn write_history(&self, tag: &str);
@@ -153,15 +153,15 @@ impl GraphFunctionality for AdjacencyMatrix {
     }
 
     // to be cached
-    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+    fn get_incoming_connections(&self, pos: &Position) -> Result<HashSet<Position>> {
         if !self.position_to_index.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
         }
 
-        let mut connections: Vec<Position> = Vec::new();
+        let mut connections: HashSet<Position> = HashSet::new();
         for i in self.position_to_index.keys() {
             match self.lookup_weight(i, &pos).unwrap() {
-                Some(_) => { connections.push(*i); },
+                Some(_) => { connections.insert(*i); },
                 None => {}
             };
         }
@@ -183,7 +183,7 @@ impl GraphFunctionality for AdjacencyMatrix {
     // }
 
     // to be cached
-    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<HashSet<Position>> {
         if !self.position_to_index.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
         }
@@ -194,7 +194,7 @@ impl GraphFunctionality for AdjacencyMatrix {
             .enumerate()
             .filter(|(_, &val)| val.is_some())
             .map(|(n, _)| self.index_to_position[&n])
-            .collect::<Vec<Position>>();
+            .collect::<HashSet<Position>>();
             
         Ok(out_going_connections)
     }
@@ -362,17 +362,17 @@ impl GraphFunctionality for AdjacencyList {
 
     // to be cached
     // or point to reference
-    fn get_incoming_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+    fn get_incoming_connections(&self, pos: &Position) -> Result<HashSet<Position>> {
         if !self.incoming_connections.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
         }
 
-        Ok(self.incoming_connections[pos].keys().cloned().collect::<Vec<Position>>())
+        Ok(self.incoming_connections[pos].keys().cloned().collect::<HashSet<Position>>())
     }
 
     // to be cached
     // or point to reference
-    fn get_outgoing_connections(&self, pos: &Position) -> Result<Vec<Position>> {
+    fn get_outgoing_connections(&self, pos: &Position) -> Result<HashSet<Position>> {
         if !self.incoming_connections.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
         }
@@ -382,8 +382,6 @@ impl GraphFunctionality for AdjacencyList {
             self.outgoing_connections.get(pos)
                 .unwrap_or(&HashSet::from([]))
                 .clone()
-                .into_iter()
-                .collect()
         )
     }
 
@@ -423,7 +421,7 @@ impl GraphFunctionality for AdjacencyList {
         }
 
         let json_string = serde_json::to_string_pretty(&history_json)
-        .expect("Failed to convert to JSON");
+            .expect("Failed to convert to JSON");
         let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))
             .expect("Could not create file"));
 
