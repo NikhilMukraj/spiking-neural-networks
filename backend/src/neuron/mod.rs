@@ -157,10 +157,83 @@ pub trait BayesianFactor {
     fn get_bayesian_factor(&self) -> f64;
 }
 
-pub trait STDP {
-    fn get_stdp_params(&self) -> &STDPParameters;
+pub trait LastFiringTime {
     fn get_last_firing_time(&self) -> Option<usize>;
     fn set_last_firing_time(&mut self, timestep: Option<usize>);
+}
+
+pub trait STDP: LastFiringTime {
+    fn get_stdp_params(&self) -> &STDPParameters;
+}
+
+
+macro_rules! impl_current_voltage {
+    ($struct:ident) => {
+        impl CurrentVoltage for $struct {
+            fn get_current_voltage(&self) -> f64 {
+                self.current_voltage
+            }
+        }
+    };
+}
+
+macro_rules! impl_gap_conductance {
+    ($struct:ident) => {
+        impl GapConductance for $struct {
+            fn get_gap_conductance(&self) -> f64 {
+                self.gap_conductance
+            }
+        }
+    };
+}
+
+macro_rules! impl_potentiation {
+    ($struct:ident) => {
+        impl Potentiation for $struct {
+            fn get_potentiation_type(&self) -> PotentiationType {
+                self.potentiation_type
+            }
+        }
+    };
+}
+
+macro_rules! impl_bayesian_factor {
+    ($struct:ident) => {
+        impl BayesianFactor for $struct {
+            fn get_bayesian_factor(&self) -> f64 {
+                limited_distr(
+                    self.bayesian_params.mean, 
+                    self.bayesian_params.std, 
+                    self.bayesian_params.min, 
+                    self.bayesian_params.max,
+                )
+            }
+        }
+    };
+}
+
+macro_rules! impl_last_firing_time {
+    ($struct:ident) => {
+        impl LastFiringTime for $struct {
+            fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+                self.last_firing_time = timestep;
+            }
+        
+            fn get_last_firing_time(&self) -> Option<usize> {
+                self.last_firing_time
+            }
+        }
+    }
+}
+
+macro_rules! impl_stdp {
+    ($struct:ident) => {
+        impl STDP for $struct {        
+            fn get_stdp_params(&self) -> &STDPParameters {
+                &self.stdp_params
+            }
+        }
+    };
 }
 
 pub trait IterateAndSpike: Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
@@ -245,48 +318,12 @@ impl IzhikevichDefault for IntegrateAndFireCell {
     }
 }
 
-impl CurrentVoltage for IntegrateAndFireCell {
-    fn get_current_voltage(&self) -> f64 {
-        self.current_voltage
-    }
-}
-
-impl GapConductance for IntegrateAndFireCell {
-    fn get_gap_conductance(&self) -> f64 {
-        self.gap_conductance
-    }
-}
-
-impl Potentiation for IntegrateAndFireCell {
-    fn get_potentiation_type(&self) -> PotentiationType {
-        self.potentiation_type
-    }
-}
-
-impl BayesianFactor for IntegrateAndFireCell {
-    fn get_bayesian_factor(&self) -> f64 {
-        limited_distr(
-            self.bayesian_params.mean, 
-            self.bayesian_params.std, 
-            self.bayesian_params.min, 
-            self.bayesian_params.max,
-        )
-    }
-}
-
-impl STDP for IntegrateAndFireCell {
-    fn get_stdp_params(&self) -> &STDPParameters {
-        &self.stdp_params
-    }
-
-    fn get_last_firing_time(&self) -> Option<usize> {
-        self.last_firing_time
-    }
-
-    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-        self.last_firing_time = timestep;
-    }
-}
+impl_current_voltage!(IntegrateAndFireCell);
+impl_gap_conductance!(IntegrateAndFireCell);
+impl_potentiation!(IntegrateAndFireCell);
+impl_bayesian_factor!(IntegrateAndFireCell);
+impl_last_firing_time!(IntegrateAndFireCell);
+impl_stdp!(IntegrateAndFireCell);
 
 impl IntegrateAndFireCell {
     pub fn get_basic_dv_change(&self, i: f64) -> f64 {
@@ -1256,7 +1293,7 @@ impl Gate {
 #[derive(Clone)]
 pub struct HodgkinHuxleyCell {
     pub current_voltage: f64,
-    pub gap_condutance: f64,
+    pub gap_conductance: f64,
     pub potentiation_type: PotentiationType,
     pub dt: f64,
     pub c_m: f64,
@@ -1280,48 +1317,12 @@ pub struct HodgkinHuxleyCell {
     pub stdp_params: STDPParameters,
 }
 
-impl CurrentVoltage for HodgkinHuxleyCell {
-    fn get_current_voltage(&self) -> f64 {
-        self.current_voltage
-    }
-}
-
-impl GapConductance for HodgkinHuxleyCell {
-    fn get_gap_conductance(&self) -> f64 {
-        self.gap_condutance
-    }
-}
-
-impl Potentiation for HodgkinHuxleyCell {
-    fn get_potentiation_type(&self) -> PotentiationType {
-        self.potentiation_type
-    }
-}
-
-impl BayesianFactor for HodgkinHuxleyCell {
-    fn get_bayesian_factor(&self) -> f64 {
-        limited_distr(
-            self.bayesian_params.mean, 
-            self.bayesian_params.std, 
-            self.bayesian_params.min, 
-            self.bayesian_params.max,
-        )
-    }
-}
-
-impl STDP for HodgkinHuxleyCell {
-    fn get_stdp_params(&self) -> &STDPParameters {
-        &self.stdp_params
-    }
-
-    fn get_last_firing_time(&self) -> Option<usize> {
-        self.last_firing_time
-    }
-
-    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-        self.last_firing_time = timestep;
-    }
-}
+impl_current_voltage!(HodgkinHuxleyCell);
+impl_gap_conductance!(HodgkinHuxleyCell);
+impl_potentiation!(HodgkinHuxleyCell);
+impl_bayesian_factor!(HodgkinHuxleyCell);
+impl_last_firing_time!(HodgkinHuxleyCell);
+impl_stdp!(HodgkinHuxleyCell);
 
 impl Default for HodgkinHuxleyCell {
     fn default() -> Self {
@@ -1333,7 +1334,7 @@ impl Default for HodgkinHuxleyCell {
 
         HodgkinHuxleyCell { 
             current_voltage: 0.,
-            gap_condutance: 7.,
+            gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
             dt: 0.1,
             c_m: 1., 
@@ -1932,11 +1933,46 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 // }
 
 // trait SpikeTrain: CurrentVoltage + Potentiation {
-    // fn iterate(&mut self);
+//     fn iterate(&mut self);
+//     fn get_neurotransmitters(&self) -> &Neurotransmitters;
 // }
 
-// struct PoissonNeuron {
+// pub struct PoissonNeuron {
+//     pub current_voltage: f64,
+//     pub v_th: f64,
+//     pub v_resting: f64,
+//     pub last_firing_time: Option<usize>,
+//     pub clearance_constant: HashMap<NeurotransmitterType, f64>,
+//     pub synaptic_neurotransmitter: Neurotransmitters,
+//     pub potentiation_type: PotentiationType,
+//     pub chance_of_firing: f64,
+//     pub dt: f64,
+// }
 
+// impl_current_voltage!(PoissonNeuron);
+// impl_potentiation!(PoissonNeuron);
+// impl_last_firing_time!(PoissonNeuron);
+
+// impl SpikeTrain for PoissonNeuron {
+//     fn iterate(&mut self) {
+//         if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
+//             self.current_voltage = self.v_th;
+//             self.synaptic_neurotransmitter.neurotransmitters
+//                 .values_mut()
+//                 .for_each(|value| value.t *= 1.0);
+//         } else {
+//             self.current_voltage = self.v_resting;
+//             self.synaptic_neurotransmitter.neurotransmitters
+//                 .iter_mut()
+//                 .for_each(|(key, value)| 
+//                     value.t = (value.t - (value.t * self.clearance_constant[key])).max(0.)
+//                 )
+//         }
+//     }
+
+//     fn get_neurotransmitters(&self) -> &Neurotransmitters {
+//         &self.synaptic_neurotransmitter
+//     }
 // }
 
 // struct PresetSpikeTrain {
