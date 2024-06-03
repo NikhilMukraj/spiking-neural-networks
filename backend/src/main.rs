@@ -13,8 +13,8 @@ use crate::{distribution::limited_distr, neuron::convert_hopfield_network};
 mod neuron;
 use crate::neuron::{
     IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, 
-    CellGrid, IzhikevichDefault, BayesianParameters, STDPParameters, 
-    NeurotransmitterConcentrations, 
+    CellGrid, LastFiringTime, IzhikevichDefault, BayesianParameters, 
+    STDPParameters, NeurotransmitterConcentrations, 
     signed_gap_junction, weight_neurotransmitter_concentration, 
     aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
@@ -1035,7 +1035,10 @@ fn write_stdp_row<T: IterateAndSpike>(
 
 // weight change = weight * dopamine
 
-fn update_weight<T: IterateAndSpike>(presynaptic_neuron: &T, postsynaptic_neuron: &T) -> f64 {
+fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
+    presynaptic_neuron: &T, 
+    postsynaptic_neuron: &U
+) -> f64 {
     let mut delta_w: f64 = 0.;
 
     match (presynaptic_neuron.get_last_firing_time(), postsynaptic_neuron.get_last_firing_time()) {
@@ -1067,7 +1070,7 @@ fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
     for (n, i) in is_spikings.iter().enumerate() {
         if *i {
             neurons[n].set_last_firing_time(Some(timestep));
-            delta_ws[n] = update_weight(&neurons[n], &neuron);
+            delta_ws[n] = update_weight(&neurons[n], &*neuron);
             weights[n] += delta_ws[n];
         }
     }
@@ -1491,7 +1494,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
     Ok(
         HodgkinHuxleyCell {
             current_voltage: v_init,
-            gap_condutance: gap_conductance,
+            gap_conductance,
             potentiation_type: potentiation_type,
             dt: dt,
             c_m: c_m,
