@@ -1953,6 +1953,32 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 // impl_potentiation!(PoissonNeuron);
 // impl_last_firing_time!(PoissonNeuron);
 
+// impl Default for PoissonNeuron {
+//     fn default() -> Self {
+//         PoissonNeuron {
+//             current_voltage: 0.,
+//             v_th: 30.,
+//             v_resting: -70.,
+//             last_firing_time: None,
+//             clearance_constant: HashMap::new(),
+//             synaptic_neurotransmitter: Neurotransmitters::default(),
+//             potentiation_type: PotentiationType::Excitatory,
+//             chance_of_firing: 0.01,
+//             dt: 0.1,
+//         }
+//     }
+// }
+
+// impl PoissonNeuron {
+//     // hertz is in seconds not ms
+//     pub fn from_firing_rate(hertz: f64) -> Self {
+//         let mut poisson_neuron = PoissonNeuron::default();
+//         poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.dt) / hertz);
+
+//         poisson_neuron
+//     }
+// }
+
 // impl SpikeTrain for PoissonNeuron {
 //     fn iterate(&mut self) {
 //         if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
