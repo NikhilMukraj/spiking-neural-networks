@@ -92,19 +92,26 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Spike train trait should return a voltage and iterate with no given input
     - Should implement potentation trait
   - Poisson neuron could be configured to spike with a Poisson distribution, ie it has some random element but over time conforms to some frequency
-  - A spike train struct should have a hashmap that contains when the neuron will spike and to what mangitude
+    - Spike train neurotransmitter should probably just decrease until 0 over time
+  - A preset spike train struct should have a hashmap that contains when the neuron will spike and to what mangitude
+    - Preset spike train should have a hashmap storing when to spike as well as a neurotransmitter hashmap that says the concentration values over time, if hits next spike and neurotransmitter is on then return to beginning of neurotransmitter hashmap
     - Spike train will have internal counter that determines when it spikes that resets when it reaches the end of its period
   - Spike train trait should eventually also have the option to return a neurotransmitter concentration to be used
+    - spike train neurotransmitter should probably just decrease until 0 over time
   - **Spike train with coupled input**
-    - Redo Hodgkin Huxley results with spike train coupling
+    - Redo Hodgkin Huxley results with spike train coupling and fitting
+  - **Evenly divided preset spike train**
   - Spike train input should be able to be fed into lattices, multiple lattices function should be able to simulate multiple lattices that are connected with one another with different parameters (different plasticity settings, different neuron types etc)
+    - Input from other lattice would likely need its own graph relating the lattices as well as a new get inputs function
     - Input hashmap (in lattices) could be modified to have inputs added from other lattices (or spiketrains), input may have to be scaled down or modified such that multiple position input keys exist as vectors, inputs going to the same position could then be summed, bayesian factor could be applied after summation
     - Lattice calculation might want to randomly select certain neurons to be read and updated first
     - **Bayesian factor could be used in place of this but bayesian factor should be reduced to +/- 10-5%**
 
 - Refactor fitting to use spike trains with neurotransmission
+- $\tau_m$ and $C_m$ fitting
 - Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
+- Maybe refactor so fitting only takes into account the presynaptic neuron
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
   - Inputs should be calculated in parallel
@@ -165,6 +172,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
+  - Creating a stable liquid
+    - Should have some consistent methodology to generate a stable liquid (eigenvalue of each weight vector being within unit circle, or rate of decay being within unit circle, try with 80-20 excitatory to inhibitory neuron ratio and then a more equal one), stability should be measured in whether neurons return to a resting firing rate, for simpler classifiers output may not need to feed back into liquid while reinforcement learning tasks may
   - Recurrent connections in reservoir compute act as working memory that stores information through recurrent connections that may slowly degrade over time, target is slowing the degradation in order to improve memory recall
   - Decoding unit acts as readout, decoding unit likely would need some training in the form of R-STDP
   - Can check accuracy of liquid state machine or stability of answer over time, similar to simple reccurent model
@@ -173,6 +182,13 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Could also check EEG to see if processing is similar to focused brain activity
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
 - When done modeling memory, attempt general classification tasks with liquid state machines
+  - Implementations of liquid state machines and reservoir computing ([Matlab](https://github.com/dmeoli/ComputationalNeuroscience), [Brian2](https://github.com/ricardodeazambuja/SNN-Experiments/blob/master/Implementing%20a%20Liquid%20State%20Machine%20using%20Brian%20Simulator/Implementing%20a%20Liquid%20State%20Machine%20using%20Brian%20Simulator.ipynb))
+- Liquid state machine + stable attractor
+  - Stable attractor connected to reservoir with feedback (going into attractor could be trainable wheras back into liquid is not)
+  - Attractor may need to have a stable state that is just all low states
+  - Liquid state machine + iscrete attractor, frequency from input neuron is measured over time a high freq means an active state while low freq means inactive, discrete neuron could correspond to a poisson neuron or something similar
+  - Testing classifiers and regression models with liquid and attractor model, maybe try multiple attractors
+  - Could try this with reinforcement learning models
 
 - Modeling hallucinations
   - Testing of effect of noise in liquid state machine or Hopfield network and convergence, testing of pruning neuronal connections on convergence
@@ -180,8 +196,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - (could train model on whether word is detected or not, test what it detects on absence of words and then induce hallucinations conditions)
   - Noise could either be direct bayesian modulation of input or input noise from surrounding poisson neurons (latter may be more accurate)
   - Testing how different converging states are from one another, seeing how different signal to noise ratio is
-  - Small world architecture in liquid state machine (various interconnected hubs, ie different connected liquids) effect of cutting off hubs and increasing path size between hubs
-  - Liquid state machine could be used to test this as well as spiking Hopfield networks
+  - Small world architecture in liquid state machine (various interconnected hubs, ie different connected liquids or stable attractors) effect of cutting off hubs and increasing path size between hubs
+  - Liquid state machine could be used to test this as well as spiking Hopfield networks, ideally a liquid state machine with explicit working memory in the form of some connected stable attractor
     - Liquid state machine could either be used to classify a given stimulus (visual or auditory)
     - Hallicunation could be considered when absence of stimuli generate readouts that say there exists auditory stimuli
     - Could also be considered a general misclassification
