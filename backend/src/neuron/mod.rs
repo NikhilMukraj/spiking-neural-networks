@@ -569,10 +569,10 @@ impl IterateAndSpike for IntegrateAndFireCell {
         input_current: f64, 
         t_total: Option<&HashMap<NeurotransmitterType, f64>>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.ligand_gates.update_receptor_kinetics(t_total);
+        self.ligand_gates.set_receptor_currents(self.current_voltage);
 
-        self.current_voltage += self.ligand_gates.get_neurotransmitter_currents(self.dt, self.c_m);
+        self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         self.iterate_and_spike(input_current)
     }
@@ -599,13 +599,13 @@ impl BV {
 
 #[derive(Debug, Clone)]
 pub struct GABAbDissociation {
-    g: f64,
-    n: f64,
-    kd: f64,
+    pub g: f64,
+    pub n: f64,
+    pub kd: f64,
     // k1: ,
     // k2: ,
-    k3: f64,
-    k4: f64,
+    pub k3: f64,
+    pub k4: f64,
 }
 
 impl Default for GABAbDissociation {
@@ -738,39 +738,71 @@ impl NeurotransmitterKinetics for DestexheNeurotransmitter {
 //     }
 // }
 
+pub trait ReceptorKinetics: Default {
+    fn apply_r_change(&mut self, t: f64);
+    fn get_r(&self) -> f64;
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DestexheReceptor {
     pub r: f64,
     pub alpha: f64,
     pub beta: f64,
+    pub dt: f64,
 }
 
 macro_rules! impl_receptor_default {
-    ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
+    ($trait:ident, $method:ident, $alpha:expr, $beta:expr, $dt:expr) => {
         impl $trait for DestexheReceptor {
             fn $method() -> Self {
                 DestexheReceptor {
                     r: 0.,
                     alpha: $alpha, // mM^-1 * ms^-1
                     beta: $beta, // ms^-1
+                    dt: $dt,
                 }
             }
         }
     };
 }
 
-impl DestexheReceptor {
-    fn apply_r_change(&mut self, t: f64, dt: f64) {
-        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
+impl ReceptorKinetics for DestexheReceptor {
+    fn apply_r_change(&mut self, t: f64) {
+        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * self.dt;
+    }
+
+    fn get_r(&self) -> f64 {
+        self.r
     }
 }
 
-impl_receptor_default!(Default, default, 1., 1.);
-impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
-impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
-impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
-impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
-impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
+impl_receptor_default!(Default, default, 1., 1., 0.1);
+impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19, 0.1);
+impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18, 0.1);
+impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047, 0.1);
+impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013, 0.1);
+impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct ApproximateReceptor {
+//     pub r: f64,
+// }
+
+// impl Default for ApproximateReceptor {
+//     fn default() -> Self {
+//         ApproximateReceptor { r: 0. }
+//     }
+// }
+
+// impl ReceptorKinetics for ApproximateReceptor {
+//     fn apply_r_change(&mut self, t: f64) {
+//         self.r = t;
+//     }
+
+//     fn get_r(&self) -> f64 {
+//         self.r
+//     }
+// }
 
 #[derive(Debug, Clone)]
 pub enum IonotropicReceptorType {
@@ -879,12 +911,12 @@ impl NMDAWithBV for LigandGatedChannel {
 }
 
 impl LigandGatedChannel {
-    fn get_modifier(&mut self, voltage: f64, dt: f64) -> f64 {
+    fn get_modifier(&mut self, voltage: f64) -> f64 {
         match &mut self.receptor_type {
             IonotropicReceptorType::AMPA(value) => *value,
             IonotropicReceptorType::GABAa(value) => *value,
             IonotropicReceptorType::GABAb(value) => {
-                value.g += (value.k3 * self.receptor.r - value.k4 * value.g) * dt;
+                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * self.receptor.dt;
                 value.calculate_modifer()
             }, // G^N / (G^N + Kd)
             IonotropicReceptorType::NMDA(value) => value.calculate_b(voltage),
@@ -892,10 +924,10 @@ impl LigandGatedChannel {
         }
     }
 
-    pub fn calculate_g(&mut self, voltage: f64, dt: f64) -> f64 {
-        let modifier = self.get_modifier(voltage, dt);
+    pub fn calculate_current(&mut self, voltage: f64) -> f64 {
+        let modifier = self.get_modifier(voltage);
 
-        self.current = modifier * self.receptor.r * self.g * (voltage - self.reversal);
+        self.current = modifier * self.receptor.get_r() * self.g * (voltage - self.reversal);
 
         self.current
     }
@@ -937,28 +969,28 @@ impl LigandGatedChannels {
         self.ligand_gates.values()
     }
 
-    pub fn set_receptor_currents(&mut self, voltage: f64, dt: f64) {
+    pub fn set_receptor_currents(&mut self, voltage: f64) {
         self.ligand_gates
             .values_mut()
             .for_each(|i| {
-                i.calculate_g(voltage, dt);
+                i.calculate_current(voltage);
         });
     }
 
-    pub fn get_neurotransmitter_currents(&self, dt: f64, c_m: f64) -> f64 {
+    pub fn get_receptor_currents(&self, dt: f64, c_m: f64) -> f64 {
         self.ligand_gates
             .values()
             .map(|i| i.current)
             .sum::<f64>() * (dt / c_m)
     }
 
-    pub fn update_receptor_kinetics(&mut self, t_total: Option<&HashMap<NeurotransmitterType, f64>>, dt: f64) {
+    pub fn update_receptor_kinetics(&mut self, t_total: Option<&HashMap<NeurotransmitterType, f64>>) {
         match t_total {
             Some(t_hashmap) => {
                 t_hashmap.iter()
                     .for_each(|(key, value)| {
                         if let Some(gate) = self.ligand_gates.get_mut(key) {
-                            gate.receptor.apply_r_change(*value, dt);
+                            gate.receptor.apply_r_change(*value);
                         }
                     })
             },
@@ -1458,7 +1490,7 @@ impl HodgkinHuxleyCell {
         let i_k = self.n.state.powf(4.) * self.g_k * (self.current_voltage - self.e_k);
         let i_k_leak = self.g_k_leak * (self.current_voltage - self.e_k_leak);
 
-        let i_ligand_gates = self.ligand_gates.get_neurotransmitter_currents(self.dt, self.c_m);
+        let i_ligand_gates = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         let i_additional_gates = self.additional_gates
             .iter_mut()
@@ -1479,8 +1511,8 @@ impl HodgkinHuxleyCell {
         &mut self, 
         t_total: Option<&HashMap<NeurotransmitterType, f64>>
     ) {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt)
+        self.ligand_gates.update_receptor_kinetics(t_total);
+        self.ligand_gates.set_receptor_currents(self.current_voltage);
     }
 
     pub fn update_gate_states(&mut self) {
