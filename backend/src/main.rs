@@ -20,7 +20,7 @@ use crate::neuron::{
     Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
     NeurotransmitterType, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
-    AdditionalGates, HighThresholdCalciumChannel,HighVoltageActivatedCalciumChannel,
+    AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
     input_pattern_into_grid, distort_pattern, // PoissonNeuron,
 };
@@ -655,7 +655,11 @@ fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Va
 
     if_neuron.stdp_params = get_stdp_params(table)?;
 
-    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(table, &format!("{}", prefix_value))?;
+    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(
+        table, 
+        &format!("{}", prefix_value), 
+        if_neuron.dt,
+    )?;
     if_neuron.synaptic_neurotransmitters = neurotransmitters;
     if_neuron.ligand_gates = ligand_gates;
 
@@ -1337,7 +1341,8 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 
 fn get_ligand_gates_and_neurotransmitters(
     table: &Value, 
-    prefix_value: &str
+    prefix_value: &str,
+    dt: f64,
 ) -> Result<(Neurotransmitters, LigandGatedChannels)> {
     let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> = HashMap::new();
     let mut neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
@@ -1432,6 +1437,7 @@ fn get_ligand_gates_and_neurotransmitters(
     ligand_gates.values_mut()
         .for_each(|value| {
             value.receptor.r = r_default;
+            value.receptor.dt = dt;
         });
 
     if ligand_gates.len() != 0 {
@@ -1631,7 +1637,11 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         state: state_init, 
     };
 
-    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(&hodgkin_huxley_table, &prefix)?;
+    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(
+        &hodgkin_huxley_table, 
+        &prefix,
+        dt,
+    )?;
     let additional_gates = get_additional_gates(&hodgkin_huxley_table, &prefix)?;
     
     Ok(
