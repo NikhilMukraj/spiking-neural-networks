@@ -93,6 +93,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should implement potentation trait
   - Poisson neuron could be configured to spike with a Poisson distribution, ie it has some random element but over time conforms to some frequency
     - Spike train neurotransmitter should probably just decrease until 0 over time
+    - **Neurotransmitter approximation with trait refactor necessary**
   - A preset spike train struct should have a hashmap that contains when the neuron will spike and to what mangitude
     - Preset spike train should have a hashmap storing when to spike as well as a neurotransmitter hashmap that says the concentration values over time, if hits next spike and neurotransmitter is on then return to beginning of neurotransmitter hashmap
     - Spike train will have internal counter that determines when it spikes that resets when it reaches the end of its period
@@ -155,6 +156,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
   - **Hopfield spiking neural network prototype**
+    - Weights may not need to change over time
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
   - Try to create a system where input eventually fades away after input is no longer being applied (fading memory)
   - Can decay gap conductance over time after a spike until a small enough value is reached or another spike occurs
