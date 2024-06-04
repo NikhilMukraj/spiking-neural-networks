@@ -545,6 +545,8 @@ impl IterateAndSpike for IntegrateAndFireCell {
             }
         };
 
+        // t changes should be applied after dv is added and before spiking is handled
+        // in if split
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 
         is_spiking
@@ -577,14 +579,6 @@ impl IterateAndSpike for IntegrateAndFireCell {
 }
 
 pub type CellGrid<T> = Vec<Vec<T>>;
-
-// fn heaviside(x: f64) -> f64 {
-//     if (x > 0) {
-//         1.
-//     } else {
-//         0.
-//     }
-// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct BV {
@@ -677,6 +671,11 @@ impl NeurotransmitterType {
     }
 }
 
+pub trait NeurotransmitterKinetics {
+    fn apply_t_change(&mut self, voltage: f64);
+    fn get_t(&self) -> f64;
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DestexheNeurotransmitter {
     pub t_max: f64,
@@ -685,7 +684,7 @@ pub struct DestexheNeurotransmitter {
     pub k_p: f64,
 }
 
-macro_rules! impl_neurotransmitter_default {
+macro_rules! impl_destexhe_neurotransmitter_default {
     ($trait:ident, $method:ident, $t_max:expr) => {
         impl $trait for DestexheNeurotransmitter {
             fn $method() -> Self {
@@ -700,18 +699,44 @@ macro_rules! impl_neurotransmitter_default {
     };
 }
 
-impl DestexheNeurotransmitter {
+impl_destexhe_neurotransmitter_default!(Default, default, 1.0);
+impl_destexhe_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
+impl_destexhe_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
+impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
+impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
+impl_destexhe_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
+
+impl NeurotransmitterKinetics for DestexheNeurotransmitter {
     fn apply_t_change(&mut self, voltage: f64) {
         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
     }
+
+    fn get_t(&self) -> f64 {
+        self.t
+    }
 }
 
-impl_neurotransmitter_default!(Default, default, 1.0);
-impl_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-impl_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-impl_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-impl_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
-impl_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
+// #[derive(Debug, Clone, Copy)]
+// pub struct ApproximateNeurotransmitter {
+//     pub t_max: f64,
+//     pub t: f64,
+//     pub v_th: f64,
+//     pub clearance_constant: f64,
+// }
+
+// fn heaviside(x: f64) -> f64 {
+//     if (x > 0.) {
+//         1.
+//     } else {
+//         0.
+//     }
+// }
+
+// impl ApproximateNeurotransmitter {
+//     fn apply_t_change(&mut self, voltage: f64) {
+//         self.t = self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
+//     }
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub struct DestexheReceptor {
@@ -1932,18 +1957,22 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //     .collect()
 // }
 
-// trait SpikeTrain: CurrentVoltage + Potentiation {
+// pub trait SpikeTrain: CurrentVoltage + Potentiation {
 //     fn iterate(&mut self);
-//     fn get_neurotransmitters(&self) -> &Neurotransmitters;
+//     // after refactor
+//     // fn get_neurotransmitters(&self) -> &Neurotransmitters
+//     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
 // }
 
+// #[derive(Debug)]
 // pub struct PoissonNeuron {
 //     pub current_voltage: f64,
 //     pub v_th: f64,
 //     pub v_resting: f64,
 //     pub last_firing_time: Option<usize>,
 //     pub clearance_constant: HashMap<NeurotransmitterType, f64>,
-//     pub synaptic_neurotransmitter: Neurotransmitters,
+//     pub t_max: HashMap<NeurotransmitterType, f64>,
+//     pub synaptic_neurotransmitters: HashMap<NeurotransmitterType, f64>,
 //     pub potentiation_type: PotentiationType,
 //     pub chance_of_firing: f64,
 //     pub dt: f64,
@@ -1961,7 +1990,8 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //             v_resting: -70.,
 //             last_firing_time: None,
 //             clearance_constant: HashMap::new(),
-//             synaptic_neurotransmitter: Neurotransmitters::default(),
+//             t_max: HashMap::new(),
+//             synaptic_neurotransmitters: HashMap::new(),
 //             potentiation_type: PotentiationType::Excitatory,
 //             chance_of_firing: 0.01,
 //             dt: 0.1,
@@ -1983,24 +2013,95 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //     fn iterate(&mut self) {
 //         if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
 //             self.current_voltage = self.v_th;
-//             self.synaptic_neurotransmitter.neurotransmitters
-//                 .values_mut()
-//                 .for_each(|value| value.t *= 1.0);
+//             self.synaptic_neurotransmitters.iter_mut()
+//                 .for_each(|(key, value)| *value = self.t_max[key]);
 //         } else {
 //             self.current_voltage = self.v_resting;
-//             self.synaptic_neurotransmitter.neurotransmitters
-//                 .iter_mut()
+//             self.synaptic_neurotransmitters.iter_mut()
 //                 .for_each(|(key, value)| 
-//                     value.t = (value.t - (value.t * self.clearance_constant[key])).max(0.)
+//                     *value = (*value - (*value * self.clearance_constant[key])).max(0.)
 //                 )
 //         }
 //     }
 
-//     fn get_neurotransmitters(&self) -> &Neurotransmitters {
-//         &self.synaptic_neurotransmitter
+//     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+//         self.synaptic_neurotransmitters.clone()
 //     }
 // }
 
-// struct PresetSpikeTrain {
+// // struct PresetSpikeTrain {
 
+// // }
+
+// pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: IterateAndSpike>(
+//     spike_train: &mut T,
+//     presynaptic_neuron: &mut U, 
+//     postsynaptic_neuron: &mut U,
+//     do_receptor_kinetics: bool,
+//     bayesian: bool,
+// ) {
+//     let input_current = signed_gap_junction(spike_train, presynaptic_neuron);
+
+//     let (pre_t_total, post_t_total, current) = if bayesian {
+//         let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
+//         let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
+
+//         let pre_t_total = if do_receptor_kinetics {
+//             let mut t = spike_train.get_neurotransmitter_concentrations();
+//             weight_neurotransmitter_concentration(&mut t, pre_bayesian_factor);
+
+//             Some(t)
+//         } else {
+//             None
+//         };
+
+//         let current = signed_gap_junction(
+//             &*presynaptic_neuron,
+//             &*postsynaptic_neuron,
+//         );
+
+//         let post_t_total = if do_receptor_kinetics {
+//             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
+//             weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
+
+//             Some(t)
+//         } else {
+//             None
+//         };
+
+//         (pre_t_total, post_t_total, current)
+//     } else {
+//         let pre_t_total = if do_receptor_kinetics {
+//             let t = spike_train.get_neurotransmitter_concentrations();
+//             Some(t)
+//         } else {
+//             None
+//         };
+
+//         let current = signed_gap_junction(
+//             &*presynaptic_neuron,
+//             &*postsynaptic_neuron,
+//         );
+
+//         let post_t_total = if do_receptor_kinetics {
+//             let t = presynaptic_neuron.get_neurotransmitter_concentrations();
+//             Some(t)
+//         } else {
+//             None
+//         };
+
+//         (pre_t_total, post_t_total, current)
+//     };
+    
+//     let _pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+//         input_current,
+//         pre_t_total.as_ref(),
+//     );
+
+//     let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+//         current,
+//         post_t_total.as_ref(),
+//     );
+
+//     spike_train.iterate();    
 // }
