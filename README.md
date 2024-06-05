@@ -112,6 +112,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - $\tau_m$ and $C_m$ fitting
 - Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
 - Fitting should include neurotransmission again
+- Could extend for all integrate and fire neurons later
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
 - Maybe refactor so fitting only takes into account the presynaptic neuron
 
