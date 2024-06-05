@@ -110,7 +110,7 @@ impl PotentiationType {
 }
 
 #[derive(Clone, Debug)]
-pub struct IntegrateAndFireCell {
+pub struct IntegrateAndFireCell<T: NeurotransmitterKinetics> {
     pub if_type: IFType,
     pub current_voltage: f64, // membrane potential
     pub refractory_count: f64, // keeping track of refractory period
@@ -137,7 +137,7 @@ pub struct IntegrateAndFireCell {
     pub dt: f64, // time step
     pub bayesian_params: BayesianParameters, // bayesian parameters
     pub stdp_params: STDPParameters, // stdp parameters
-    pub synaptic_neurotransmitters: Neurotransmitters,
+    pub synaptic_neurotransmitters: Neurotransmitters<T>, // neurotransmitters
     pub ligand_gates: LigandGatedChannels, // ligand gates
 }
 
@@ -169,7 +169,7 @@ pub trait STDP: LastFiringTime {
 
 macro_rules! impl_current_voltage {
     ($struct:ident) => {
-        impl CurrentVoltage for $struct {
+        impl<T: NeurotransmitterKinetics> CurrentVoltage for $struct<T> {
             fn get_current_voltage(&self) -> f64 {
                 self.current_voltage
             }
@@ -179,7 +179,7 @@ macro_rules! impl_current_voltage {
 
 macro_rules! impl_gap_conductance {
     ($struct:ident) => {
-        impl GapConductance for $struct {
+        impl<T: NeurotransmitterKinetics> GapConductance for $struct<T> {
             fn get_gap_conductance(&self) -> f64 {
                 self.gap_conductance
             }
@@ -189,7 +189,7 @@ macro_rules! impl_gap_conductance {
 
 macro_rules! impl_potentiation {
     ($struct:ident) => {
-        impl Potentiation for $struct {
+        impl<T: NeurotransmitterKinetics> Potentiation for $struct<T> {
             fn get_potentiation_type(&self) -> PotentiationType {
                 self.potentiation_type
             }
@@ -199,7 +199,7 @@ macro_rules! impl_potentiation {
 
 macro_rules! impl_bayesian_factor {
     ($struct:ident) => {
-        impl BayesianFactor for $struct {
+        impl<T: NeurotransmitterKinetics> BayesianFactor for $struct<T> {
             fn get_bayesian_factor(&self) -> f64 {
                 limited_distr(
                     self.bayesian_params.mean, 
@@ -214,7 +214,7 @@ macro_rules! impl_bayesian_factor {
 
 macro_rules! impl_last_firing_time {
     ($struct:ident) => {
-        impl LastFiringTime for $struct {
+        impl<T: NeurotransmitterKinetics> LastFiringTime for $struct<T> {
             fn set_last_firing_time(&mut self, timestep: Option<usize>) {
                 self.last_firing_time = timestep;
             }
@@ -228,7 +228,7 @@ macro_rules! impl_last_firing_time {
 
 macro_rules! impl_stdp {
     ($struct:ident) => {
-        impl STDP for $struct {        
+        impl<T: NeurotransmitterKinetics> STDP for $struct<T> {        
             fn get_stdp_params(&self) -> &STDPParameters {
                 &self.stdp_params
             }
@@ -236,10 +236,12 @@ macro_rules! impl_stdp {
     };
 }
 
-pub trait IterateAndSpike: Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
+pub trait IterateAndSpike: 
+Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
+    type T: NeurotransmitterKinetics;
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
     fn get_ligand_gates(&self) -> &LigandGatedChannels;
-    fn get_neurotransmitters(&self) -> &Neurotransmitters;
+    fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
@@ -248,7 +250,7 @@ pub trait IterateAndSpike: Clone + CurrentVoltage + GapConductance + Potentiatio
     ) -> bool;
 }
 
-impl Default for IntegrateAndFireCell {
+impl<T: NeurotransmitterKinetics> Default for IntegrateAndFireCell<T> {
     fn default() -> Self {
         IntegrateAndFireCell {
             if_type: IFType::Basic,
@@ -277,13 +279,13 @@ impl Default for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            synaptic_neurotransmitters: Neurotransmitters::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
     }
 }
 
-impl IzhikevichDefault for IntegrateAndFireCell {
+impl<T: NeurotransmitterKinetics> IzhikevichDefault for IntegrateAndFireCell<T> {
     fn izhikevich_default() -> Self {
         IntegrateAndFireCell {
             if_type: IFType::Izhikevich,
@@ -312,7 +314,7 @@ impl IzhikevichDefault for IntegrateAndFireCell {
             slope_factor: 1., // exponential time step (ms)
             stdp_params: STDPParameters::default(),
             bayesian_params: BayesianParameters::default(),
-            synaptic_neurotransmitters: Neurotransmitters::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
     }
@@ -325,7 +327,7 @@ impl_bayesian_factor!(IntegrateAndFireCell);
 impl_last_firing_time!(IntegrateAndFireCell);
 impl_stdp!(IntegrateAndFireCell);
 
-impl IntegrateAndFireCell {
+impl<T: NeurotransmitterKinetics> IntegrateAndFireCell<T> {
     pub fn get_basic_dv_change(&self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -525,7 +527,9 @@ impl IntegrateAndFireCell {
     }
 }
 
-impl IterateAndSpike for IntegrateAndFireCell {
+impl<T: NeurotransmitterKinetics> IterateAndSpike for IntegrateAndFireCell<T> {
+    type T = T;
+
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
         let is_spiking = match self.if_type {
             IFType::Basic => {
@@ -556,7 +560,7 @@ impl IterateAndSpike for IntegrateAndFireCell {
         &self.ligand_gates
     }
 
-    fn get_neurotransmitters(&self) -> &Neurotransmitters {
+    fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
         &self.synaptic_neurotransmitters
     }
 
@@ -606,6 +610,7 @@ pub struct GABAbDissociation {
     // k2: ,
     pub k3: f64,
     pub k4: f64,
+    pub dt: f64,
 }
 
 impl Default for GABAbDissociation {
@@ -618,6 +623,7 @@ impl Default for GABAbDissociation {
             // k2: ,
             k3: 0.098,
             k4: 0.033, 
+            dt: 0.1,
         }
     }
 }
@@ -648,6 +654,9 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
+// pub trait NeurotransmitterTypeDefaults: 
+// Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault {}
+
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 #[allow(dead_code)] 
 // basic neurotransmitter type for unspecific general glutamate testing
@@ -671,9 +680,10 @@ impl NeurotransmitterType {
     }
 }
 
-pub trait NeurotransmitterKinetics {
+pub trait NeurotransmitterKinetics: Clone {
     fn apply_t_change(&mut self, voltage: f64);
     fn get_t(&self) -> f64;
+    fn set_t(&mut self, t: f64);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -714,33 +724,47 @@ impl NeurotransmitterKinetics for DestexheNeurotransmitter {
     fn get_t(&self) -> f64 {
         self.t
     }
+
+    fn set_t(&mut self, t: f64) {
+        self.t = t;
+    }
 }
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct ApproximateNeurotransmitter {
-//     pub t_max: f64,
-//     pub t: f64,
-//     pub v_th: f64,
-//     pub clearance_constant: f64,
-// }
+#[derive(Debug, Clone, Copy)]
+pub struct ApproximateNeurotransmitter {
+    pub t_max: f64,
+    pub t: f64,
+    pub v_th: f64,
+    pub clearance_constant: f64,
+}
 
-// fn heaviside(x: f64) -> f64 {
-//     if (x > 0.) {
-//         1.
-//     } else {
-//         0.
-//     }
-// }
+fn heaviside(x: f64) -> f64 {
+    if x > 0. {
+        1.
+    } else {
+        0.
+    }
+}
 
-// impl ApproximateNeurotransmitter {
-//     fn apply_t_change(&mut self, voltage: f64) {
-//         self.t = self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
-//     }
-// }
+impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
+    fn apply_t_change(&mut self, voltage: f64) {
+        self.t = self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
+        self.t = self.t_max.min(self.t.max(0.));
+    }
+
+    fn get_t(&self) -> f64 {
+        self.t
+    }
+
+    fn set_t(&mut self, t: f64) {
+        self.t = t;
+    }
+}
 
 pub trait ReceptorKinetics: Default {
     fn apply_r_change(&mut self, t: f64);
     fn get_r(&self) -> f64;
+    fn set_r(&mut self, r: f64);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -751,7 +775,7 @@ pub struct DestexheReceptor {
     pub dt: f64,
 }
 
-macro_rules! impl_receptor_default {
+macro_rules! impl_destexhe_receptor_default {
     ($trait:ident, $method:ident, $alpha:expr, $beta:expr, $dt:expr) => {
         impl $trait for DestexheReceptor {
             fn $method() -> Self {
@@ -774,14 +798,18 @@ impl ReceptorKinetics for DestexheReceptor {
     fn get_r(&self) -> f64 {
         self.r
     }
+
+    fn set_r(&mut self, r: f64) {
+        self.r = r;
+    }
 }
 
-impl_receptor_default!(Default, default, 1., 1., 0.1);
-impl_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19, 0.1);
-impl_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18, 0.1);
-impl_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047, 0.1);
-impl_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013, 0.1);
-impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
+impl_destexhe_receptor_default!(Default, default, 1., 1., 0.1);
+impl_destexhe_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19, 0.1);
+impl_destexhe_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18, 0.1);
+impl_destexhe_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047, 0.1);
+impl_destexhe_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013, 0.1);
+impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
 
 // #[derive(Debug, Clone, Copy)]
 // pub struct ApproximateReceptor {
@@ -802,6 +830,10 @@ impl_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
 //     fn get_r(&self) -> f64 {
 //         self.r
 //     }
+
+    // fn set_r(&mut self, r: f64) {
+    //     self.r = r;
+    // }
 // }
 
 #[derive(Debug, Clone)]
@@ -916,9 +948,9 @@ impl LigandGatedChannel {
             IonotropicReceptorType::AMPA(value) => *value,
             IonotropicReceptorType::GABAa(value) => *value,
             IonotropicReceptorType::GABAb(value) => {
-                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * self.receptor.dt;
-                value.calculate_modifer()
-            }, // G^N / (G^N + Kd)
+                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * value.dt;
+                value.calculate_modifer() // G^N / (G^N + Kd)
+            }, 
             IonotropicReceptorType::NMDA(value) => value.calculate_b(voltage),
             IonotropicReceptorType::Basic(value) => *value,
         }
@@ -944,7 +976,7 @@ impl LigandGatedChannel {
 }
 
 #[derive(Clone, Debug)]
-pub struct LigandGatedChannels{ 
+pub struct LigandGatedChannels { 
     pub ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> 
 }
 
@@ -1000,13 +1032,13 @@ impl LigandGatedChannels {
 }
 
 #[derive(Clone, Debug)]
-pub struct Neurotransmitters {
-    pub neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter>
+pub struct Neurotransmitters<T: NeurotransmitterKinetics> {
+    pub neurotransmitters: HashMap<NeurotransmitterType, T>
 }
 
 pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f64>;
 
-impl Default for Neurotransmitters {
+impl<T: NeurotransmitterKinetics> Default for Neurotransmitters<T> {
     fn default() -> Self {
         Neurotransmitters {
             neurotransmitters: HashMap::new(),
@@ -1014,7 +1046,7 @@ impl Default for Neurotransmitters {
     }
 }
 
-impl Neurotransmitters {
+impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     pub fn len(&self) -> usize {
         self.neurotransmitters.keys().len()
     }
@@ -1023,13 +1055,13 @@ impl Neurotransmitters {
     //     self.neurotransmitters.keys()
     // }
 
-    pub fn values(&self) -> Values<NeurotransmitterType, DestexheNeurotransmitter> {
+    pub fn values(&self) -> Values<NeurotransmitterType, T> {
         self.neurotransmitters.values()
     }
 
     fn get_concentrations(&self) -> NeurotransmitterConcentrations {
         self.neurotransmitters.iter()
-            .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.t))
+            .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.get_t()))
             .collect::<NeurotransmitterConcentrations>()
     }
 
@@ -1348,7 +1380,7 @@ impl Gate {
 }
 
 #[derive(Clone)]
-pub struct HodgkinHuxleyCell {
+pub struct HodgkinHuxleyCell<T: NeurotransmitterKinetics> {
     pub current_voltage: f64,
     pub gap_conductance: f64,
     pub potentiation_type: PotentiationType,
@@ -1368,7 +1400,7 @@ pub struct HodgkinHuxleyCell {
     pub was_increasing: bool,
     pub is_spiking: bool,
     pub additional_gates: Vec<AdditionalGates>,
-    pub synaptic_neurotransmitters: Neurotransmitters,
+    pub synaptic_neurotransmitters: Neurotransmitters<T>,
     pub ligand_gates: LigandGatedChannels,
     pub bayesian_params: BayesianParameters,
     pub stdp_params: STDPParameters,
@@ -1381,7 +1413,7 @@ impl_bayesian_factor!(HodgkinHuxleyCell);
 impl_last_firing_time!(HodgkinHuxleyCell);
 impl_stdp!(HodgkinHuxleyCell);
 
-impl Default for HodgkinHuxleyCell {
+impl<T: NeurotransmitterKinetics> Default for HodgkinHuxleyCell<T> {
     fn default() -> Self {
         let default_gate = Gate {
             alpha: 0.,
@@ -1464,7 +1496,7 @@ pub fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
 }
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
-impl HodgkinHuxleyCell {
+impl<T: NeurotransmitterKinetics> HodgkinHuxleyCell<T> {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
@@ -1659,7 +1691,9 @@ impl HodgkinHuxleyCell {
     }
 }
 
-impl IterateAndSpike for HodgkinHuxleyCell {
+impl<T: NeurotransmitterKinetics> IterateAndSpike for HodgkinHuxleyCell<T> {
+    type T = T;
+
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate(input_current);
@@ -1677,7 +1711,7 @@ impl IterateAndSpike for HodgkinHuxleyCell {
         &self.ligand_gates
     }
 
-    fn get_neurotransmitters(&self) -> &Neurotransmitters {
+    fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
         &self.synaptic_neurotransmitters
     }
 
@@ -1731,15 +1765,13 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     bayesian: bool,
     input_current: f64,
 ) {
-    if bayesian {
+    let (t_total, post_current, input_current) = if bayesian {
         let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
         let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
 
-        let _pre_spiking = presynaptic_neuron.iterate_and_spike(
-            input_current * pre_bayesian_factor
-        );
+        let input_current = input_current * pre_bayesian_factor;
 
-        let current = signed_gap_junction(
+        let post_current = signed_gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
@@ -1753,14 +1785,9 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             None
         };
 
-        let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-            current * post_bayesian_factor,
-            t_total.as_ref(),
-        );
+        (t_total, post_current, input_current)
     } else {
-        let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
-
-        let current = signed_gap_junction(
+        let post_current = signed_gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
@@ -1772,11 +1799,15 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             None
         };
 
-        let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-            current,
-            t_total.as_ref(),
-        );
-    }
+        (t_total, post_current, input_current)
+    };
+
+    let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
+
+    let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+        post_current,
+        t_total.as_ref(),
+    );
 }
 
 pub enum DiscreteNeuronState {
@@ -1828,20 +1859,6 @@ fn outer_product(a: &Vec<isize>, b: &Vec<isize>) -> Vec<Vec<isize>> {
 fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usize) {
     ((i / num_cols), (i % num_cols))
 }
-
-// // self.lookup_weight on adjacencylist may not have the same behavior as matrix
-// // it should error if either one of the positions given are not in the network
-// // (modify methods so they can return errors for weight lookups and edits)
-// // (check if incoming and outgoing pos in incoming connections keys)
-// // (replace self.incoming_connections[postsynaptic][presynaptic] so it uses get and returns option<f64>)
-// // (edit weight should cut off connection if input weight is None)
-// // ***** BASICALLY REPLACE CURRENT ADJ LIST EDIT LOGIC WITH INIT CONNECTION LOGIC IF SOME *****
-// // if none then cut appropriate connections (if in outgoing, remove respective node)
-// // (if edit weight is creating a new connection, update outgoing accordingly)
-// // (initialize connections should add all neurons (pre/post) to incoming map)
-// // add_vertex added to trait
-// // additionally if the postsynaptic position is in the network but not connected
-// // it should not error it should return none
 
 pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
     num_rows: usize, 
@@ -2002,9 +2019,7 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //     pub v_th: f64,
 //     pub v_resting: f64,
 //     pub last_firing_time: Option<usize>,
-//     pub clearance_constant: HashMap<NeurotransmitterType, f64>,
-//     pub t_max: HashMap<NeurotransmitterType, f64>,
-//     pub synaptic_neurotransmitters: HashMap<NeurotransmitterType, f64>,
+//     pub synaptic_neurotransmitter: Neurotransmitters<ApproximateNeurotransmitter>,
 //     pub potentiation_type: PotentiationType,
 //     pub chance_of_firing: f64,
 //     pub dt: f64,
@@ -2054,6 +2069,8 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //                     *value = (*value - (*value * self.clearance_constant[key])).max(0.)
 //                 )
 //         }
+
+    // // self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 //     }
 
 //     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
@@ -2124,6 +2141,8 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 
 //         (pre_t_total, post_t_total, current)
 //     };
+
+//     spike_train.iterate();   
     
 //     let _pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
 //         input_current,
@@ -2133,7 +2152,5 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<i
 //     let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
 //         current,
 //         post_t_total.as_ref(),
-//     );
-
-//     spike_train.iterate();    
+//     ); 
 // }
