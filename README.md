@@ -84,9 +84,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Split `main.rs` functions into a few different files for readability
 - Printing should have colors
 
+- **Neurotransmitter approximate refactor**
 - Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
-
-- FitzHugh–Nagumo model (FHN) (with bursting)
+- **FitzHugh–Nagumo model (FHN) (with bursting)**
 
 - Spike trains and multiple lattices
   - Spike train trait should return a voltage and iterate with no given input
@@ -111,8 +111,11 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Refactor fitting to use spike trains with neurotransmission
 - $\tau_m$ and $C_m$ fitting
 - Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
+- Fitting should include neurotransmission again
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
 - Maybe refactor so fitting only takes into account the presynaptic neuron
+
+- **Neurotransmitter approximation refactor for ligand gated channels**, use receptor kinetics and neurotransmitter kinetics traits
 
 - Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
   - Inputs should be calculated in parallel
@@ -133,6 +136,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should expect beta or gamma frequencies above 10 hz and below 50 hz
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
+  - **Neurotransmitter approximation refactor should come before Lixirnet**
   - Update by copying over backend
     - Should have methods that iterate one timestep for each kind of simulation
     - That way when exposed to Python there can be tqdm stuff
@@ -188,7 +192,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Liquid state machine + stable attractor
   - Stable attractor connected to reservoir with feedback (going into attractor could be trainable wheras back into liquid is not)
   - Attractor may need to have a stable state that is just all low states
-  - Liquid state machine + iscrete attractor, frequency from input neuron is measured over time a high freq means an active state while low freq means inactive, discrete neuron could correspond to a poisson neuron or something similar
+  - Liquid state machine + discrete attractor, frequency from input neuron is measured over time a high freq means an active state while low freq means inactive, discrete neuron could correspond to a poisson neuron or something similar
+    - Liquid state machine + discrete attractor should have the discrete attractor randomly flip input sign for noise
+  - Liquid state machine + spiking attractor
   - Testing classifiers and regression models with liquid and attractor model, maybe try multiple attractors
   - Could try this with reinforcement learning models
 
