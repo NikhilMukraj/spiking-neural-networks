@@ -255,6 +255,7 @@ pub struct FittingSettings<'a, T: NeurotransmitterKinetics, U: NeurotransmitterK
 fn bayesian_izhikevich_iterate<T: NeurotransmitterKinetics>(
     izhikevich_neuron: &mut IntegrateAndFireCell<T>, 
     input_current: f64,
+    // t_total: NeurotransmitterConcentrations,
     bayesian: bool,
     // do_receptor_kinetics: bool,
 ) -> bool {
