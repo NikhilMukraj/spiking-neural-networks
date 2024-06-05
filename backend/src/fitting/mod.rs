@@ -4,9 +4,8 @@ use std::{
 };
 use crate::distribution::limited_distr;
 use crate::neuron::{
-    IntegrateAndFireCell, HodgkinHuxleyCell, find_peaks, diff,
-    gap_junction, iterate_coupled_spiking_neurons,
-    // handle_receptor_kinetics
+    IntegrateAndFireCell, HodgkinHuxleyCell, NeurotransmitterKinetics,
+    find_peaks, diff, gap_junction, iterate_coupled_spiking_neurons,
 };
 use crate::ga::{BitString, decode};
 
@@ -201,8 +200,8 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
     }
 }
 
-pub fn get_hodgkin_huxley_summary(
-    hodgkin_huxley_model: &HodgkinHuxleyCell, 
+pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics>(
+    hodgkin_huxley_model: &HodgkinHuxleyCell<T>, 
     input_current: f64, 
     iterations: usize,
     do_receptor_kinetics: bool,
@@ -240,9 +239,9 @@ pub fn get_hodgkin_huxley_summary(
 }
 
 #[derive(Clone)]
-pub struct FittingSettings<'a> {
-    pub hodgkin_huxley_model: HodgkinHuxleyCell,
-    pub if_neuron: &'a IntegrateAndFireCell,
+pub struct FittingSettings<'a, T: NeurotransmitterKinetics, U: NeurotransmitterKinetics> {
+    pub hodgkin_huxley_model: HodgkinHuxleyCell<T>,
+    pub if_neuron: &'a IntegrateAndFireCell<U>,
     pub action_potential_summary: &'a [ActionPotentialSummary],
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
     pub use_amplitude: bool,
@@ -253,8 +252,8 @@ pub struct FittingSettings<'a> {
     // pub do_receptor_kinetics: bool,
 }
 
-fn bayesian_izhikevich_iterate(
-    izhikevich_neuron: &mut IntegrateAndFireCell, 
+fn bayesian_izhikevich_iterate<T: NeurotransmitterKinetics>(
+    izhikevich_neuron: &mut IntegrateAndFireCell<T>, 
     input_current: f64,
     bayesian: bool,
     // do_receptor_kinetics: bool,
@@ -268,21 +267,17 @@ fn bayesian_izhikevich_iterate(
         input_current
     };
 
-    // handle_receptor_kinetics(izhikevich_neuron, processed_input, do_receptor_kinetics);
-
     let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
         processed_input,
     );
 
-    // izhikevich_neuron.update_based_on_neurotransmitter_currents();
-
     spike
 }
 
-pub fn get_izhikevich_summary(
-    presynaptic_neuron: &mut IntegrateAndFireCell, 
-    postsynaptic_neuron: &mut IntegrateAndFireCell,
-    settings: &FittingSettings,
+pub fn get_izhikevich_summary<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics>(
+    presynaptic_neuron: &mut IntegrateAndFireCell<U>, 
+    postsynaptic_neuron: &mut IntegrateAndFireCell<U>,
+    settings: &FittingSettings<T, U>,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
@@ -324,11 +319,11 @@ pub fn get_izhikevich_summary(
 
 // bounds should be a, b, c, d, and v_th for now
 // if fitting does not generalize, optimize other coefs in equation
-pub fn fitting_objective(
+pub fn fitting_objective<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics>(
     bitstring: &BitString, 
     bounds: &Vec<Vec<f64>>, 
     n_bits: usize, 
-    settings: &HashMap<&str, FittingSettings>
+    settings: &HashMap<&str, FittingSettings<T, U>>
 ) -> Result<f64> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
