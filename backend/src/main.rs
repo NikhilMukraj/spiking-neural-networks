@@ -5,6 +5,7 @@ use std::{
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
+use neuron::IonotropicReceptorType;
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
@@ -17,8 +18,8 @@ use crate::neuron::{
     STDPParameters, NeurotransmitterConcentrations, 
     signed_gap_junction, weight_neurotransmitter_concentration, 
     aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
-    Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels,
-    NeurotransmitterType, DestexheNeurotransmitter, Neurotransmitters,
+    Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, 
+    NeurotransmitterType, NeurotransmitterKinetics, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
     AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
@@ -199,7 +200,12 @@ fn get_volt_avg<T: IterateAndSpike>(cell_grid: &CellGrid<T>) -> f64 {
 // refence voltage: 7 uV (microvolt)
 // either convert dist to m, or conductivity to S/mm
 // should be inputtable from user as well
-fn convert_to_eeg<T: IterateAndSpike>(cell_grid: &CellGrid<T>, distance: f64, conductivity: f64, reference_voltage: f64) -> f64 {
+fn convert_to_eeg<T: IterateAndSpike>(
+    cell_grid: &CellGrid<T>, 
+    distance: f64, 
+    conductivity: f64, 
+    reference_voltage: f64
+) -> f64 {
     let mut total_current: f64 = 0.;
 
     for row in cell_grid {
@@ -602,7 +608,11 @@ macro_rules! get_integrate_and_fire_params_with_default {
     };
 }
 
-fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Value) -> Result<IntegrateAndFireCell> {
+fn get_destexhe_integrate_and_fire_cell(
+    if_type: IFType, 
+    prefix: Option<&str>, 
+    table: &Value
+) -> Result<IntegrateAndFireCell<DestexheNeurotransmitter>> {
     let prefix_value = match prefix {
         Some(value) => format!("{}_", value),
         None => String::from(""),
@@ -655,7 +665,7 @@ fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Va
 
     if_neuron.stdp_params = get_stdp_params(table)?;
 
-    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(
+    let (neurotransmitters, ligand_gates) = get_destexhe_ligand_gates_and_neurotransmitters(
         table, 
         &format!("{}", prefix_value), 
         if_neuron.dt,
@@ -682,6 +692,7 @@ fn get_integrate_and_fire_cell(if_type: IFType, prefix: Option<&str>, table: &Va
 //     };
 // }
 
+// create seperate method for generating approximate neurotransmitter structs from toml
 // fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeuron> {
 //     let prefix_value = match prefix {
 //         Some(value) => format!("{}_", value),
@@ -893,7 +904,9 @@ fn get_bayesian_params(
     Ok(bayesian_params)
 }
 
-fn get_simulation_parameters<U: GraphFunctionality + Default>(table: &Value) -> Result<SimulationParameters<IntegrateAndFireCell, U>> {
+fn get_destexhe_simulation_parameters<U: GraphFunctionality + Default>(
+    table: &Value
+) -> Result<SimulationParameters<IntegrateAndFireCell<DestexheNeurotransmitter>, U>> {
     let num_rows: usize = parse_value_with_default(&table, "num_rows", parse_usize, 10)?;
     println!("num_rows: {}", num_rows);
 
@@ -958,7 +971,7 @@ fn get_simulation_parameters<U: GraphFunctionality + Default>(table: &Value) -> 
         false => None, 
     };
 
-    let if_neuron = get_integrate_and_fire_cell(if_type, None, table)?;
+    let if_neuron = get_destexhe_integrate_and_fire_cell(if_type, None, table)?;
     println!("{:#?}", if_neuron);
 
     // in ms
@@ -985,7 +998,7 @@ fn get_simulation_parameters<U: GraphFunctionality + Default>(table: &Value) -> 
     };
     println!("iterations: {}", iterations);
 
-    let mut cell_grid: CellGrid<IntegrateAndFireCell> = (0..num_rows)
+    let mut cell_grid: CellGrid<IntegrateAndFireCell<DestexheNeurotransmitter>> = (0..num_rows)
         .map(|_| {
             (0..num_cols)
                 .map(|_| {
@@ -994,9 +1007,9 @@ fn get_simulation_parameters<U: GraphFunctionality + Default>(table: &Value) -> 
 
                     current_neuron
                 })
-                .collect::<Vec<IntegrateAndFireCell>>()
+                .collect::<Vec<IntegrateAndFireCell<DestexheNeurotransmitter>>>()
         })
-        .collect::<CellGrid<IntegrateAndFireCell>>();
+        .collect::<CellGrid<IntegrateAndFireCell<DestexheNeurotransmitter>>>();
 
     let mut rng = rand::thread_rng();
 
@@ -1339,11 +1352,13 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     Ok(())
 }
 
-fn get_ligand_gates_and_neurotransmitters(
+// separate method for approximate ligand gates
+// separate method for approximate neurotransmitters
+fn get_destexhe_ligand_gates_and_neurotransmitters(
     table: &Value, 
     prefix_value: &str,
     dt: f64,
-) -> Result<(Neurotransmitters, LigandGatedChannels)> {
+) -> Result<(Neurotransmitters<DestexheNeurotransmitter>, LigandGatedChannels)> {
     let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> = HashMap::new();
     let mut neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
 
@@ -1432,12 +1447,16 @@ fn get_ligand_gates_and_neurotransmitters(
 
     neurotransmitters.values_mut()
         .for_each(|value| {
-            value.t = t_default;
+            value.set_t(t_default);
         });
     ligand_gates.values_mut()
         .for_each(|value| {
-            value.receptor.r = r_default;
+            value.receptor.set_r(r_default);
             value.receptor.dt = dt;
+            match &mut value.receptor_type {
+                IonotropicReceptorType::GABAb(ref mut value) => value.dt = dt,
+                _ => {}
+            };
         });
 
     if ligand_gates.len() != 0 {
@@ -1500,7 +1519,10 @@ fn get_additional_gates(table: &Value, prefix: &str) -> Result<Vec<AdditionalGat
     Ok(additional_gates)
 }
 
-fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>) -> Result<HodgkinHuxleyCell> {
+fn get_hodgkin_huxley_params(
+    hodgkin_huxley_table: &Value, 
+    prefix: Option<&str>
+) -> Result<HodgkinHuxleyCell<DestexheNeurotransmitter>> {
     let prefix = match prefix {
         Some(prefix_value) => format!("{}_", prefix_value),
         None => String::from(""),
@@ -1637,7 +1659,7 @@ fn get_hodgkin_huxley_params(hodgkin_huxley_table: &Value, prefix: Option<&str>)
         state: state_init, 
     };
 
-    let (neurotransmitters, ligand_gates) = get_ligand_gates_and_neurotransmitters(
+    let (neurotransmitters, ligand_gates) = get_destexhe_ligand_gates_and_neurotransmitters(
         &hodgkin_huxley_table, 
         &prefix,
         dt,
@@ -1730,7 +1752,7 @@ fn test_coupled_neurons<'a, T: IterateAndSpike>(
                 write!(file, ", {}, {}, {}", 
                     ligand_gate.current,
                     ligand_gate.receptor.r,
-                    neurotransmitter.t,
+                    neurotransmitter.get_t(),
                 )?;
             }
 
@@ -1909,12 +1931,12 @@ fn main() -> Result<()> {
 
         match graph_type {
             Graph::List => {
-                let mut sim_params = get_simulation_parameters::<AdjacencyList>(&simulation_table)?;
+                let mut sim_params = get_destexhe_simulation_parameters::<AdjacencyList>(&simulation_table)?;
 
                 run_lattice_from_simulation_params!(sim_params, output, tag);
             },
             Graph::Matrix => {
-                let mut sim_params = get_simulation_parameters::<AdjacencyMatrix>(&simulation_table)?;
+                let mut sim_params = get_destexhe_simulation_parameters::<AdjacencyMatrix>(&simulation_table)?;
 
                 run_lattice_from_simulation_params!(sim_params, output, tag);
             },
@@ -2067,7 +2089,7 @@ fn main() -> Result<()> {
         //     ligand_gates: if_params.ligand_gates_init.clone(),
         // };
 
-        let mut test_cell = get_integrate_and_fire_cell(if_type, None, single_neuron_table)?;
+        let mut test_cell = get_destexhe_integrate_and_fire_cell(if_type, None, single_neuron_table)?;
         println!("{:#?}", test_cell);
 
         test_cell.run_static_input(input_current, bayesian, iterations, &filename);
@@ -2126,8 +2148,8 @@ fn main() -> Result<()> {
         )?;
         println!("verbose: {}", verbose);
 
-        let mut presynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("pre"), coupled_table)?;
-        let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("post"), coupled_table)?;
+        let mut presynaptic_neuron = get_destexhe_integrate_and_fire_cell(if_type, Some("pre"), coupled_table)?;
+        let mut postsynaptic_neuron = get_destexhe_integrate_and_fire_cell(if_type, Some("post"), coupled_table)?;
         println!("presynaptic: {:#?}", presynaptic_neuron);
         println!("postsynaptic: {:#?}", postsynaptic_neuron);
 
@@ -2201,7 +2223,7 @@ fn main() -> Result<()> {
     //     println!("presynaptic: {:#?}", presynaptic_neuron);
     //     println!("postsynaptic: {:#?}", postsynaptic_neuron);
 
-    //     let mut poisson_neuron = get_poisson_neuron(None, spike_train_table)?;
+    //     let mut poisson_neuron = get_poisson_neuron(Some("poisson"), spike_train_table)?;
     //     println!("poisson neuron: {:#?}", poisson_neuron);
     } else if let Some(stdp_table) = config.get("stdp_test") {
         let if_type: String = parse_value_with_default(
@@ -2254,10 +2276,10 @@ fn main() -> Result<()> {
 
         let weight_params = get_bayesian_params(&stdp_table, Some("weight_initialization"))?;
 
-        let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, None, &stdp_table)?;
+        let mut postsynaptic_neuron = get_destexhe_integrate_and_fire_cell(if_type, None, &stdp_table)?;
         println!("{:#?}", postsynaptic_neuron);
     
-        let mut presynaptic_neurons: Vec<IntegrateAndFireCell> = (0..n).map(|_| postsynaptic_neuron.clone())
+        let mut presynaptic_neurons: Vec<IntegrateAndFireCell<DestexheNeurotransmitter>> = (0..n).map(|_| postsynaptic_neuron.clone())
             .collect();
     
         for i in presynaptic_neurons.iter_mut() {
@@ -2620,7 +2642,7 @@ fn main() -> Result<()> {
             (hodgkin_huxley_summaries, scaling_factors_vector)            
         };
 
-        let mut test_cell = get_integrate_and_fire_cell(IFType::Izhikevich, None, fit_neuron_models_table)?;
+        let mut test_cell = get_destexhe_integrate_and_fire_cell(IFType::Izhikevich, None, fit_neuron_models_table)?;
     
         // if !do_receptor_kinetics {
         //     test_cell.ligand_gates.iter_mut().for_each(|i| {
@@ -2641,7 +2663,9 @@ fn main() -> Result<()> {
             // do_receptor_kinetics: do_receptor_kinetics,
         };
 
-        let mut fitting_settings_map: HashMap<&str, FittingSettings> = HashMap::new();
+        let mut fitting_settings_map: HashMap<
+            &str, FittingSettings<DestexheNeurotransmitter, DestexheNeurotransmitter>
+        > = HashMap::new();
         fitting_settings_map.insert("settings", fitting_settings.clone());
 
         println!("\nStarting genetic algorithm...");
