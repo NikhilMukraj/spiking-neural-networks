@@ -718,8 +718,7 @@ fn get_destexhe_integrate_and_fire_cell(
 //     );
 
 //     let mut neurotransmitters: HashMap<NeurotransmitterType, f64> = HashMap::new();
-//     let mut clearance_constant_map: HashMap<NeurotransmitterType, f64> = HashMap::new();
-//     let mut t_max_map: HashMap<NeurotransmitterType, f64> = HashMap::new();
+//     let clearance_constant = parse_value_with_default(table, "clearance_constant", parse_f64, 0.1);
 
 //     let ampa: bool = parse_value_with_default(
 //         table,
