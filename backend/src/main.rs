@@ -18,12 +18,12 @@ use crate::neuron::{
     STDPParameters, NeurotransmitterConcentrations, 
     signed_gap_junction, weight_neurotransmitter_concentration, 
     aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
-    Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, 
-    NeurotransmitterType, NeurotransmitterKinetics, DestexheNeurotransmitter, Neurotransmitters,
+    Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, NeurotransmitterKinetics,
+    NeurotransmitterType, ApproximateNeurotransmitter, DestexheNeurotransmitter, Neurotransmitters,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
     AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
-    input_pattern_into_grid, distort_pattern, // PoissonNeuron,
+    input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, iterate_coupled_spiking_neurons_and_spike_train,
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -676,148 +676,150 @@ fn get_destexhe_integrate_and_fire_cell(
     Ok(if_neuron)
 }
 
-// macro_rules! get_poisson_neuron_with_default {
-//     ($table:expr, $prefix:expr, $poisson_neuron:expr, $($param:ident),+ ) => {
-//         $(
-//             $poisson_neuron.$param = parse_value_with_default(
-//                 $table, 
-//                 &format!("{}{}", 
-//                     $prefix, 
-//                     stringify!($param)
-//                 ), 
-//                 parse_f64, 
-//                 $poisson_neuron.$param
-//             )?;
-//         )+
-//     };
-// }
+macro_rules! get_poisson_neuron_with_default {
+    ($table:expr, $prefix:expr, $poisson_neuron:expr, $($param:ident),+ ) => {
+        $(
+            $poisson_neuron.$param = parse_value_with_default(
+                $table, 
+                &format!("{}{}", 
+                    $prefix, 
+                    stringify!($param)
+                ), 
+                parse_f64, 
+                $poisson_neuron.$param
+            )?;
+        )+
+    };
+}
 
 // create seperate method for generating approximate neurotransmitter structs from toml
-// fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeuron> {
-//     let prefix_value = match prefix {
-//         Some(value) => format!("{}_", value),
-//         None => String::from(""),
-//     };
+fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeuron> {
+    let prefix_value = match prefix {
+        Some(value) => format!("{}_", value),
+        None => String::from(""),
+    };
 
-//     let firing_rate: f64 = match table.get("firing_rate") {
-//         Some(value) => parse_f64(value, "firing_rate")?,
-//         None => { return Err(Error::new(ErrorKind::InvalidInput, "'firing_rate' value not found")); },
-//     };
-//     println!("firing_rate: {}", firing_rate);
+    let firing_rate: f64 = match table.get(format!("{}firing_rate", prefix_value)) {
+        Some(value) => parse_f64(value, &format!("{}firing_rate", prefix_value))?,
+        None => { return Err(Error::new(ErrorKind::InvalidInput, "'firing_rate' value not found")); },
+    };
+    println!("firing_rate: {}", firing_rate);
 
-//     let mut poisson_neuron = PoissonNeuron::from_firing_rate(firing_rate);
+    let dt = parse_value_with_default(
+        table,
+        format!("{}dt", prefix_value).as_str(),
+        parse_f64,
+        0.1
+    )?;
+    println!("{}dt: {}", prefix_value, dt);
 
-//     get_poisson_neuron_with_default!(
-//         table,
-//         prefix_value,
-//         poisson_neuron,
-//         current_voltage,
-//         v_th,
-//         v_resting,
-//         dt
-//     );
+    let mut poisson_neuron = PoissonNeuron::from_firing_rate(firing_rate, dt);
 
-//     let mut neurotransmitters: HashMap<NeurotransmitterType, f64> = HashMap::new();
-//     let clearance_constant = parse_value_with_default(table, "clearance_constant", parse_f64, 0.1);
+    get_poisson_neuron_with_default!(
+        table,
+        prefix_value,
+        poisson_neuron,
+        v_th,
+        v_resting,
+        dt
+    );
 
-//     let ampa: bool = parse_value_with_default(
-//         table,
-//         format!("{}AMPA", prefix_value).as_str(), 
-//         parse_bool, 
-//         false
-//     )?;
+    poisson_neuron.current_voltage = poisson_neuron.v_resting;
 
-//     let gabaa: bool = parse_value_with_default(
-//         table,
-//         format!("{}GABAa", prefix_value).as_str(), 
-//         parse_bool, 
-//         false
-//     )?;
+    let ampa: bool = parse_value_with_default(
+        table,
+        format!("{}AMPA", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-//     let gabab: bool = parse_value_with_default(
-//         table,
-//         format!("{}GABAb", prefix_value).as_str(), 
-//         parse_bool, 
-//         false
-//     )?;
+    let gabaa: bool = parse_value_with_default(
+        table,
+        format!("{}GABAa", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-//     let gabab_2: bool = parse_value_with_default(
-//         table,
-//         format!("{}GABAb_secondary", prefix_value).as_str(), 
-//         parse_bool, 
-//         false
-//     )?;
+    let gabab: bool = parse_value_with_default(
+        table,
+        format!("{}GABAb", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-//     if gabab && gabab_2 {
-//         return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
-//     }
+    let gabab_2: bool = parse_value_with_default(
+        table,
+        format!("{}GABAb_secondary", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-//     let nmda: bool = parse_value_with_default(
-//         table,
-//         format!("{}NMDA", prefix_value).as_str(), 
-//         parse_bool, 
-//         false
-//     )?;
+    if gabab && gabab_2 {
+        return Err(Error::new(ErrorKind::InvalidInput, "Cannot use 'GABAb' and 'GABAb (secondary)' simultaneously"))
+    }
 
-//     let clearance_constant: f64 = parse_value_with_default(
-//         table,
-//         format!("{}clearance_constant", prefix_value).as_str(),
-//         parse_f64,
-//         0.1,
-//     )?;
-//     println!("{}clearance_constant: {}", prefix_value, clearance_constant);
+    let nmda: bool = parse_value_with_default(
+        table,
+        format!("{}NMDA", prefix_value).as_str(), 
+        parse_bool, 
+        false
+    )?;
 
-//     let t_max: f64 = parse_value_with_default(
-//         table,
-//         format!("{}t_max", prefix_value).as_str(),
-//         parse_f64,
-//         1.,
-//     )?;
-//     println!("{}t_max: {}", prefix_value, t_max);
+    let clearance_constant: f64 = parse_value_with_default(
+        table,
+        format!("{}clearance_constant", prefix_value).as_str(),
+        parse_f64,
+        0.1,
+    )?;
+    println!("{}clearance_constant: {}", prefix_value, clearance_constant);
 
-//     if ampa {
-//         neurotransmitters.insert(NeurotransmitterType::AMPA, 0.);
-//         clearance_constant_map.insert(NeurotransmitterType::AMPA, clearance_constant);
-//         t_max_map.insert(NeurotransmitterType::AMPA, t_max);
-//     }
-//     if gabaa {
-//         neurotransmitters.insert(NeurotransmitterType::GABAa, 0.);
-//         clearance_constant_map.insert(NeurotransmitterType::GABAa, clearance_constant);
-//         t_max_map.insert(NeurotransmitterType::GABAa, t_max);
-//     }
-//     if gabab {
-//         neurotransmitters.insert(NeurotransmitterType::GABAb, 0.);
-//         clearance_constant_map.insert(NeurotransmitterType::GABAb, clearance_constant);
-//         t_max_map.insert(NeurotransmitterType::GABAb, t_max);
-//     }
-//     if gabab_2 {
-//         neurotransmitters.insert(NeurotransmitterType::GABAb, 0.);
-//         clearance_constant_map.insert(NeurotransmitterType::GABAb, clearance_constant);
-//         t_max_map.insert(NeurotransmitterType::GABAb, t_max);
-//     }
-//     if nmda {
-//         neurotransmitters.insert(NeurotransmitterType::NMDA, 0.);
-//         clearance_constant_map.insert(NeurotransmitterType::NMDA, clearance_constant);
-//         t_max_map.insert(NeurotransmitterType::NMDA, t_max);
-//     }
+    let t_max: f64 = parse_value_with_default(
+        table,
+        format!("{}t_max", prefix_value).as_str(),
+        parse_f64,
+        1.,
+    )?;
+    println!("{}t_max: {}", prefix_value, t_max);
 
-//     poisson_neuron.synaptic_neurotransmitters = neurotransmitters;
-//     poisson_neuron.clearance_constant = clearance_constant_map;
-//     poisson_neuron.t_max = t_max_map;
+    let mut neurotransmitters: HashMap<NeurotransmitterType, ApproximateNeurotransmitter> = HashMap::new();
 
-//     let potentiation_type_str = parse_value_with_default(
-//         table, 
-//         &format!("{}potentiation_type", prefix_value).as_str(), 
-//         parse_string, 
-//         String::from("excitatory")
-//     )?;
-//     let potentiation_type = PotentiationType::from_str(&potentiation_type_str)?;
-//     println!("{}potentiation_type: {:?}", prefix_value, potentiation_type);
+    if ampa {
+        neurotransmitters.insert(NeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
+    }
+    if gabaa {
+        neurotransmitters.insert(NeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
+    }
+    if gabab {
+        neurotransmitters.insert(NeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default());
+    }
+    if gabab_2 {
+        neurotransmitters.insert(NeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default2());
+    }
+    if nmda {
+        neurotransmitters.insert(NeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
+    }
 
-//     poisson_neuron.potentiation_type = potentiation_type;
+    poisson_neuron.synaptic_neurotransmitters = Neurotransmitters { neurotransmitters: neurotransmitters };
+    poisson_neuron.synaptic_neurotransmitters.values_mut()
+        .for_each(|i| i.clearance_constant = clearance_constant);
+    poisson_neuron.synaptic_neurotransmitters.values_mut()
+        .for_each(|i| i.t_max = t_max);
+    poisson_neuron.synaptic_neurotransmitters.values_mut()
+        .for_each(|i| i.dt = dt);
 
-//     Ok(poisson_neuron)
-// }
+    let potentiation_type_str = parse_value_with_default(
+        table, 
+        &format!("{}potentiation_type", prefix_value).as_str(), 
+        parse_string, 
+        String::from("excitatory")
+    )?;
+    let potentiation_type = PotentiationType::from_str(&potentiation_type_str)?;
+    println!("{}potentiation_type: {:?}", prefix_value, potentiation_type);
+
+    poisson_neuron.potentiation_type = potentiation_type;
+
+    Ok(poisson_neuron)
+}
 
 fn get_stdp_params(table: &Value) -> Result<STDPParameters> {
     let mut stdp_params = STDPParameters::default();
@@ -1762,6 +1764,103 @@ fn test_coupled_neurons<'a, T: IterateAndSpike>(
     Ok(())
 }
 
+// iterate_coupled_spiking_neurons_and_spike_train
+fn test_spike_train_coupled<'a, T: SpikeTrain, U: IterateAndSpike>(
+    spike_train: &'a mut T,
+    presynaptic_neuron: &'a mut U, 
+    postsynaptic_neuron: &'a mut U,
+    iterations: usize,
+    do_receptor_kinetics: bool,
+    bayesian: bool,
+    verbose: bool,
+    filename: &str,
+) -> Result<()> {
+    let mut file = BufWriter::new(File::create(filename)?);
+
+    write!(file, "spike_train,pre_voltage,post_voltage")?;
+
+    let has_full_neurotransmission = 
+        presynaptic_neuron.get_neurotransmitters().len() != 0 &&
+        presynaptic_neuron.get_ligand_gates().len() != 0 &&
+        postsynaptic_neuron.get_neurotransmitters().len() != 0 &&
+        postsynaptic_neuron.get_ligand_gates().len() != 0 &&
+        spike_train.get_neurotransmitters().len() != 0;
+    
+    if verbose && has_full_neurotransmission {
+        for i in spike_train.get_neurotransmitters().keys() {
+            write!(file, ",spike_train_T_{}", i.to_str())?;
+        }
+        for i in postsynaptic_neuron.get_ligand_gates().values() {
+            let name = i.to_str();
+            write!(file, ",pre_g_{},pre_r_{},pre_T_{}", name, name, name)?;
+        }
+        for i in postsynaptic_neuron.get_ligand_gates().values() {
+            let name = i.to_str();
+            write!(file, ",post_g_{},post_r_{},post_T_{}", name, name, name)?;
+        }
+    } 
+    
+    write!(file, "\n")?;
+        
+    for _ in 0..iterations {
+        iterate_coupled_spiking_neurons_and_spike_train(
+            spike_train,
+            presynaptic_neuron,
+            postsynaptic_neuron, 
+            do_receptor_kinetics, 
+            bayesian
+        );
+
+        if !verbose || !has_full_neurotransmission {
+            writeln!(file, "{}, {}, {}", 
+                spike_train.get_current_voltage(),
+                presynaptic_neuron.get_current_voltage(),
+                postsynaptic_neuron.get_current_voltage(),
+            )?;
+        } else {
+            write!(file, "{}, {}, {}", 
+                spike_train.get_current_voltage(),
+                presynaptic_neuron.get_current_voltage(), 
+                postsynaptic_neuron.get_current_voltage(),
+            )?;
+
+            for t in spike_train.get_neurotransmitter_concentrations().values() {
+                write!(file, ", {}", t)?;
+            }
+
+            let ligand_gates = presynaptic_neuron.get_ligand_gates();
+            for (ligand_gate, neurotransmitter) in ligand_gates
+                .values().zip(
+                    presynaptic_neuron.get_neurotransmitters().values()
+                ) 
+            {
+                write!(file, ", {}, {}, {}", 
+                    ligand_gate.current,
+                    ligand_gate.receptor.get_r(),
+                    neurotransmitter.get_t(),
+                )?;
+            }
+
+            let ligand_gates = postsynaptic_neuron.get_ligand_gates();
+            for (ligand_gate, neurotransmitter) in ligand_gates
+                .values().zip(
+                    postsynaptic_neuron.get_neurotransmitters().values()
+                ) 
+            {
+                write!(file, ", {}, {}, {}", 
+                    ligand_gate.current,
+                    ligand_gate.receptor.get_r(),
+                    neurotransmitter.get_t(),
+                )?;
+            }
+
+            write!(file, "\n")?;
+        }
+    }
+
+    Ok(())
+}
+
 macro_rules! run_lattice_from_simulation_params {
     ($sim_params:expr, $output:expr, $tag:expr) => {
         run_lattice(
@@ -2164,66 +2263,79 @@ fn main() -> Result<()> {
         )?;   
         
         println!("Finished coupling test");
-    // } else if let Some(spike_train_table) = config.get("coupled_spike_train_test") {
-    //     let if_type: String = parse_value_with_default(
-    //         spike_train_table, 
-    //         "if_type", 
-    //         parse_string, 
-    //         String::from("basic")
-    //     )?;
-    //     println!("if_type: {}", if_type);
+    } else if let Some(spike_train_table) = config.get("coupled_spike_train_test") {
+        let if_type: String = parse_value_with_default(
+            spike_train_table, 
+            "if_type", 
+            parse_string, 
+            String::from("basic")
+        )?;
+        println!("if_type: {}", if_type);
 
-    //     let if_type = IFType::from_str(&if_type)?;
+        let if_type = IFType::from_str(&if_type)?;
 
-    //     let iterations: usize = match spike_train_table.get("iterations") {
-    //         Some(value) => parse_usize(value, "iterations")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
-    //     };
-    //     println!("iterations: {}", iterations);
+        let iterations: usize = match spike_train_table.get("iterations") {
+            Some(value) => parse_usize(value, "iterations")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+        };
+        println!("iterations: {}", iterations);
     
-    //     let filename: String = match spike_train_table.get("filename") {
-    //         Some(value) => parse_string(value, "filename")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
-    //     };
-    //     println!("filename: {}", filename);
+        let filename: String = match spike_train_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
     
-    //     let input_current: f64 = match spike_train_table.get("input_current") {
-    //         Some(value) => parse_f64(value, "input_current")?,
-    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
-    //     };
-    //     println!("input_current: {}", input_current);
+        let input_current: f64 = match spike_train_table.get("input_current") {
+            Some(value) => parse_f64(value, "input_current")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+        };
+        println!("input_current: {}", input_current);
 
-    //     let do_receptor_kinetics: bool = parse_value_with_default(
-    //         &spike_train_table, 
-    //         "do_receptor_kinetics", 
-    //         parse_bool, 
-    //         false
-    //     )?;
-    //     println!("do_receptor_kinetics: {}", do_receptor_kinetics);
+        let do_receptor_kinetics: bool = parse_value_with_default(
+            &spike_train_table, 
+            "do_receptor_kinetics", 
+            parse_bool, 
+            false
+        )?;
+        println!("do_receptor_kinetics: {}", do_receptor_kinetics);
 
-    //     let bayesian: bool = parse_value_with_default(
-    //         &spike_train_table, 
-    //         "bayesian", 
-    //         parse_bool, 
-    //         false
-    //     )?;
-    //     println!("bayesian: {}", bayesian);
+        let bayesian: bool = parse_value_with_default(
+            &spike_train_table, 
+            "bayesian", 
+            parse_bool, 
+            false
+        )?;
+        println!("bayesian: {}", bayesian);
 
-    //     let verbose: bool = parse_value_with_default(
-    //         &spike_train_table, 
-    //         "verbose", 
-    //         parse_bool, 
-    //         false
-    //     )?;
-    //     println!("verbose: {}", verbose);
+        let verbose: bool = parse_value_with_default(
+            &spike_train_table, 
+            "verbose", 
+            parse_bool, 
+            false
+        )?;
+        println!("verbose: {}", verbose);
 
-    //     let mut presynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("pre"), spike_train_table)?;
-    //     let mut postsynaptic_neuron = get_integrate_and_fire_cell(if_type, Some("post"), spike_train_table)?;
-    //     println!("presynaptic: {:#?}", presynaptic_neuron);
-    //     println!("postsynaptic: {:#?}", postsynaptic_neuron);
+        let mut presynaptic_neuron = get_destexhe_integrate_and_fire_cell(if_type, Some("pre"), spike_train_table)?;
+        let mut postsynaptic_neuron = get_destexhe_integrate_and_fire_cell(if_type, Some("post"), spike_train_table)?;
+        println!("presynaptic: {:#?}", presynaptic_neuron);
+        println!("postsynaptic: {:#?}", postsynaptic_neuron);
 
-    //     let mut poisson_neuron = get_poisson_neuron(Some("poisson"), spike_train_table)?;
-    //     println!("poisson neuron: {:#?}", poisson_neuron);
+        let mut poisson_neuron = get_poisson_neuron(Some("poisson"), spike_train_table)?;
+        println!("poisson neuron: {:#?}", poisson_neuron);
+
+        test_spike_train_coupled(
+            &mut poisson_neuron,
+            &mut presynaptic_neuron,
+            &mut postsynaptic_neuron,
+            iterations,
+            do_receptor_kinetics,
+            bayesian, 
+            verbose,
+            &filename,
+        )?;
+        
+        println!("Finished spike train coupling test");
     } else if let Some(stdp_table) = config.get("stdp_test") {
         let if_type: String = parse_value_with_default(
             stdp_table, 
