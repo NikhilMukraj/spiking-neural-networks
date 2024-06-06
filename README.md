@@ -27,6 +27,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Fitting bursting Izhikevich to bursting Hodgkin Huxley
       - Need way to detect bursts for Izhikevich fitting, probably something that has a burst tolerance (distance between spikes that differentiates either part of a burst group or the next set of bursts firing)
       - Then comparing the distance between burst groups and the intervals of the burst groups
+      - **Can be done with correlation**
+        - Correlation of burst time between reference and fit could work for fitting bursting neurons could be tested with a bursting FitzHugh-Nagumo neuron
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
 - **Subtract 70 mv (or n) from Hodgkin Huxley in fitting** for peak amplitudes
@@ -136,6 +138,28 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Leave room for convergence (about 500 steps with $dt=0.1$)
     - Should expect beta or gamma frequencies above 10 hz and below 50 hz
 
+- **Integrate and fire split**
+  - Write code changes in obsidian
+
+- **Cargo package**
+  - Cell grid type should be refactored into a struct containing
+    - Grid of neurons
+    - Graph
+    - Graph parameters
+    - Whether to do STDP
+    - Basically anything essential for run lattice
+  - Should have method to either take in a pre-existing graph and cell grid or generate a random one given the dimensions
+    - Should also be able to generate a 3D lattice
+  - Methods should include
+    - `iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1
+    - `iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses
+  - Should expose EEG tooling and fitting methods
+  - `IterateAndSpike` trait should be exposed (along with relevant macros)
+    - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
+    - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation
+    - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
+  - Receptor refactor as well
+
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - **Neurotransmitter approximation refactor should come before Lixirnet**
   - Update by copying over backend
@@ -150,6 +174,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - **Lixirnet should expose EEG processing tools**
 
 - Should also be adapted for a cargo package
+
+- `IterateAndSpikeCUDA` trait, could be implemented for electrical synapses only to start out
 
 - Option to subtract 70 mV (or n mV) from Hodgkin Huxley model to set resting potential at n
 
@@ -227,7 +253,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Ca++ (L-current HVA, T-current)
   - M-current
   - Rectifying channels
-- Synaptic conductance of ligand gated channels (potentially maximal neurotransmitter concentration) (and forward and backward rate constants)
+- Synaptic conductance of ligand gated channels (potentially maximal neurotransmitter concentration) (and forward and backward rate constants, clearance constant too)
   - AMPA, GABA(a/b), NMDA
 - Metabotropic neurotransmitters (concentration)
   - Dopamine
