@@ -2140,6 +2140,30 @@ impl SpikeTrain for PoissonNeuron {
 
 // }
 
+// fn delta_dirac(x: f64, k: f64) -> f64 {
+//     k / (x.powf(2.) + k.powf(2.))
+// }
+
+// pub fn time_based_coupling<T: LastFiringTime + Potentiation, U: GapConductance>(
+//     presynaptic_neuron: &T,
+//     postsynaptic_neuron: &U,
+//     timestep: usize,
+//     k: f64,
+// ) -> f64 {
+//     if let None = presynaptic_neuron.get_last_firing_time() {
+//         return 0.
+//     }
+
+//     let sign = match presynaptic_neuron.get_potentiation_type() {
+//         PotentiationType::Excitatory => 1.,
+//         PotentiationType::Inhibitory => -1.,
+//     };
+
+//     let out = sign * (timestep - presynaptic_neuron.get_last_firing_time().unwrap()) as f64;
+
+//     postsynaptic_neuron.get_gap_conductance() * delta_dirac(out, k)
+// }
+
 pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: IterateAndSpike>(
     spike_train: &mut T,
     presynaptic_neuron: &mut U, 
