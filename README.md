@@ -102,7 +102,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Spike train trait should eventually also have the option to return a neurotransmitter concentration to be used
     - spike train neurotransmitter should probably just decrease until 0 over time
   - **Spike train with coupled input**
-    - Redo Hodgkin Huxley results with spike train coupling and fitting
+  - **Test spike train with time based coupling**
   - **Evenly divided preset spike train**
   - Spike train input should be able to be fed into lattices, multiple lattices function should be able to simulate multiple lattices that are connected with one another with different parameters (different plasticity settings, different neuron types etc)
     - Input from other lattice would likely need its own graph relating the lattices as well as a new get inputs function
@@ -110,7 +110,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Lattice calculation might want to randomly select certain neurons to be read and updated first
     - **Bayesian factor could be used in place of this but bayesian factor should be reduced to +/- 10-5%**
 
-- Refactor fitting to use spike trains with neurotransmission
+- Refactor fitting to use neurotransmission, assume that with neurotransmission may not be as accurate as fitting without neurotransmission
 - $\tau_m$ and $C_m$ fitting
 - Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
 - Fitting should include neurotransmission again
@@ -140,6 +140,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Integrate and fire split**
   - Write code changes in obsidian
+  - FitzHugo-Nagumo model with bursting
+  - Redo results with new neurotransmission coupling for Hodgkin Huxley models
 
 - **Cargo package**
   - Cell grid type should be refactored into a struct containing
