@@ -134,11 +134,6 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
   - Parallel functionality should also be benchmarked
 
-- EEG testing
-  - Determine frequency band of EEG values over 30 seconds (could calculate frequencies seperately in Python with Numpy for now)
-  - Leave room for convergence (about 500 steps with $dt=0.1$)
-    - Should expect beta or gamma frequencies above 10 hz and below 50 hz
-
 - **Integrate and fire split**
   - Write code changes in obsidian
   - FitzHugo-Nagumo model with bursting
@@ -156,13 +151,14 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Methods should include
     - `iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1
     - `iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses
-  - Should expose EEG tooling and fitting methods
+  - **Should expose EEG tooling and fitting methods**
   - `IterateAndSpike` trait should be exposed (along with relevant macros)
     - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
-    - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation
+    - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation or a macro to translate equations to `IterateAndSpike` trait
     - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
   - Receptor refactor as well
   - **Documentation revamp**
+    - [how to write documentation](https://blog.guillaume-gomez.fr/articles/2020-03-12+Guide+on+how+to+write+documentation+for+a+Rust+crate)
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - **Neurotransmitter approximation refactor should come before Lixirnet**
@@ -177,7 +173,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
   - **Lixirnet should expose EEG processing tools**
 
-- Should also be adapted for a cargo package
+- EEG testing
+  - Determine frequency band of EEG values over 30 seconds (could calculate frequencies seperately in Python with Numpy for now)
+  - Leave room for convergence (about 500 steps with $dt=0.1$)
+    - Should expect beta or gamma frequencies above 10 hz and below 50 hz
 
 - `IterateAndSpikeCUDA` trait, could be implemented for electrical synapses only to start out
 
