@@ -111,6 +111,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - **Bayesian factor could be used in place of this but bayesian factor should be reduced to +/- 10-5%**
 
 - Refactor fitting to use neurotransmission, assume that with neurotransmission may not be as accurate as fitting without neurotransmission
+  - Or potentially use neurotransmission but assume recurrent connections, (a -> b -> a)
 - $\tau_m$ and $C_m$ fitting
 - Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
 - Fitting should include neurotransmission again
@@ -161,6 +162,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation
     - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
   - Receptor refactor as well
+  - **Documentation revamp**
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - **Neurotransmitter approximation refactor should come before Lixirnet**
