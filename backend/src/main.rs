@@ -5,7 +5,6 @@ use std::{
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
-use neuron::IonotropicReceptorType;
 use rand::{Rng, seq::SliceRandom};
 use toml::{from_str, Value};
 // use ndarray::Array1;
@@ -17,13 +16,14 @@ use crate::neuron::{
     CellGrid, LastFiringTime, IzhikevichDefault, BayesianParameters, 
     STDPParameters, NeurotransmitterConcentrations, 
     signed_gap_junction, weight_neurotransmitter_concentration, 
-    aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons,
-    Gate, HodgkinHuxleyCell, LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, NeurotransmitterKinetics,
-    NeurotransmitterType, ApproximateNeurotransmitter, DestexheNeurotransmitter, Neurotransmitters,
+    aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons, Gate, HodgkinHuxleyCell,
+    LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, IonotropicReceptorType, Neurotransmitters,
+    NeurotransmitterKinetics, NeurotransmitterType, ApproximateNeurotransmitter, DestexheNeurotransmitter,
     AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
     AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
-    input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, iterate_coupled_spiking_neurons_and_spike_train,
+    input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, NeuralRefractoriness,
+    DeltaDiracRefractoriness, iterate_coupled_spiking_neurons_and_spike_train,
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -693,7 +693,7 @@ macro_rules! get_poisson_neuron_with_default {
 }
 
 // create seperate method for generating approximate neurotransmitter structs from toml
-fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeuron> {
+fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeuron<DeltaDiracRefractoriness>> {
     let prefix_value = match prefix {
         Some(value) => format!("{}_", value),
         None => String::from(""),
@@ -713,7 +713,7 @@ fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeur
     )?;
     println!("{}dt: {}", prefix_value, dt);
 
-    let mut poisson_neuron = PoissonNeuron::from_firing_rate(firing_rate, dt);
+    let mut poisson_neuron = PoissonNeuron::<DeltaDiracRefractoriness>::from_firing_rate(firing_rate, dt);
 
     get_poisson_neuron_with_default!(
         table,
@@ -725,6 +725,16 @@ fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeur
     );
 
     poisson_neuron.current_voltage = poisson_neuron.v_resting;
+
+    let decay = parse_value_with_default(
+        table, 
+        format!("{}decay", prefix_value).as_str(), 
+        parse_f64, 
+        poisson_neuron.neural_refractoriness.get_decay()
+    )?;
+    println!("{}decay", prefix_value);
+
+    poisson_neuron.neural_refractoriness.set_decay(decay);
 
     let ampa: bool = parse_value_with_default(
         table,
@@ -1802,11 +1812,12 @@ fn test_spike_train_coupled<'a, T: SpikeTrain, U: IterateAndSpike>(
     
     write!(file, "\n")?;
         
-    for _ in 0..iterations {
+    for timestep in 0..iterations {
         iterate_coupled_spiking_neurons_and_spike_train(
             spike_train,
             presynaptic_neuron,
             postsynaptic_neuron, 
+            timestep,
             do_receptor_kinetics, 
             bayesian
         );
