@@ -2071,7 +2071,7 @@ impl NeuralRefractoriness for DeltaDiracRefractoriness {
 
 pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime {
     type T: NeuralRefractoriness;
-    fn iterate(&mut self);
+    fn iterate(&mut self) -> bool;
     fn get_height(&self) -> (f64, f64);
     fn get_timestep(&self) -> f64;
     fn get_neurotransmitters(&self) -> &Neurotransmitters<ApproximateNeurotransmitter>;
@@ -2162,14 +2162,20 @@ impl<T: NeuralRefractoriness> PoissonNeuron<T> {
 impl<T: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T> {
     type T = T;
 
-    fn iterate(&mut self) {
-        if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
+    fn iterate(&mut self) -> bool {
+        let is_spiking = if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
             self.current_voltage = self.v_th;
+
+            true
         } else {
             self.current_voltage = self.v_resting;
-        }
+
+            false
+        };
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+
+        is_spiking
     }
 
     fn get_height(&self) -> (f64, f64) {
@@ -2281,15 +2287,24 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
         (pre_t_total, post_t_total, current)
     };
 
-    spike_train.iterate();   
+    let spike_train_spiking = spike_train.iterate();   
+    if spike_train_spiking {
+        spike_train.set_last_firing_time(Some(timestep));
+    }
     
-    let _pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+    let pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
         input_current,
         pre_t_total.as_ref(),
     );
+    if pre_spiking {
+        presynaptic_neuron.set_last_firing_time(Some(timestep));
+    }
 
-    let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+    let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
         current,
         post_t_total.as_ref(),
     ); 
+    if post_spiking {
+        postsynaptic_neuron.set_last_firing_time(Some(timestep));
+    }
 }
