@@ -190,7 +190,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Hopfield network explained](https://towardsdatascience.com/hopfield-networks-neural-memory-machines-4c94be821073)
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
   - **Hopfield spiking neural network prototype**
-    - Weights may not need to change over time
+    - Spiking hopfield should measure how long pattern remains after cue is removed in response in to poissonian noise and how easily it transitions from stable state to stable state, longer it stays in a certain state in response to noise indicates more stability, harder to transition indicates more stability
+    - Potentially looking at attractor based classifiers in similar fashion to izhikevich + astrocyte model before moving to liquid state machine + attractor in similar
+    - Trainable attractor network model is likely a good model to look at replicating through (potentially unsupervised) hebbian dynamics
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
   - Try to create a system where input eventually fades away after input is no longer being applied (fading memory)
   - Can decay gap conductance over time after a spike until a small enough value is reached or another spike occurs
@@ -226,6 +228,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Liquid state machine + discrete attractor should have the discrete attractor randomly flip input sign for noise
   - Liquid state machine + spiking attractor
   - Testing classifiers and regression models with liquid and attractor model, maybe try multiple attractors
+  - Liquid state machine + different kinds of attractors, point/cyclic/sheet/etc attractor
+    - Benchmarking the different classifers, (liquid state machine, liquid state machine with n liquids, liquid state machine + x attractor, liquid state machine + n attractors, etc)
   - Could try this with reinforcement learning models
 
 - Modeling hallucinations
