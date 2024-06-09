@@ -720,8 +720,7 @@ fn get_poisson_neuron(prefix: Option<&str>, table: &Value) -> Result<PoissonNeur
         prefix_value,
         poisson_neuron,
         v_th,
-        v_resting,
-        dt
+        v_resting
     );
 
     poisson_neuron.current_voltage = poisson_neuron.v_resting;
