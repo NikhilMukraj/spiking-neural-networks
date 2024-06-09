@@ -152,6 +152,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - `iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1
     - `iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses
   - **Should expose EEG tooling and fitting methods**
+    - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
   - `IterateAndSpike` trait should be exposed (along with relevant macros)
     - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
     - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation or a macro to translate equations to `IterateAndSpike` trait
