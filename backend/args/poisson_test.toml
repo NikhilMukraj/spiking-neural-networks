@@ -20,7 +20,7 @@ pre_c_m = 100.0
 post_c_m = 100.0
 
 pre_gap_conductance = 10.0
-post_gap_conductance = 5.0
+post_gap_conductance = 10.0
 
 # pre_c_m = 10.0
 # post_c_m = 10.0
