@@ -2208,8 +2208,10 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     postsynaptic_neuron: &U,
     timestep: usize,
 ) -> f64 {
+    let (v_max, v_resting) = presynaptic_neuron.get_height();
+
     if let None = presynaptic_neuron.get_last_firing_time() {
-        return 0.
+        return v_resting;
     }
 
     let sign = match presynaptic_neuron.get_potentiation_type() {
@@ -2219,7 +2221,6 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 
     let last_firing_time = presynaptic_neuron.get_last_firing_time().unwrap();
     let refractoriness_function = presynaptic_neuron.get_refractoriness_function();
-    let (v_max, v_resting) = presynaptic_neuron.get_height();
     let dt = presynaptic_neuron.get_timestep();
     let conductance = postsynaptic_neuron.get_gap_conductance();
 
