@@ -2,7 +2,7 @@ use std::{
     f64::consts::E, 
     fs::File, 
     io::{BufWriter, Error, ErrorKind, Result, Write},
-    collections::{HashMap, hash_map::{Values, ValuesMut, Keys}},
+    collections::{HashMap, HashSet, hash_map::{Values, ValuesMut, Keys}},
     ops::Sub,
 };
 use rand::Rng;
@@ -2039,41 +2039,62 @@ pub trait NeuralRefractoriness: Default {
     fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64;
 }
 
+macro_rules! impl_default_neural_refractoriness {
+    ($name:ident, $effect:expr) => {
+        impl Default for $name {
+            fn default() -> Self {
+                $name {
+                    k: 1000.,
+                }
+            }
+        }
+
+        impl NeuralRefractoriness for $name {
+            fn set_decay(&mut self, decay_factor: f64) {
+                self.k = decay_factor;
+            }
+
+            fn get_decay(&self) -> f64 {
+                self.k
+            }
+
+            fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64 {
+                let a = v_max - v_resting;
+                let time_difference = (timestep - last_firing_time) as f64;
+
+                $effect(self.k, a, time_difference, v_resting, dt)
+            }
+        }
+    };
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct DeltaDiracRefractoriness {
     pub k: f64,
 }
 
-impl Default for DeltaDiracRefractoriness {
-    fn default() -> Self {
-        DeltaDiracRefractoriness {
-            k: 1000.,
-        }
-    }
+fn delta_dirac_effect(k: f64, a: f64, time_difference: f64, v_resting: f64, dt: f64) -> f64 {
+    a * ((-1. / (k / dt)) * time_difference.powf(2.)).exp() + v_resting
 }
 
-impl NeuralRefractoriness for DeltaDiracRefractoriness {
-    fn set_decay(&mut self, decay_factor: f64) {
-        self.k = decay_factor;
-    }
+impl_default_neural_refractoriness!(DeltaDiracRefractoriness, delta_dirac_effect);
 
-    fn get_decay(&self) -> f64 {
-        self.k
-    }
-
-    fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64 {
-        let a = v_max - v_resting;
-        let time_difference = (timestep - last_firing_time) as f64;
-
-        a * ((-1. / (self.k / dt)) * time_difference.powf(2.)).exp() + v_resting
-    }
+#[derive(Debug, Clone, Copy)]
+pub struct ExponentialDecayRefractoriness {
+    pub k: f64
 }
+
+fn exponential_decay_effect(k: f64, a: f64, time_difference: f64, v_resting: f64, dt: f64) -> f64 {
+    a * ((-1. / (k / dt)) * time_difference).exp() + v_resting
+}
+
+impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime {
     type T: NeuralRefractoriness;
     fn iterate(&mut self) -> bool;
     fn get_height(&self) -> (f64, f64);
-    fn get_timestep(&self) -> f64;
+    fn get_refractoriness_timestep(&self) -> f64;
     fn get_neurotransmitters(&self) -> &Neurotransmitters<ApproximateNeurotransmitter>;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
     fn get_refractoriness_function(&self) -> &Self::T;
@@ -2124,7 +2145,33 @@ pub struct PoissonNeuron<T: NeuralRefractoriness> {
     pub potentiation_type: PotentiationType,
     pub neural_refractoriness: T,
     pub chance_of_firing: f64,
-    pub dt: f64,
+    pub refractoriness_dt: f64,
+}
+
+macro_rules! impl_default_spike_train_methods {
+    () => {
+        type T = T;
+
+        fn get_height(&self) -> (f64, f64) {
+            (self.v_th, self.v_resting)
+        }
+    
+        fn get_refractoriness_timestep(&self) -> f64 {
+            self.refractoriness_dt
+        }
+    
+        fn get_neurotransmitters(&self) -> &Neurotransmitters<ApproximateNeurotransmitter> {
+            &self.synaptic_neurotransmitters
+        }
+    
+        fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+            self.synaptic_neurotransmitters.get_concentrations()
+        }
+    
+        fn get_refractoriness_function(&self) -> &T {
+            &self.neural_refractoriness
+        }
+    }
 }
 
 impl_current_voltage_spike_train!(PoissonNeuron);
@@ -2142,7 +2189,7 @@ impl<T: NeuralRefractoriness> Default for PoissonNeuron<T> {
             potentiation_type: PotentiationType::Excitatory,
             neural_refractoriness: T::default(),
             chance_of_firing: 0.01,
-            dt: 0.1,
+            refractoriness_dt: 0.1,
         }
     }
 }
@@ -2152,16 +2199,14 @@ impl<T: NeuralRefractoriness> PoissonNeuron<T> {
     pub fn from_firing_rate(hertz: f64, dt: f64) -> Self {
         let mut poisson_neuron = PoissonNeuron::<T>::default();
 
-        poisson_neuron.dt = dt;
-        poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.dt) / hertz);
+        poisson_neuron.refractoriness_dt = dt;
+        poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.refractoriness_dt) / hertz);
 
         poisson_neuron
     }
 }
 
 impl<T: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T> {
-    type T = T;
-
     fn iterate(&mut self) -> bool {
         let is_spiking = if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
             self.current_voltage = self.v_th;
@@ -2178,30 +2223,90 @@ impl<T: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T> {
         is_spiking
     }
 
-    fn get_height(&self) -> (f64, f64) {
-        (self.v_th, self.v_resting)
-    }
+    impl_default_spike_train_methods!();
+}
 
-    fn get_timestep(&self) -> f64 {
-        self.dt
-    }
+#[derive(Debug, Clone)]
+struct PresetSpikeTrain<T: NeuralRefractoriness> {
+    pub current_voltage: f64,
+    pub v_th: f64,
+    pub v_resting: f64,
+    pub last_firing_time: Option<usize>,
+    pub synaptic_neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>,
+    pub potentiation_type: PotentiationType,
+    pub neural_refractoriness: T,
+    pub firing_times: HashSet<usize>,
+    pub internal_clock: usize,
+    pub max_clock_value: usize,
+    pub refractoriness_dt: f64,
+}
 
-    fn get_neurotransmitters(&self) -> &Neurotransmitters<ApproximateNeurotransmitter> {
-        &self.synaptic_neurotransmitters
-    }
+impl_current_voltage_spike_train!(PresetSpikeTrain);
+impl_potentiation_spike_train!(PresetSpikeTrain);
+impl_last_firing_time_spike_train!(PresetSpikeTrain);
 
-    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
-        self.synaptic_neurotransmitters.get_concentrations()
-    }
-
-    fn get_refractoriness_function(&self) -> &T {
-        &self.neural_refractoriness
+impl<T: NeuralRefractoriness> Default for PresetSpikeTrain<T> {
+    fn default() -> Self {
+        PresetSpikeTrain {
+            current_voltage: 0.,
+            v_th: 30.,
+            v_resting: 0.,
+            last_firing_time: None,
+            synaptic_neurotransmitters: Neurotransmitters::<ApproximateNeurotransmitter>::default(),
+            potentiation_type: PotentiationType::Excitatory,
+            neural_refractoriness: T::default(),
+            firing_times: HashSet::from([100, 300, 500]),
+            internal_clock: 0,
+            max_clock_value: 600,
+            refractoriness_dt: 0.1,
+        }
     }
 }
 
-// struct PresetSpikeTrain {
+// impl<T: NeuralRefractoriness> PresetSpikeTrain<T> {
+//     fn from_evenly_divided(num_spikes: usize, dt: f64) -> Self {
+//         let mut firing_times: HashSet<usize> =  HashSet::new();
+//         let interval = ((1000. / dt) / (num_spikes as f64)) as usize;
 
+//         let mut current_timestep = 0;
+//         for _ in 0..num_spikes {
+//             firing_times.insert(current_timestep);
+//             current_timestep += interval;
+//         }
+
+//         let mut preset_spike_train = PresetSpikeTrain::<T>::default();
+//         preset_spike_train.refractoriness_dt = dt;
+//         preset_spike_train.firing_times = firing_times;
+//         preset_spike_train.max_clock_value = current_timestep;
+
+//         preset_spike_train
+//     }
 // }
+
+impl<T: NeuralRefractoriness> SpikeTrain for PresetSpikeTrain<T> {
+    fn iterate(&mut self) -> bool {
+        self.internal_clock += 1;
+        if self.internal_clock > self.max_clock_value {
+            self.internal_clock = 0;
+        }
+
+        let is_spiking = if self.firing_times.contains(&self.internal_clock) {
+            self.current_voltage = self.v_th;
+
+            true
+        } else {
+            self.current_voltage = self.v_resting;
+
+            false
+        };
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+
+        is_spiking
+    }
+
+    impl_default_spike_train_methods!();
+}
 
 pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     presynaptic_neuron: &T,
@@ -2221,7 +2326,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 
     let last_firing_time = presynaptic_neuron.get_last_firing_time().unwrap();
     let refractoriness_function = presynaptic_neuron.get_refractoriness_function();
-    let dt = presynaptic_neuron.get_timestep();
+    let dt = presynaptic_neuron.get_refractoriness_timestep();
     let conductance = postsynaptic_neuron.get_gap_conductance();
 
     sign * conductance * refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
