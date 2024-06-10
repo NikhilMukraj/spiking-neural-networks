@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-#[path ="iterate_and_spike/mod.rs"]
-pub mod iterate_and_spike;
-use iterate_and_spike::{ 
+use super::{ 
     CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
     IterateAndSpike, BayesianParameters, STDPParameters, PotentiationType,
     Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, LigandGatedChannels,
