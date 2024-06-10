@@ -12,18 +12,20 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFType, PotentiationType, IntegrateAndFireCell, IterateAndSpike, 
-    CellGrid, LastFiringTime, IzhikevichDefault, BayesianParameters, 
-    STDPParameters, NeurotransmitterConcentrations, 
-    signed_gap_junction, weight_neurotransmitter_concentration, 
-    aggregate_neurotransmitter_concentrations, iterate_coupled_spiking_neurons, Gate, HodgkinHuxleyCell,
-    LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, IonotropicReceptorType, Neurotransmitters,
-    NeurotransmitterKinetics, NeurotransmitterType, ApproximateNeurotransmitter, DestexheNeurotransmitter,
-    AMPADefault, GABAaDefault, GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, 
-    AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
+    IFType, IntegrateAndFireCell, CellGrid, IzhikevichDefault, signed_gap_junction, iterate_coupled_spiking_neurons, 
+    Gate, HodgkinHuxleyCell, AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
     input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, NeuralRefractoriness,
     DeltaDiracRefractoriness, iterate_coupled_spiking_neurons_and_spike_train,
+    iterate_and_spike::{
+        IterateAndSpike, PotentiationType, LastFiringTime, BayesianParameters, STDPParameters,
+        LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, IonotropicReceptorType, Neurotransmitters,
+        NeurotransmitterKinetics, NeurotransmitterConcentrations,NeurotransmitterType, 
+        ApproximateNeurotransmitter, DestexheNeurotransmitter, AMPADefault, GABAaDefault, 
+        GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, weight_neurotransmitter_concentration, 
+        aggregate_neurotransmitter_concentrations
+    },
+    // integrate_and_fire::LeakyIntegrateAndFireNeuron,
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -2203,6 +2205,29 @@ fn main() -> Result<()> {
         test_cell.run_static_input(input_current, bayesian, iterations, &filename);
 
         println!("\nFinished single neuron test");
+    // } else if let Some(static_input_table) = config.get("static_input_test") {
+    //     let iterations: usize = match static_input_table.get("iterations") {
+    //         Some(value) => parse_usize(value, "iterations")?,
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
+    //     };
+    //     println!("iterations: {}", iterations);
+
+    //     let input_current: f64 = match static_input_table.get("input_current") {
+    //         Some(value) => parse_f64(value, "input_current")?,
+    //         None => { return Err(Error::new(ErrorKind::InvalidInput, "'input_current' value not found")); },
+    //     };
+    //     println!("input_current: {}", input_current);  
+
+    //     let bayesian: bool = parse_value_with_default(&static_input_table, "bayesian", parse_bool, false)?; 
+    //     println!("bayesian: {}", bayesian);
+
+    //     let mut test_cell: LeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = LeakyIntegrateAndFireNeuron::default();
+
+    //     let voltages = test_cell.run_static_input(input_current, bayesian, iterations);
+
+    //     println!("Last voltage: {}", voltages.last().unwrap());
+
+    //     println!("Finished static input test");
     } else if let Some(coupled_table) = config.get("coupled_test") {
         let if_type: String = parse_value_with_default(
             coupled_table, 
