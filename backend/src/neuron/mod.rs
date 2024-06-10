@@ -8,7 +8,7 @@ use std::{
 use rand::Rng;
 use crate::distribution;
 use distribution::limited_distr;
-// pub mod integrate_and_fire;
+pub mod integrate_and_fire;
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
