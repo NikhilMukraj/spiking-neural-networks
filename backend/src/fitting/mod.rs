@@ -4,8 +4,9 @@ use std::{
 };
 use crate::distribution::limited_distr;
 use crate::neuron::{
-    IntegrateAndFireCell, HodgkinHuxleyCell, NeurotransmitterKinetics,
+    IntegrateAndFireCell, HodgkinHuxleyCell,
     find_peaks, diff, gap_junction, iterate_coupled_spiking_neurons,
+    iterate_and_spike::NeurotransmitterKinetics,
 };
 use crate::ga::{BitString, decode};
 
