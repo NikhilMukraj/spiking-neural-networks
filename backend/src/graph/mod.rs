@@ -8,7 +8,7 @@ use serde_json;
 #[path = "../distribution/mod.rs"]
 mod distribution;
 use distribution::limited_distr;
-use crate::neuron::BayesianParameters;
+use crate::neuron::iterate_and_spike::BayesianParameters;
 
 
 pub type Position = (usize, usize);
