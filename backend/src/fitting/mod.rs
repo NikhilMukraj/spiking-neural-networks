@@ -4,7 +4,7 @@ use std::{
 };
 use crate::distribution::limited_distr;
 use crate::neuron::{
-    IntegrateAndFireCell, HodgkinHuxleyCell,
+    IntegrateAndFireCell, HodgkinHuxleyNeuron,
     find_peaks, diff, gap_junction, iterate_coupled_spiking_neurons,
     iterate_and_spike::NeurotransmitterKinetics,
 };
@@ -202,7 +202,7 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
 }
 
 pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics>(
-    hodgkin_huxley_model: &HodgkinHuxleyCell<T>, 
+    hodgkin_huxley_model: &HodgkinHuxleyNeuron<T>, 
     input_current: f64, 
     iterations: usize,
     do_receptor_kinetics: bool,
@@ -241,7 +241,7 @@ pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics>(
 
 #[derive(Clone)]
 pub struct FittingSettings<'a, T: NeurotransmitterKinetics, U: NeurotransmitterKinetics> {
-    pub hodgkin_huxley_model: HodgkinHuxleyCell<T>,
+    pub hodgkin_huxley_model: HodgkinHuxleyNeuron<T>,
     pub if_neuron: &'a IntegrateAndFireCell<U>,
     pub action_potential_summary: &'a [ActionPotentialSummary],
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
