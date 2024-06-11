@@ -687,7 +687,7 @@ impl Gate {
 }
 
 #[derive(Clone)]
-pub struct HodgkinHuxleyCell<T: NeurotransmitterKinetics> {
+pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics> {
     pub current_voltage: f64,
     pub gap_conductance: f64,
     pub potentiation_type: PotentiationType,
@@ -713,14 +713,14 @@ pub struct HodgkinHuxleyCell<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
 }
 
-impl_current_voltage_with_neurotransmitter!(HodgkinHuxleyCell);
-impl_gap_conductance_with_neurotransmitter!(HodgkinHuxleyCell);
-impl_potentiation_with_neurotransmitter!(HodgkinHuxleyCell);
-impl_bayesian_factor_with_neurotransmitter!(HodgkinHuxleyCell);
-impl_last_firing_time_with_neurotransmitter!(HodgkinHuxleyCell);
-impl_stdp_with_neurotransmitter!(HodgkinHuxleyCell);
+impl_current_voltage_with_neurotransmitter!(HodgkinHuxleyNeuron);
+impl_gap_conductance_with_neurotransmitter!(HodgkinHuxleyNeuron);
+impl_potentiation_with_neurotransmitter!(HodgkinHuxleyNeuron);
+impl_bayesian_factor_with_neurotransmitter!(HodgkinHuxleyNeuron);
+impl_last_firing_time_with_neurotransmitter!(HodgkinHuxleyNeuron);
+impl_stdp_with_neurotransmitter!(HodgkinHuxleyNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for HodgkinHuxleyCell<T> {
+impl<T: NeurotransmitterKinetics> Default for HodgkinHuxleyNeuron<T> {
     fn default() -> Self {
         let default_gate = Gate {
             alpha: 0.,
@@ -728,7 +728,7 @@ impl<T: NeurotransmitterKinetics> Default for HodgkinHuxleyCell<T> {
             state: 0.,
         };
 
-        HodgkinHuxleyCell { 
+        HodgkinHuxleyNeuron { 
             current_voltage: 0.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
@@ -803,7 +803,7 @@ pub fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
 }
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
-impl<T: NeurotransmitterKinetics> HodgkinHuxleyCell<T> {
+impl<T: NeurotransmitterKinetics> HodgkinHuxleyNeuron<T> {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
@@ -998,7 +998,7 @@ impl<T: NeurotransmitterKinetics> HodgkinHuxleyCell<T> {
     }
 }
 
-impl<T: NeurotransmitterKinetics> IterateAndSpike for HodgkinHuxleyCell<T> {
+impl<T: NeurotransmitterKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T> {
     type T = T;
 
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
