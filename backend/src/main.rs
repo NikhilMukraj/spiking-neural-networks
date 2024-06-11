@@ -2206,6 +2206,12 @@ fn main() -> Result<()> {
 
         println!("\nFinished single neuron test");
     } else if let Some(static_input_table) = config.get("static_input_test") {
+        let filename: String = match static_input_table.get("filename") {
+            Some(value) => parse_string(value, "filename")?,
+            None => { return Err(Error::new(ErrorKind::InvalidInput, "'filename' value not found")); },
+        };
+        println!("filename: {}", filename);
+
         let iterations: usize = match static_input_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
@@ -2221,11 +2227,17 @@ fn main() -> Result<()> {
         let bayesian: bool = parse_value_with_default(&static_input_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian);
 
+        // test all other neurons too
+        // write the voltages to a file
         let mut test_cell: LeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = LeakyIntegrateAndFireNeuron::default();
 
         let voltages = test_cell.run_static_input(input_current, bayesian, iterations);
 
-        println!("Last voltage: {}", voltages.last().unwrap());
+        let mut file = File::create(filename)?;
+
+        for voltage in voltages {
+            writeln!(file, "{}", voltage)?;
+        }
 
         println!("Finished static input test");
     } else if let Some(coupled_table) = config.get("coupled_test") {
