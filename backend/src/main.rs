@@ -13,7 +13,7 @@ use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
     IFType, IntegrateAndFireCell, CellGrid, IzhikevichDefault, signed_gap_junction, iterate_coupled_spiking_neurons, 
-    Gate, HodgkinHuxleyCell, AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
+    Gate, HodgkinHuxleyNeuron, AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
     DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
     input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, NeuralRefractoriness,
     DeltaDiracRefractoriness, iterate_coupled_spiking_neurons_and_spike_train,
@@ -1534,7 +1534,7 @@ fn get_additional_gates(table: &Value, prefix: &str) -> Result<Vec<AdditionalGat
 fn get_hodgkin_huxley_params(
     hodgkin_huxley_table: &Value, 
     prefix: Option<&str>
-) -> Result<HodgkinHuxleyCell<DestexheNeurotransmitter>> {
+) -> Result<HodgkinHuxleyNeuron<DestexheNeurotransmitter>> {
     let prefix = match prefix {
         Some(prefix_value) => format!("{}_", prefix_value),
         None => String::from(""),
@@ -1679,7 +1679,7 @@ fn get_hodgkin_huxley_params(
     let additional_gates = get_additional_gates(&hodgkin_huxley_table, &prefix)?;
     
     Ok(
-        HodgkinHuxleyCell {
+        HodgkinHuxleyNeuron {
             current_voltage: v_init,
             gap_conductance,
             potentiation_type: potentiation_type,
