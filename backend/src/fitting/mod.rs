@@ -3,9 +3,12 @@ use std::{
     io::{Error, ErrorKind, Result},
 };
 use crate::distribution::limited_distr;
-use crate::neuron::{
-    IntegrateAndFireCell, HodgkinHuxleyNeuron,
-    find_peaks, diff, gap_junction, iterate_coupled_spiking_neurons,
+use crate::neuron::{   
+    hodgkin_huxley::{
+        HodgkinHuxleyNeuron, find_peaks, diff,
+    },
+    IntegrateAndFireCell, 
+    gap_junction, iterate_coupled_spiking_neurons,
     iterate_and_spike::NeurotransmitterKinetics,
 };
 use crate::ga::{BitString, decode};
