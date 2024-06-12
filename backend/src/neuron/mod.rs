@@ -627,7 +627,7 @@ pub enum AdditionalGates {
 impl AdditionalGates {
     pub fn initialize(&mut self, voltage: f64) {
         match self {
-            AdditionalGates::LTypeCa(_) => {},
+            AdditionalGates::LTypeCa(_) => {}, // rewrite this such that m_ca state is initialized
             AdditionalGates::HVACa(channel) => channel.initialize_m_and_h(voltage),
         }
     }
