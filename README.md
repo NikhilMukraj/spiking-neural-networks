@@ -197,6 +197,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
   - Try to create a system where input eventually fades away after input is no longer being applied (fading memory)
   - Can decay gap conductance over time after a spike until a small enough value is reached or another spike occurs
+    - **Intrinsic bursting Izhikevich neurons display spike adaption**, should investigate if they will eventually start bursting behavior again after adaptation (could test this by providing static for a period of time until adaptation occurs, removing input for a period of time, and then injecting input again, woud be useful to plot voltages and adaptive values over time)
   - Could use STDP to see if that slowly eliminates input over time
 - [Cue model](https://onlinelibrary.wiley.com/doi/full/10.1111/tops.12247#:~:text=Guanfacine%20increases%20(Yohimbine%20decreases)%20the,effect%20on%20nonpreferred%20direction%20neurons.)
   - Cue input is fed into working memory neurons
@@ -263,10 +264,11 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Rectifying channels
 - Synaptic conductance of ligand gated channels (potentially maximal neurotransmitter concentration) (and forward and backward rate constants, clearance constant too)
   - AMPA, GABA(a/b), NMDA
+  - Glutamate transporter inhibition (by modulation of clearance constant) (potential for antipsychotic properties)
 - Metabotropic neurotransmitters (concentration)
   - Dopamine
   - Serotonin
-  - Nitric oxide
+  - Nitric oxide (potential for study of autism)
   - Acetylcholine
   - Glutamate
   - Adrenaline
@@ -440,6 +442,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Additionally multiple outputs from different neurons in the output layer could be summed for a single regression value (for example one neuron could represnt 0-9, another could be 0, 10, 20, ..., 90 and summed together for the full number)
   - [ ] Liquid state machine fitting differential equation or time series
     - Potentially physics prediction, parameters of physics simulation could be inputs along with current position, next position could be target to predict
+    - Similarly, a Lorenz attractor could be predicted by a liquid state machine
 - [ ] Liquid state machine solving of more general cognition problem  
   - [ ] Traveling salesman
   - [ ] Maze solve/navigation to reward
