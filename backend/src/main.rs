@@ -25,7 +25,10 @@ use crate::neuron::{
         GABAbDefault, GABAbDefault2, NMDADefault, NMDAWithBV, BV, weight_neurotransmitter_concentration, 
         aggregate_neurotransmitter_concentrations
     },
-    integrate_and_fire::LeakyIntegrateAndFireNeuron,
+    integrate_and_fire::{
+        run_static_input_integrate_and_fire, LeakyIntegrateAndFireNeuron, AdaptiveLeakyIntegrateAndFireNeuron,
+        AdaptiveExpLeakyIntegrateAndFireNeuron, IzhikevichNeuron, LeakyIzhikevichNeuron,
+    },
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
@@ -2212,6 +2215,15 @@ fn main() -> Result<()> {
         };
         println!("filename: {}", filename);
 
+        let if_type: String = parse_value_with_default(
+            static_input_table, 
+            "if_type", 
+            parse_string, 
+            String::from("basic")
+        )?;
+        let if_type = IFType::from_str(&if_type)?;
+        println!("if_type: {:#?}", if_type);
+
         let iterations: usize = match static_input_table.get("iterations") {
             Some(value) => parse_usize(value, "iterations")?,
             None => { return Err(Error::new(ErrorKind::InvalidInput, "'iterations' value not found")); },
@@ -2227,14 +2239,36 @@ fn main() -> Result<()> {
         let bayesian: bool = parse_value_with_default(&static_input_table, "bayesian", parse_bool, false)?; 
         println!("bayesian: {}", bayesian);
 
-        // test all other neurons too
-        // write the voltages to a file
-        let mut test_cell: LeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = LeakyIntegrateAndFireNeuron::default();
+        let voltages = match if_type {
+            IFType::Basic => {
+                let mut test_cell: LeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = LeakyIntegrateAndFireNeuron::default();
 
-        let voltages = test_cell.run_static_input(input_current, bayesian, iterations);
+                run_static_input_integrate_and_fire(&mut test_cell, input_current, bayesian, iterations)
+            },
+            IFType::Adaptive => {
+                let mut test_cell: AdaptiveLeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = AdaptiveLeakyIntegrateAndFireNeuron::default();
 
-        let mut file = File::create(filename)?;
+                run_static_input_integrate_and_fire(&mut test_cell, input_current, bayesian, iterations)
+            },
+            IFType::AdaptiveExponential => {
+                let mut test_cell: AdaptiveExpLeakyIntegrateAndFireNeuron<DestexheNeurotransmitter> = AdaptiveExpLeakyIntegrateAndFireNeuron::default();
 
+                run_static_input_integrate_and_fire(&mut test_cell, input_current, bayesian, iterations)
+            },
+            IFType::Izhikevich => {
+                let mut test_cell: IzhikevichNeuron<DestexheNeurotransmitter> = IzhikevichNeuron::default();
+
+                run_static_input_integrate_and_fire(&mut test_cell, input_current, bayesian, iterations)
+            },
+            IFType::IzhikevichLeaky => {
+                let mut test_cell: LeakyIzhikevichNeuron<DestexheNeurotransmitter> = LeakyIzhikevichNeuron::default();
+
+                run_static_input_integrate_and_fire(&mut test_cell, input_current, bayesian, iterations)
+            }
+        };
+
+        let mut file = BufWriter::new(File::create(filename)?);
+        writeln!(file, "v")?;
         for voltage in voltages {
             writeln!(file, "{}", voltage)?;
         }
