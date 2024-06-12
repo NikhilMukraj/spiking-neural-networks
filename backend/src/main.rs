@@ -12,11 +12,8 @@ mod distribution;
 use crate::distribution::limited_distr;
 mod neuron;
 use crate::neuron::{
-    IFType, IntegrateAndFireCell, CellGrid, IzhikevichDefault, signed_gap_junction, iterate_coupled_spiking_neurons, 
-    Gate, HodgkinHuxleyNeuron, AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
-    DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
-    input_pattern_into_grid, distort_pattern, PoissonNeuron, SpikeTrain, NeuralRefractoriness,
-    DeltaDiracRefractoriness, iterate_coupled_spiking_neurons_and_spike_train,
+    IFType, IntegrateAndFireCell, CellGrid, IzhikevichDefault, signed_gap_junction, 
+    iterate_coupled_spiking_neurons, iterate_coupled_spiking_neurons_and_spike_train,
     iterate_and_spike::{
         IterateAndSpike, PotentiationType, LastFiringTime, BayesianParameters, STDPParameters,
         LigandGatedChannel, LigandGatedChannels, ReceptorKinetics, IonotropicReceptorType, Neurotransmitters,
@@ -29,6 +26,16 @@ use crate::neuron::{
         run_static_input_integrate_and_fire, LeakyIntegrateAndFireNeuron, AdaptiveLeakyIntegrateAndFireNeuron,
         AdaptiveExpLeakyIntegrateAndFireNeuron, IzhikevichNeuron, LeakyIzhikevichNeuron,
     },
+    hodgkin_huxley::{
+        Gate, HodgkinHuxleyNeuron, AdditionalGates, HighThresholdCalciumChannel, HighVoltageActivatedCalciumChannel,
+    },
+    attractors::{
+        DiscreteNeuron, generate_hopfield_network, iterate_hopfield_network, convert_hopfield_network,
+        input_pattern_into_grid, distort_pattern,
+    },
+    spike_train::{
+        PoissonNeuron, SpikeTrain, NeuralRefractoriness, DeltaDiracRefractoriness,
+    }
 };
 // mod eeg;
 // use crate::eeg::{read_eeg_csv, get_power_density, power_density_comparison};
