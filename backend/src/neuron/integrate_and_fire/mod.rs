@@ -12,6 +12,27 @@ use super::{
 };
 
 
+pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
+    cell: &mut T, 
+    input: f64, 
+    bayesian: bool, 
+    iterations: usize
+) -> Vec<f64> {
+    let mut voltages: Vec<f64> = vec![cell.get_current_voltage()];
+
+    for _ in 0..iterations {
+        let _is_spiking = if bayesian {
+            cell.iterate_and_spike(cell.get_bayesian_factor() * input)
+        } else {
+            cell.iterate_and_spike(input)
+        };
+
+        voltages.push(cell.get_current_voltage());
+    }
+
+    voltages
+}
+
 macro_rules! impl_default_neurotransmitter_methods {
     () => {
         type T = T;
@@ -119,22 +140,6 @@ impl<T: NeurotransmitterKinetics> LeakyIntegrateAndFireNeuron<T> {
         }
 
         is_spiking
-    }
-
-    pub fn run_static_input(&mut self, input: f64, bayesian: bool, iterations: usize, ) -> Vec<f64> {
-        let mut voltages: Vec<f64> = vec![self.current_voltage];
-
-        for _ in 0..iterations {
-            let _is_spiking = if bayesian {
-                self.iterate_and_spike(self.get_bayesian_factor() * input)
-            } else {
-                self.iterate_and_spike(input)
-            };
-
-            voltages.push(self.current_voltage);
-        }
-
-        voltages
     }
 }
 
@@ -442,10 +447,10 @@ impl<T: NeurotransmitterKinetics> Default for IzhikevichNeuron<T> {
             c: -55.0,
             d: 8.0,
             v_th: 30., // spike threshold (mV)
-            tau_m: 10., // membrane time constant (ms)
+            tau_m: 1., // membrane time constant (ms)
             c_m: 100., // membrane capacitance (nF)
             v_init: -65., // initial potential (mV)
-            w_init: 0., // initial w value
+            w_init: 30., // initial w value
             dt: 0.1, // simulation time step (ms)
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
@@ -462,7 +467,7 @@ macro_rules! impl_izhikevich_default_methods {
         pub fn izhikevich_get_dw_change(&self) -> f64 {
             let dw = (
                 self.alpha * (self.beta * self.current_voltage - self.w_value)
-            ) * self.dt;
+            ) * (self.dt / self.tau_m);
     
             dw
         }
@@ -542,7 +547,7 @@ impl<T: NeurotransmitterKinetics> Default for LeakyIzhikevichNeuron<T> {
             c_m: 100., // membrane capacitance (nF)
             v_init: -65., // initial potential (mV)
             e_l: -65., // leak reversal potential (mV)
-            w_init: 0., // initial w value
+            w_init: 30., // initial w value
             dt: 0.1, // simulation time step (ms)
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
