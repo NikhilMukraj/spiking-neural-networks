@@ -9,6 +9,7 @@ use super::{
     impl_bayesian_factor_with_neurotransmitter,
     impl_last_firing_time_with_neurotransmitter,
     impl_stdp_with_neurotransmitter,
+    impl_necessary_iterate_and_spike_traits,
 };
 
 
@@ -48,17 +49,6 @@ macro_rules! impl_default_neurotransmitter_methods {
         fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
             self.synaptic_neurotransmitters.get_concentrations()
         }
-    }
-}
-
-macro_rules! impl_necessary_iterate_and_spike_traits {
-    ($name:ident) => {
-        impl_current_voltage_with_neurotransmitter!($name);
-        impl_gap_conductance_with_neurotransmitter!($name);
-        impl_potentiation_with_neurotransmitter!($name);
-        impl_bayesian_factor_with_neurotransmitter!($name);
-        impl_last_firing_time_with_neurotransmitter!($name);
-        impl_stdp_with_neurotransmitter!($name);
     }
 }
 
