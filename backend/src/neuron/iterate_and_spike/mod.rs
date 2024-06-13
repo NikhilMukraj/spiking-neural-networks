@@ -206,7 +206,8 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
     }
 }
 
-pub trait ReceptorKinetics: Default {
+pub trait ReceptorKinetics: 
+Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + GABAbDefault2 + NMDADefault {
     fn apply_r_change(&mut self, t: f64);
     fn get_r(&self) -> f64;
     fn set_r(&mut self, r: f64);
@@ -256,30 +257,41 @@ impl_destexhe_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047, 0.1)
 impl_destexhe_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013, 0.1);
 impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct ApproximateReceptor {
-//     pub r: f64,
-// }
+#[derive(Debug, Clone, Copy)]
+pub struct ApproximateReceptor {
+    pub r: f64,
+}
 
-// impl Default for ApproximateReceptor {
-//     fn default() -> Self {
-//         ApproximateReceptor { r: 0. }
-//     }
-// }
+impl ReceptorKinetics for ApproximateReceptor {
+    fn apply_r_change(&mut self, t: f64) {
+        self.r = t;
+    }
 
-// impl ReceptorKinetics for ApproximateReceptor {
-//     fn apply_r_change(&mut self, t: f64) {
-//         self.r = t;
-//     }
+    fn get_r(&self) -> f64 {
+        self.r
+    }
 
-//     fn get_r(&self) -> f64 {
-//         self.r
-//     }
+    fn set_r(&mut self, r: f64) {
+        self.r = r;
+    }
+}
 
-    // fn set_r(&mut self, r: f64) {
-    //     self.r = r;
-    // }
-// }
+macro_rules! impl_approximate_receptor_default {
+    ($trait:ident, $method:ident) => {
+        impl $trait for ApproximateReceptor {
+            fn $method() -> Self {
+                ApproximateReceptor { r: 0. }
+            }
+        }
+    };
+}
+
+impl_approximate_receptor_default!(Default, default);
+impl_approximate_receptor_default!(AMPADefault, ampa_default);
+impl_approximate_receptor_default!(GABAaDefault, gabaa_default);
+impl_approximate_receptor_default!(GABAbDefault, gabab_default);
+impl_approximate_receptor_default!(GABAbDefault2, gabab_default2);
+impl_approximate_receptor_default!(NMDADefault, nmda_default);
 
 #[derive(Debug, Clone)]
 pub enum IonotropicReceptorType {
@@ -291,80 +303,80 @@ pub enum IonotropicReceptorType {
 }
 
 #[derive(Debug, Clone)]
-pub struct LigandGatedChannel {
+pub struct LigandGatedChannel<T: ReceptorKinetics> {
     pub g: f64,
     pub reversal: f64,
-    pub receptor: DestexheReceptor,
+    pub receptor: T,
     pub receptor_type: IonotropicReceptorType,
     pub current: f64,
 }
 
-impl Default for LigandGatedChannel {
+impl<T: ReceptorKinetics> Default for LigandGatedChannel<T> {
     fn default() -> Self {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: DestexheReceptor::default(),
+            receptor: T::default(),
             receptor_type: IonotropicReceptorType::Basic(1.0),
             current: 0.,
         }
     }
 }
 
-impl AMPADefault for LigandGatedChannel {
+impl<T: ReceptorKinetics> AMPADefault for LigandGatedChannel<T> {
     fn ampa_default() -> Self {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
-            receptor: DestexheReceptor::ampa_default(),
+            receptor: T::ampa_default(),
             receptor_type: IonotropicReceptorType::AMPA(1.0),
             current: 0.,
         }
     }
 }
 
-impl GABAaDefault for LigandGatedChannel {
+impl<T: ReceptorKinetics> GABAaDefault for LigandGatedChannel<T> {
     fn gabaa_default() -> Self {
         LigandGatedChannel {
             g: 1.2, // 1.2 nS
             reversal: -80., // -80 mV
-            receptor: DestexheReceptor::gabaa_default(),
+            receptor: T::gabaa_default(),
             receptor_type: IonotropicReceptorType::GABAa(1.0),
             current: 0.,
         }
     }
 }
 
-impl GABAbDefault for LigandGatedChannel {
+impl<T: ReceptorKinetics> GABAbDefault for LigandGatedChannel<T> {
     fn gabab_default() -> Self {
         LigandGatedChannel {
             g: 0.06, // 0.06 nS
             reversal: -95., // -95 mV
-            receptor: DestexheReceptor::gabab_default(),
+            receptor: T::gabab_default(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
 }
 
-impl GABAbDefault2 for LigandGatedChannel {
+impl<T: ReceptorKinetics> GABAbDefault2 for LigandGatedChannel<T> {
     fn gabab_default2() -> Self {
         LigandGatedChannel {
             g: 0.06, // 0.06 nS
             reversal: -95., // -95 mV
-            receptor: DestexheReceptor::gabab_default2(),
+            receptor: T::gabab_default2(),
             receptor_type: IonotropicReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
     }
 }
 
-impl NMDADefault for LigandGatedChannel {
+impl<T: ReceptorKinetics> NMDADefault for LigandGatedChannel<T> {
     fn nmda_default() -> Self {
         LigandGatedChannel {
             g: 0.6, // 0.6 nS
             reversal: 0., // 0.0 mV
-            receptor: DestexheReceptor::nmda_default(),
+            receptor: T::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(BV::default()),
             current: 0.,
         }
@@ -375,19 +387,19 @@ pub trait NMDAWithBV {
     fn nmda_with_bv(bv: BV) -> Self;
 }
 
-impl NMDAWithBV for LigandGatedChannel {
+impl<T: ReceptorKinetics> NMDAWithBV for LigandGatedChannel<T> {
     fn nmda_with_bv(bv: BV) -> Self {
         LigandGatedChannel {
             g: 0.6, // 0.6 nS
             reversal: 0., // 0.0 mV
-            receptor: DestexheReceptor::nmda_default(),
+            receptor: T::nmda_default(),
             receptor_type: IonotropicReceptorType::NMDA(bv),
             current: 0.,
         }
     }
 }
 
-impl LigandGatedChannel {
+impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     fn get_modifier(&mut self, voltage: f64) -> f64 {
         match &mut self.receptor_type {
             IonotropicReceptorType::AMPA(value) => *value,
@@ -421,11 +433,11 @@ impl LigandGatedChannel {
 }
 
 #[derive(Clone, Debug)]
-pub struct LigandGatedChannels { 
-    pub ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel> 
+pub struct LigandGatedChannels<T: ReceptorKinetics> { 
+    pub ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<T>> 
 }
 
-impl Default for LigandGatedChannels {
+impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
     fn default() -> Self {
         LigandGatedChannels {
             ligand_gates: HashMap::new(),
@@ -433,7 +445,7 @@ impl Default for LigandGatedChannels {
     }
 }
 
-impl LigandGatedChannels {
+impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     pub fn len(&self) -> usize {
         self.ligand_gates.len()
     }
@@ -442,7 +454,7 @@ impl LigandGatedChannels {
     //     self.ligand_gates.keys()
     // }
 
-    pub fn values(&self) -> Values<NeurotransmitterType, LigandGatedChannel> {
+    pub fn values(&self) -> Values<NeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.values()
     }
 
@@ -660,7 +672,7 @@ pub trait STDP: LastFiringTime {
 
 macro_rules! impl_current_voltage_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> CurrentVoltage for $struct<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for $struct<T, R> {
             fn get_current_voltage(&self) -> f64 {
                 self.current_voltage
             }
@@ -672,7 +684,7 @@ pub(crate) use impl_current_voltage_with_neurotransmitter;
 
 macro_rules! impl_gap_conductance_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> GapConductance for $struct<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for $struct<T, R> {
             fn get_gap_conductance(&self) -> f64 {
                 self.gap_conductance
             }
@@ -684,7 +696,7 @@ pub(crate) use impl_gap_conductance_with_neurotransmitter;
 
 macro_rules! impl_potentiation_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> Potentiation for $struct<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Potentiation for $struct<T, R> {
             fn get_potentiation_type(&self) -> PotentiationType {
                 self.potentiation_type
             }
@@ -696,7 +708,7 @@ pub(crate) use impl_potentiation_with_neurotransmitter;
 
 macro_rules! impl_bayesian_factor_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> BayesianFactor for $struct<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BayesianFactor for $struct<T, R> {
             fn get_bayesian_factor(&self) -> f64 {
                 crate::distribution::limited_distr(
                     self.bayesian_params.mean, 
@@ -713,7 +725,7 @@ pub(crate) use impl_bayesian_factor_with_neurotransmitter;
 
 macro_rules! impl_last_firing_time_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> LastFiringTime for $struct<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for $struct<T, R> {
             fn set_last_firing_time(&mut self, timestep: Option<usize>) {
                 self.last_firing_time = timestep;
             }
@@ -729,7 +741,7 @@ pub(crate) use impl_last_firing_time_with_neurotransmitter;
 
 macro_rules! impl_stdp_with_neurotransmitter {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics> STDP for $struct<T> {        
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> STDP for $struct<T, R> {        
             fn get_stdp_params(&self) -> &STDPParameters {
                 &self.stdp_params
             }
@@ -755,8 +767,9 @@ pub(crate) use impl_necessary_iterate_and_spike_traits;
 pub trait IterateAndSpike: 
 Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
     type T: NeurotransmitterKinetics;
+    type R: ReceptorKinetics;
     fn iterate_and_spike(&mut self, input_current: f64) -> bool;
-    fn get_ligand_gates(&self) -> &LigandGatedChannels;
+    fn get_ligand_gates(&self) -> &LigandGatedChannels<Self::R>;
     fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
     fn iterate_with_neurotransmitter_and_spike(
