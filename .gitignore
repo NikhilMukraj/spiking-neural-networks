@@ -1,24 +1,24 @@
 /.vscode
-/backend/target
-/backend/output/*.txt
-/backend/output/*.bin
-/backend/output/*.csv
-/backend/output/*.ipynb
-/backend/single neuron tests
-/backend/stdp tests
-/backend/coupled tests
-/backend/lattice simulations
-/backend/stdp lattice
-/backend/hodgkin huxley tests
-/backend/args/test_izhikevich_lattice.toml
-/backend/hodgkin huxley tests/hodgkin_huxley_test.csv
-/backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
-/backend/results/*.csv
-/backend/results/*.ipynb
-/backend/results/gif_generation.py
-/backend/results/*.bin
-/backend/results/*.txt
-/backend/results/lattice_images/*
+/archive_backend/target
+/archive_backend/output/*.txt
+/archive_backend/output/*.bin
+/archive_backend/output/*.csv
+/archive_backend/output/*.ipynb
+/archive_backend/single neuron tests
+/archive_backend/stdp tests
+/archive_backend/coupled tests
+/archive_backend/lattice simulations
+/archive_backend/stdp lattice
+/archive_backend/hodgkin huxley tests
+/archive_backend/args/test_izhikevich_lattice.toml
+/archive_backend/hodgkin huxley tests/hodgkin_huxley_test.csv
+/archive_backend/hodgkin huxley tests/coupled_hodgkin_huxley.csv
+/archive_backend/results/*.csv
+/archive_backend/results/*.ipynb
+/archive_backend/results/gif_generation.py
+/archive_backend/results/*.bin
+/archive_backend/results/*.txt
+/archive_backend/results/lattice_images/*
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
