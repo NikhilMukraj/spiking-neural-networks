@@ -19,6 +19,7 @@
 /archive_backend/results/*.bin
 /archive_backend/results/*.txt
 /archive_backend/results/lattice_images/*
+/backend/target
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
