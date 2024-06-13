@@ -11,7 +11,7 @@ fn std(values: &Vec<f64>, values_mean: f64) -> f64 {
         .sum()
 }
 
-fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64> {
+pub fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64> {
     if x.len() != y.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "x length must match y length"));
     }
