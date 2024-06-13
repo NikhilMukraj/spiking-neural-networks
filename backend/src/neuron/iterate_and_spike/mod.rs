@@ -739,6 +739,19 @@ macro_rules! impl_stdp_with_neurotransmitter {
 
 pub(crate) use impl_stdp_with_neurotransmitter;
 
+macro_rules! impl_necessary_iterate_and_spike_traits {
+    ($name:ident) => {
+        impl_current_voltage_with_neurotransmitter!($name);
+        impl_gap_conductance_with_neurotransmitter!($name);
+        impl_potentiation_with_neurotransmitter!($name);
+        impl_bayesian_factor_with_neurotransmitter!($name);
+        impl_last_firing_time_with_neurotransmitter!($name);
+        impl_stdp_with_neurotransmitter!($name);
+    }
+}
+
+pub(crate) use impl_necessary_iterate_and_spike_traits;
+
 pub trait IterateAndSpike: 
 Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
     type T: NeurotransmitterKinetics;
