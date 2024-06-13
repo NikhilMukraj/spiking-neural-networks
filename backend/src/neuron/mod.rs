@@ -10,12 +10,12 @@ use iterate_and_spike::{
     Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, 
     ApproximateNeurotransmitter, weight_neurotransmitter_concentration,
     LigandGatedChannels,
-    impl_current_voltage_with_neurotransmitter,
-    impl_gap_conductance_with_neurotransmitter,
-    impl_potentiation_with_neurotransmitter,
-    impl_bayesian_factor_with_neurotransmitter,
-    impl_last_firing_time_with_neurotransmitter,
-    impl_stdp_with_neurotransmitter,
+    impl_current_voltage_with_kinetics,
+    impl_gap_conductance_with_kinetics,
+    impl_potentiation_with_kinetics,
+    impl_bayesian_factor_with_kinetics,
+    impl_last_firing_time_with_kinetics,
+    impl_stdp_with_kinetics,
     impl_necessary_iterate_and_spike_traits,
 };
 
