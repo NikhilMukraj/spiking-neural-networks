@@ -670,7 +670,7 @@ pub trait STDP: LastFiringTime {
     fn get_stdp_params(&self) -> &STDPParameters;
 }
 
-macro_rules! impl_current_voltage_with_neurotransmitter {
+macro_rules! impl_current_voltage_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for $struct<T, R> {
             fn get_current_voltage(&self) -> f64 {
@@ -680,9 +680,9 @@ macro_rules! impl_current_voltage_with_neurotransmitter {
     };
 }
 
-pub(crate) use impl_current_voltage_with_neurotransmitter;
+pub(crate) use impl_current_voltage_with_kinetics;
 
-macro_rules! impl_gap_conductance_with_neurotransmitter {
+macro_rules! impl_gap_conductance_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for $struct<T, R> {
             fn get_gap_conductance(&self) -> f64 {
@@ -692,9 +692,9 @@ macro_rules! impl_gap_conductance_with_neurotransmitter {
     };
 }
 
-pub(crate) use impl_gap_conductance_with_neurotransmitter;
+pub(crate) use impl_gap_conductance_with_kinetics;
 
-macro_rules! impl_potentiation_with_neurotransmitter {
+macro_rules! impl_potentiation_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Potentiation for $struct<T, R> {
             fn get_potentiation_type(&self) -> PotentiationType {
@@ -704,9 +704,9 @@ macro_rules! impl_potentiation_with_neurotransmitter {
     };
 }
 
-pub(crate) use impl_potentiation_with_neurotransmitter;
+pub(crate) use impl_potentiation_with_kinetics;
 
-macro_rules! impl_bayesian_factor_with_neurotransmitter {
+macro_rules! impl_bayesian_factor_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BayesianFactor for $struct<T, R> {
             fn get_bayesian_factor(&self) -> f64 {
@@ -721,9 +721,9 @@ macro_rules! impl_bayesian_factor_with_neurotransmitter {
     };
 }
 
-pub(crate) use impl_bayesian_factor_with_neurotransmitter;
+pub(crate) use impl_bayesian_factor_with_kinetics;
 
-macro_rules! impl_last_firing_time_with_neurotransmitter {
+macro_rules! impl_last_firing_time_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for $struct<T, R> {
             fn set_last_firing_time(&mut self, timestep: Option<usize>) {
@@ -737,9 +737,9 @@ macro_rules! impl_last_firing_time_with_neurotransmitter {
     }
 }
 
-pub(crate) use impl_last_firing_time_with_neurotransmitter;
+pub(crate) use impl_last_firing_time_with_kinetics;
 
-macro_rules! impl_stdp_with_neurotransmitter {
+macro_rules! impl_stdp_with_kinetics {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> STDP for $struct<T, R> {        
             fn get_stdp_params(&self) -> &STDPParameters {
@@ -749,16 +749,16 @@ macro_rules! impl_stdp_with_neurotransmitter {
     };
 }
 
-pub(crate) use impl_stdp_with_neurotransmitter;
+pub(crate) use impl_stdp_with_kinetics;
 
 macro_rules! impl_necessary_iterate_and_spike_traits {
     ($name:ident) => {
-        impl_current_voltage_with_neurotransmitter!($name);
-        impl_gap_conductance_with_neurotransmitter!($name);
-        impl_potentiation_with_neurotransmitter!($name);
-        impl_bayesian_factor_with_neurotransmitter!($name);
-        impl_last_firing_time_with_neurotransmitter!($name);
-        impl_stdp_with_neurotransmitter!($name);
+        impl_current_voltage_with_kinetics!($name);
+        impl_gap_conductance_with_kinetics!($name);
+        impl_potentiation_with_kinetics!($name);
+        impl_bayesian_factor_with_kinetics!($name);
+        impl_last_firing_time_with_kinetics!($name);
+        impl_stdp_with_kinetics!($name);
     }
 }
 
