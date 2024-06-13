@@ -7,17 +7,7 @@ use std::{
     ops::Sub,
 };
 use super::{ 
-    CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
-    IterateAndSpike, BayesianParameters, STDPParameters, PotentiationType,
-    Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, 
-    LigandGatedChannels,
-    impl_current_voltage_with_neurotransmitter,
-    impl_gap_conductance_with_neurotransmitter,
-    impl_potentiation_with_neurotransmitter,
-    impl_bayesian_factor_with_neurotransmitter,
-    impl_last_firing_time_with_neurotransmitter,
-    impl_stdp_with_neurotransmitter,
-    impl_necessary_iterate_and_spike_traits,
+    impl_bayesian_factor_with_neurotransmitter, impl_current_voltage_with_neurotransmitter, impl_gap_conductance_with_neurotransmitter, impl_last_firing_time_with_neurotransmitter, impl_necessary_iterate_and_spike_traits, impl_potentiation_with_neurotransmitter, impl_stdp_with_neurotransmitter, iterate_and_spike::ReceptorKinetics, BayesianFactor, BayesianParameters, CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, Potentiation, PotentiationType, STDPParameters, STDP
 };
 
 
@@ -278,7 +268,7 @@ impl Gate {
 }
 
 #[derive(Clone)]
-pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics> {
+pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64,
     pub gap_conductance: f64,
     pub potentiation_type: PotentiationType,
@@ -299,14 +289,14 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics> {
     pub is_spiking: bool,
     pub additional_gates: Vec<AdditionalGates>,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
     pub bayesian_params: BayesianParameters,
     pub stdp_params: STDPParameters,
 }
 
 impl_necessary_iterate_and_spike_traits!(HodgkinHuxleyNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for HodgkinHuxleyNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
     fn default() -> Self {
         let default_gate = Gate {
             alpha: 0.,
@@ -389,7 +379,7 @@ pub fn find_peaks(voltages: &Vec<f64>, tolerance: f64) -> Vec<usize> {
 }
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
-impl<T: NeurotransmitterKinetics> HodgkinHuxleyNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R> {
     pub fn update_gate_time_constants(&mut self, voltage: f64) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
@@ -574,8 +564,9 @@ impl<T: NeurotransmitterKinetics> HodgkinHuxleyNeuron<T> {
     }
 }
 
-impl<T: NeurotransmitterKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T, R> {
     type T = T;
+    type R = R;
 
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
         let last_voltage = self.current_voltage;
@@ -590,7 +581,7 @@ impl<T: NeurotransmitterKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T> {
         is_spiking
     }
 
-    fn get_ligand_gates(&self) -> &LigandGatedChannels {
+    fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
         &self.ligand_gates
     }
 
