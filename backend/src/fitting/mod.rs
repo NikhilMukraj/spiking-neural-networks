@@ -2,14 +2,10 @@ use std::{
     collections::HashMap,
     io::{Error, ErrorKind, Result},
 };
-use crate::distribution::limited_distr;
 use crate::neuron::{   
-    hodgkin_huxley::{
-        HodgkinHuxleyNeuron, find_peaks, diff,
-    },
-    IntegrateAndFireCell, 
-    gap_junction, iterate_coupled_spiking_neurons,
-    iterate_and_spike::NeurotransmitterKinetics,
+    gap_junction, hodgkin_huxley::{
+        diff, find_peaks, HodgkinHuxleyNeuron
+    }, integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{BayesianFactor, IterateAndSpike, NeurotransmitterKinetics, ReceptorKinetics}, iterate_coupled_spiking_neurons
 };
 use crate::ga::{BitString, decode};
 
@@ -204,8 +200,8 @@ fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotential
     }
 }
 
-pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics>(
-    hodgkin_huxley_model: &HodgkinHuxleyNeuron<T>, 
+pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics, R: ReceptorKinetics>(
+    hodgkin_huxley_model: &HodgkinHuxleyNeuron<T, R>, 
     input_current: f64, 
     iterations: usize,
     do_receptor_kinetics: bool,
@@ -243,9 +239,11 @@ pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics>(
 }
 
 #[derive(Clone)]
-pub struct FittingSettings<'a, T: NeurotransmitterKinetics, U: NeurotransmitterKinetics> {
-    pub hodgkin_huxley_model: HodgkinHuxleyNeuron<T>,
-    pub if_neuron: &'a IntegrateAndFireCell<U>,
+pub struct FittingSettings
+<'a, T: NeurotransmitterKinetics, U: NeurotransmitterKinetics, V: ReceptorKinetics, W: ReceptorKinetics> 
+{
+    pub hodgkin_huxley_model: HodgkinHuxleyNeuron<T, W>,
+    pub if_neuron: &'a IzhikevichNeuron<U, V>,
     pub action_potential_summary: &'a [ActionPotentialSummary],
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
     pub use_amplitude: bool,
@@ -256,15 +254,15 @@ pub struct FittingSettings<'a, T: NeurotransmitterKinetics, U: NeurotransmitterK
     // pub do_receptor_kinetics: bool,
 }
 
-fn bayesian_izhikevich_iterate<T: NeurotransmitterKinetics>(
-    izhikevich_neuron: &mut IntegrateAndFireCell<T>, 
+fn bayesian_izhikevich_iterate<T: NeurotransmitterKinetics, R: ReceptorKinetics>(
+    izhikevich_neuron: &mut IzhikevichNeuron<T, R>, 
     input_current: f64,
     // t_total: NeurotransmitterConcentrations,
     bayesian: bool,
     // do_receptor_kinetics: bool,
 ) -> bool {
     let processed_input = if bayesian {
-        let bayesian_factor = limited_distr(izhikevich_neuron.bayesian_params.mean, izhikevich_neuron.bayesian_params.std, 0., 1.);
+        let bayesian_factor = izhikevich_neuron.get_bayesian_factor();
         let bayesian_input = input_current * bayesian_factor;
 
         bayesian_input
@@ -272,17 +270,18 @@ fn bayesian_izhikevich_iterate<T: NeurotransmitterKinetics>(
         input_current
     };
 
-    let spike = izhikevich_neuron.izhikevich_iterate_and_spike(
+    let spike = izhikevich_neuron.iterate_and_spike(
         processed_input,
     );
 
     spike
 }
 
-pub fn get_izhikevich_summary<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics>(
-    presynaptic_neuron: &mut IntegrateAndFireCell<U>, 
-    postsynaptic_neuron: &mut IntegrateAndFireCell<U>,
-    settings: &FittingSettings<T, U>,
+pub fn get_izhikevich_summary
+<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics, W: ReceptorKinetics, V: ReceptorKinetics>(
+    presynaptic_neuron: &mut IzhikevichNeuron<U, W>, 
+    postsynaptic_neuron: &mut IzhikevichNeuron<U, W>,
+    settings: &FittingSettings<T, U, W, V>,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
@@ -324,11 +323,12 @@ pub fn get_izhikevich_summary<T: NeurotransmitterKinetics, U: NeurotransmitterKi
 
 // bounds should be a, b, c, d, and v_th for now
 // if fitting does not generalize, optimize other coefs in equation
-pub fn fitting_objective<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics>(
+pub fn fitting_objective
+<T: NeurotransmitterKinetics, U: NeurotransmitterKinetics, W: ReceptorKinetics, V: ReceptorKinetics>(
     bitstring: &BitString, 
     bounds: &Vec<Vec<f64>>, 
     n_bits: usize, 
-    settings: &HashMap<&str, FittingSettings<T, U>>
+    settings: &HashMap<&str, FittingSettings<T, U, W, V>>
 ) -> Result<f64> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
