@@ -12,7 +12,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - (explanation of ion channels)
 - (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich, explain why receptor kinetics are fixed)
 
-## Notes
+## Todo Notes
 
 - To fit Izhikevich neuron to Hodgkin Huxley model, can either:
   - Fit voltage changes in Izhikevich to voltage changes in Hodgkin Huxley
@@ -140,24 +140,35 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Redo results with new neurotransmission coupling for Hodgkin Huxley models
 
 - **Cargo package**
+  - **Receptor kinetics refactor** (do this first so its less work refactoring later)
+  - **Remove original integrate and fire neuron**
+  - Isolated STDP testing should be included
+  - **Examples folder**
   - Cell grid type should be refactored into a struct containing
     - Grid of neurons
     - Graph
     - Graph parameters
     - Whether to do STDP
     - Basically anything essential for run lattice
+    - Cell grid struct should be able to handle SpikeTrain, IterateAndSpike, and discrete neurons
+      - Probably could split lattice types between inputtable and non inputtable, specific internal dynamics shouldnt matter outside whether there is a given input
+      - Could have a neuron type that combines discrete neuron and spike train, if discrete neuron is active there is a set (likely high) frequency the discrete neuron ouputs whereas a inactive discrete neuron would have a set low (or 0) frequency
+        - Changes to discrete neurons may need to be slowed down in someway
+          - *Should abstract this to another note in biological models*
+  - Cell grid struct should be placed within neuron `mod.rs`
   - Should have method to either take in a pre-existing graph and cell grid or generate a random one given the dimensions
     - Should also be able to generate a 3D lattice
   - Methods should include
     - `iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1
     - `iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses
-  - **Should expose EEG tooling and fitting methods**
+  - **Should expose EEG tooling correlation and fitting methods**
     - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
+  - Hodgkin Huxley model should refactor additional gates enum into a trait
   - `IterateAndSpike` trait should be exposed (along with relevant macros)
     - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
     - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation or a macro to translate equations to `IterateAndSpike` trait
     - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
-  - Receptor refactor as well
+  - **FitzHugo-Nagumo**
   - **Documentation revamp**
     - [how to write documentation](https://blog.guillaume-gomez.fr/articles/2020-03-12+Guide+on+how+to+write+documentation+for+a+Rust+crate)
     - Update obsidian code and equations accordingly
@@ -186,6 +197,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
+### Biological Models Notes
+
 - Hopfield network
   - [Hopfield network pseudocode](https://www.geeksforgeeks.org/hopfield-neural-network/)
   - [Hopfield network tutorial](https://github.com/ImagineOrange/Hopfield-Network/blob/main/hopfield_MNIST.py)
@@ -213,6 +226,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
+  - Liquid state machine with discrete neuron reservoir then spiking reservoir
   - Creating a stable liquid
     - Should have some consistent methodology to generate a stable liquid (eigenvalue of each weight vector being within unit circle, or rate of decay being within unit circle, try with 80-20 excitatory to inhibitory neuron ratio and then a more equal one), stability should be measured in whether neurons return to a resting firing rate, for simpler classifiers output may not need to feed back into liquid while reinforcement learning tasks may
   - Recurrent connections in reservoir compute act as working memory that stores information through recurrent connections that may slowly degrade over time, target is slowing the degradation in order to improve memory recall
