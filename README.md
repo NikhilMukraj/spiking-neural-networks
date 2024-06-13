@@ -501,19 +501,19 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ### Lattice
 
-![Lattice](backend/results/lattice_images.gif)
+![Lattice](archive_backend/results/lattice_images.gif)
 
 ### Hodgkin Huxley
 
 #### Neurotransmission
 
-![AMPA](backend/results/ampa.png)
+![AMPA](archive_backend/results/ampa.png)
 
-![GABAa](backend/results/gabaa.png)
+![GABAa](archive_backend/results/gabaa.png)
 
-![GABAb](backend/results/gabab.png)
+![GABAb](archive_backend/results/gabab.png)
 
-![NMDA](backend/results/nmda.png)
+![NMDA](archive_backend/results/nmda.png)
 
 #### Additional Gates
 
@@ -521,7 +521,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 #### Hopfield Reconstruction
 
-![Hopfield Reconstruction of Input Patterns](backend/results/hopfield_reconstructions.jpg)
+![Hopfield Reconstruction of Input Patterns](archive_backend/results/hopfield_reconstructions.jpg)
 
 ## Sources
 
