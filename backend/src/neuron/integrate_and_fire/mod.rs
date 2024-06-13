@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 use super::{ 
-    CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
-    IterateAndSpike, BayesianParameters, STDPParameters, PotentiationType,
-    Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, LigandGatedChannels,
-    impl_current_voltage_with_neurotransmitter,
-    impl_gap_conductance_with_neurotransmitter,
-    impl_potentiation_with_neurotransmitter,
-    impl_bayesian_factor_with_neurotransmitter,
-    impl_last_firing_time_with_neurotransmitter,
-    impl_stdp_with_neurotransmitter,
-    impl_necessary_iterate_and_spike_traits,
+    iterate_and_spike::ReceptorKinetics, BayesianFactor, BayesianParameters, 
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
+    LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, 
+    Neurotransmitters, Potentiation, PotentiationType, STDPParameters, STDP,
+    impl_bayesian_factor_with_neurotransmitter, 
+    impl_current_voltage_with_neurotransmitter, 
+    impl_gap_conductance_with_neurotransmitter, 
+    impl_last_firing_time_with_neurotransmitter, 
+    impl_necessary_iterate_and_spike_traits, 
+    impl_potentiation_with_neurotransmitter, 
+    impl_stdp_with_neurotransmitter, 
 };
 
 
@@ -37,8 +38,9 @@ pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
 macro_rules! impl_default_neurotransmitter_methods {
     () => {
         type T = T;
+        type R = R;
 
-        fn get_ligand_gates(&self) -> &LigandGatedChannels {
+        fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
             &self.ligand_gates
         }
     
@@ -55,7 +57,7 @@ macro_rules! impl_default_neurotransmitter_methods {
 pub(crate) use impl_default_neurotransmitter_methods;
 
 #[derive(Debug, Clone)]
-pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
+pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64, // membrane potential (mV)
     pub v_th: f64, // voltage threshold (mV)
     pub v_reset: f64, // voltage reset value (mV)
@@ -75,12 +77,12 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
     pub bayesian_params: BayesianParameters,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
 }
 
 impl_necessary_iterate_and_spike_traits!(LeakyIntegrateAndFireNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for LeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
         LeakyIntegrateAndFireNeuron {
             current_voltage: -75., 
@@ -107,7 +109,7 @@ impl<T: NeurotransmitterKinetics> Default for LeakyIntegrateAndFireNeuron<T> {
     }
 }
 
-impl<T: NeurotransmitterKinetics> LeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeuron<T, R> {
     pub fn get_basic_dv_change(&self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -133,7 +135,7 @@ impl<T: NeurotransmitterKinetics> LeakyIntegrateAndFireNeuron<T> {
     }
 }
 
-impl<T: NeurotransmitterKinetics> IterateAndSpike for LeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for LeakyIntegrateAndFireNeuron<T, R> {
     impl_default_neurotransmitter_methods!();
 
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
@@ -166,7 +168,7 @@ impl<T: NeurotransmitterKinetics> IterateAndSpike for LeakyIntegrateAndFireNeuro
 
 macro_rules! impl_iterate_and_spike {
     ($name:ident, $dv_method:ident, $dw_method:ident, $handle_spiking:ident) => {
-        impl<T: NeurotransmitterKinetics> IterateAndSpike for $name<T> {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for $name<T, R> {
             impl_default_neurotransmitter_methods!();
 
             fn iterate_and_spike(&mut self, input_current: f64) -> bool {
@@ -205,7 +207,7 @@ macro_rules! impl_iterate_and_spike {
 }
 
 #[derive(Debug, Clone)]
-pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
+pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64, // membrane potential (mV)
     pub v_th: f64, // voltage threshold (mV)
     pub v_reset: f64, // voltage reset value (mV)
@@ -229,12 +231,12 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
     pub bayesian_params: BayesianParameters,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
 }
 
 impl_necessary_iterate_and_spike_traits!(AdaptiveLeakyIntegrateAndFireNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for AdaptiveLeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
         AdaptiveLeakyIntegrateAndFireNeuron {
             current_voltage: -75., 
@@ -295,7 +297,7 @@ macro_rules! impl_adaptive_default_methods {
     }
 }
 
-impl<T: NeurotransmitterKinetics> AdaptiveLeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
     pub fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -317,7 +319,7 @@ impl_iterate_and_spike!(
 );
 
 #[derive(Debug, Clone)]
-pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
+pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64, // membrane potential (mV)
     pub v_th: f64, // voltage threshold (mV)
     pub v_reset: f64, // voltage reset value (mV)
@@ -342,12 +344,12 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
     pub bayesian_params: BayesianParameters,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
 }
 
 impl_necessary_iterate_and_spike_traits!(AdaptiveExpLeakyIntegrateAndFireNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for AdaptiveExpLeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
         AdaptiveExpLeakyIntegrateAndFireNeuron {
             current_voltage: -75., 
@@ -379,7 +381,7 @@ impl<T: NeurotransmitterKinetics> Default for AdaptiveExpLeakyIntegrateAndFireNe
     }
 }
 
-impl<T: NeurotransmitterKinetics> AdaptiveExpLeakyIntegrateAndFireNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
     pub fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -402,7 +404,7 @@ impl_iterate_and_spike!(
 );
 
 #[derive(Debug, Clone)]
-pub struct IzhikevichNeuron<T: NeurotransmitterKinetics> {
+pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64, // membrane potential (mV)
     pub v_th: f64, // voltage threshold (mV)
     pub v_init: f64, // voltage initialization value (mV)
@@ -421,12 +423,12 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
     pub bayesian_params: BayesianParameters,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
 }
 
 impl_necessary_iterate_and_spike_traits!(IzhikevichNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for IzhikevichNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeuron<T, R> {
     fn default() -> Self {
         IzhikevichNeuron {
             current_voltage: -75., 
@@ -476,7 +478,7 @@ macro_rules! impl_izhikevich_default_methods {
     }
 }
 
-impl<T: NeurotransmitterKinetics> IzhikevichNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
     pub fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
@@ -497,7 +499,7 @@ impl_iterate_and_spike!(
 );
 
 #[derive(Debug, Clone)]
-pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics> {
+pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub current_voltage: f64, // membrane potential (mV)
     pub v_th: f64, // voltage threshold (mV)
     pub v_init: f64, // voltage initialization value (mV)
@@ -517,12 +519,12 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics> {
     pub stdp_params: STDPParameters,
     pub bayesian_params: BayesianParameters,
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    pub ligand_gates: LigandGatedChannels,
+    pub ligand_gates: LigandGatedChannels<R>,
 }
 
 impl_necessary_iterate_and_spike_traits!(LeakyIzhikevichNeuron);
 
-impl<T: NeurotransmitterKinetics> Default for LeakyIzhikevichNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevichNeuron<T, R> {
     fn default() -> Self {
         LeakyIzhikevichNeuron {
             current_voltage: -75., 
@@ -549,7 +551,7 @@ impl<T: NeurotransmitterKinetics> Default for LeakyIzhikevichNeuron<T> {
     }
 }
 
-impl<T: NeurotransmitterKinetics> LeakyIzhikevichNeuron<T> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
     pub fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
