@@ -1,3 +1,4 @@
+// use std::collections::HashMap;
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
 pub mod attractors;
@@ -7,7 +8,7 @@ pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
     IterateAndSpike, BayesianParameters, STDPParameters, PotentiationType,
-    Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, 
+    Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, // NeurotransmitterConcentrations,
     ApproximateNeurotransmitter, weight_neurotransmitter_concentration,
     LigandGatedChannels,
     impl_current_voltage_with_kinetics,
@@ -18,9 +19,8 @@ use iterate_and_spike::{
     impl_stdp_with_kinetics,
     impl_necessary_iterate_and_spike_traits,
 };
+// use crate::graph::GraphFunctionality;
 
-
-pub type CellGrid<T> = Vec<Vec<T>>;
 
 pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
@@ -307,5 +307,319 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
 //         delta_ws[n_neuron] = update_weight(i, postsynaptic_neuron);
 //         weights[n_neuron] += delta_ws[n_neuron];
+//     }
+// }
+
+// pub trait GridHistory {
+//     fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>);
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct EEGHistory {
+
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct GridVoltageHistory {
+
+// }
+
+// pub trait SpikeTrainHistory {
+//     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct SpikeTrainGridHistory {
+
+// }
+
+// macro_rules! impl_reset_timing  {
+//     () => {
+//         pub fn reset_timing(&mut self) {
+//             self.internal_clock = 0;
+//             self.cell_grid.iter_mut()
+//                 .for_each(|i| {
+//                     i.iter_mut()
+//                         .for_each(|j| {
+//                             j.set_last_firing_time(None)
+//                     })
+//                 });
+//         } 
+//     };
+// }
+
+// fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+//     cell_grid: &CellGrid<T>, 
+//     graph: &U,
+//     position: &Position,
+//     input_positions: &HashSet<Position>, 
+//     bayesian: bool,
+// ) -> f64 {
+//     let (x, y) = position;
+//     let postsynaptic_neuron = &cell_grid[*x][*y];
+
+//     let mut input_val = input_positions
+//         .iter()
+//         .map(|input_position| {
+//             let (pos_x, pos_y) = input_position;
+//             let input_cell = &cell_grid[*pos_x][*pos_y];
+
+//             let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
+            
+//             final_input * graph.lookup_weight(&input_position, position).unwrap().unwrap()
+//         })
+//         .sum();
+
+//     if bayesian {
+//         input_val *= cell_grid[*x][*y].get_bayesian_factor();
+//     }
+
+//     input_val /= input_positions.len() as f64;
+
+//     return input_val;
+// }
+
+// fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+//     cell_grid: &CellGrid<T>, 
+//     graph: &U,
+//     position: &Position,
+//     input_positions: &HashSet<Position>, 
+//     bayesian: bool,
+// ) -> NeurotransmitterConcentrations {
+//     let input_vals = input_positions
+//         .iter()
+//         .map(|input_position| {
+//             let (pos_x, pos_y) = input_position;
+//             let input_cell = &cell_grid[*pos_x][*pos_y];
+
+//             let mut final_input = input_cell.get_neurotransmitter_concentrations();
+//             let weight = graph.lookup_weight(&input_position, position).unwrap().unwrap();
+            
+//             weight_neurotransmitter_concentration(&mut final_input, weight);
+
+//             final_input
+//         })
+//         .collect::<Vec<NeurotransmitterConcentrations>>();
+
+//     let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+
+//     if bayesian {
+//         let (x, y) = position;
+//         weight_neurotransmitter_concentration(&mut input_val, cell_grid[*x][*y].get_bayesian_factor());
+//     }
+
+//     weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
+
+//     return input_val;
+// }
+
+// // grid history should either be eeg or grid voltage for now
+// // later can move to looking at neurotransmitter/receptor tracking
+// // inputtable lattice
+// #[derive(Debug, Clone)]
+// pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: GridHistory> {
+//     cell_grid: Vec<Vec<T>>,
+//     graph: U,
+//     grid_history: V,
+//     update_graph_history: bool,
+//     update_grid_history: bool,
+//     do_stdp: bool,
+//     do_receptor_kinetics: bool,
+//     bayesian: bool,
+//     internal_clock: usize,
+// }
+
+// updating graph history boolean should be moved to graph itself
+
+// impl<T: IterateAndSpike, U: GraphFunctionality, V: GridHistory> Lattice<T, U, V> {
+//     impl_reset_timing!();
+
+//     // should always be averaged
+//     fn calculate_internal_inputs(&self) -> 
+//     (HashMap<Position, f64>, Option<HashMap<Pos, NeurotransmitterConcentrations>>) {
+//         let internal_neurotransmitter_inputs = match self.do_receptor_kinetics {
+//             true => {
+//                 let neurotransmitters: HashMap<Position, NeurotransmitterConcentrations> = graph.get_every_node()
+//                     .iter()
+//                     .map(|&pos| {
+//                         let input_positions = graph.get_incoming_connections(&pos).expect("Cannot find position");
+
+//                         let neurotransmitter_input = get_neurotransmitter_input_from_positions(
+//                             &cell_grid,
+//                             &*graph,
+//                             &pos,
+//                             &input_positions,
+//                             self.bayesian,
+//                         );
+
+//                         (pos, neurotransmitter_input)
+//                     })
+//                     .collect();
+                    
+//                 Some(neurotransmitters)
+//             },
+//             false => None,
+//         };
+
+//         // eventually convert to this
+//         // let inputs: HashMap<Position, f64> = graph
+//         //     .get_every_node()
+//         //     .par_iter()
+//         //     .map(|&pos| {
+//         //     // .. calculating input
+//         //     (pos, change)
+//         //     });
+//         //     .collect();
+
+//         let internal_inputs = self.graph.get_every_node()
+//             .iter()
+//             .map(|pos| {
+//                 let input_positions = graph.get_incoming_connections(&pos).expect("Cannot find position");
+
+//                 let input = get_input_from_positions(
+//                     &cell_grid,
+//                     &*graph,
+//                     &pos,
+//                     &input_positions,
+//                     bayesian,
+//                 );
+
+//                 (pos, input)
+//             });
+
+//         (internal_inputs, internal_neurotransmitter_inputs)
+//     }
+
+//     pub fn run_lattice(
+//         &mut self, 
+//         iterations: usize,
+//         external_inputs: HashMap<Position, f64>, 
+//         external_neurotransmitter_inputs: Option<HashMap<Position, NeurotransmitterType>>,
+//     ) -> Result<()> {
+//         match (self.do_receptor_kinetics, external_neurotransmitter_inputs) {
+//             (true, Some(_)) => {},
+//             (true, None) => {
+//                 let external_neurotransmitter_inputs: HashMap<Position, NeurotransmitterType> = HashMap::new()
+//             }
+//             (false, Some(_)) => {
+//                 return Err(Error::new(
+//                     ErrorKind::InvalidInput,
+//                     "Cannot use neurotransmitter input when receptor kinetics is false"
+//                 ))
+//             },
+//             (false, None) => {}
+//         };
+
+//         for loop_timestep in 0..iterations {
+//             let timestep = loop_timestep + self.internal_clock;         
+    
+//             // loop through every cell
+//             // modify the voltage and handle stdp
+//             // end loop
+
+//             let (internal_inputs, internal_neurotransmitter_inputs) = self.calculate_internal_inputs();
+    
+//             // could be changed to graph.get_every_node()
+//             for pos in graph.get_every_node() {
+//                 let (x, y) = *pos;
+//                 let input_value = *internal_inputs.get(&pos).unwrap();
+    
+//                 // if cloning becomes performance bottleneck
+//                 // calculate bayesian factor within iterate function
+//                 // apply bayesian there and to each part of neurotransmitter in update receptor kinetics
+//                 // necessary to keep input hashmaps immutable for the sake of simplicity and interfacing
+//                 let input_neurotransmitter = match internal_neurotransmitter_inputs {
+//                     Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
+//                     None => None,
+//                 };
+    
+//                 // takes neurotransmitter input since input is not needed after this statement
+//                 // if neurotransmitter needs to be read for some reason other than this
+//                 // read neurotransmitter concentration directly from the given neuron
+//                 let is_spiking = cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+//                     input_value, input_neurotransmitter,
+//                 );
+    
+//                 if is_spiking {
+//                     cell_grid[x][y].set_last_firing_time(Some(timestep));
+//                 }
+    
+//                 if do_stdp && is_spiking {
+//                     let input_positions = graph.get_incoming_connections(&pos)?;
+//                     for i in input_positions {
+//                         let (x_in, y_in) = i;
+//                         let current_weight = graph.lookup_weight(&(x_in, y_in), &pos)?.unwrap();
+                                                    
+//                         graph.edit_weight(
+//                             &(x_in, y_in), 
+//                             &pos, 
+//                             Some(current_weight + update_weight(&cell_grid[x_in][y_in], &cell_grid[x][y]))
+//                         )?;
+//                     }
+    
+//                     let out_going_connections = graph.get_outgoing_connections(&pos)?;
+    
+//                     for i in out_going_connections {
+//                         let (x_out, y_out) = i;
+//                         let current_weight = graph.lookup_weight(&pos, &(x_out, y_out))?.unwrap();
+    
+//                         graph.edit_weight(
+//                             &pos, 
+//                             &(x_out, y_out), 
+//                             Some(current_weight + update_weight(&cell_grid[x][y], &cell_grid[x_out][y_out]))
+//                         )?; 
+//                     }
+//                 } 
+//             }
+
+//             if self.update_graph_history {
+//                 self.graph.update_history();
+//             }
+//             if self.update_grid_history {
+//                 self.grid_history.update(&self.cell_grid);
+//             }
+//         }
+
+//         Ok(())
+//     }
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainHistory> {
+//     cell_grid: Vec<Vec<T>>,
+//     grid_history: U,
+//     update_grid_history: bool,
+//     internal_clock: usize,
+// }
+
+// impl<T: SpikeTrain, U: SpikeTrainHistory> SpikeTrainLattice<T, U> {
+//     impl_reset_timing!();
+
+//     fn iterate(&mut self) {
+//         self.cell_grid.iter_mut()
+//             .for_each(|i| {
+//                 i.iter_mut()
+//                     .for_each(|j| {
+//                         let is_spiking = j.iterate();
+//                         if is_spiking {
+//                             j.set_last_firing_time(Some(self.internal_clock))
+//                         }
+//                 })
+//             });
+
+//         if self.update_grid_history {
+//             self.grid_history.update(&self.cell_grid);
+//         }
+//     }
+
+//     pub fn run_lattice(&mut self, iterations: Option<usize>) {
+//         let iterations = match iterations {
+//             Some(value) => value,
+//             None => 1,
+//         };
+
+//         for _ in 0..iterations {
+//             self.iterate();
+//         }
 //     }
 // }
