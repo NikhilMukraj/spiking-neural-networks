@@ -158,9 +158,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should have method to either take in a pre-existing graph and cell grid or generate a random one given the dimensions
     - Should also be able to generate a 3D lattice
   - Methods should include
-    - `iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1
-    - `iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses
-  - **Should expose EEG tooling correlation and fitting methods**
+    - **`iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1**, should be able to take in a hashmap of inputs, in this case both electrical and neurotransmitter
+    - **`iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses**, should be able to take in a hashmap of inputs, in this case only electrical
+  - Should expose EEG tooling correlation and fitting methods
+    - **Write method that takes in one Hodgkin Huxley model and fits Izhikevich neuron to it**
     - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
   - Hodgkin Huxley model should refactor additional gates enum into a trait
   - `IterateAndSpike` trait should be exposed (along with relevant macros)
@@ -177,14 +178,20 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - **Neurotransmitter approximation refactor should come before Lixirnet**
-  - Update by copying over backend
+  - Update by pulling from package
     - Should have methods that iterate one timestep for each kind of simulation
     - That way when exposed to Python there can be tqdm stuff
+  - Maybe each struct could have a flag that says it implements a certain trait, the backend for that struct could then be passed to functions that take in that trait (creating cell grid, spiking neuron coupling tests, etc)
+  - **Check if struct has (private?) method `get_iterate_and_spike_backend`, if so call it and use it in a given function**, coupled testing, generating cell grid, etc
   - Use macros to generate getter and setter methods given the argument name
     - For integrate and fire cell and Hodgkin Huxley model
     - **Enable multiple-pymethods so the macro can be written**
     - [Reference for macro](https://github.com/PyO3/pyo3/discussions/3628)
   - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
+  - *Cell grid struct for now could just use an enum that specifies one of the integrate and fire neurons using approximate neurotransmitter kinetics and approximate receptor kinetics, only use matrix and grid history for now*
+    - *Could also generate a different cell grid structure for each neuron using macros to get around lack of traits in Python*
+    - *Could also try a method that given a grid of neurons generates the appropriate cell grid structure and wraps it in a box on the heap*
+  - Allow basic testing with Hodgkin Huxley (coupled spiking tests)
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
   - **Lixirnet should expose EEG processing tools**
 
@@ -208,8 +215,25 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
   - **Hopfield spiking neural network prototype**
     - Spiking hopfield should measure how long pattern remains after cue is removed in response in to poissonian noise and how easily it transitions from stable state to stable state, longer it stays in a certain state in response to noise indicates more stability, harder to transition indicates more stability
-    - Potentially looking at attractor based classifiers in similar fashion to izhikevich + astrocyte model before moving to liquid state machine + attractor in similar
-    - Trainable attractor network model is likely a good model to look at replicating through (potentially unsupervised) hebbian dynamics
+
+- Attractor models general attractor models
+  - Potentially looking at attractor based classifiers in similar fashion to izhikevich + astrocyte model before moving to liquid state machine + attractor in similar
+  - Trainable attractor network model is likely a good model to look at replicating through (potentially unsupervised) hebbian dynamics
+- Track when stable states occur
+- [Ring attractor in julia](https://github.com/wl17443/ring-attractor/blob/master/src/ring-attractor.jl)
+  - Should try modeling head direction cells as a ring attractor (see [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5613981/]), could use gaussian function to get weights where x is the postynaptic neuron's index and b is the presynaptic, a global inhibition term could be added to the weight (minus k), should also test it without a global inhibitory constant subtraction
+    - Gaussian function: $f(x) = ae^\frac{-(i-j)^2}{2c^2} - k$, $i$ is index of presynaptic neuron, $j$ is index of postsynaptic neuron
+  - Weights may or may not necessarily need inhibitory connections ($k$ may or may not be necessary)
+    - `Nearby cells are connected by strong excitatory synapses, with the strength of excitation proportional to the angular distance between the cells on the ring. Cells that are far apart on the ring are connected with inhibitory synapses. If the strength of excitation and inhibition is appropriately tuned, such an architecture exhibits attractor dynamics.`
+  - [Relevant model](https://isn.ucsd.edu/courses/beng260/2019/reports/Yao_Du_Ring_Attractor_Project_Report.pdf)
+  - [Another relevant model](https://www.princeton.edu/~adame/papers/coupled-attractor/coupled-attractor)
+  - Head direction cells should likely receive input based on rotational velocity, input would then only be necessary when changes in position occur
+  - Angular velocity should be translated into either a direct increase in input current or an increase in spikes, that should be given as input to ring attractor
+  - [Graph eigenvalues](https://youtu.be/uTUVhsxdGS8?si=1QYUdWrongUZnh-P)
+- Could also try a similar mechanism but expanded for (hexagonal and toroidial) grid cells (axial coordinates) (again based on some kind of velocity input) or with place cells/fields
+- Effect of different receptors on learning patterns through stdp could be tested (ie effect of dopamine and serotonin)
+- Investigate astrocyte effect on attractors
+
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
   - Try to create a system where input eventually fades away after input is no longer being applied (fading memory)
   - Can decay gap conductance over time after a spike until a small enough value is reached or another spike occurs
@@ -227,6 +251,7 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Might be more practical to use an excitatory and inhibitory input and check deviation from baseline over time
   - Firing rate of neurons increase over time signal should become more unstable over time and starts to not represent the same signal
   - To also model forgetting, increasing amounts of noise can be added to working memory model over time
+
 - When done with cue models, move to [liquid state machines](https://medium.com/@noraveshfarshad/reservoir-computing-model-of-prefrontal-cortex-4cf0629a8eff#:~:text=In%20a%20reservoir%20computing%20model,as%20visual%20or%20auditory%20cues.) (also accessible [here](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1006624))
   - Liquid state machine with discrete neuron reservoir then spiking reservoir
   - Creating a stable liquid
@@ -238,7 +263,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Can also check the stability of liquid as metric
   - Could also check EEG to see if processing is similar to focused brain activity
   - Model of memory using reservoir compute and R-STDP could model effects of dopamine by modulating relevant R-STDP parameters and modulating the neuron parameters as well, could also model effects of drugs by training first and the messing with modulated values
-- When done modeling memory, attempt general classification tasks with liquid state machines
+
+- When done with basic principles of liquid state machine, attempt general classification tasks with liquid state machines
   - Implementations of liquid state machines and reservoir computing ([Matlab](https://github.com/dmeoli/ComputationalNeuroscience), [Brian2](https://github.com/ricardodeazambuja/SNN-Experiments/blob/master/Implementing%20a%20Liquid%20State%20Machine%20using%20Brian%20Simulator/Implementing%20a%20Liquid%20State%20Machine%20using%20Brian%20Simulator.ipynb))
 - Liquid state machine + stable attractor
   - Stable attractor connected to reservoir with feedback (going into attractor could be trainable wheras back into liquid is not)
@@ -251,22 +277,31 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Benchmarking the different classifers, (liquid state machine, liquid state machine with n liquids, liquid state machine + x attractor, liquid state machine + n attractors, etc)
   - Could try this with reinforcement learning models
 
+- Model of cognition
+  - Use head direction attractor and grid cell attractor as input to a liquid reservoir in a liquid state machine, attempt to solve navigation task using this combination of liquid mechanics and attractor mechanics
+  - Eventually expand this to a more general system where attractor forms patterns based on internals of liquid through STDP on sections of the liquid, this should allow for more long term memory storage
+    - Attractor would take input from the liquid and output back to the liquid
+    - Multiple attractors could be used (likely point attractors)
+    - Should test for stability after training by running model and probing attractors
+  - Could test recurrence in liquid state machine's readout layer to model further aspects of the brain
+    - Test effect of backwards and forward connectivity, increasing backward connectivity could be mechanism of hallucination
+
 - Modeling hallucinations
   - Testing of effect of noise in liquid state machine or Hopfield network and convergence, testing of pruning neuronal connections on convergence
   - Hallucinations are mischaracterization of sensory stimuli (generally the absence of stimuli being mischaracterized as present stimuli) (may need visual or auditory/speech model for lsm) while memory issues are misrecall over time (temporal mischaracterization)
     - (could train model on whether word is detected or not, test what it detects on absence of words and then induce hallucinations conditions)
   - Noise could either be direct bayesian modulation of input or input noise from surrounding poisson neurons (latter may be more accurate)
   - Testing how different converging states are from one another, seeing how different signal to noise ratio is
-  - Small world architecture in liquid state machine (various interconnected hubs, ie different connected liquids or stable attractors) effect of cutting off hubs and increasing path size between hubs
+  - Small world architecture in liquid state machine (various interconnected hubs, ie different connected liquids or stable attractors) effect of cutting off hubs and increasing path size between hubs or decreasing connectivity between hubs in other ways
   - Liquid state machine could be used to test this as well as spiking Hopfield networks, ideally a liquid state machine with explicit working memory in the form of some connected stable attractor
     - Liquid state machine could either be used to classify a given stimulus (visual or auditory)
     - Hallicunation could be considered when absence of stimuli generate readouts that say there exists auditory stimuli
     - Could also be considered a general misclassification
     - Could also have a liquid state machine generate a grid pattern on readout given an input similar to a Hopfield network
 
-- [Gap junction equation and various models for different currents](https://www.maths.nottingham.ac.uk/plp/pmzsc/cnn/CNN4.pdf)
+- Eventually try liquid state machine management task
 
-- Phase plane analysis of adaptive $w$ and voltage $v$ values
+- [Gap junction equation and various models for different currents](https://www.maths.nottingham.ac.uk/plp/pmzsc/cnn/CNN4.pdf)
 
 - Look into delta rule for learning
 - [Implementation details of a Izhikevich R-STDP synapse](https://link.springer.com/article/10.1007/s00521-022-07220-6)
