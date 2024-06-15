@@ -348,6 +348,7 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     };
 // }
 
+// should be a private method of lattice
 // fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
 //     cell_grid: &CellGrid<T>, 
 //     graph: &U,
@@ -379,6 +380,7 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     return input_val;
 // }
 
+// should be a private method of lattice
 // fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
 //     cell_grid: &CellGrid<T>, 
 //     graph: &U,
@@ -435,9 +437,11 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     impl_reset_timing!();
 
 //     // should always be averaged
-//     fn calculate_internal_inputs(&self) -> 
+//     // external inputs should be passed to this function
+//     // external inputs relate desired neuron to neurons in other grid
+//     fn calculate_inputs(&self) -> 
 //     (HashMap<Position, f64>, Option<HashMap<Pos, NeurotransmitterConcentrations>>) {
-//         let internal_neurotransmitter_inputs = match self.do_receptor_kinetics {
+//         let neurotransmitter_inputs = match self.do_receptor_kinetics {
 //             true => {
 //                 let neurotransmitters: HashMap<Position, NeurotransmitterConcentrations> = graph.get_every_node()
 //                     .iter()
@@ -471,7 +475,7 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //         //     });
 //         //     .collect();
 
-//         let internal_inputs = self.graph.get_every_node()
+//         let inputs = self.graph.get_every_node()
 //             .iter()
 //             .map(|pos| {
 //                 let input_positions = graph.get_incoming_connections(&pos).expect("Cannot find position");
@@ -487,14 +491,19 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //                 (pos, input)
 //             });
 
-//         (internal_inputs, internal_neurotransmitter_inputs)
+//         (internal_inputs, neurotransmitter_inputs)
 //     }
 
+    // should have private run lattice function should just take inputs as an argument
+    // one version would be just calculating the interal inputs
+    // one would take the external inputs
+    // and two more versions would do the same but with only electrical synapses
+    // stdp weight update functionality should be abstracted to a function
 //     pub fn run_lattice(
 //         &mut self, 
 //         iterations: usize,
-//         external_inputs: HashMap<Position, f64>, 
-//         external_neurotransmitter_inputs: Option<HashMap<Position, NeurotransmitterType>>,
+//         external_inputs: HashMap<Position, Vec<f64>>, 
+//         external_neurotransmitter_inputs: Option<HashMap<Position, Vec<NeurotransmitterConcentrations>>>,
 //     ) -> Result<()> {
 //         match (self.do_receptor_kinetics, external_neurotransmitter_inputs) {
 //             (true, Some(_)) => {},
@@ -517,18 +526,18 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //             // modify the voltage and handle stdp
 //             // end loop
 
-//             let (internal_inputs, internal_neurotransmitter_inputs) = self.calculate_internal_inputs();
+//             let (inputs, neurotransmitter_inputs) = self.calculate_internal_inputs();
     
 //             // could be changed to graph.get_every_node()
 //             for pos in graph.get_every_node() {
 //                 let (x, y) = *pos;
-//                 let input_value = *internal_inputs.get(&pos).unwrap();
+//                 let input_value = *inputs.get(&pos).unwrap();
     
 //                 // if cloning becomes performance bottleneck
 //                 // calculate bayesian factor within iterate function
 //                 // apply bayesian there and to each part of neurotransmitter in update receptor kinetics
 //                 // necessary to keep input hashmaps immutable for the sake of simplicity and interfacing
-//                 let input_neurotransmitter = match internal_neurotransmitter_inputs {
+//                 let input_neurotransmitter = match neurotransmitter_inputs {
 //                     Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
 //                     None => None,
 //                 };
