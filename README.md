@@ -160,6 +160,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Methods should include
     - **`iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1**, should be able to take in a hashmap of inputs, in this case both electrical and neurotransmitter
     - **`iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses**, should be able to take in a hashmap of inputs, in this case only electrical
+  - Multiple lattices
+    - Should have cell grids and internal graphs in a hashmap, key is the id of the grid
+    - Should have another field for graphs connecting lattices
+    - In every input calculation, whether the neuron is in the other graphs connecting each lattice is checked (O(1) for a hashmap per connecting graph)
   - Should expose EEG tooling correlation and fitting methods
     - **Write method that takes in one Hodgkin Huxley model and fits Izhikevich neuron to it**
     - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
@@ -279,7 +283,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Model of cognition
   - Use head direction attractor and grid cell attractor as input to a liquid reservoir in a liquid state machine, attempt to solve navigation task using this combination of liquid mechanics and attractor mechanics
-  - Eventually expand this to a more general system where attractor forms patterns based on internals of liquid through STDP on sections of the liquid, this should allow for more long term memory storage
+  - Eventually expand this to a more general system where attractor forms patterns based on internals of liquid through STDP on sections of the liquid, this should allow for more long term memory storage or conceptual representations
     - Attractor would take input from the liquid and output back to the liquid
     - Multiple attractors could be used (likely point attractors)
     - Should test for stability after training by running model and probing attractors
