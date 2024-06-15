@@ -7,9 +7,24 @@ use std::{
     ops::Sub,
 };
 use super::{ 
-    impl_bayesian_factor_with_kinetics, impl_current_voltage_with_kinetics, impl_gap_conductance_with_kinetics, impl_last_firing_time_with_kinetics, impl_necessary_iterate_and_spike_traits, impl_potentiation_with_kinetics, impl_stdp_with_kinetics, iterate_and_spike::ReceptorKinetics, BayesianFactor, BayesianParameters, CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, Potentiation, PotentiationType, STDPParameters, STDP
+    iterate_and_spike::{
+        ReceptorKinetics, BayesianFactor, BayesianParameters, 
+        CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
+        Potentiation, PotentiationType, STDPParameters, STDP,
+        LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters
+    },
+    impl_bayesian_factor_with_kinetics, 
+    impl_current_voltage_with_kinetics, 
+    impl_gap_conductance_with_kinetics, 
+    impl_last_firing_time_with_kinetics, 
+    impl_potentiation_with_kinetics, 
+    impl_stdp_with_kinetics, 
+    impl_necessary_iterate_and_spike_traits, 
 };
 
+
+// CHECK THIS PAPER TO CREATE MORE ION CHANNELS WHEN REFACTORING
+// https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/25282547/
 
 // https://webpages.uidaho.edu/rwells/techdocs/Biological%20Signal%20Processing/Chapter%2004%20The%20Biological%20Neuron.pdf
 
