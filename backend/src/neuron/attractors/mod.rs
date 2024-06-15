@@ -20,14 +20,14 @@ impl Default for DiscreteNeuron {
 }
 
 impl DiscreteNeuron {
-    fn update(&mut self, input: f64) {
+    pub fn update(&mut self, input: f64) {
         match input > 0. {
             true => self.state = DiscreteNeuronState::Active,
             false => self.state = DiscreteNeuronState::Inactive,
         }
     }
 
-    fn state_to_numeric(&self) -> f64 {
+    pub fn state_to_numeric(&self) -> f64 {
         match &self.state {
             DiscreteNeuronState::Active => 1.,
             DiscreteNeuronState::Inactive => -1.,
@@ -115,7 +115,7 @@ pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
     Ok(weights)
 }
 
-pub fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern: Vec<Vec<isize>>) {
+pub fn input_pattern_into_discrete_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern: Vec<Vec<isize>>) {
     for (i, pattern_vec) in pattern.iter().enumerate() {
         for (j, value) in pattern_vec.iter().enumerate() {
             cell_grid[i][j].update(*value as f64);
@@ -153,7 +153,7 @@ pub fn iterate_discrete_hopfield_network<T: GraphFunctionality>(
     Ok(())
 }
 
-pub fn convert_hopfield_network(cell_grid: &Vec<Vec<DiscreteNeuron>>) -> Vec<Vec<isize>> {
+pub fn convert_discrete_hopfield_network(cell_grid: &Vec<Vec<DiscreteNeuron>>) -> Vec<Vec<isize>> {
     let mut output: Vec<Vec<isize>> = Vec::new();
 
     for i in cell_grid.iter() {
