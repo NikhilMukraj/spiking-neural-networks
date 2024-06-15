@@ -1,7 +1,7 @@
 use std::io::Result;
 use rand::Rng;
 use crate::graph;
-use graph::GraphFunctionality;
+use graph::{GraphFunctionality, GraphPosition};
 
 
 pub enum DiscreteNeuronState {
@@ -57,13 +57,14 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
     num_rows: usize, 
     num_cols: usize, 
+    graph_id: usize,
     data: &Vec<Vec<Vec<isize>>>
 ) -> Result<T> {
     let mut weights = T::default();
 
     for i in 0..num_rows {
         for j in 0..num_cols {
-            weights.add_vertex((i, j));
+            weights.add_vertex(GraphPosition { id: graph_id, pos: (i, j)});
         }
     }
 
@@ -78,6 +79,9 @@ pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
             for (j, value) in weight_vec.iter().enumerate() {
                 let coming = first_dimensional_index_to_position(i, num_cols);
                 let going = first_dimensional_index_to_position(j, num_cols);
+
+                let coming = GraphPosition { id: graph_id, pos: coming };
+                let going = GraphPosition { id: graph_id, pos: going };
 
                 //   1 2 3 ...
                 // 1 . . .
@@ -106,6 +110,8 @@ pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
         }  
     } 
 
+    weights.set_id(graph_id);
+
     Ok(weights)
 }
 
@@ -117,19 +123,26 @@ pub fn input_pattern_into_grid(cell_grid: &mut Vec<Vec<DiscreteNeuron>>, pattern
     }
 }
 
-pub fn iterate_hopfield_network<T: GraphFunctionality>(
+pub fn iterate_discrete_hopfield_network<T: GraphFunctionality>(
     cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
     weights: &T, 
 ) -> Result<()> {
+    let id = weights.get_id();
+
     for i in 0..cell_grid.len() {
         for j in 0..cell_grid[0].len() {
-            let input_positions = weights.get_incoming_connections(&(i, j))?;
+            let current_pos = GraphPosition { id: id, pos: (i, j)};
+
+            let input_positions = weights.get_incoming_connections(&current_pos)?;
 
             // if there is problem with convergence it is likely this calculation
             let input_value: f64 = input_positions.iter()
-                .map(|(pos_i, pos_j)| 
-                    weights.lookup_weight(&(*pos_i, *pos_j), &(i, j)).unwrap().unwrap() 
-                    * cell_grid[*pos_i][*pos_j].state_to_numeric()
+                .map(|graph_pos| {
+                        let (pos_i, pos_j) = graph_pos.pos;
+
+                        weights.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
+                        * cell_grid[pos_i][pos_j].state_to_numeric()
+                    }
                 )
                 .sum();
 
