@@ -349,20 +349,20 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 // }
 
 // should be a private method of lattice
-// fn get_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+// fn get_internal_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
 //     cell_grid: &CellGrid<T>, 
 //     graph: &U,
-//     position: &Position,
-//     input_positions: &HashSet<Position>, 
+//     position: &GraphPosition,
+//     input_positions: &HashSet<GraphPosition>, 
 //     bayesian: bool,
 // ) -> f64 {
-//     let (x, y) = position;
+//     let (x, y) = position.pos;
 //     let postsynaptic_neuron = &cell_grid[*x][*y];
 
 //     let mut input_val = input_positions
 //         .iter()
 //         .map(|input_position| {
-//             let (pos_x, pos_y) = input_position;
+//             let (pos_x, pos_y) = input_position.pos;
 //             let input_cell = &cell_grid[*pos_x][*pos_y];
 
 //             let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
@@ -381,18 +381,18 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 // }
 
 // should be a private method of lattice
-// fn get_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
+// fn get_internal_neurotransmitter_input_from_positions<T: IterateAndSpike, U: GraphFunctionality>(
 //     cell_grid: &CellGrid<T>, 
 //     graph: &U,
-//     position: &Position,
-//     input_positions: &HashSet<Position>, 
+//     position: &GraphPosition,
+//     input_positions: &HashSet<GraphPosition>, 
 //     bayesian: bool,
 // ) -> NeurotransmitterConcentrations {
 //     let input_vals = input_positions
 //         .iter()
 //         .map(|input_position| {
-//             let (pos_x, pos_y) = input_position;
-//             let input_cell = &cell_grid[*pos_x][*pos_y];
+//             let (pos_x, pos_y) = input_position.pos;
+//             let input_cell = &cell_grid[pos_x][pos_y];
 
 //             let mut final_input = input_cell.get_neurotransmitter_concentrations();
 //             let weight = graph.lookup_weight(&input_position, position).unwrap().unwrap();
@@ -406,8 +406,8 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
 //     if bayesian {
-//         let (x, y) = position;
-//         weight_neurotransmitter_concentration(&mut input_val, cell_grid[*x][*y].get_bayesian_factor());
+//         let (x, y) = position.pos;
+//         weight_neurotransmitter_concentration(&mut input_val, cell_grid[x][y].get_bayesian_factor());
 //     }
 
 //     weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
