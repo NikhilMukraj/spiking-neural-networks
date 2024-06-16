@@ -167,7 +167,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should expose EEG tooling correlation and fitting methods
     - **Write method that takes in one Hodgkin Huxley model and fits Izhikevich neuron to it**
     - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
-  - Hodgkin Huxley model should refactor additional gates enum into a trait
+  - **Hodgkin Huxley model should refactor additional gates enum into a trait**
+    - Could have an example with integrate and fire neuron that has an additional gate
   - `IterateAndSpike` trait should be exposed (along with relevant macros)
     - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
     - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation or a macro to translate equations to `IterateAndSpike` trait
@@ -179,6 +180,15 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Redo results images
   
 - **Fitting refactor**
+
+- Multiple lattices struct
+  - Hashmap of lattice struct where key is graph id
+  - Hashmap of spike train lattice struct where key is also an id
+  - When calculating inputs between lattices, for each neuron check internal graph for that cell grid, and then check if that neuron is in the connecting graphs
+    - Pass the hashmap of lattices as a reference as well as a hashset of all the presynaptic graph positions and a reference to all the connecting graphs (as a hashmap, key is id of graph)
+      - A hashmap of the spike train lattices should also be passed through
+    - This should be a method on the multiple lattices struct
+    - Iterate through each presynaptic graph position to get the weights and then grab the reference to the specific neuron to generate the inputs
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
   - **Neurotransmitter approximation refactor should come before Lixirnet**
@@ -210,6 +220,27 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
 
+### Classifier/Regression Model Notes
+
+- [Biologically plausible STDP based classifier](https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full)
+  - Only STDP is used
+  - Output is dictated as neuron that has the highest firing rate when data is presented
+  - After the rates are measured the neurons are assigned a class label
+  - [Code example](https://github.com/libgirlenterprise/WheatNNLeek/tree/master)
+
+- Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
+
+- Attractor based classifier
+
+- R-STDP based classifier
+- R-STDP based regression
+
+- R-STDP based liquid state machine classifier/regression
+  - Regression could be predicting a system differential equations representing some physics or some strange attractor
+  - Liquid + attractors
+    - Test performance of different attractor and combinations of liquids and attractors
+  - Testing performance of different number of liquids and different connectivity between liquids effect
+
 ### Biological Models Notes
 
 - Hopfield network
@@ -227,6 +258,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [Ring attractor in julia](https://github.com/wl17443/ring-attractor/blob/master/src/ring-attractor.jl)
   - Should try modeling head direction cells as a ring attractor (see [https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5613981/]), could use gaussian function to get weights where x is the postynaptic neuron's index and b is the presynaptic, a global inhibition term could be added to the weight (minus k), should also test it without a global inhibitory constant subtraction
     - Gaussian function: $f(x) = ae^\frac{-(i-j)^2}{2c^2} - k$, $i$ is index of presynaptic neuron, $j$ is index of postsynaptic neuron
+  - Weights may need some degree of asymmetry to work properly
   - Weights may or may not necessarily need inhibitory connections ($k$ may or may not be necessary)
     - `Nearby cells are connected by strong excitatory synapses, with the strength of excitation proportional to the angular distance between the cells on the ring. Cells that are far apart on the ring are connected with inhibitory synapses. If the strength of excitation and inhibition is appropriately tuned, such an architecture exhibits attractor dynamics.`
   - [Relevant model](https://isn.ucsd.edu/courses/beng260/2019/reports/Yao_Du_Ring_Attractor_Project_Report.pdf)
