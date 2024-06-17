@@ -234,7 +234,7 @@ impl<T: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T> {
 /// firing times the neuron fires, the internal clock is reset once it reaches the maximum value
 /// and cyclees through the designated firing times again
 #[derive(Debug, Clone)]
-struct PresetSpikeTrain<T: NeuralRefractoriness> {
+pub struct PresetSpikeTrain<T: NeuralRefractoriness> {
     /// Membrane potential (mV)
     pub current_voltage: f64,
     /// Maximum voltage (mV)
