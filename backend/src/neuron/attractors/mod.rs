@@ -47,6 +47,77 @@ impl DiscreteNeuron {
     }
 }
 
+/// Simple lattice of bipolar discrete neurons with a weight matrix
+pub struct DiscreteNeuronLattice<T: GraphFunctionality>{
+    cell_grid: Vec<Vec<DiscreteNeuron>>,
+    weights: T,
+}
+
+impl<T: GraphFunctionality> Default for DiscreteNeuronLattice<T> {
+    fn default() -> Self {
+        DiscreteNeuronLattice {
+            cell_grid: vec![],
+            weights: T::default(),
+        }
+    }
+}
+
+impl<T: GraphFunctionality> DiscreteNeuronLattice<T> {
+    /// Sets state of given grid of discrete neurons to the given, if value
+    /// in pattern is greater than 0 the corressponding state is set to `Active`,
+    /// otherwise it is set to `Inactive`
+    pub fn input_pattern_into_discrete_grid(&mut self, pattern: Vec<Vec<isize>>) {
+        for (i, pattern_vec) in pattern.iter().enumerate() {
+            for (j, value) in pattern_vec.iter().enumerate() {
+                self.cell_grid[i][j].update(*value as f64);
+            }
+        }
+    }
+
+    /// Converts the given network of discrete neurons to a grid of `isize` values
+    pub fn convert_to_numerics(&self) -> Vec<Vec<isize>> {
+        let mut output: Vec<Vec<isize>> = Vec::new();
+
+        for i in self.cell_grid.iter() {
+            let mut output_vec: Vec<isize> = Vec::new();
+            for j in i.iter() {
+                output_vec.push(j.state_to_numeric());
+            }
+
+            output.push(output_vec);
+        }
+
+        output
+    }
+
+    /// Iterates the discrete network of neurons based on the weights between neurons
+    pub fn iterate(&mut self) -> Result<()> {
+        let id = self.weights.get_id();
+
+        for i in 0..self.cell_grid.len() {
+            for j in 0..self.cell_grid[0].len() {
+                let current_pos = GraphPosition { id: id, pos: (i, j)};
+
+                let input_positions = self.weights.get_incoming_connections(&current_pos)?;
+
+                let input_value: f64 = input_positions.iter()
+                    .map(|graph_pos| {
+                            let (pos_i, pos_j) = graph_pos.pos;
+
+                            self.weights.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
+                            * self.cell_grid[pos_i][pos_j].state_to_numeric() as f64
+                        }
+                    )
+                    .sum();
+
+                self.cell_grid[i][j].update(input_value);
+            }
+        }
+
+        Ok(())
+    }
+}
+
 fn outer_product(a: &Vec<isize>, b: &Vec<isize>) -> Vec<Vec<isize>> {
     let mut output: Vec<Vec<isize>> = Vec::new();
 
@@ -146,66 +217,6 @@ pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
     }
 
     Ok(weights)
-}
-
-/// Sets state of given grid of discrete neurons to the given, if value
-/// in pattern is greater than 0 the corressponding state is set to `Active`,
-/// otherwise it is set to `Inactive`
-pub fn input_pattern_into_discrete_grid(
-    cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
-    pattern: Vec<Vec<isize>>
-) {
-    for (i, pattern_vec) in pattern.iter().enumerate() {
-        for (j, value) in pattern_vec.iter().enumerate() {
-            cell_grid[i][j].update(*value as f64);
-        }
-    }
-}
-
-/// Iterates the discrete network of neurons based on the weights between neurons
-pub fn iterate_discrete_network<T: GraphFunctionality>(
-    cell_grid: &mut Vec<Vec<DiscreteNeuron>>, 
-    weights: &T, 
-) -> Result<()> {
-    let id = weights.get_id();
-
-    for i in 0..cell_grid.len() {
-        for j in 0..cell_grid[0].len() {
-            let current_pos = GraphPosition { id: id, pos: (i, j)};
-
-            let input_positions = weights.get_incoming_connections(&current_pos)?;
-
-            let input_value: f64 = input_positions.iter()
-                .map(|graph_pos| {
-                        let (pos_i, pos_j) = graph_pos.pos;
-
-                        weights.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
-                        * cell_grid[pos_i][pos_j].state_to_numeric() as f64
-                    }
-                )
-                .sum();
-
-            cell_grid[i][j].update(input_value);
-        }
-    }
-
-    Ok(())
-}
-
-/// Converts the given network of discrete neurons to a grid of `isize` values
-pub fn convert_discrete_network_to_numerics(cell_grid: &Vec<Vec<DiscreteNeuron>>) -> Vec<Vec<isize>> {
-    let mut output: Vec<Vec<isize>> = Vec::new();
-
-    for i in cell_grid.iter() {
-        let mut output_vec: Vec<isize> = Vec::new();
-        for j in i.iter() {
-            output_vec.push(j.state_to_numeric());
-        }
-
-        output.push(output_vec);
-    }
-
-    output
 }
 
 /// Adds random noise to a given pattern based on a given `noise_level` between `0.` and `1.`
