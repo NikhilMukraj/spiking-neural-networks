@@ -178,6 +178,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [how to write documentation](https://blog.guillaume-gomez.fr/articles/2020-03-12+Guide+on+how+to+write+documentation+for+a+Rust+crate)
     - Update obsidian code and equations accordingly
     - Redo results images
+    - **Examples should be detailed in documentation as well**
   
 - **Fitting refactor**
 
