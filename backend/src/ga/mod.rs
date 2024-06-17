@@ -1,3 +1,5 @@
+//! A basic parallelized genetic algorithm implementation.
+
 use std::{
     io::{Error, ErrorKind, Result},
     collections::HashMap,
@@ -6,7 +8,7 @@ use std::{
 use rand::Rng;
 use rayon::prelude::*;
 
-
+/// Bitstring to use as a chromosome
 #[derive(Clone)]
 pub struct BitString {
     pub string: String
@@ -24,14 +26,13 @@ impl BitString {
     }
 
     fn set(&mut self, new_string: String) -> Result<()> {
-        // check after initalization
-
         self.string = new_string;
 
         return self.check();
     }
 
-    fn length(&self) -> usize {
+    /// Returns the length of the bit string
+    pub fn length(&self) -> usize {
         self.string.len()
     }
 }
@@ -68,7 +69,7 @@ fn mutate(bitstring: &mut BitString, r_mut: f64) {
     }
 }
 
-fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: usize) -> BitString {
+fn selection(pop: &Vec<BitString>, scores: &Vec<f64>, k: usize) -> BitString {
     // default should be 3
     let mut rng_thread = rand::thread_rng(); 
     let mut selection_index = rng_thread.gen_range(1..pop.len());
@@ -87,7 +88,11 @@ fn selection(pop: &Vec::<BitString>, scores: &Vec::<f64>, k: usize) -> BitString
     return pop[selection_index].clone();
 }
 
-pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> Result<Vec<f64>> {
+/// Decodes the given bitstring given the number of bits in each bit substring and scales 
+/// the output based on the given `bounds`, the length of the `bounds` must match the number
+/// of substrings in the bitstring, `bounds` should be a vector of tuples where the first item is the 
+/// minimum value for scaling and the second item is the maximal value for scaling
+pub fn decode(bitstring: &BitString, bounds: &Vec<(f64, f64)>, n_bits: usize) -> Result<Vec<f64>> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
@@ -111,7 +116,7 @@ pub fn decode(bitstring: &BitString, bounds: &Vec<Vec<f64>>, n_bits: usize) -> R
                 Error::new(ErrorKind::Other, format!("Non binary substring found or overflow: {}", substring))
             ),
         };
-        value = value * (bounds[i][1] - bounds[i][0]) / maximum + bounds[i][0];
+        value = value * (bounds[i].1 - bounds[i].0) / maximum + bounds[i].0;
 
         decoded_vec[i] = value;
     }
@@ -133,10 +138,29 @@ fn create_random_string(length: usize) -> BitString {
     return BitString {string: random_string};
 }
 
-// use par_iter to calculate objective scores
+/// Executes the genetic algorithm given a objective function, (`f`), that takes in parameters
+/// to decode the given bitstring as well as additional settings to use in the
+/// objective function
+/// 
+/// `bounds` should be a vector of tuples where the first item is the 
+/// minimum value for scaling and the second item is the maximal value for scaling
+/// 
+/// `n_bits` should be the number of bits per substring in each chromosomal bitstring
+/// 
+/// `n_iter` should be the number of iterations to use
+/// 
+/// `n_pop` should be the size of the population and even
+/// 
+/// `r_cross` should be the chance of cross over
+/// 
+/// `r_mut` should be the chance of mutation
+/// 
+/// `k` controls size of tournament during selection process, recommended to keep at `3`
+/// 
+/// `settings` should be any additional parameters necessary in the objective function
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<Vec<f64>>, usize, &HashMap<&str, T>) -> Result<f64>, 
-    bounds: &Vec<Vec<f64>>, 
+    f: fn(&BitString, &Vec<(f64, f64)>, usize, &HashMap<&str, T>) -> Result<f64>, 
+    bounds: &Vec<(f64, f64)>, 
     n_bits: usize, 
     n_iter: usize, 
     n_pop: usize, 
@@ -145,10 +169,14 @@ pub fn genetic_algo<T: Sync>(
     k: usize, 
     settings: &HashMap<&str, T>,
 ) -> Result<(BitString, f64, Vec<Vec<f64>>)> {
+    if n_pop % 2 != 0 {
+        return Err(Error::new(ErrorKind::InvalidInput, "n_pop should be even"))
+    }
+
     let mut pop: Vec<BitString> = (0..n_pop)
         .map(|_x| create_random_string(n_bits * bounds.len()))
         .collect();
-    // let (mut best, mut best_eval) = (&pop[0], objective(&pop[0], &bounds, n_bits, &settings));
+
     let mut best = pop[0].clone();
     let mut best_eval = match f(&pop[0], &bounds, n_bits, &settings) {
         Ok(best_eval_result) => best_eval_result,
@@ -180,38 +208,10 @@ pub fn genetic_algo<T: Sync>(
             }
         }
 
-        // parallel refactor needs testing
-        // let min_score_index: Option<usize> = scores
-        //     .iter()
-        //     .enumerate()
-        //     .min_by(|(_, a), (_, b)| a.total_cmp(b))
-        //     .map(|(index, _)| index);
-
-        // if scores[min_score_index] < best_eval {
-        //     best = pop[min_score_index];
-        //     best_eval = scores[min_score_index];
-        //     println!("new string: {}, score: {}", &pop[min_score_index].string, &scores[min_score_index]);
-        // }
-
-        // let selected: Vec<BitString> = (0..n_pop)
-        //     .map(|_x| selection(&pop, &scores, k))
-        //     .collect();
-
         let selected: Vec<BitString> = (0..n_pop)
             .into_par_iter()
             .map(|_| selection(&pop, &scores, k))
             .collect();
-
-        // let mut children: Vec<BitString> = Vec::new();
-        // for i in (0..n_pop as usize).step_by(2) {
-        //     // let (parent1, parent2) = (selected[i].clone(), selected[i+1].clone());
-        //     let new_children = crossover(&selected[i], &selected[i+1], r_cross);
-        //     let mut new_children_vec = vec![new_children.0, new_children.1];
-        //     for child in new_children_vec.iter_mut() {
-        //         mutate(child, r_mut);
-        //         children.push(child.clone());
-        //     }
-        // }
 
         let children = (0..n_pop)
             .into_par_iter()
