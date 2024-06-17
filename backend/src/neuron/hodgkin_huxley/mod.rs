@@ -135,8 +135,6 @@ pub struct HighVoltageActivatedCalciumChannel {
     h: f64,
     h_a: f64,
     h_b: f64,
-    // ca_in: f64,
-    // ca_out: f64,
     gca_bar: f64,
     ca_rev: f64,
     current: f64,
@@ -144,13 +142,6 @@ pub struct HighVoltageActivatedCalciumChannel {
 
 impl Default for HighVoltageActivatedCalciumChannel {
     fn default() -> Self {
-        let r: f64 = 8.314; // joules * kelvin ^ -1 * mol ^ -1 // universal gas constant
-        let faraday: f64 = 96485.; // coulombs per mole // faraday constant
-        let celsius: f64 = 36.; // degrees c
-        let ca_in: f64 = 0.00024; // mM
-        let ca_out: f64 = 2.; // mM
-        let ca_rev: f64 = 1e3 * ((r * (celsius + 273.15)) / (2. * faraday)) * (ca_out / ca_in).ln(); // nernst equation
-
         HighVoltageActivatedCalciumChannel {
             m: 0.,
             m_a: 0.,
@@ -158,10 +149,8 @@ impl Default for HighVoltageActivatedCalciumChannel {
             h: 0.,
             h_a: 0.,
             h_b: 0.,
-            // ca_in: ca_in,
-            // ca_out: ca_out,
             gca_bar: 1e-4,
-            ca_rev: ca_rev,
+            ca_rev: 80.,
             current: 0.,
         }
     }
@@ -199,10 +188,6 @@ impl HighVoltageActivatedCalciumChannel {
     fn get_ca_and_update_current(&mut self, voltage: f64, dt: f64) -> f64 {
         self.update_m_and_h_states(voltage, dt);
         self.current = self.gca_bar * self.m.powf(2.) * self.h * (voltage - self.ca_rev);
-
-        // if this isnt working gas constant might be wrong
-        // try to determine where it is reaching inf
-        // println!("m: {}, h: {}", self.m, self.h);
 
         self.current
     }
@@ -249,6 +234,12 @@ impl AdditionalGates {
         }
     }
 }
+
+// pub trait AdditionalGate {
+//     fn initialize(&mut self, voltage: f64);
+//     fn update_current(voltage: f64);
+//     fn get_current(&self) -> f64;
+// }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
 // https://github.com/antgon/msn-model/blob/main/msn/cell.py 
