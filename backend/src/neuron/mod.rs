@@ -1,3 +1,12 @@
+//! A collection of various neuron models as well as methods to connect the neurons together,
+//! simulate neuronal dynamics including basic electrical synapses, neurotransmission,
+//! the effect of ligand gated channels, other channels, integrate and fire models, 
+//! and conductance based models.
+//! 
+//! Also includes various traits that can be implemented to customize neurotransmitter, receptor,
+//! neuronal, and spike train dynamics to the enable the swapping out different models
+//! with new ones without having to rewrite functionality.
+
 use std::{
     f64::consts::PI, 
     collections::{HashMap, HashSet},
