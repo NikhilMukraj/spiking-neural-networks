@@ -24,7 +24,7 @@ pub struct GraphPosition {
 }
 
 /// Implementation of a basic graph
-pub trait GraphFunctionality {
+pub trait GraphFunctionality: Default {
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
