@@ -1,3 +1,7 @@
+//! Various integrate and fire models that implement `IterateAndSpike` 
+//! as well as neurotransmitter and receptor dynamics through
+//! `NeurotransmitterKinetics` and `ReceptorKinetics`.
+
 use std::collections::HashMap;
 use super::{ 
     iterate_and_spike::ReceptorKinetics, BayesianFactor, BayesianParameters, 
@@ -14,6 +18,9 @@ use super::{
 };
 
 
+/// Takes in a static current as an input and iterates the given
+/// neuron for a given duration, set `bayesian` to true to add 
+/// normally distributed noise to the input as it iterates
 pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     cell: &mut T, 
     input: f64, 
@@ -56,27 +63,48 @@ macro_rules! impl_default_neurotransmitter_methods {
 
 pub(crate) use impl_default_neurotransmitter_methods;
 
+/// A leaky integrate and fire neuron
 #[derive(Debug, Clone)]
 pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-    pub current_voltage: f64, // membrane potential (mV)
-    pub v_th: f64, // voltage threshold (mV)
-    pub v_reset: f64, // voltage reset value (mV)
-    pub v_init: f64, // voltage initialization value (mV)
-    pub refractory_count: f64, // counter for refractory period
-    pub tref: f64, // total refractory period
-    pub leak_constant: f64, // leak constant
-    pub integration_constant: f64, // input value modifier
-    pub gap_conductance: f64, // controls conductance of input gap junctions
-    pub e_l: f64, // leak reversal potential (mV)
-    pub g_l: f64, // leak conductance (nS)
-    pub tau_m: f64, // membrane time constant (ms)
-    pub c_m: f64, // membrane capacitance (nF)
-    pub dt: f64, // time step (ms)
+    /// Membrane potential (mV)
+    pub current_voltage: f64, 
+    /// Voltage threshold (mV)
+    pub v_th: f64,
+    /// Voltage reset value (mV)
+    pub v_reset: f64, 
+    /// Voltage initialization value (mV)
+    pub v_init: f64, 
+    /// Counter for refractory period
+    pub refractory_count: f64, 
+    /// Total refractory period (ms)
+    pub tref: f64,
+    /// Leak constant 
+    pub leak_constant: f64, 
+    /// Input value modifier
+    pub integration_constant: f64, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f64, 
+    /// Leak reversal potential (mV)
+    pub e_l: f64, 
+    /// Leak conductance (nS)
+    pub g_l: f64, 
+    /// Membrane time constant (ms)
+    pub tau_m: f64, 
+    /// Membrane capacitance (nF)
+    pub c_m: f64, 
+    /// Time step (ms)
+    pub dt: f64, 
+    /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// STDP parameters
     pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
     pub bayesian_params: BayesianParameters,
+    /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
@@ -110,7 +138,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeuron<T, R> {
-    pub fn get_basic_dv_change(&self, i: f64) -> f64 {
+    /// Calculates the change in voltage given an input current
+    pub fn leaky_get_dv_change(&self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.integration_constant * (i / self.g_l))
@@ -119,6 +148,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeur
         dv
     }
 
+    /// Determines whether the neuron is spiking and resets the voltage
+    /// if so, also handles refractory period
     pub fn basic_handle_spiking(&mut self) -> bool {
         let mut is_spiking = false;
 
@@ -139,7 +170,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
     impl_default_neurotransmitter_methods!();
 
     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
-        let dv = self.get_basic_dv_change(input_current);
+        let dv = self.leaky_get_dv_change(input_current);
         self.current_voltage += dv;
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
@@ -155,7 +186,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
 
-        let dv = self.get_basic_dv_change(input_current);
+        let dv = self.leaky_get_dv_change(input_current);
         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
@@ -206,31 +237,56 @@ macro_rules! impl_iterate_and_spike {
     };
 }
 
+/// An adaptive leaky integrate and fire neuron
 #[derive(Debug, Clone)]
 pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-    pub current_voltage: f64, // membrane potential (mV)
-    pub v_th: f64, // voltage threshold (mV)
-    pub v_reset: f64, // voltage reset value (mV)
-    pub v_init: f64, // voltage initialization value (mV)
-    pub refractory_count: f64, // counter for refractory period
-    pub tref: f64, // total refractory period
-    pub alpha: f64, // arbitrary paramterization value
-    pub beta: f64, // arbitrary paramterization value
-    pub w_value: f64, // adaptive value
-    pub w_init: f64, // adaptive value initialization
-    pub leak_constant: f64, // leak constant
-    pub integration_constant: f64, // input value modifier
-    pub gap_conductance: f64, // controls conductance of input gap junctions
-    pub e_l: f64, // leak reversal potential (mV)
-    pub g_l: f64, // leak conductance (nS)
-    pub tau_m: f64, // membrane time constant (ms)
-    pub c_m: f64, // membrane capacitance (nF)
-    pub dt: f64, // time step (ms)
+    /// Membrane potential (mV)
+    pub current_voltage: f64, 
+    /// Voltage threshold (mV)
+    pub v_th: f64, 
+    /// Voltage reset value (mV)
+    pub v_reset: f64, 
+    /// Voltage initialization value (mV)
+    pub v_init: f64, 
+    /// Counter for refractory period
+    pub refractory_count: f64, 
+    /// Total refractory period (ms)
+    pub tref: f64, 
+    /// Controls effect of leak reverse potential on adaptive value update
+    pub alpha: f64, 
+    /// Controls how adaptive value is changed in spiking
+    pub beta: f64, 
+    /// Adaptive value
+    pub w_value: f64, 
+    /// Adaptive value initialization
+    pub w_init: f64, 
+    /// Leak constant
+    pub leak_constant: f64, 
+    /// Input value modifier
+    pub integration_constant: f64, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f64, 
+    /// Leak reversal potential (mV)
+    pub e_l: f64, 
+    /// Leak conductance (nS)
+    pub g_l: f64, 
+    /// Membrane time constant (ms)
+    pub tau_m: f64, 
+    /// Membrane capacitance (nF)
+    pub c_m: f64, 
+    /// Time step (ms)
+    pub dt: f64, 
+    /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// STDP parameters
     pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
     pub bayesian_params: BayesianParameters,
+    /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
@@ -269,6 +325,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
 
 macro_rules! impl_adaptive_default_methods {
     () => {
+        /// Calculates how adaptive value changes
         pub fn adaptive_get_dw_change(&self) -> f64 {
             let dw = (
                 self.alpha * (self.current_voltage - self.e_l) -
@@ -278,7 +335,8 @@ macro_rules! impl_adaptive_default_methods {
             dw
         }
     
-        
+        /// Determines whether the neuron is spiking, resets the voltage and 
+        /// updates the adaptive value if spiking, also handles refractory period
         pub fn adaptive_handle_spiking(&mut self) -> bool {
             let mut is_spiking = false;
     
@@ -298,6 +356,7 @@ macro_rules! impl_adaptive_default_methods {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
+    /// Calculates the change in voltage given an input current
     pub fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -318,32 +377,58 @@ impl_iterate_and_spike!(
     adaptive_handle_spiking
 );
 
+/// An adaptive exponential leaky integrate and fire neuron
 #[derive(Debug, Clone)]
 pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-    pub current_voltage: f64, // membrane potential (mV)
-    pub v_th: f64, // voltage threshold (mV)
-    pub v_reset: f64, // voltage reset value (mV)
-    pub v_init: f64, // voltage initialization value (mV)
-    pub refractory_count: f64, // counter for refractory period
-    pub tref: f64, // total refractory period
-    pub alpha: f64, // arbitrary paramterization value
-    pub beta: f64, // arbitrary paramterization value
-    pub slope_factor: f64, // controls steepness
-    pub w_value: f64, // adaptive value
-    pub w_init: f64, // adaptive value initialization
-    pub leak_constant: f64, // leak constant
-    pub integration_constant: f64, // input value modifier
-    pub gap_conductance: f64, // controls conductance of input gap junctions
-    pub e_l: f64, // leak reversal potential (mV)
-    pub g_l: f64, // leak conductance (nS)
-    pub tau_m: f64, // membrane time constant (ms)
-    pub c_m: f64, // membrane capacitance (nF)
-    pub dt: f64, // time step (ms)
+    /// Membrane potential (mV)
+    pub current_voltage: f64, 
+    /// Voltage threshold (mV)
+    pub v_th: f64, 
+    /// Voltage reset value (mV)
+    pub v_reset: f64, 
+    /// Voltage initialization value (mV)
+    pub v_init: f64, 
+    /// Counter for refractory period
+    pub refractory_count: f64, 
+    /// Total refractory period (ms)
+    pub tref: f64, 
+    /// Controls effect of leak reverse potential on adaptive value update
+    pub alpha: f64, 
+    /// Controls how adaptive value is changed in spiking
+    pub beta: f64, 
+    /// Controls steepness
+    pub slope_factor: f64, 
+    /// Adaptive value
+    pub w_value: f64, 
+    /// Adaptive value initialization
+    pub w_init: f64, 
+    /// Leak constant
+    pub leak_constant: f64, 
+    /// Input value modifier
+    pub integration_constant: f64, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f64, 
+    /// Leak reversal potential (mV)
+    pub e_l: f64, 
+    /// Leak conductance (nS)
+    pub g_l: f64, 
+    /// Membrane time constant (ms)
+    pub tau_m: f64, 
+    /// Membrane capacitance (nF)
+    pub c_m: f64, 
+    /// Time step (ms)
+    pub dt: f64, 
+    /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// STDP parameters
     pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
     pub bayesian_params: BayesianParameters,
+    /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
@@ -382,6 +467,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
+    /// Calculates the change in voltage given an input current
     pub fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
@@ -403,26 +489,46 @@ impl_iterate_and_spike!(
     adaptive_handle_spiking
 );
 
+/// An Izhikevich neuron
 #[derive(Debug, Clone)]
 pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-    pub current_voltage: f64, // membrane potential (mV)
-    pub v_th: f64, // voltage threshold (mV)
-    pub v_init: f64, // voltage initialization value (mV)
-    pub alpha: f64, // controls speed
-    pub beta: f64, // controls sensitivity to adaptive value
-    pub c: f64, // after spike reset value for voltage
-    pub d: f64, // after spike reset value for adaptive value
-    pub w_value: f64, // adaptive value
-    pub w_init: f64, // adaptive value initialization
-    pub gap_conductance: f64, // controls conductance of input gap junctions
-    pub tau_m: f64, // membrane time constant (ms)
-    pub c_m: f64, // membrane capacitance (nF)
-    pub dt: f64, // time step (ms)
+    /// Membrane potential (mV)
+    pub current_voltage: f64, 
+    /// Voltage threshold (mV)
+    pub v_th: f64,
+    /// Voltage initialization value (mV) 
+    pub v_init: f64, 
+    /// Controls speed
+    pub alpha: f64, 
+    /// Controls sensitivity to adaptive value
+    pub beta: f64,
+    /// After spike reset value for voltage 
+    pub c: f64,
+    /// After spike reset value for adaptive value 
+    pub d: f64, 
+    /// Adaptive value
+    pub w_value: f64, 
+    /// Adaptive value initialization
+    pub w_init: f64, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f64, 
+    /// Membrane time constant (ms)
+    pub tau_m: f64, 
+    /// Membrane capacitance (nF)
+    pub c_m: f64, 
+    /// Time step (ms)
+    pub dt: f64, 
+    /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// STDP parameters
     pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
     pub bayesian_params: BayesianParameters,
+    /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
@@ -456,6 +562,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
 
 macro_rules! impl_izhikevich_default_methods {
     () => {
+        // Calculates how adaptive value changes
         pub fn izhikevich_get_dw_change(&self) -> f64 {
             let dw = (
                 self.alpha * (self.beta * self.current_voltage - self.w_value)
@@ -464,6 +571,8 @@ macro_rules! impl_izhikevich_default_methods {
             dw
         }
     
+        /// Determines whether the neuron is spiking, updates the voltage and 
+        /// updates the adaptive value if spiking
         pub fn izhikevich_handle_spiking(&mut self) -> bool {
             let mut is_spiking = false;
     
@@ -481,6 +590,7 @@ macro_rules! impl_izhikevich_default_methods {
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
+    /// Calculates the change in voltage given an input current
     pub fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
@@ -498,27 +608,48 @@ impl_iterate_and_spike!(
     izhikevich_handle_spiking
 );
 
+/// A leaky Izhikevich neuron
 #[derive(Debug, Clone)]
 pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-    pub current_voltage: f64, // membrane potential (mV)
-    pub v_th: f64, // voltage threshold (mV)
-    pub v_init: f64, // voltage initialization value (mV)
-    pub alpha: f64, // controls speed
-    pub beta: f64, // controls sensitivity to adaptive value
-    pub c: f64, // after spike reset value for voltage
-    pub d: f64, // after spike reset value for adaptive value
-    pub w_value: f64, // adaptive value
-    pub w_init: f64, // adaptive value initialization
-    pub e_l: f64, // leak reversal potential (mV)
-    pub gap_conductance: f64, // controls conductance of input gap junctions
-    pub tau_m: f64, // membrane time constant (ms)
-    pub c_m: f64, // membrane capacitance (nF)
-    pub dt: f64, // time step (ms)
+    /// Membrane potential (mV)
+    pub current_voltage: f64, 
+    /// Voltage threshold (mV)
+    pub v_th: f64,
+    /// Voltage initialization value (mV) 
+    pub v_init: f64, 
+    /// Controls speed
+    pub alpha: f64, 
+    /// Controls sensitivity to adaptive value
+    pub beta: f64,
+    /// After spike reset value for voltage 
+    pub c: f64,
+    /// After spike reset value for adaptive value 
+    pub d: f64, 
+    /// Adaptive value
+    pub w_value: f64, 
+    /// Adaptive value initialization
+    pub w_init: f64, 
+    /// Leak reversal potential (mV)
+    pub e_l: f64,
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f64, 
+    /// Membrane time constant (ms)
+    pub tau_m: f64, 
+    /// Membrane capacitance (nF)
+    pub c_m: f64, 
+    /// Time step (ms)
+    pub dt: f64, 
+    /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// STDP parameters
     pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
     pub bayesian_params: BayesianParameters,
+    /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
@@ -554,6 +685,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
+    /// Calculates the change in voltage given an input current
     pub fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
