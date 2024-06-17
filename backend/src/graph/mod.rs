@@ -1,7 +1,8 @@
+//! A few different graph implementations to connect various neuron models together.
+
 use std::{
     collections::{HashMap, HashSet}, 
     fs::File, 
-    // io::{Result, Error, ErrorKind}, 
     io::{Write, BufWriter, Result, Error, ErrorKind}, 
     fmt::Display,
 };
@@ -12,31 +13,50 @@ use distribution::limited_distr;
 use crate::neuron::iterate_and_spike::BayesianParameters;
 
 
+/// Cartesian coordinate represented as unsigned integers for x and y
 pub type Position = (usize, usize);
 
+/// Cartesian coordinates as well as and id to specify which graph the coordinates belong to
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub struct GraphPosition {
     pub id: usize,
     pub pos: Position,
 }
 
+/// Implementation of a basic graph
 pub trait GraphFunctionality {
+    /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
+    /// Gets the identifier of the graph
     fn get_id(&self) -> usize;
+    /// Adds a new vertex to the graph, unconnected to other graphs
     fn add_vertex(&mut self, position: GraphPosition);
+    /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
+    /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
+    /// is initialized as a normally distributed random value based on the inputted weight parameters
     fn initialize_connections(
         &mut self, 
         postsynaptic: GraphPosition, 
-        connections: Vec<GraphPosition>, 
+        presynaptic_connections: Vec<GraphPosition>, 
         weight_params: &Option<BayesianParameters>,
     );
+    /// Returns every node or vertex on the graph
     fn get_every_node(&self) -> Vec<GraphPosition>;
+    /// Gets the weight between two neurons, errors if the positions are not in the graph 
+    /// and returns `None` if there is no connection between the given neurons
     fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>>; 
+    /// Edits the weight between two neurons, errors if the positions are not in the graph,
+    /// `None` represents no connection while `Some(f64)` represents some weight
     fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<()>;
+    /// Returns all presynaptic connections if the position is in the graph
     fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>>; 
+    /// Returns all postsynaptic connections if the position is in the graph
     fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>>;
+    /// Updates the history of the graph with the current state
     fn update_history(&mut self);
+    /// Writes current weights to files prefixed by the `tag` value
     fn write_current_weights(&self, tag: &str);
+    /// Writes history of weights to files prefixed by the `tag` value
     fn write_history(&self, tag: &str);
 }
 
@@ -58,12 +78,19 @@ fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T
     }
 } 
 
+/// A graph implemented as an adjacency matrix where the positions of each node
+/// are converted to `usize` to be index in a 2-dimensional matrix
 #[derive(Clone, Debug)]
 pub struct AdjacencyMatrix {
+    /// Converts position to a index for the matrix
     pub position_to_index: HashMap<GraphPosition, usize>,
+    /// Converts the index back to a position
     pub index_to_position: HashMap<usize, GraphPosition>,
+    /// Matrix of weights
     pub matrix: Vec<Vec<Option<f64>>>,
+    /// History of matrix weights
     pub history: Vec<Vec<Vec<Option<f64>>>>,
+    /// Identifier
     pub id: usize,
 }
 
@@ -175,7 +202,6 @@ impl GraphFunctionality for AdjacencyMatrix {
         Ok(())
     }
 
-    // to be cached
     fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
         if !self.position_to_index.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
@@ -192,20 +218,6 @@ impl GraphFunctionality for AdjacencyMatrix {
         Ok(connections)
     }
 
-    // #[cache]
-    // fn cached_get_incoming_connections(&self, pos: &Position) -> Vec<Position> {
-    //     let mut connections: Vec<Position> = Vec::new();
-    //     for i in self.position_to_index.keys() {
-    //         match self.lookup_weight(i, &pos) {
-    //             Some(_) => { connections.push(*i); },
-    //             None => {}
-    //         };
-    //     }
-
-    //     return connections;
-    // }
-
-    // to be cached
     fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
         if !self.position_to_index.contains_key(pos) {
             return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
@@ -274,11 +286,16 @@ impl Default for AdjacencyMatrix {
     }
 }
 
+/// A graph implemented as an adjacency list
 #[derive(Clone, Debug)]
 pub struct AdjacencyList {
+    /// All presynaptic connections
     pub incoming_connections: HashMap<GraphPosition, HashMap<GraphPosition, f64>>,
+    /// All postsynaptic connections
     pub outgoing_connections: HashMap<GraphPosition, HashSet<GraphPosition>>,
+    /// History of presynaptic connection weights
     pub history: Vec<HashMap<GraphPosition, HashMap<GraphPosition, f64>>>,
+    /// Identifier
     pub id: usize,
 }
 
@@ -501,26 +518,4 @@ impl Default for AdjacencyList {
             id: 0,
         }
     }
-}
-
-#[derive(Clone, Debug)]
-pub enum Graph {
-    Matrix,
-    List,
-}
-
-impl Graph {
-    pub fn from_str(string: &str) -> Result<Graph> {
-        match string.to_ascii_lowercase().as_str() {
-            "matrix" | "adjacency matrix" => Ok(Graph::Matrix),
-            "list" | "adjacency list" => Ok(Graph::List),
-            _ => { Err(Error::new(ErrorKind::InvalidInput, "Unknown graph type")) }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct GraphParameters {
-    pub write_weights: bool,
-    pub write_history: bool,
 }
