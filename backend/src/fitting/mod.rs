@@ -326,7 +326,7 @@ pub fn get_izhikevich_summary
 pub fn fitting_objective
 <T: NeurotransmitterKinetics, U: NeurotransmitterKinetics, W: ReceptorKinetics, V: ReceptorKinetics>(
     bitstring: &BitString, 
-    bounds: &Vec<Vec<f64>>, 
+    bounds: &Vec<(f64, f64)>, 
     n_bits: usize, 
     settings: &HashMap<&str, FittingSettings<T, U, W, V>>
 ) -> Result<f64> {
