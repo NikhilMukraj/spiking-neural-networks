@@ -1,3 +1,6 @@
+//! A few implementations of different spike trains that can be coupled with `IterateAndSpike`
+//! based neurons.
+
 use std::collections::{HashMap, HashSet};
 use rand::Rng;
 use super::{
