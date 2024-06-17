@@ -8,10 +8,15 @@ use super::{
     Neurotransmitters, NeurotransmitterType, ApproximateNeurotransmitter
 };
 
-
+/// Handles dynamics of spike train effect or the neural refractoriness function
 pub trait NeuralRefractoriness: Default {
+    /// Sets decay value
     fn set_decay(&mut self, decay_factor: f64);
+    /// Gets decay value
     fn get_decay(&self) -> f64;
+    /// Calculates neural refractoriness based on the current time of the simulation, the 
+    /// last spiking time, the maximum and minimum voltage (mV)
+    /// for scaling, and the simulation timestep (ms)
     fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64;
 }
 
@@ -44,8 +49,10 @@ macro_rules! impl_default_neural_refractoriness {
     };
 }
 
+/// Calculates refractoriness based on the delta dirac function
 #[derive(Debug, Clone, Copy)]
 pub struct DeltaDiracRefractoriness {
+    /// Decay value
     pub k: f64,
 }
 
@@ -55,8 +62,10 @@ fn delta_dirac_effect(k: f64, a: f64, time_difference: f64, v_resting: f64, dt: 
 
 impl_default_neural_refractoriness!(DeltaDiracRefractoriness, delta_dirac_effect);
 
+/// Calculates refactoriness based on exponential decay
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayRefractoriness {
+    /// Decay value
     pub k: f64
 }
 
@@ -66,13 +75,20 @@ fn exponential_decay_effect(k: f64, a: f64, time_difference: f64, v_resting: f64
 
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
+/// Handles spike train dynamics
 pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime {
     type T: NeuralRefractoriness;
+    /// Updates spike train
     fn iterate(&mut self) -> bool;
+    /// Gets maximum and minimum voltage values
     fn get_height(&self) -> (f64, f64);
+    /// Gets timestep or `dt` (ms)
     fn get_refractoriness_timestep(&self) -> f64;
+    /// Returns neurotransmitters
     fn get_neurotransmitters(&self) -> &Neurotransmitters<ApproximateNeurotransmitter>;
+    /// Returns neurotransmitter concentrations
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
+    /// Returns refractoriness dynamics
     fn get_refractoriness_function(&self) -> &Self::T;
 }
 
@@ -111,16 +127,26 @@ macro_rules! impl_last_firing_time_spike_train {
     };
 }
 
+/// A Poisson neuron
 #[derive(Debug, Clone)]
 pub struct PoissonNeuron<T: NeuralRefractoriness> {
+    /// Membrane potential (mV)
     pub current_voltage: f64,
+    /// Maximum voltage (mV)
     pub v_th: f64,
+    /// Minimum voltage (mV)
     pub v_resting: f64,
+    /// Last firing time
     pub last_firing_time: Option<usize>,
+    /// Postsynaptic eurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// Neural refactoriness dynamics
     pub neural_refractoriness: T,
+    /// Chance of neuron firing at a given timestep
     pub chance_of_firing: f64,
+    /// Timestep for refractoriness (ms)
     pub refractoriness_dt: f64,
 }
 
@@ -171,7 +197,8 @@ impl<T: NeuralRefractoriness> Default for PoissonNeuron<T> {
 }
 
 impl<T: NeuralRefractoriness> PoissonNeuron<T> {
-    // hertz is in seconds not ms
+    /// Generates Poisson neuron with appropriate chance of firing based
+    /// on the given hertz (Hz) and a given refractoriness timestep (ms)
     pub fn from_firing_rate(hertz: f64, dt: f64) -> Self {
         let mut poisson_neuron = PoissonNeuron::<T>::default();
 
@@ -202,18 +229,33 @@ impl<T: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T> {
     impl_default_spike_train_methods!();
 }
 
+/// A preset spike train that has a set of designated firing times and an internal clock,
+/// the internal clock is updated every iteration and once the internal clock reaches one of the 
+/// firing times the neuron fires, the internal clock is reset once it reaches the maximum value
+/// and cyclees through the designated firing times again
 #[derive(Debug, Clone)]
 struct PresetSpikeTrain<T: NeuralRefractoriness> {
+    /// Membrane potential (mV)
     pub current_voltage: f64,
+    /// Maximum voltage (mV)
     pub v_th: f64,
+    /// Minimum voltage (mV)
     pub v_resting: f64,
+    /// Last spiking time
     pub last_firing_time: Option<usize>,
+    /// Postsynaptic eurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>,
+    /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
+    /// Neural refactoriness dynamics
     pub neural_refractoriness: T,
+    /// Set of times to fire at
     pub firing_times: HashSet<usize>,
+    /// Internal clock to track when to fire
     pub internal_clock: usize,
+    /// Value to reset internal clock at
     pub max_clock_value: usize,
+    /// Timestep for refractoriness (ms)
     pub refractoriness_dt: f64,
 }
 
