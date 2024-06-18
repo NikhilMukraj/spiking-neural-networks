@@ -20,7 +20,8 @@ use super::{
 
 /// Takes in a static current as an input and iterates the given
 /// neuron for a given duration, set `bayesian` to true to add 
-/// normally distributed noise to the input as it iterates
+/// normally distributed noise to the input as it iterates,
+/// returns the voltages from the neuron over time
 pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     cell: &mut T, 
     input: f64, 
