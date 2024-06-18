@@ -415,9 +415,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [x] Static input
     - [ ] STDP testing
     - [x] Built in neurotransmitters
-    - [ ] New neurotransmitter from TOML
     - [x] Built in additional gates
-    - [ ] New gates from TOML
 - [ ] Izhikevich neurotransmission
   - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
     - [x] Objective function
@@ -432,24 +430,20 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] Fitting with CUDA backend (and transfering this to Python interface)
   - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
     - [x] Remove existing neurotranmission system
-    - [ ] Integrate and fire models with ligand gated channels interacting with neurotransmitters
-      - [ ] Moving neurotransmitter concentration into seperate struct and moving receptor kinetics variables to seperate struct (with parameter $T_max$)
-        - [ ] Presynaptic neuron calculates concentration and saves it
-        - [ ] Post synaptic neuron applies weight to the concentration and sums it, then applies receptor kinetics
-          - [ ] Neurotransmission current should be calculated with `iterate_and_spike` function after $dv$ is calculated and before spike is handled, `iterate_and_spike` should have a input neurotransmitter concentration as an option, if some do neurotransmitter current processing, if `None` then do not perform neurotransmitter current operation
+    - [x] Integrate and fire models with ligand gated channels interacting with neurotransmitters
+      - [x] Moving neurotransmitter concentration into seperate struct and moving receptor kinetics variables to seperate struct (with parameter $T_max$)
+        - [x] Presynaptic neuron calculates concentration and saves it
+        - [x] Post synaptic neuron applies weight to the concentration and sums it, then applies receptor kinetics
+          - [x] Neurotransmission current should be calculated with `iterate_and_spike` function after $dv$ is calculated and before spike is handled, `iterate_and_spike` should have a input neurotransmitter concentration as an option, if some do neurotransmitter current processing, if `None` then do not perform neurotransmitter current operation
             - [ ] Update this within fitting Izhikevich neuron too
-        - [ ] Integrate this into Hodgkin Huxley models too
-      - [ ] Option to record each neurotransmitter current over time in lattice (g * r)
-      - [ ] Recording g, r, and T over time
-        - [ ] Coupling tests
-        - [ ] STDP tests
-    - [ ] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
+        - [x] Integrate this into Hodgkin Huxley models too
+    - [x] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
       - $\frac{dT}{dt} = \alpha T + T_{max} H(V_p - V_{th})$ where $T$ is neurotransmitter concentration, $T_{max}$ is maximum neurotransmitter concentration, $\alpha$ is clearance rate, $H(x)$ is the heaviside function, $V_p$ is the average of the presynaptic voltages, and $V_{th}$ is the spiking threshold
       - Receptor occupancy could be assumed to be at maximum
       - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
-- [ ] Poisson neuron
-  - [ ] Coupling
-    - [ ] Potentiation type
+- [x] Poisson neuron
+  - [x] Coupling
+    - [x] Potentiation type
 - [ ] Spike train struct
   - Given a set of times, the neuron will spike and not spike at given times
     - Vector of times to spike at + delay before first spike + delay after last spike
