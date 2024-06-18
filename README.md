@@ -36,31 +36,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Eventually remove old neurotransmitter system and replace it with new one
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
-- Add neurotransmitter output to each presynaptic neuron that calculates concentration with its own membrane potential, then have postsynaptic neurons sum the concentration * weight to calculate their neurotransmitters
-- Separate receptor kinetics struct, dependent on $t_total$
-  - Receptor kinetics input (of weighted neurotransmitter concentration) should only be calculated if receptor kinetics is not static
-    - **Receptor kinetics handling should have an inputtable value to set r at**
-      - **If receptor kinetics are static do not calculate neurotransmitter input**
-  - Neurotransmitter and receptor kinetics structs should be stored in different hashmaps that relate an enum (specifying the type, basic, AMPA, NMDA, GABAa, GABAb) to the struct (the struct would then have the appriopriate parameters associated with that enum)
-    - `HashMap<NeurotransmitterType, Neurotransmitter>`, `HashMap<NeurotrnasmitterType, ReceptorKinetics>`
-- Neurotransmitter current should be calculated after $dv$ and $dw$ are calculated and applied when those respective changes are applied, `iterate_and_spike` function should be modified to take in an addition change in voltage which can be applied with the $dv$ calculation so it can be added before the spike is handled
-  - ie add argument to `iterate_and_spike` which is an `Option<f64>` called `additional_dv` that adds the $dv$ change calculated by the neurotransmitter current after neurotransmitter currents are set and returned
-    - Get presynaptic neurotransmitter concentrate
-      - Multiply by receptor value
-      - **Generating noise factor from bayesian parameters (outside of neuron)** and then applying that noise to input current and input neurotransmitter (for sake of handling Hodgkin Huxley and integrate and fire)
-        - Noise should be applied to total input current and total input neurotransmitter
-    - Calculate $dv$ change from neurotransmitter current
-    - Add it to the voltage in the `iterate_and_spike` function
-  - Or integrate the neurotransmitter calculation into the `iterate_and_spike` function
-  - **Or into a seperate `iterate_and_spike_with_neurotransmission` function**
-    - `pub fn iterate_and_spike_with_neurotransmission(&mut self, i: f64, t_total: Option<HashMap<NeurotransmitterType, f64>>) -> bool`
-    - If `t_total` is `Some` then update receptor kinetics, if `t_total` is `None` then do not change receptor kinetics
-      - If `t_total` is `Some` but neurotransmitter type in `t_total` does not match the receptors on the neuron, assume neurotransmitter concentrate is 0
-    - In lattice, return `(f64, Option<HashMap<NeurotransmitterType, f64>>)`, if `receptor_kinetics` is `false`, return `(f64, None)`
-  - Old update neurotransmitter function should be removed in favor of this
-
-- When neurotransmitter refactor done, refactor fitting neurons have the option to only consider the postsynaptic neuron when implementing neurotransmission schemes
-
 - **Another refactor for neurotransmission**, neurotransmitter and receptors should be a trait that structs can implement
   - Approximation of neurotransmission for integrate and fire cells
     - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
@@ -119,16 +94,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
 - Maybe refactor so fitting only takes into account the presynaptic neuron
 
-- **Neurotransmitter approximation refactor for ligand gated channels**, use receptor kinetics and neurotransmitter kinetics traits
-
-- Use Rayon to thread lattice calculations (remove storing dv and is_spiking in hashmap and place it in the struct)
+- Use Rayon to thread lattice calculations
   - Inputs should be calculated in parallel
     - There should be a GraphFunctionalitySynced trait for the lookup weight function, get incoming connections, get outgoing connections, and get every node function, the rest can be under the regular GraphFunctionality trait, the weighted input function should have a `&dyn GraphFunctionalitySynced` argument
-      - Could replace `&dyn GraphFuntionality` with a generic and a trait
-      - Maybe graph should be in an `Arc<Mutex<T>>`, unlocked to edit weights, would need to be able to pass locked version to get weights without unlocking Mutex
-  <!-- - Build function to allow Arc mutex access of cell grid, it first calculates dv and dw and spike and then unlocks Mutex to modify neuron, function should return another function that does this for the appropriate integrate and fire type -->
-  <!-- - Calculations could be chunked (a section of neurons to operate on instead of just one at a time)
-    - Weight changes do not need to be parallelized immediately if many spikes do not occur at once -->
   - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
     - **Update cells by looping over grid**
     - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
@@ -143,6 +111,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - **Receptor kinetics refactor** (do this first so its less work refactoring later)
   - Isolated STDP testing should be included
   - **Examples folder**
+    - Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
+    - Should make writing outputs to files faster
   - Cell grid type should be refactored into a struct containing
     - Grid of neurons
     - Graph
