@@ -49,7 +49,9 @@ impl DiscreteNeuron {
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
 pub struct DiscreteNeuronLattice<T: GraphFunctionality>{
+    /// 2 dimensional grid of discrete neurons
     cell_grid: Vec<Vec<DiscreteNeuron>>,
+    /// Internal weights
     weights: T,
 }
 
