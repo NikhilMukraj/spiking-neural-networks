@@ -497,12 +497,6 @@ pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorK
     state_output.insert("n".to_string(), vec![]);
     state_output.insert("h".to_string(), vec![]);
 
-    let mut gate_currents: HashMap<String, Vec<f64>> = HashMap::new();
-    for gate in &hodgkin_huxley_neuron.additional_gates {
-        let gate_name = gate.name();
-        gate_currents.insert(gate_name.to_string(), vec![]);
-    }
-
     for _ in 0..iterations {
         let current_input = if bayesian {
             input * hodgkin_huxley_neuron.get_bayesian_factor()
@@ -516,20 +510,6 @@ pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorK
         state_output.get_mut("m").map(|val| val.push(hodgkin_huxley_neuron.m.state));
         state_output.get_mut("n").map(|val| val.push(hodgkin_huxley_neuron.n.state));
         state_output.get_mut("h").map(|val| val.push(hodgkin_huxley_neuron.h.state));
-
-        for (gate_name, current_vec) in gate_currents.iter_mut() {
-            let gate_current = hodgkin_huxley_neuron.additional_gates
-                .iter()
-                .find(|gate| gate.name() == *gate_name)
-                .map(|gate| gate.get_current())
-                .unwrap_or(0.0);
-
-            current_vec.push(gate_current);
-        }
-    }
-
-    for (gate_name, current_vec) in gate_currents {
-        state_output.insert(gate_name, current_vec);
     }
 
     state_output
