@@ -1,14 +1,21 @@
 use std::{
     collections::HashMap,
     io::{Error, ErrorKind, Result},
+    ops::Sub,
 };
 use crate::neuron::{   
-    gap_junction, hodgkin_huxley::{
-        diff, find_peaks, HodgkinHuxleyNeuron
-    }, integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{BayesianFactor, IterateAndSpike, NeurotransmitterKinetics, ReceptorKinetics}, iterate_coupled_spiking_neurons
+    hodgkin_huxley::HodgkinHuxleyNeuron, 
+    integrate_and_fire::IzhikevichNeuron, 
+    iterate_and_spike::{BayesianFactor, IterateAndSpike, NeurotransmitterKinetics, ReceptorKinetics}, 
+    iterate_coupled_spiking_neurons, gap_junction,
 };
 use crate::ga::{BitString, decode};
 
+
+fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
+    (1..x.len()).map(|i| x[i] - x[i-1])
+        .collect()
+}
 
 fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f64>, default: f64) -> f64 {
     if peaks.len() == 0 {
@@ -33,36 +40,10 @@ pub struct ActionPotentialSummary {
 fn get_summary(
     pre_voltages: &Vec<f64>, 
     post_voltages: &Vec<f64>, 
-    pre_peaks: Option<&Vec<usize>>,
-    post_peaks: Option<&Vec<usize>>,
-    tolerance: Option<f64>,
+    pre_peaks: &Vec<usize>,
+    post_peaks: &Vec<usize>,
     spike_amplitude_default: f64,
 ) -> Result<ActionPotentialSummary> {
-    let pre_peaks = match (pre_peaks, tolerance) {
-        (Some(values), None) | (Some(values), Some(_)) => values.to_owned(),
-        (None, Some(tolerance)) => find_peaks(pre_voltages, tolerance),
-        (None, None) => { 
-            return Err(
-                Error::new(
-                    ErrorKind::InvalidInput, 
-                    "Peaks must be precalculated or provide a tolerance to calculate peaks"
-                )
-            );
-        },
-    };
-    let post_peaks = match (post_peaks, tolerance) {
-        (Some(values), None) | (Some(values), Some(_)) => values.to_owned(),
-        (None, Some(tolerance)) => find_peaks(post_voltages, tolerance),
-        (None, None) => { 
-            return Err(
-                Error::new(
-                    ErrorKind::InvalidInput, 
-                    "Peaks must be precalculated or provide a tolerance to calculate peaks"
-                )
-            );
-        },
-    };
-
     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
     let average_post_spike: f64 = get_average_spike(&post_peaks, post_voltages, spike_amplitude_default);
 
@@ -206,7 +187,6 @@ pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics, R: ReceptorKineti
     iterations: usize,
     do_receptor_kinetics: bool,
     bayesian: bool, 
-    tolerance: f64,
     spike_amplitude_default: f64,
 ) -> Result<ActionPotentialSummary> {
     let mut presynaptic_neuron = hodgkin_huxley_model.clone();
@@ -218,7 +198,10 @@ pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics, R: ReceptorKineti
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
     let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
 
-    for _ in 0..iterations {
+    let mut pre_peaks: Vec<usize> = vec![];
+    let mut post_peaks: Vec<usize> = vec![];
+
+    for timestep in 0..iterations {
         iterate_coupled_spiking_neurons(
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron, 
@@ -227,13 +210,21 @@ pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics, R: ReceptorKineti
             input_current
         );
 
+        if presynaptic_neuron.is_spiking {
+            pre_peaks.push(timestep);
+        }
+
+        if postsynaptic_neuron.is_spiking {
+            post_peaks.push(timestep);
+        }
+
         pre_voltages.push(presynaptic_neuron.current_voltage);
         post_voltages.push(postsynaptic_neuron.current_voltage);
     }
 
     Ok(
         get_summary(
-            &pre_voltages, &post_voltages, None, None, Some(tolerance), spike_amplitude_default
+            &pre_voltages, &post_voltages, &pre_peaks, &post_peaks, spike_amplitude_default
         )?
     )
 }
@@ -312,7 +303,7 @@ pub fn get_izhikevich_summary
     }
 
     let summary = get_summary(
-        &pre_voltages, &post_voltages, Some(&pre_peaks), Some(&post_peaks), None, settings.spike_amplitude_default
+        &pre_voltages, &post_voltages, &pre_peaks, &post_peaks, settings.spike_amplitude_default
     )?;
 
     match settings.scaling_factors[index] {
