@@ -10,7 +10,7 @@ use std::{
 #[path = "../distribution/mod.rs"]
 mod distribution;
 use distribution::limited_distr;
-use crate::neuron::iterate_and_spike::BayesianParameters;
+use crate::neuron::iterate_and_spike::GaussianParameters;
 
 
 /// Cartesian coordinate represented as unsigned integers for x and y
@@ -38,7 +38,7 @@ pub trait GraphFunctionality: Default {
         &mut self, 
         postsynaptic: GraphPosition, 
         presynaptic_connections: Vec<GraphPosition>, 
-        weight_params: &Option<BayesianParameters>,
+        weight_params: &Option<GaussianParameters>,
     );
     /// Returns every node or vertex on the graph
     fn get_every_node(&self) -> Vec<GraphPosition>;
@@ -146,7 +146,7 @@ impl GraphFunctionality for AdjacencyMatrix {
         &mut self, 
         postsynaptic: GraphPosition, 
         connections: Vec<GraphPosition>, 
-        weight_params: &Option<BayesianParameters>,
+        weight_params: &Option<GaussianParameters>,
     ) {
         if !self.position_to_index.contains_key(&postsynaptic) {
             self.add_vertex(postsynaptic)
@@ -343,7 +343,7 @@ impl GraphFunctionality for AdjacencyList {
         &mut self, 
         postsynaptic: GraphPosition, 
         connections: Vec<GraphPosition>, 
-        weight_params: &Option<BayesianParameters>,
+        weight_params: &Option<GaussianParameters>,
     ) {
         for i in connections.iter() {
             let weight = match weight_params {
