@@ -34,7 +34,9 @@ use iterate_and_spike::{
 use crate::graph::{GraphFunctionality, GraphPosition};
 
 
-pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
+/// Calculates the current between two neurons based on the voltage and
+/// the gap conductance of the synapse
+fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
 ) -> f64 {
@@ -42,6 +44,11 @@ pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
 
+/// Calculates the current between two neurons based on the voltage,
+/// the gap conductance of the synapse, and the potentiation of the
+/// presynaptic neuron, both neurons should implement `CurrentVoltage`,
+/// the presynaptic neuron should implement `Potentation`, and
+/// the postsynaptic neuron should implemenent `GapConductance`
 pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
@@ -54,12 +61,24 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
     sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
 
+/// Calculates one iteration of two coupled neurons where the presynaptic neuron
+/// has a static input current while the postsynaptic neuron takes
+/// the current input and neurotransmitter input from the presynaptic neuron
+/// 
+/// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// 
+/// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// 
+/// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// the neurons based on neurotransmitter input during the simulation
+/// 
+/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
+    input_current: f64,
     do_receptor_kinetics: bool,
     gaussian: bool,
-    input_current: f64,
 ) -> (bool, bool) {
     let (t_total, post_current, input_current) = if gaussian {
         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
@@ -108,6 +127,9 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     (pre_spiking, post_spiking)
 }
 
+/// Calculates the input to the postsynaptic neuron given a spike train
+/// and the potenation of the spike train as well as the current timestep 
+/// of the simulation
 pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     presynaptic_neuron: &T,
     postsynaptic_neuron: &U,
@@ -132,6 +154,24 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     sign * conductance * refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
 }
 
+/// Calculates one iteration of two coupled neurons where the presynaptic neuron
+/// has a spike train input while the postsynaptic neuron takes
+/// the current input and neurotransmitter input from the presynaptic neuron,
+/// also updates the last firing times of each neuron and spike train given the
+/// current timestep of the simulation
+/// 
+/// - `spike_train` : a spike train that implements `Spiketrain`
+/// 
+/// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// 
+/// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// 
+/// - `timestep` : the current timestep of the simulation
+/// 
+/// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// the neurons based on neurotransmitter input during the simulation
+/// 
+/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: IterateAndSpike>(
     spike_train: &mut T,
     presynaptic_neuron: &mut U, 
@@ -217,7 +257,10 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     (spike_train_spiking, pre_spiking, post_spiking)
 }
 
-pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
+/// Calculates the change in weight based off of STDP (spike time dependent plasticity)
+/// given one presynaptic neuron that implements `LastFiringTime` to get the last time it fired
+/// as well as a postsynaptic neuron that implements `STDP`
+pub fn update_weight<T: LastFiringTime, U: STDP>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
 ) -> f64 {
@@ -326,15 +369,22 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     }
 // }
 
+/// Handles history of a lattice
 pub trait LatticeHistory: Default {
+    /// Stores the current state of the lattice given the cell grid
     fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>);
 }
 
+/// Stores EEG value history
 #[derive(Debug, Clone)]
 pub struct EEGHistory {
+    /// EEG values
     history: Vec<f64>,
+    /// Voltage from EEG equipment (mV)
     reference_voltage: f64,
+    /// Distance from neurons to equipment (mm)
     distance: f64,
+    /// Conductivity of medium (S/mm)
     conductivity: f64,
 }
 
@@ -342,9 +392,9 @@ impl Default for EEGHistory {
     fn default() -> Self {
         EEGHistory {
             history: Vec::new(),
-            reference_voltage: 0.007,
-            distance: 0.8,
-            conductivity: 251.,
+            reference_voltage: 0.007, // 0.007 mV or 7 uV
+            distance: 0.8, // 0.8 mm
+            conductivity: 251., // 251 S/mm or 0.251 S/m
         }
     }
 }
@@ -377,8 +427,10 @@ impl LatticeHistory for EEGHistory {
     }
 }
 
+/// Stores history as grid of voltages
 #[derive(Debug, Clone)]
 pub struct GridVoltageHistory {
+    /// Voltage history
     history: Vec<Vec<Vec<f64>>>
 }
 
@@ -396,6 +448,8 @@ impl LatticeHistory for GridVoltageHistory {
 
 macro_rules! impl_reset_timing  {
     () => {
+        /// Resets the last firing time of the neurons to `None`
+        /// and resets the `internal_clock` to `0`
         pub fn reset_timing(&mut self) {
             self.internal_clock = 0;
             self.cell_grid.iter_mut()
@@ -409,28 +463,34 @@ macro_rules! impl_reset_timing  {
     };
 }
 
-// grid history should either be eeg or grid voltage for now
-// later can move to looking at neurotransmitter/receptor tracking
-// inputtable lattice
+/// Lattice of `IterateAndSpike` neurons
 #[derive(Debug, Clone)]
 pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> {
-    cell_grid: Vec<Vec<T>>,
-    graph: U,
-    grid_history: V,
-    update_graph_history: bool,
-    update_grid_history: bool,
-    do_stdp: bool,
-    do_receptor_kinetics: bool,
-    gaussian: bool,
-    internal_clock: usize,
+    /// Grid of neurons
+    pub cell_grid: Vec<Vec<T>>,
+    /// Graph connecting internal neurons and storing weights between neurons
+    pub graph: U,
+    /// History of grid
+    pub grid_history: V,
+    /// Whether to update graph's history of weights
+    pub update_graph_history: bool,
+    /// Whether to update grid's history
+    pub update_grid_history: bool,
+    /// Whether to update weights with STDP when iterating
+    pub do_stdp: bool,
+    /// Whether to update receptor gating values based on neurotransmitter
+    pub do_receptor_kinetics: bool,
+    /// Whether to add normally distributed random noise
+    pub gaussian: bool,
+    /// Internal clock keeping track of what timestep the lattice is at
+    pub internal_clock: usize,
 }
-
-// updating graph history boolean should be moved to graph itself
 
 impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U, V> {
     impl_reset_timing!();
 
-    fn get_internal_input_from_positions(
+    /// Calculates electrical input value from positions
+    fn calculate_internal_input_from_positions(
         &self,
         position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>, 
@@ -459,7 +519,8 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         return input_val;
     }
 
-    fn get_internal_neurotransmitter_input_from_positions(
+    /// Calculates neurotransmitter input value from positions
+    fn calculate_internal_neurotransmitter_input_from_positions(
         &self,
         position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>, 
@@ -491,7 +552,8 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         return input_val;
     }
 
-    fn calculate_internal_electrical_inputs(&self) -> HashMap<GraphPosition, f64> {
+    /// Gets all internal electrical inputs 
+    fn get_internal_electrical_inputs(&self) -> HashMap<GraphPosition, f64> {
         // eventually convert to this, same with neurotransmitter input
         // let inputs: HashMap<Position, f64> = graph
         //     .get_every_node()
@@ -508,7 +570,7 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
                 let input_positions = self.graph.get_incoming_connections(&pos)
                     .expect("Cannot find position");
 
-                let input = self.get_internal_input_from_positions(
+                let input = self.calculate_internal_input_from_positions(
                     &pos,
                     &input_positions,
                 );
@@ -518,7 +580,8 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
             .collect()
     }
 
-    fn calculate_internal_inputs(&self) -> 
+    /// Gets all internal neurotransmitter inputs 
+    fn get_internal_neurotransmitter_inputs(&self) -> 
     (HashMap<GraphPosition, f64>, Option<HashMap<GraphPosition, NeurotransmitterConcentrations>>) {
         let neurotransmitter_inputs = match self.do_receptor_kinetics {
             true => {
@@ -528,7 +591,7 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
                         let input_positions = self.graph.get_incoming_connections(&pos)
                             .expect("Cannot find position");
 
-                        let neurotransmitter_input = self.get_internal_neurotransmitter_input_from_positions(
+                        let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
                             &pos,
                             &input_positions,
                         );
@@ -542,11 +605,12 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
             false => None,
         };
 
-        let inputs = self.calculate_internal_electrical_inputs();
+        let inputs = self.get_internal_electrical_inputs();
 
         (inputs, neurotransmitter_inputs)
     }
 
+    /// Updates internal weights based on STDP
     fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<()> {
         let given_neuron = &self.cell_grid[x][y];
         
@@ -579,6 +643,7 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         Ok(())
     }
 
+    /// Iterates one simulation timestep lattice given a set of electrical and neurotransmitter inputs
     pub fn iterate(
         &mut self, 
         inputs: &HashMap<GraphPosition, f64>, 
@@ -617,6 +682,7 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         Ok(())
     }
 
+    /// Iterates one simulation timestep lattice given a set of only electrical inputs
     pub fn iterate_electrical_only(
         &mut self,
         inputs: &HashMap<GraphPosition, f64>,
@@ -647,12 +713,13 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         Ok(())
     }
 
+    /// Iterates the lattice based only on internal connections for a given amount of time
     pub fn run_lattice(
         &mut self, 
         iterations: usize,
     ) -> Result<()> {
         for _ in 0..iterations {       
-            let (inputs, neurotransmitter_inputs) = self.calculate_internal_inputs();
+            let (inputs, neurotransmitter_inputs) = self.get_internal_neurotransmitter_inputs();
     
             self.iterate(&inputs, &neurotransmitter_inputs)?;        
         }
@@ -660,12 +727,14 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         Ok(())
     }
 
+    /// Iterates lattice based only on internal connections for a given amount of time using
+    /// only electrical inputs
     pub fn run_lattice_electrical_only(
         &mut self,
         iterations: usize,
     ) -> Result<()> {
         for _ in 0..iterations {
-            let inputs = self.calculate_internal_electrical_inputs();
+            let inputs = self.get_internal_electrical_inputs();
 
             self.iterate_electrical_only(&inputs)?;
         }
@@ -674,12 +743,16 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
     }
 }
 
+/// Handles history of a spike train lattice
 pub trait SpikeTrainLatticeHistory {
+    /// Stores the current state of the lattice given the cell grid
     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
 }
 
+/// Stores history as a grid of voltages
 #[derive(Debug, Clone)]
 pub struct SpikeTrainGridHistory {
+    /// Voltage history
     history: Vec<Vec<Vec<f64>>>,
 }
 
@@ -695,17 +768,23 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
     }
 }
 
+/// Lattice of `SpikeTrain` neurons
 #[derive(Debug, Clone)]
 pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
+    /// Grid of spike trains
     cell_grid: Vec<Vec<T>>,
+    /// History of grid states
     grid_history: U,
+    /// Whether to update grid history
     update_grid_history: bool,
+    /// Internal clock keeping track of what timestep the lattice is at
     internal_clock: usize,
 }
 
 impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     impl_reset_timing!();
 
+    /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
         self.cell_grid.iter_mut()
             .for_each(|i| {
@@ -724,12 +803,8 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
         self.internal_clock += 1;
     }
 
-    pub fn run_lattice(&mut self, iterations: Option<usize>) {
-        let iterations = match iterations {
-            Some(value) => value,
-            None => 1,
-        };
-
+    /// Iterates simulation for the given amount of time
+    pub fn run_lattice(&mut self, iterations: usize) {
         for _ in 0..iterations {
             self.iterate();
         }
