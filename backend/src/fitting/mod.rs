@@ -229,9 +229,14 @@ pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPoten
 /// on neurotransmitter input or to `false` to keep it state, use `gaussian` to add normally distributed 
 /// random noise, use `spike_amplitude_default` to set a default spike height if no spikes are generated,
 /// use `resting_potential` to set the resting potential of both Hodgkin Huxley neurons (mV)
-pub fn get_hodgkin_huxley_summary<T: NeurotransmitterKinetics, R: ReceptorKinetics, V: NeuralRefractoriness>(
-    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<T, R>, 
-    input_spike_train: &PresetSpikeTrain<V>, 
+pub fn get_hodgkin_huxley_summary<
+    T: NeurotransmitterKinetics, 
+    U: ReceptorKinetics, 
+    V: NeurotransmitterKinetics,
+    W: NeuralRefractoriness,
+>(
+    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<T, U>, 
+    input_spike_train: &PresetSpikeTrain<V, W>, 
     iterations: usize,
     do_receptor_kinetics: bool,
     gaussian: bool, 
@@ -295,12 +300,13 @@ pub struct FittingSettings<
     'a, 
     T: NeurotransmitterKinetics, 
     U: ReceptorKinetics, 
-    V: NeuralRefractoriness,
+    V: NeurotransmitterKinetics,
+    W: NeuralRefractoriness,
 >{
     /// Izhikevich neuron to reference for parameters during fitting
     pub izhikevich_neuron: IzhikevichNeuron<T, U>,
     /// Spike trains to use when simulating Izhikevich neurons
-    pub spike_trains: Vec<PresetSpikeTrain<V>>,
+    pub spike_trains: Vec<PresetSpikeTrain<V, W>>,
     /// Reference summaries to compare Izhikevich neuron against
     pub action_potential_summary: &'a [ActionPotentialSummary],
     /// Scalars to use when comparing summaries
@@ -324,11 +330,12 @@ pub struct FittingSettings<
 pub fn get_izhikevich_summary<
     T: NeurotransmitterKinetics, 
     U: ReceptorKinetics, 
-    V: NeuralRefractoriness, 
+    V: NeurotransmitterKinetics, 
+    W: NeuralRefractoriness
 >(
     presynaptic_neuron: &mut IzhikevichNeuron<T, U>, 
     postsynaptic_neuron: &mut IzhikevichNeuron<T, U>,
-    settings: &FittingSettings<T, U, V>,
+    settings: &FittingSettings<T, U, V, W>,
     index: usize,
 ) -> Result<ActionPotentialSummary> {
     let mut current_spike_train = settings.spike_trains[index].clone();
@@ -377,12 +384,13 @@ pub fn get_izhikevich_summary<
 fn fitting_objective<
     T: NeurotransmitterKinetics, 
     U: ReceptorKinetics,
+    W: NeurotransmitterKinetics,
     V: NeuralRefractoriness,
 >(
     bitstring: &BitString, 
     bounds: &Vec<(f64, f64)>, 
     n_bits: usize, 
-    settings: &HashMap<&str, FittingSettings<T, U, V>>
+    settings: &HashMap<&str, FittingSettings<T, U, W, V>>
 ) -> Result<f64> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
@@ -476,15 +484,16 @@ fn fitting_objective<
 pub fn fit_izhikevich_to_hodgkin_huxley<
     T: NeurotransmitterKinetics, 
     U: NeurotransmitterKinetics, 
-    V: ReceptorKinetics, 
+    V: NeurotransmitterKinetics, 
     W: ReceptorKinetics,
-    Y: NeuralRefractoriness,
+    Y: ReceptorKinetics,
+    X: NeuralRefractoriness,
 >(
-    izhikevich_neuron: &IzhikevichNeuron<T, V>,
-    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<U, W>,
+    izhikevich_neuron: &IzhikevichNeuron<T, W>,
+    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<U, Y>,
     scaling_defaults: Option<SummaryScalingDefaults>,
     iterations: usize,
-    input_spike_trains: &Vec<PresetSpikeTrain<Y>>,
+    input_spike_trains: &Vec<PresetSpikeTrain<V, X>>,
     genetic_algo_params: &GeneticAlgorithmParameters,
     hodgkin_huxley_do_receptor_kinetics: bool,
     izhikevich_do_receptor_kinetics: bool,
@@ -559,7 +568,7 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
         do_receptor_kinetics: izhikevich_do_receptor_kinetics,
     };
 
-    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V, Y>> = HashMap::new();
+    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, W, V, X>> = HashMap::new();
     fitting_settings_map.insert("settings", fitting_settings.clone());
 
     if debug {
