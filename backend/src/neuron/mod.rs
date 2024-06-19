@@ -19,15 +19,15 @@ pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, Potentiation, BayesianFactor, LastFiringTime, STDP,
-    IterateAndSpike, BayesianParameters, STDPParameters, PotentiationType,
+    CurrentVoltage, GapConductance, Potentiation, GaussianFactor, LastFiringTime, STDP,
+    IterateAndSpike, GaussianParameters, STDPParameters, PotentiationType,
     Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, NeurotransmitterConcentrations,
     ApproximateNeurotransmitter, weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
     LigandGatedChannels,
     impl_current_voltage_with_kinetics,
     impl_gap_conductance_with_kinetics,
     impl_potentiation_with_kinetics,
-    impl_bayesian_factor_with_kinetics,
+    impl_gaussian_factor_with_kinetics,
     impl_last_firing_time_with_kinetics,
     impl_stdp_with_kinetics,
     impl_necessary_iterate_and_spike_traits,
@@ -59,14 +59,14 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
     do_receptor_kinetics: bool,
-    bayesian: bool,
+    gaussian: bool,
     input_current: f64,
-) {
-    let (t_total, post_current, input_current) = if bayesian {
-        let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
-        let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
+) -> (bool, bool) {
+    let (t_total, post_current, input_current) = if gaussian {
+        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
+        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
 
-        let input_current = input_current * pre_bayesian_factor;
+        let input_current = input_current * pre_gaussian_factor;
 
         let post_current = signed_gap_junction(
             &*presynaptic_neuron,
@@ -75,7 +75,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 
         let t_total = if do_receptor_kinetics {
             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
+            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
 
             Some(t)
         } else {
@@ -99,12 +99,14 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
         (t_total, post_current, input_current)
     };
 
-    let _pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
+    let pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
 
-    let _post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+    let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
         post_current,
         t_total.as_ref(),
     );
+
+    (pre_spiking, post_spiking)
 }
 
 pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
@@ -137,17 +139,17 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     postsynaptic_neuron: &mut U,
     timestep: usize,
     do_receptor_kinetics: bool,
-    bayesian: bool,
-) {
+    gaussian: bool,
+) -> (bool, bool, bool) {
     let input_current = spike_train_gap_juncton(spike_train, presynaptic_neuron, timestep);
 
-    let (pre_t_total, post_t_total, current) = if bayesian {
-        let pre_bayesian_factor = presynaptic_neuron.get_bayesian_factor();
-        let post_bayesian_factor = postsynaptic_neuron.get_bayesian_factor();
+    let (pre_t_total, post_t_total, current) = if gaussian {
+        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
+        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
 
         let pre_t_total = if do_receptor_kinetics {
             let mut t = spike_train.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, pre_bayesian_factor);
+            weight_neurotransmitter_concentration(&mut t, pre_gaussian_factor);
 
             Some(t)
         } else {
@@ -161,7 +163,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
 
         let post_t_total = if do_receptor_kinetics {
             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, post_bayesian_factor);
+            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
 
             Some(t)
         } else {
@@ -212,6 +214,8 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     if post_spiking {
         postsynaptic_neuron.set_last_firing_time(Some(timestep));
     }
+
+    (spike_train_spiking, pre_spiking, post_spiking)
 }
 
 pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
@@ -292,9 +296,9 @@ pub fn update_weight<T: LastFiringTime, U: IterateAndSpike>(
 //     false => None
 // };
 
-// let noise_factor = postsynaptic_neuron.get_bayesian_factor();
+// let noise_factor = postsynaptic_neuron.get_gaussian_factor();
 // let presynaptic_inputs: Vec<f64> = (0..n)
-//     .map(|i| input_currents[i] * presynaptic_neurons[i].get_bayesian_factor())
+//     .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
 //     .collect();
 // let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
 //     .map(|(presynaptic_neuron, input_value)| {
@@ -418,7 +422,7 @@ pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory>
     update_grid_history: bool,
     do_stdp: bool,
     do_receptor_kinetics: bool,
-    bayesian: bool,
+    gaussian: bool,
     internal_clock: usize,
 }
 
@@ -447,8 +451,8 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
             })
             .sum();
 
-        if self.bayesian {
-            input_val *= self.cell_grid[x][y].get_bayesian_factor();
+        if self.gaussian {
+            input_val *= self.cell_grid[x][y].get_gaussian_factor();
         }
 
         input_val /= input_positions.len() as f64;
@@ -478,9 +482,9 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
 
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
-        if self.bayesian {
+        if self.gaussian {
             let (x, y) = position.pos;
-            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[x][y].get_bayesian_factor());
+            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[x][y].get_gaussian_factor());
         }
 
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
