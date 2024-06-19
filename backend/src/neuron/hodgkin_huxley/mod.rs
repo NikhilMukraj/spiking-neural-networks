@@ -1,3 +1,5 @@
+//! An implementation of a Hodgkin Huxley neuron with neurotransmission, receptor kinetics,
+//! and the option to add an arbitrary additional ion channel gate to the model
 
 use std::{
     collections::HashMap,
@@ -5,13 +7,13 @@ use std::{
 };
 use super::{ 
     iterate_and_spike::{
-        IterateAndSpike, BayesianFactor, BayesianParameters, CurrentVoltage,
+        IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage,
         GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
         LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
         NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, 
         ReceptorKinetics,
     },
-    impl_bayesian_factor_with_kinetics, 
+    impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
     impl_gap_conductance_with_kinetics, 
     impl_last_firing_time_with_kinetics, 
@@ -33,7 +35,7 @@ use super::{
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
 /// Handles dynamics of any additional ion channels
-pub trait AdditionalGate: AdditionalGateClone {
+pub trait AdditionalGate: AdditionalGateClone + Sync + Send {
     /// Initializes parameters based on a starting voltage (mV)
     fn initialize(&mut self, voltage: f64);
     /// Updates current based on the current voltage (mV) and a timestep (ms)
@@ -220,7 +222,7 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -253,7 +255,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
                 .collect(),
             synaptic_neurotransmitters: self.synaptic_neurotransmitters.clone(),
             ligand_gates: self.ligand_gates.clone(),
-            bayesian_params: self.bayesian_params.clone(),
+            gaussian_params: self.gaussian_params.clone(),
             stdp_params: self.stdp_params.clone(),
         }
     }
@@ -291,7 +293,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             stdp_params: STDPParameters::default(),
         }
     }
@@ -481,14 +483,14 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
 }
 
 /// Takes in a static current as an input and iterates the given
-/// neuron for a given duration, set `bayesian` to true to add 
+/// neuron for a given duration, set `gaussian` to true to add 
 /// normally distributed noise to the input as it iterates,
 /// returns various state variables over time including voltages
 /// and gating states
 pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorKinetics>(
     hodgkin_huxley_neuron: &mut HodgkinHuxleyNeuron<T, R>,
     input: f64,
-    bayesian: bool,
+    gaussian: bool,
     iterations: usize,
 ) -> HashMap<String, Vec<f64>> {
     let mut state_output = HashMap::new();
@@ -498,8 +500,8 @@ pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorK
     state_output.insert("h".to_string(), vec![]);
 
     for _ in 0..iterations {
-        let current_input = if bayesian {
-            input * hodgkin_huxley_neuron.get_bayesian_factor()
+        let current_input = if gaussian {
+            input * hodgkin_huxley_neuron.get_gaussian_factor()
         } else {
             input
         };
