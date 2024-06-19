@@ -4,11 +4,11 @@
 
 use std::collections::HashMap;
 use super::{ 
-    iterate_and_spike::ReceptorKinetics, BayesianFactor, BayesianParameters, 
+    iterate_and_spike::ReceptorKinetics, GaussianFactor, GaussianParameters, 
     CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
     LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, 
     Neurotransmitters, Potentiation, PotentiationType, STDPParameters, STDP,
-    impl_bayesian_factor_with_kinetics, 
+    impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
     impl_gap_conductance_with_kinetics, 
     impl_last_firing_time_with_kinetics, 
@@ -19,20 +19,20 @@ use super::{
 
 
 /// Takes in a static current as an input and iterates the given
-/// neuron for a given duration, set `bayesian` to true to add 
+/// neuron for a given duration, set `gaussian` to true to add 
 /// normally distributed noise to the input as it iterates,
 /// returns the voltages from the neuron over time
 pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     cell: &mut T, 
     input: f64, 
-    bayesian: bool, 
+    gaussian: bool, 
     iterations: usize
 ) -> Vec<f64> {
     let mut voltages: Vec<f64> = vec![cell.get_current_voltage()];
 
     for _ in 0..iterations {
-        let _is_spiking = if bayesian {
-            cell.iterate_and_spike(cell.get_bayesian_factor() * input)
+        let _is_spiking = if gaussian {
+            cell.iterate_and_spike(cell.get_gaussian_factor() * input)
         } else {
             cell.iterate_and_spike(input)
         };
@@ -102,7 +102,7 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -131,7 +131,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -284,7 +284,7 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -317,7 +317,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -426,7 +426,7 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -460,7 +460,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -500,9 +500,9 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Voltage initialization value (mV) 
     pub v_init: f64, 
     /// Controls speed
-    pub alpha: f64, 
+    pub a: f64, 
     /// Controls sensitivity to adaptive value
-    pub beta: f64,
+    pub b: f64,
     /// After spike reset value for voltage 
     pub c: f64,
     /// After spike reset value for adaptive value 
@@ -526,7 +526,7 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -541,8 +541,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
             current_voltage: -75., 
             gap_conductance: 7.,
             w_value: 0.,
-            alpha: 0.02,
-            beta: 0.2,
+            a: 0.02,
+            b: 0.2,
             c: -55.0,
             d: 8.0,
             v_th: 30., // spike threshold (mV)
@@ -554,7 +554,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -566,7 +566,7 @@ macro_rules! impl_izhikevich_default_methods {
         // Calculates how adaptive value changes
         pub fn izhikevich_get_dw_change(&self) -> f64 {
             let dw = (
-                self.alpha * (self.beta * self.current_voltage - self.w_value)
+                self.a * (self.b * self.current_voltage - self.w_value)
             ) * (self.dt / self.tau_m);
     
             dw
@@ -619,9 +619,9 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     /// Voltage initialization value (mV) 
     pub v_init: f64, 
     /// Controls speed
-    pub alpha: f64, 
+    pub a: f64, 
     /// Controls sensitivity to adaptive value
-    pub beta: f64,
+    pub b: f64,
     /// After spike reset value for voltage 
     pub c: f64,
     /// After spike reset value for adaptive value 
@@ -647,7 +647,7 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
-    pub bayesian_params: BayesianParameters,
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
@@ -662,8 +662,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
             current_voltage: -75., 
             gap_conductance: 7.,
             w_value: 0.,
-            alpha: 0.02,
-            beta: 0.2,
+            a: 0.02,
+            b: 0.2,
             c: -55.0,
             d: 8.0,
             v_th: 30., // spike threshold (mV)
@@ -676,7 +676,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
-            bayesian_params: BayesianParameters::default(),
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
