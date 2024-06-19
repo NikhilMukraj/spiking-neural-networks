@@ -9,7 +9,8 @@ use emd::earth_moving_distance;
 
 
 /// Retrieves the power density of the given time series based on the given timestep (ms)
-/// and total time elapsed by the end of the series (ms)
+/// and total time elapsed by the end of the series (ms), returns tuple of power spectrum 
+/// and associated frequency respectively
 pub fn get_power_density(x: Vec<f64>, dt: f64, total_time: f64) -> (Array1<f64>, Array1<f64>) {
     let x_mean = x.iter().sum::<f64>() / x.len() as f64;
 
@@ -47,7 +48,9 @@ fn find_max(arr: &Array1<f64>) -> Option<&f64> {
     arr.iter().max_by(|a, b| a.total_cmp(b))
 }
 
-/// Compares two power densities using the earth moving distance
+/// Compares two power densities spectra using the earth moving distance, 
+/// it assumes the same frequency range for each argument, 
+/// (only compares the second item of `get_power_density`)
 pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
     if sxx1.len() != sxx2.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
