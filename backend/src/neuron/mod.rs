@@ -20,10 +20,9 @@ use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     CurrentVoltage, GapConductance, Potentiation, GaussianFactor, LastFiringTime, STDP,
-    IterateAndSpike, GaussianParameters, STDPParameters, PotentiationType,
+    IterateAndSpike, GaussianParameters, STDPParameters, PotentiationType, LigandGatedChannels,
     Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, NeurotransmitterConcentrations,
-    ApproximateNeurotransmitter, weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
-    LigandGatedChannels,
+    weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
     impl_current_voltage_with_kinetics,
     impl_gap_conductance_with_kinetics,
     impl_potentiation_with_kinetics,
