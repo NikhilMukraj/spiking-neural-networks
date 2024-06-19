@@ -450,37 +450,37 @@ fn fitting_objective<
 /// returns an action potential summary for the fit Izhikevich neuron in third item of tuple,
 /// and returns scaling factors used during simulations in fourth item of tuple
 /// 
-/// `izhikevich_neuron` : Izhikevich neuron to simulate for fitting
+/// - `izhikevich_neuron` : Izhikevich neuron to simulate for fitting
 /// 
-/// `hodgkin_huxley_neuron` : Hodgkin Huxley neuron to reference
+/// - `hodgkin_huxley_neuron` : Hodgkin Huxley neuron to reference
 /// 
-/// `scaling_defaults` : a set of default values to use when scaling action potential summaries,
+/// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
 /// use `None` to not scale summaries during fitting
 /// 
-/// `iterations` : number of iterations to run each Hodgkin Huxley and Izhikevich simulation for
+/// - `iterations` : number of iterations to run each Hodgkin Huxley and Izhikevich simulation for
 /// 
-/// `input_spike_trains` : a set of preset spike trains to use when simulating each neuron, essentially
+/// - `input_spike_trains` : a set of preset spike trains to use when simulating each neuron, essentially
 /// a set of conditions to observe the neurons over in order to ensure the models are fit
 /// 
-/// `genetic_algo_parameters` : a set of hyperparameters for the genetic algorithm that fits
+/// - `genetic_algo_parameters` : a set of hyperparameters for the genetic algorithm that fits
 /// the neurons to use
 /// 
-/// `hodgkin_huxley_do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// - `hodgkin_huxley_do_receptor_kinetics` : use `true` to update receptor gating values of 
 /// Hodgkin Huxley neuron based on neurotransmitter input during the simulation
 /// 
-/// `izhikevich_do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// - `izhikevich_do_receptor_kinetics` : use `true` to update receptor gating values of 
 /// Izhikevich neuron based on neurotransmitter input during the simulation
 /// 
-/// `resting_potential` : resting potential of the Hodgkin Huxley neuron
+/// - `resting_potential` : resting potential of the Hodgkin Huxley neuron
 /// 
-/// `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
+/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 /// 
-/// `use_amplitude` : use `true` to compare the average spike amplitudes of the simulations
+/// - `use_amplitude` : use `true` to compare the average spike amplitudes of the simulations
 /// in the fitting function
 /// 
-/// `spike_amplitude_default` : default height for a spike if no spikes are found in a given simulation
+/// - `spike_amplitude_default` : default height for a spike if no spikes are found in a given simulation
 /// 
-/// `verbose` : use `true` to print extra information
+/// - `verbose` : use `true` to print extra information
 pub fn fit_izhikevich_to_hodgkin_huxley<
     T: NeurotransmitterKinetics, 
     U: NeurotransmitterKinetics, 
