@@ -9,7 +9,7 @@ use super::{
 };
 
 /// Handles dynamics of spike train effect or the neural refractoriness function
-pub trait NeuralRefractoriness: Default {
+pub trait NeuralRefractoriness: Default + Clone + Send + Sync {
     /// Sets decay value
     fn set_decay(&mut self, decay_factor: f64);
     /// Gets decay value
@@ -281,25 +281,28 @@ impl<T: NeuralRefractoriness> Default for PresetSpikeTrain<T> {
     }
 }
 
-// impl<T: NeuralRefractoriness> PresetSpikeTrain<T> {
-//     fn from_evenly_divided(num_spikes: usize, dt: f64) -> Self {
-//         let mut firing_times: HashSet<usize> =  HashSet::new();
-//         let interval = ((1000. / dt) / (num_spikes as f64)) as usize;
+impl<T: NeuralRefractoriness> PresetSpikeTrain<T> {
+    /// Generates a spike train that evenly divides up a preset spike train's
+    /// firing times across a timeframe given the number of spikes
+    /// and the timestep (dt)
+    pub fn from_evenly_divided(num_spikes: usize, dt: f64) -> Self {
+        let mut firing_times: HashSet<usize> =  HashSet::new();
+        let interval = ((1000. / dt) / (num_spikes as f64)) as usize;
 
-//         let mut current_timestep = 0;
-//         for _ in 0..num_spikes {
-//             firing_times.insert(current_timestep);
-//             current_timestep += interval;
-//         }
+        let mut current_timestep = 0;
+        for _ in 0..num_spikes {
+            firing_times.insert(current_timestep);
+            current_timestep += interval;
+        }
 
-//         let mut preset_spike_train = PresetSpikeTrain::<T>::default();
-//         preset_spike_train.refractoriness_dt = dt;
-//         preset_spike_train.firing_times = firing_times;
-//         preset_spike_train.max_clock_value = current_timestep;
+        let mut preset_spike_train = PresetSpikeTrain::<T>::default();
+        preset_spike_train.refractoriness_dt = dt;
+        preset_spike_train.firing_times = firing_times;
+        preset_spike_train.max_clock_value = current_timestep;
 
-//         preset_spike_train
-//     }
-// }
+        preset_spike_train
+    }
+}
 
 impl<T: NeuralRefractoriness> SpikeTrain for PresetSpikeTrain<T> {
     fn iterate(&mut self) -> bool {
