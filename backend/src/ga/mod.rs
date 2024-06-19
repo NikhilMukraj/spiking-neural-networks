@@ -177,6 +177,9 @@ impl Default for GeneticAlgorithmParameters {
 /// objective function, returns the best bit string in first item of tuple, the score of the
 /// bit string, and a vector of vectors containing the scores for each bit string over time
 /// 
+/// `f` : the objective function to minimize the output of, should take in the bitstring, bounds,
+/// number of bits per bit substring, and a hashmap of any necessary parameters as arguments
+/// 
 /// `params` : a set of genetic algorithm parameters
 ///
 /// `settings` : any additional parameters necessary in the objective function
