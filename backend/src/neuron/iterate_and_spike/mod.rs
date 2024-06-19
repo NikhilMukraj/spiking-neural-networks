@@ -120,7 +120,7 @@ impl NeurotransmitterType {
 }
 
 /// Calculates neurotransmitter concentration over time based on voltage of neuron
-pub trait NeurotransmitterKinetics: Clone {
+pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     /// Calculates change in neurotransmitter concentration based on voltage
     fn apply_t_change(&mut self, voltage: f64);
     /// Returns neurotransmitter concentration
@@ -244,7 +244,7 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 
 /// Calculates receptor gating values over time based on neurotransmitter concentration
 pub trait ReceptorKinetics: 
-Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + GABAbDefault2 + NMDADefault {
+Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + GABAbDefault2 + NMDADefault + Sync + Send {
     /// Calculates the change in receptor gating based on neurotransmitter input
     fn apply_r_change(&mut self, t: f64);
     /// Gets the receptor gating value
@@ -693,7 +693,7 @@ impl PotentiationType {
 
 /// A set of parameters to use in generating gaussian noise
 #[derive(Debug, Clone)]
-pub struct BayesianParameters {
+pub struct GaussianParameters {
     /// Mean of distribution
     pub mean: f64,
     /// Standard deviation of distribution
@@ -704,9 +704,9 @@ pub struct BayesianParameters {
     pub min: f64,
 }
 
-impl Default for BayesianParameters {
+impl Default for GaussianParameters {
     fn default() -> Self {
-        BayesianParameters { 
+        GaussianParameters { 
             mean: 1.0, // center of norm distr
             std: 0.0, // std of norm distr
             max: 2.0, // maximum cutoff for norm distr
@@ -755,8 +755,8 @@ pub trait Potentiation {
 }
 
 /// Gets the noise factor for the neuron
-pub trait BayesianFactor {
-    fn get_bayesian_factor(&self) -> f64;
+pub trait GaussianFactor {
+    fn get_gaussian_factor(&self) -> f64;
 }
 
 /// Handles the firing times of the neuron
@@ -808,22 +808,22 @@ macro_rules! impl_potentiation_with_kinetics {
 
 pub(crate) use impl_potentiation_with_kinetics;
 
-macro_rules! impl_bayesian_factor_with_kinetics {
+macro_rules! impl_gaussian_factor_with_kinetics {
     ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BayesianFactor for $struct<T, R> {
-            fn get_bayesian_factor(&self) -> f64 {
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for $struct<T, R> {
+            fn get_gaussian_factor(&self) -> f64 {
                 crate::distribution::limited_distr(
-                    self.bayesian_params.mean, 
-                    self.bayesian_params.std, 
-                    self.bayesian_params.min, 
-                    self.bayesian_params.max,
+                    self.gaussian_params.mean, 
+                    self.gaussian_params.std, 
+                    self.gaussian_params.min, 
+                    self.gaussian_params.max,
                 )
             }
         }
     };
 }
 
-pub(crate) use impl_bayesian_factor_with_kinetics;
+pub(crate) use impl_gaussian_factor_with_kinetics;
 
 macro_rules! impl_last_firing_time_with_kinetics {
     ($struct:ident) => {
@@ -858,7 +858,7 @@ macro_rules! impl_necessary_iterate_and_spike_traits {
         impl_current_voltage_with_kinetics!($name);
         impl_gap_conductance_with_kinetics!($name);
         impl_potentiation_with_kinetics!($name);
-        impl_bayesian_factor_with_kinetics!($name);
+        impl_gaussian_factor_with_kinetics!($name);
         impl_last_firing_time_with_kinetics!($name);
         impl_stdp_with_kinetics!($name);
     }
@@ -868,7 +868,7 @@ pub(crate) use impl_necessary_iterate_and_spike_traits;
 
 /// Handles dynamics neurons that can take in an input to update membrane potential
 pub trait IterateAndSpike: 
-Clone + CurrentVoltage + GapConductance + Potentiation + BayesianFactor + STDP {
+Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + STDP + Send + Sync {
     /// Type of neurotransmitter kinetics to use
     type T: NeurotransmitterKinetics;
     /// Type of receptor kinetics to use
