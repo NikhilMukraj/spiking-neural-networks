@@ -242,6 +242,18 @@
 //! 
 //! ```rust
 //! // copy example from examples folder
+//! 
+//! fn test_isolated_stdp<T: IterateAndSpike>(
+//! presynaptic_neurons: &mut Vec<T>,
+//! postsynaptic_neuron: &mut T,
+//! iterations: usize,
+//! input_current: f64,
+//! input_current_deviation: f64,
+//! weight_params: &GaussianParameters,
+//! do_receptor_kinetics: bool,
+//! ) -> HashMap<String, Vec<f64>> {
+//! 
+//! }
 //! ```
 //! 
 //! ### Custom `IterateAndSpike` implementation
