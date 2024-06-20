@@ -13,7 +13,7 @@
 //! ### Coupling neurons with current input
 //! 
 //! ```rust
-//! use crate::spiking_neural_networks::{
+//! use spiking_neural_networks::{
 //!     neuron::{
 //!         iterate_and_spike::{
 //!             IterateAndSpike, weight_neurotransmitter_concentration,
@@ -104,7 +104,7 @@
 //! ### Coupling neurons with spike train input
 //! 
 //! ```rust
-//! use crate::spiking_neural_networks::{
+//! use spiking_neural_networks::{
 //!     neuron::{
 //!         iterate_and_spike::{
 //!             IterateAndSpike, weight_neurotransmitter_concentration,
@@ -261,7 +261,7 @@
 //! ### Custom `NeurotransmitterKinetics` implementation
 //! 
 //! ```rust
-//! use crate::spiking_neural_networks::iterate_and_spike::NeurotransmitterKinetics;
+//! use spiking_neural_networks::iterate_and_spike::NeurotransmitterKinetics;
 //! 
 //! /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 //! /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
@@ -315,7 +315,7 @@
 //! ### Custom `ReceptorKinetics` implementation
 //! 
 //! ```rust
-//! use crate::spiking_neural_networks::iterate_and_spike::ReceptorKinetics;
+//! use spiking_neural_networks::iterate_and_spike::ReceptorKinetics;
 //! 
 //! /// Receptor dynamics approximation that sets the receptor
 //! /// gating value to the inputted neurotransmitter concentration and
