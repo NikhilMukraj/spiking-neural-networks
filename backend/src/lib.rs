@@ -10,6 +10,8 @@
 //!
 //! ## Examples:
 //! 
+//! See examples folder for more examples.
+//! 
 //! ### Coupling neurons with current input
 //! 
 //! ```rust
