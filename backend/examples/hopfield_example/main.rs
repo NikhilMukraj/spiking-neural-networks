@@ -1,5 +1,5 @@
 use std::{
-    env,
+    env::{args, current_dir},
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
 };
@@ -55,7 +55,7 @@ fn test_hopfield_network<T: GraphFunctionality>(
             hopfield_history.push(discrete_lattice.convert_to_numerics());
         }
 
-        let mut hopfield_file = BufWriter::new(File::create(format!("{}_hopfield.txt", n))
+        let mut hopfield_file = BufWriter::new(File::create(format!("{}_hopfield.txt", n + 1))
             .expect("Could not create file"));
 
         for grid in hopfield_history {
@@ -76,10 +76,30 @@ fn test_hopfield_network<T: GraphFunctionality>(
 }
 
 fn main() -> Result<()> {
-    // list paths to patterns to read
-    // cargo run --example hopfield_example pattern1.txt pattern2.txt
-    let pattern_files: Vec<String> = env::args().skip(1).collect();
+    // creates a hopfield network from discrete neurons and given patterns
+    // distorts patterns, and inputs pattern into lattice
+    // then iterates lattice for set amount of iterations to converge 
+    // writes the history of the lattice over time from input to finish
 
+    // list relative to patterns to read
+    // cargo run --example hopfield_example hopfield_example/pattern1.txt hopfield_example/pattern2.txt
+    let pattern_files: Vec<String> = args().skip(1).collect();
+
+    if pattern_files.is_empty() {
+        return Err(Error::new(ErrorKind::InvalidInput, "Example requires input pattern text files"));
+    }
+
+    let current_directory = current_dir()?
+        .parent()
+        .ok_or_else(|| Error::new(ErrorKind::Other, "Could not determine executable directory"))?
+        .to_path_buf();
+
+    let pattern_files: Vec<String> = pattern_files.iter()
+        .map(|i| {
+            let abs_path = current_directory.join(i);
+            abs_path.to_string_lossy().into_owned()
+        })
+        .collect();
     let patterns: Vec<Vec<Vec<isize>>> = pattern_files.iter()
         .map(|i| 
             read_pattern(
