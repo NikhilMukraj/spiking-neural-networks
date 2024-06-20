@@ -92,7 +92,7 @@ fn main() -> Result<()> {
 
     let current_directory = current_dir()?
         .parent()
-        .ok_or_else(|| Error::new(ErrorKind::Other, "Could not determine executable directory"))?
+        .ok_or_else(|| Error::new(ErrorKind::Other, "Could not determine working directory"))?
         .to_path_buf();
 
     let pattern_files: Vec<String> = pattern_files.iter()
