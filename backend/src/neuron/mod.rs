@@ -63,7 +63,8 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
 
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
 /// has a static input current while the postsynaptic neuron takes
-/// the current input and neurotransmitter input from the presynaptic neuron
+/// the current input and neurotransmitter input from the presynaptic neuron,
+/// returns whether each neuron is spiking
 /// 
 /// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
 /// 
@@ -158,7 +159,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 /// has a spike train input while the postsynaptic neuron takes
 /// the current input and neurotransmitter input from the presynaptic neuron,
 /// also updates the last firing times of each neuron and spike train given the
-/// current timestep of the simulation
+/// current timestep of the simulation, returns whether each neuron is spiking
 /// 
 /// - `spike_train` : a spike train that implements `Spiketrain`
 /// 
