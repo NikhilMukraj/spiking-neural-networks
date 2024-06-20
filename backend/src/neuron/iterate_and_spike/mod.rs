@@ -413,7 +413,7 @@ pub struct ExponentialDecayReceptor {
 
 impl ReceptorKinetics for ExponentialDecayReceptor {
     fn apply_r_change(&mut self, t: f64) {
-        self.r = exp_decay_derivative(self.r, self.r_max, self.decay_constant, self.dt) + t;
+        self.r += exp_decay_derivative(self.r, self.r_max, self.decay_constant, self.dt) + t;
         self.r = self.r_max.min(self.r.max(0.));
     }
 
