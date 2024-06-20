@@ -82,7 +82,8 @@ fn main() -> Result<()> {
     // writes the history of the lattice over time from input to finish
 
     // list relative to patterns to read
-    // cargo run --example hopfield_example hopfield_example/pattern1.txt hopfield_example/pattern2.txt
+    // (assumes user is in examples folder, outputs will be written to examples folder)
+    // cargo run --example hopfield_example examples/hopfield_example/pattern1.txt examples/hopfield_example/pattern2.txt
     let pattern_files: Vec<String> = args().skip(1).collect();
 
     if pattern_files.is_empty() {
