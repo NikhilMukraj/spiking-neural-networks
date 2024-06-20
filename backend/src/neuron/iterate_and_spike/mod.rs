@@ -163,7 +163,6 @@ impl_destexhe_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
 impl_destexhe_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
-impl_destexhe_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
 
 impl NeurotransmitterKinetics for DestexheNeurotransmitter {
     fn apply_t_change(&mut self, voltage: f64) {
@@ -217,7 +216,6 @@ impl_approximate_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
 impl_approximate_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
-impl_approximate_neurotransmitter_default!(GABAbDefault2, gabab_default2, 0.5);
 
 fn heaviside(x: f64) -> f64 {
     if x > 0. {
@@ -242,9 +240,68 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
     }
 }
 
+/// An approximation of neurotransmitter kinetics that sets the concentration to the 
+/// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
+/// slowly through exponential decay that scales based on the `decay_constant` and `dt`
+#[derive(Debug, Clone, Copy)]
+pub struct ExponentialDecayNeurotransmitter {
+    /// Maximal neurotransmitter concentration (mM)
+    pub t_max: f64,
+    /// Current neurotransmitter concentration (mM)
+    pub t: f64,
+    /// Voltage threshold for detecting spikes (mV)
+    pub v_th: f64,
+    /// Amount to decay neurotransmitter concentration by
+    pub decay_constant: f64,
+    /// Timestep factor in decreasing neurotransmitter concentration (ms)
+    pub dt: f64,
+}
+
+macro_rules! impl_exp_decay_neurotransmitter_default {
+    ($trait:ident, $method:ident, $t_max:expr) => {
+        impl $trait for ExponentialDecayNeurotransmitter {
+            fn $method() -> Self {
+                ExponentialDecayNeurotransmitter {
+                    t_max: $t_max,
+                    t: 0.,
+                    v_th: 25.,
+                    decay_constant: 2.0,
+                    dt: 0.1,
+                }
+            }
+        }
+    };
+}
+
+impl_exp_decay_neurotransmitter_default!(Default, default, 1.0);
+impl_exp_decay_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
+impl_exp_decay_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
+impl_exp_decay_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
+impl_exp_decay_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
+
+fn exp_decay_derivative(x: f64, a: f64, b: f64, dt: f64) -> f64 {
+    -a / b * (-x / b).exp() * dt
+}
+
+impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
+    fn apply_t_change(&mut self, voltage: f64) {
+        let t_change = exp_decay_derivative(self.t, self.t_max, self.decay_constant, self.dt);
+        self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
+        self.t = self.t_max.min(self.t.max(0.));
+    }
+
+    fn get_t(&self) -> f64 {
+        self.t
+    }
+
+    fn set_t(&mut self, t: f64) {
+        self.t = t;
+    }
+}
+
 /// Calculates receptor gating values over time based on neurotransmitter concentration
 pub trait ReceptorKinetics: 
-Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + GABAbDefault2 + NMDADefault + Sync + Send {
+Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync + Send {
     /// Calculates the change in receptor gating based on neurotransmitter input
     fn apply_r_change(&mut self, t: f64);
     /// Gets the receptor gating value
@@ -266,6 +323,20 @@ pub struct DestexheReceptor {
     pub dt: f64,
 }
 
+impl ReceptorKinetics for DestexheReceptor {
+    fn apply_r_change(&mut self, t: f64) {
+        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * self.dt;
+    }
+
+    fn get_r(&self) -> f64 {
+        self.r
+    }
+
+    fn set_r(&mut self, r: f64) {
+        self.r = r;
+    }
+}
+
 macro_rules! impl_destexhe_receptor_default {
     ($trait:ident, $method:ident, $alpha:expr, $beta:expr, $dt:expr) => {
         impl $trait for DestexheReceptor {
@@ -279,20 +350,6 @@ macro_rules! impl_destexhe_receptor_default {
             }
         }
     };
-}
-
-impl ReceptorKinetics for DestexheReceptor {
-    fn apply_r_change(&mut self, t: f64) {
-        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * self.dt;
-    }
-
-    fn get_r(&self) -> f64 {
-        self.r
-    }
-
-    fn set_r(&mut self, r: f64) {
-        self.r = r;
-    }
 }
 
 impl_destexhe_receptor_default!(Default, default, 1., 1., 0.1);
@@ -337,8 +394,58 @@ impl_approximate_receptor_default!(Default, default);
 impl_approximate_receptor_default!(AMPADefault, ampa_default);
 impl_approximate_receptor_default!(GABAaDefault, gabaa_default);
 impl_approximate_receptor_default!(GABAbDefault, gabab_default);
-impl_approximate_receptor_default!(GABAbDefault2, gabab_default2);
 impl_approximate_receptor_default!(NMDADefault, nmda_default);
+
+/// Receptor dynamics approximation that sets the receptor
+/// gating value to the inputted neurotransmitter concentration and
+/// then exponentially decays the receptor over time
+#[derive(Debug, Clone, Copy)]
+pub struct ExponentialDecayReceptor {
+    /// Maximal receptor gating value
+    pub r_max: f64,
+    /// Receptor gating value
+    pub r: f64,
+    /// Amount to decay neurotransmitter concentration by
+    pub decay_constant: f64,
+    /// Timestep factor in decreasing neurotransmitter concentration (ms)
+    pub dt: f64,
+}
+
+impl ReceptorKinetics for ExponentialDecayReceptor {
+    fn apply_r_change(&mut self, t: f64) {
+        self.r = exp_decay_derivative(self.r, self.r_max, self.decay_constant, self.dt) + t;
+        self.r = self.r_max.min(self.r.max(0.));
+    }
+
+    fn get_r(&self) -> f64 {
+        self.r
+    }
+
+    fn set_r(&mut self, r: f64) {
+        self.r = r;
+    }
+}
+
+macro_rules! impl_exp_decay_receptor_default {
+    ($trait:ident, $method:ident) => {
+        impl $trait for ExponentialDecayReceptor {
+            fn $method() -> Self {
+                ExponentialDecayReceptor { 
+                    r_max: 1.0,
+                    r: 0.,
+                    decay_constant: 2.,
+                    dt: 0.1,
+                }
+            }
+        }
+    };
+}
+
+impl_exp_decay_receptor_default!(Default, default);
+impl_exp_decay_receptor_default!(AMPADefault, ampa_default);
+impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
+impl_exp_decay_receptor_default!(GABAbDefault, gabab_default);
+impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 
 /// Enum containing the type of ionotropic ligand gated receptor
 /// containing a modifier to use when calculating current
@@ -419,12 +526,12 @@ impl<T: ReceptorKinetics> GABAbDefault for LigandGatedChannel<T> {
     }
 }
 
-impl<T: ReceptorKinetics> GABAbDefault2 for LigandGatedChannel<T> {
+impl<DestexheReceptor: ReceptorKinetics + GABAbDefault2> GABAbDefault2 for LigandGatedChannel<DestexheReceptor> {
     fn gabab_default2() -> Self {
         LigandGatedChannel {
             g: 0.06, // 0.06 nS
             reversal: -95., // -95 mV
-            receptor: T::gabab_default2(),
+            receptor: DestexheReceptor::gabab_default2(),
             receptor_type: IonotropicLigandGatedReceptorType::GABAb(GABAbDissociation::default()),
             current: 0.,
         }
