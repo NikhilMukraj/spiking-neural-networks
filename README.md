@@ -193,6 +193,13 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ### Classifier/Regression Model Notes
 
+- Potential refactor of STDP to a plasticity trait that, given the last time of firing for two neurons and the current timestep, calculates weight change
+  - Triplet STDP
+  - External reward could just be multiplied by change in weight for reward modulated plasticity
+  - Plasticity rule called at the end of each `iterate_and_spike`
+    - STDP would then check if neuron is spiking and proceed with changing presynaptic and postsynaptic weights
+    given the graph and respective lattice
+
 - [Biologically plausible STDP based classifier](https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full)
   - Only STDP is used
   - Output is dictated as neuron that has the highest firing rate when data is presented
@@ -203,8 +210,11 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Attractor based classifier
 
-- R-STDP based classifier
-- R-STDP based regression
+- R-STDP
+  - Lattices implementation
+  - Classifier
+  - Regression
+  - Exploratory period may be necessary
 
 - R-STDP based liquid state machine classifier/regression
   - Regression could be predicting a system differential equations representing some physics or some strange attractor
@@ -238,7 +248,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Angular velocity should be translated into either a direct increase in input current or an increase in spikes, that should be given as input to ring attractor
   - [Graph eigenvalues](https://youtu.be/uTUVhsxdGS8?si=1QYUdWrongUZnh-P)
 - Could also try a similar mechanism but expanded for (hexagonal and toroidial) grid cells (axial coordinates) (again based on some kind of velocity input) or with place cells/fields
-- Effect of different receptors on learning patterns through stdp could be tested (ie effect of dopamine and serotonin)
+- **Test effect of neurotransmitter on stability of attractor**
+  - Neurotransmitters may have to be tweaked to achieve accurate results
+  - **Discrete spike neurotransmitter + exponential decay receptor** may be more accurate, will need testing, could also try approximate neurotransmitter + approximate receptor
+- Effect of different receptors on learning patterns through STDP could be tested (ie effect of dopamine and serotonin)
 - Investigate astrocyte effect on attractors
 
 - Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
@@ -305,6 +318,10 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Hallicunation could be considered when absence of stimuli generate readouts that say there exists auditory stimuli
     - Could also be considered a general misclassification
     - Could also have a liquid state machine generate a grid pattern on readout given an input similar to a Hopfield network
+
+- Models of hallucinations and memory may need different neuro chemical dynamics, hallucination may need to have a reduction in just GABA whereas memory may need a reduction in NMDA, should test treatment strategy on both models
+  - May need to simulate various combinations of different receptor efficacies to find which one best matches schizophrenia
+  - Then looking at treatment simulation, or look at hippocampus or other regions of the brain and try to replicate their receptor statistics
 
 - Eventually try liquid state machine management task
 
