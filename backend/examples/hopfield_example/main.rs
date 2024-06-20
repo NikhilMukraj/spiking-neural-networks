@@ -76,6 +76,8 @@ fn test_hopfield_network<T: GraphFunctionality>(
 }
 
 fn main() -> Result<()> {
+    // list paths to patterns to read
+    // cargo run --example hopfield_example pattern1.txt pattern2.txt
     let pattern_files: Vec<String> = env::args().skip(1).collect();
 
     let patterns: Vec<Vec<Vec<isize>>> = pattern_files.iter()
