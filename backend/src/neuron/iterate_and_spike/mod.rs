@@ -242,6 +242,53 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
+/// then immediately sets it to 0
+#[derive(Debug, Clone, Copy)]
+pub struct DiscreteSpikeNeurotransmitter {
+    /// Maximal neurotransmitter concentration (mM)
+    pub t_max: f64,
+    /// Current neurotransmitter concentration (mM)
+    pub t: f64,
+    /// Voltage threshold for detecting spikes (mV)
+    pub v_th: f64,
+}
+
+impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
+    fn apply_t_change(&mut self, voltage: f64) {
+        self.t = self.t_max * heaviside(voltage - self.v_th);
+    }
+
+    fn get_t(&self) -> f64 {
+        self.t
+    }
+
+    fn set_t(&mut self, t: f64) {
+        self.t = t;
+    }
+}
+
+macro_rules! impl_discrete_neurotransmitter_default {
+    ($trait:ident, $method:ident, $t_max:expr) => {
+        impl $trait for DiscreteSpikeNeurotransmitter {
+            fn $method() -> Self {
+                DiscreteSpikeNeurotransmitter {
+                    t_max: $t_max,
+                    t: 0.,
+                    v_th: 25.,
+                }
+            }
+        }
+    };
+}
+
+impl_discrete_neurotransmitter_default!(Default, default, 1.0);
+impl_discrete_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
+impl_discrete_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
+impl_discrete_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
+impl_discrete_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
+
+/// An approximation of neurotransmitter kinetics that sets the concentration to the 
+/// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
 /// slowly through exponential decay that scales based on the `decay_constant` and `dt`
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayNeurotransmitter {
@@ -279,13 +326,13 @@ impl_exp_decay_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_exp_decay_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_exp_decay_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
-fn exp_decay_derivative(x: f64, a: f64, b: f64, dt: f64) -> f64 {
-    -a / b * (-x / b).exp() * dt
+fn exp_decay(x: f64, l: f64, dt: f64) -> f64 {
+    -x * (dt / -l).exp()
 }
 
 impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
     fn apply_t_change(&mut self, voltage: f64) {
-        let t_change = exp_decay_derivative(self.t, self.t_max, self.decay_constant, self.dt);
+        let t_change = exp_decay(self.t, self.decay_constant, self.dt);
         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
@@ -413,7 +460,7 @@ pub struct ExponentialDecayReceptor {
 
 impl ReceptorKinetics for ExponentialDecayReceptor {
     fn apply_r_change(&mut self, t: f64) {
-        self.r += exp_decay_derivative(self.r, self.r_max, self.decay_constant, self.dt) + t;
+        self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
         self.r = self.r_max.min(self.r.max(0.));
     }
 
