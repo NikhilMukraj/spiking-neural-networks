@@ -50,9 +50,9 @@ impl DiscreteNeuron {
 /// Simple lattice of bipolar discrete neurons with a weight matrix
 pub struct DiscreteNeuronLattice<T: GraphFunctionality>{
     /// 2 dimensional grid of discrete neurons
-    cell_grid: Vec<Vec<DiscreteNeuron>>,
+    pub cell_grid: Vec<Vec<DiscreteNeuron>>,
     /// Internal weights
-    weights: T,
+    pub weights: T,
 }
 
 impl<T: GraphFunctionality> Default for DiscreteNeuronLattice<T> {
@@ -65,6 +65,24 @@ impl<T: GraphFunctionality> Default for DiscreteNeuronLattice<T> {
 }
 
 impl<T: GraphFunctionality> DiscreteNeuronLattice<T> {
+    /// Generates a lattice with default weights given a number of rows and columns to use
+    pub fn generate_lattice_from_dimension(num_rows: usize, num_cols: usize) -> Self {
+        let cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        DiscreteNeuron::default()
+                    })
+                    .collect::<Vec<DiscreteNeuron>>()
+            })
+            .collect::<Vec<Vec<DiscreteNeuron>>>();
+
+        DiscreteNeuronLattice {
+            cell_grid: cell_grid,
+            weights: T::default(),
+        }
+    }
+
     /// Sets state of given grid of discrete neurons to the given, if value
     /// in pattern is greater than 0 the corressponding state is set to `Active`,
     /// otherwise it is set to `Inactive`
