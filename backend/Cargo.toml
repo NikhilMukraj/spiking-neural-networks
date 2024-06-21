@@ -17,6 +17,9 @@ serde = "1.0.192"
 serde_json = "1.0.108"
 # toml = "0.7.8"
 
+# [dev-dependencies]
+# ratatui = "0.26.3"
+
 [lib]
 name = "spiking_neural_networks"
 path = "src/lib.rs"
