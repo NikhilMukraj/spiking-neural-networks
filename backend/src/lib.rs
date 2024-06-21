@@ -443,18 +443,197 @@
 //! ### Custom `IterateAndSpike` implementation
 //! 
 //! ```rust
+//! use spiking_neural_networks::neuron::{ 
+//!     iterate_and_spike::{
+//!         GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+//!         STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+//!         LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+//!         ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
+//!         ApproximateNeurotransmitter, ApproximateReceptor,
+//!     }, 
+//!     distribution,
+//! };
+//! 
+//! 
+//! /// A FitzHugh-Nagumo neuron 
 //! #[derive(Debug, Clone)]
 //! pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-//!     // should include bursting, should have parameter to set whether bursting occurs,
-//!     // like multiplying by 0 to get rid of bursting term
+//!     /// Membrane potential
+//!     pub current_voltage: f64,
+//!     /// Initial voltage
+//!     pub v_init: f64,
+//!     /// Voltage threshold for spike calculation (mV)
+//!     pub v_th: f64,
+//!     /// Adaptive value
+//!     pub w: f64,
+//!     // Initial adaptive value
+//!     pub w_init: f64,
+//!     /// Resistance value
+//!     pub resistance: f64,
+//!     /// Adaptive value modifier
+//!     pub a: f64,
+//!     /// Adaptive value integration constant
+//!     pub b: f64,
+//!     /// Controls conductance of input gap junctions
+//!     pub gap_conductance: f64, 
+//!     /// Membrane time constant (ms)
+//!     pub tau_m: f64,
+//!     /// Membrane capacitance (nF)
+//!     pub c_m: f64, 
+//!     /// Timestep (ms)
+//!     pub dt: f64, 
+//!     /// Last timestep the neuron has spiked 
+//!     pub last_firing_time: Option<usize>,
+//!     /// Whether the voltage was increasing in the last step
+//!     pub was_increasing: bool,
+//!     /// Whether the neuron is currently spiking
+//!     pub is_spiking: bool,
+//!     /// Potentiation type of neuron
+//!     pub potentiation_type: PotentiationType,
+//!     /// STDP parameters
+//!     pub stdp_params: STDPParameters,
+//!     /// Parameters used in generating noise
+//!     pub gaussian_params: GaussianParameters,
+//!     /// Postsynaptic neurotransmitters in cleft
+//!     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+//!     /// Ionotropic receptor ligand gated channels
+//!     pub ligand_gates: LigandGatedChannels<R>,
 //! }
 //! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> for FitzHughNagumoNeuron {
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> FitzHughNagumoNeuron<T, R> {
+//!     // calculates change in voltage
+//!     fn get_dv_change(&self, i: f64) -> f64 {
+//!         (  
+//!             self.current_voltage - (self.current_voltage.powf(3.) / 3.) 
+//!             - self.w + self.resistance * i
+//!         ) * self.dt
+//!     }
 //! 
+//!     // calculates change in adaptive value
+//!     fn get_dw_change(&self) -> f64 {
+//!         (self.current_voltage + self.a + self.b * self.w) * (self.dt / self.tau_m)
+//!     }
+//! 
+//!     // checks if neuron is currently spiking but seeing if the neuron is increasing in
+//!     // reference to the last inputted voltage and if it is above a certain
+//!     // voltage threshold, if it is then the neuron is considered spiking
+//!     // and `true` is returned, otherwise `false` is returned
+//!     fn handle_spiking(&mut self, last_voltage: f64) -> bool {
+//!         let increasing_right_now = last_voltage < self.current_voltage;
+//!         let threshold_crossed = self.current_voltage > self.v_th;
+//!         let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;
+//! 
+//!         self.is_spiking = is_spiking;
+//!         self.was_increasing = increasing_right_now;
+//! 
+//!         is_spiking
+//!     }
 //! }
 //! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzHughNagumoNeuron {
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzHughNagumoNeuron<T, R> {
+//!     type T = T;
+//!     type R = R;
 //! 
+//!     fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
+//!         &self.ligand_gates
+//!     }
+//! 
+//!     fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
+//!         &self.synaptic_neurotransmitters
+//!     }
+//! 
+//!     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
+//!         self.synaptic_neurotransmitters.get_concentrations()
+//!     }
+//!     
+//!     // updates voltage and adaptive values as well as the 
+//!     // neurotransmitters, receptor current is not factored in,
+//!     // and spiking is handled and returns whether it is currently spiking
+//!     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+//!         let dv = self.get_dv_change(input_current);
+//!         let dw = self.get_dw_change();
+//!         let last_voltage = self.current_voltage;
+//! 
+//!         self.current_voltage += dv;
+//!         self.w += dw;
+//! 
+//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+//! 
+//!         self.handle_spiking(last_voltage)
+//!     }
+//! 
+//!     // updates voltage and adaptive values as well as the 
+//!     // neurotransmitters, receptor current is factored in and receptor gating
+//!     // is updated if `t_total` is not `None`, spiking is handled at the end
+//!     // of the method and returns whether it is currently spiking
+//!     fn iterate_with_neurotransmitter_and_spike(
+//!         &mut self, 
+//!         input_current: f64, 
+//!         t_total: Option<&NeurotransmitterConcentrations>,
+//!     ) -> bool {
+//!         self.ligand_gates.update_receptor_kinetics(t_total);
+//!         self.ligand_gates.set_receptor_currents(self.current_voltage);
+//! 
+//!         let dv = self.get_dv_change(input_current);
+//!         let dw = self.get_dw_change();
+//!         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+//!         let last_voltage = self.current_voltage;
+//! 
+//!         self.current_voltage += dv + neurotransmitter_dv;
+//!         self.w += dw;
+//! 
+//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+//! 
+//!         self.handle_spiking(last_voltage)
+//!     }
+//! }
+//! 
+//! // necessary traits are implemented to integrate with other general methods
+//! // that use neuron models, like coupling and lattice methods
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for FitzHughNagumoNeuron<T, R> {
+//!     fn get_current_voltage(&self) -> f64 {
+//!         self.current_voltage
+//!     }
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for FitzHughNagumoNeuron<T, R> {
+//!     fn get_gap_conductance(&self) -> f64 {
+//!         self.gap_conductance
+//!     }
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Potentiation for FitzHughNagumoNeuron<T, R> {
+//!     fn get_potentiation_type(&self) -> PotentiationType {
+//!         self.potentiation_type
+//!     }
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for FitzHughNagumoNeuron<T, R> {
+//!     fn get_gaussian_factor(&self) -> f64 {
+//!         distribution::limited_distr(
+//!             self.gaussian_params.mean, 
+//!             self.gaussian_params.std, 
+//!             self.gaussian_params.min, 
+//!             self.gaussian_params.max,
+//!         )
+//!     }
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for FitzHughNagumoNeuron<T, R> {
+//!     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+//!         self.last_firing_time = timestep;
+//!     }
+//! 
+//!     fn get_last_firing_time(&self) -> Option<usize> {
+//!         self.last_firing_time
+//!     }
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> STDP for FitzHughNagumoNeuron<T, R> {        
+//!     fn get_stdp_params(&self) -> &STDPParameters {
+//!         &self.stdp_params
+//!     }
 //! }
 //! ```
 //! 
