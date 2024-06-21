@@ -149,8 +149,6 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Update obsidian code and equations accordingly
     - Redo results images
     - **Examples should be detailed in documentation as well**
-  
-- **Fitting refactor**
 
 - Multiple lattices struct
   - Hashmap of lattice struct where key is graph id
@@ -186,10 +184,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should expect beta or gamma frequencies above 10 hz and below 50 hz
 
 - `IterateAndSpikeCUDA` trait, could be implemented for electrical synapses only to start out
-
-- Option to subtract 70 mV (or n mV) from Hodgkin Huxley model to set resting potential at n
-
-- Input from cell grid functions should be refactored to work with Hodgkin Huxley cells via a trait and condensed into one function where weighting is optional
+  - Maybe use WGPU instead
 
 ### Classifier/Regression Model Notes
 
@@ -199,6 +194,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Plasticity rule called at the end of each `iterate_and_spike`
     - STDP would then check if neuron is spiking and proceed with changing presynaptic and postsynaptic weights
     given the graph and respective lattice
+  - Could also refactor lattice such that a trait containing a struct with a function to calculate input given an arbitrary neuron
+    - Basically generalizing `gap_junction` functionality
 
 - [Biologically plausible STDP based classifier](https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full)
   - Only STDP is used
@@ -231,8 +228,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Hopfield network needs its own graph representation, should extend graph trait, some of graph trait could be split up so graph used in lattice simulation has functionality for STDP weights while Hopfield static weights don't change, graph trait could also be refactored so min, max, mean, and std can be passed in rather than STDP parameters
   - **Hopfield spiking neural network prototype**
     - Spiking hopfield should measure how long pattern remains after cue is removed in response in to poissonian noise and how easily it transitions from stable state to stable state, longer it stays in a certain state in response to noise indicates more stability, harder to transition indicates more stability
+  - May need to optimize gap conductance values
 
 - Attractor models general attractor models
+  - May need to optimize gap conductance values
   - Potentially looking at attractor based classifiers in similar fashion to izhikevich + astrocyte model before moving to liquid state machine + attractor in similar
   - Trainable attractor network model is likely a good model to look at replicating through (potentially unsupervised) hebbian dynamics
 - Track when stable states occur
