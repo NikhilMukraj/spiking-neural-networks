@@ -2,12 +2,11 @@
 //! as well as neurotransmitter and receptor dynamics through
 //! `NeurotransmitterKinetics` and `ReceptorKinetics`.
 
-use std::collections::HashMap;
 use super::{ 
     iterate_and_spike::ReceptorKinetics, GaussianFactor, GaussianParameters, 
-    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
-    LigandGatedChannels, NeurotransmitterKinetics, NeurotransmitterType, 
-    Neurotransmitters, Potentiation, PotentiationType, STDPParameters, STDP,
+    Potentiation, PotentiationType, STDPParameters, STDP, CurrentVoltage, 
+    GapConductance, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations,
+    LigandGatedChannels, NeurotransmitterKinetics, Neurotransmitters, 
     impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
     impl_gap_conductance_with_kinetics, 
@@ -56,7 +55,7 @@ macro_rules! impl_default_neurotransmitter_methods {
             &self.synaptic_neurotransmitters
         }
     
-        fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+        fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
             self.synaptic_neurotransmitters.get_concentrations()
         }
     }
@@ -182,7 +181,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
@@ -218,7 +217,7 @@ macro_rules! impl_iterate_and_spike {
             fn iterate_with_neurotransmitter_and_spike(
                 &mut self, 
                 input_current: f64, 
-                t_total: Option<&HashMap<NeurotransmitterType, f64>>,
+                t_total: Option<&NeurotransmitterConcentrations>,
             ) -> bool {
                 self.ligand_gates.update_receptor_kinetics(t_total);
                 self.ligand_gates.set_receptor_currents(self.current_voltage);
