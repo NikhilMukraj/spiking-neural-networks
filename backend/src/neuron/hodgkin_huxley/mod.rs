@@ -10,8 +10,7 @@ use super::{
         IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage,
         GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
         LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
-        NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, 
-        ReceptorKinetics,
+        NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
     },
     impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
@@ -427,7 +426,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     fn iterate_with_neurotransmitter(
         &mut self, 
         input: f64, 
-        t_total: Option<&HashMap<NeurotransmitterType, f64>>
+        t_total: Option<&NeurotransmitterConcentrations>
     ) {
         self.update_receptors(t_total);
         self.iterate(input);
@@ -459,14 +458,14 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
         &self.synaptic_neurotransmitters
     }
 
-    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
         self.synaptic_neurotransmitters.get_concentrations()
     }
 
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate_with_neurotransmitter(input_current, t_total);
