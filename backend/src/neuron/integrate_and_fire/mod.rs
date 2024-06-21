@@ -3,17 +3,20 @@
 //! `NeurotransmitterKinetics` and `ReceptorKinetics`.
 
 use super::{ 
-    iterate_and_spike::ReceptorKinetics, GaussianFactor, GaussianParameters, 
-    Potentiation, PotentiationType, STDPParameters, STDP, CurrentVoltage, 
-    GapConductance, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations,
-    LigandGatedChannels, NeurotransmitterKinetics, Neurotransmitters, 
+    iterate_and_spike::{
+        GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+        STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+        LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+        ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
+        ApproximateNeurotransmitter, ApproximateReceptor,
+    }, 
     impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
     impl_gap_conductance_with_kinetics, 
     impl_last_firing_time_with_kinetics, 
-    impl_necessary_iterate_and_spike_traits, 
     impl_potentiation_with_kinetics, 
     impl_stdp_with_kinetics, 
+    impl_necessary_iterate_and_spike_traits, 
 };
 
 
@@ -27,7 +30,7 @@ pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     gaussian: bool, 
     iterations: usize
 ) -> Vec<f64> {
-    let mut voltages: Vec<f64> = vec![cell.get_current_voltage()];
+    let mut voltages: Vec<f64> = vec![];
 
     for _ in 0..iterations {
         let _is_spiking = if gaussian {
@@ -62,6 +65,17 @@ macro_rules! impl_default_neurotransmitter_methods {
 }
 
 pub(crate) use impl_default_neurotransmitter_methods;
+
+macro_rules! impl_default_impl_integrate_and_fire {
+    ($name:ident) => {
+        impl $name<ApproximateNeurotransmitter, ApproximateReceptor> {
+            /// Returns the default implementation of the neuron
+            pub fn default_impl() -> Self {
+                $name::default()
+            }
+        }
+    }
+}
 
 /// A leaky integrate and fire neuron
 #[derive(Debug, Clone)]
@@ -109,6 +123,7 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
 }
 
 impl_necessary_iterate_and_spike_traits!(LeakyIntegrateAndFireNeuron);
+impl_default_impl_integrate_and_fire!(LeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
@@ -291,6 +306,7 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
 }
 
 impl_necessary_iterate_and_spike_traits!(AdaptiveLeakyIntegrateAndFireNeuron);
+impl_default_impl_integrate_and_fire!(AdaptiveLeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
@@ -433,6 +449,7 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
 }
 
 impl_necessary_iterate_and_spike_traits!(AdaptiveExpLeakyIntegrateAndFireNeuron);
+impl_default_impl_integrate_and_fire!(AdaptiveExpLeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
     fn default() -> Self {
@@ -533,6 +550,7 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 }
 
 impl_necessary_iterate_and_spike_traits!(IzhikevichNeuron);
+impl_default_impl_integrate_and_fire!(IzhikevichNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeuron<T, R> {
     fn default() -> Self {
@@ -654,6 +672,7 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
 }
 
 impl_necessary_iterate_and_spike_traits!(LeakyIzhikevichNeuron);
+impl_default_impl_integrate_and_fire!(LeakyIzhikevichNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevichNeuron<T, R> {
     fn default() -> Self {
