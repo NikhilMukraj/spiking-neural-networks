@@ -243,18 +243,201 @@
 //! ### Coupling neurons with spike time dependent plasticity
 //! 
 //! ```rust
-//! // copy example from examples folder
+//! use std::collections::HashMap;
+//! extern crate spiking_neural_networks;
+//! use crate::spiking_neural_networks::{
+//!     neuron::{
+//!         integrate_and_fire::IzhikevichNeuron,
+//!         iterate_and_spike::{
+//!             IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
+//!             ApproximateNeurotransmitter, ApproximateReceptor,
+//!             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
+//!         },
+//!         update_weight_stdp, signed_gap_junction,
+//!     },
+//!     distribution::limited_distr,
+//! };
 //! 
+//! 
+//! /// Generates keys in an ordered manner to ensure columns in file are ordered
+//! fn generate_keys(n: usize) -> Vec<String> {
+//!     let mut keys_vector: Vec<String> = vec![];
+//! 
+//!     for i in 0..n {
+//!         keys_vector.push(format!("presynaptic_voltage_{}", i))
+//!     }
+//!     keys_vector.push(String::from("postsynaptic_voltage"));
+//!     for i in 0..n {
+//!         keys_vector.push(format!("weight_{}", i));
+//!     }
+//! 
+//!     keys_vector
+//! }
+//! 
+//! /// Updates each presynaptic neuron's weights given the timestep
+//! /// and whether the neuron is spiking along with the state of the
+//! /// postsynaptic neuron
+//! fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
+//!     neurons: &mut Vec<T>,
+//!     neuron: &T,
+//!     weights: &mut Vec<f64>,
+//!     delta_ws: &mut Vec<f64>,
+//!     timestep: usize,
+//!     is_spikings: Vec<bool>,
+//! ) {
+//!     for (n, i) in is_spikings.iter().enumerate() {
+//!         if *i {
+//!             // update firing times if spiking
+//!             neurons[n].set_last_firing_time(Some(timestep));
+//!             delta_ws[n] = update_weight_stdp(&neurons[n], &*neuron);
+//!             weights[n] += delta_ws[n];
+//!         }
+//!     }
+//! }
+//! 
+//! /// Tests spike time dependent plasticity on a set of given neurons
+//! /// 
+//! /// `presynaptic_neurons` : a set of input neurons
+//! ///
+//! /// `postsynaptic_neuron` : a single output neuron
+//! ///
+//! /// `iterations` : number of timesteps to simulate neurons for
+//! ///
+//! /// `input_current` : an input current for the presynaptic neurons to take input from
+//! ///
+//! /// `input_current_deviation` : degree of noise to add to input currents to introduce changes
+//! /// in postsynaptic input
+//! ///
+//! /// `weight_params` : parameters to use to randomly initialize the weights on the 
+//! /// input presynaptic neurons
+//! ///
+//! /// `do_receptor_kinetics` : whether to update receptor gating values based on neurotransmitter input
 //! fn test_isolated_stdp<T: IterateAndSpike>(
-//! presynaptic_neurons: &mut Vec<T>,
-//! postsynaptic_neuron: &mut T,
-//! iterations: usize,
-//! input_current: f64,
-//! input_current_deviation: f64,
-//! weight_params: &GaussianParameters,
-//! do_receptor_kinetics: bool,
+//!     presynaptic_neurons: &mut Vec<T>,
+//!     postsynaptic_neuron: &mut T,
+//!     iterations: usize,
+//!     input_current: f64,
+//!     input_current_deviation: f64,
+//!     weight_params: &GaussianParameters,
+//!     do_receptor_kinetics: bool,
 //! ) -> HashMap<String, Vec<f64>> {
+//!     let n = presynaptic_neurons.len();
 //! 
+//!     // generate different currents
+//!     let input_currents: Vec<f64> = (0..n).map(|_| 
+//!             input_current * limited_distr(1.0, input_current_deviation, 0., 2.)
+//!         )
+//!         .collect();
+//! 
+//!     // generate random weights
+//!     let mut weights: Vec<f64> = (0..n).map(
+//!         |_| limited_distr(
+//!             weight_params.mean, 
+//!             weight_params.std, 
+//!             weight_params.min, 
+//!             weight_params.max,
+//!         )
+//!     ).collect();
+//! 
+//!     let mut delta_ws: Vec<f64> = (0..n)
+//!         .map(|_| 0.0)
+//!         .collect();
+//! 
+//!     // generate hashmap to save history of simulation
+//!     let mut output_hashmap: HashMap<String, Vec<f64>> = HashMap::new();
+//!     let keys_vector = generate_keys(n);
+//!     for i in keys_vector.iter() {
+//!         output_hashmap.insert(String::from(i), vec![]);
+//!     }
+//! 
+//!     for timestep in 0..iterations {
+//!         // calculates weighted current inputs and averages them to ensure input does not get too high,
+//!         // otherwise neuronal dynamics becomes unstable
+//!         let calculated_current: f64 = (0..n)
+//!             .map(
+//!                 |i| {
+//!                     let output = weights[i] * signed_gap_junction(
+//!                         &presynaptic_neurons[i], 
+//!                         &*postsynaptic_neuron
+//!                     );
+//! 
+//!                     output / (n as f64)
+//!                 }
+//!             ) 
+//!             .collect::<Vec<f64>>()
+//!             .iter()
+//!             .sum();
+//!         // calculates weighted neurotransmitter inputs
+//!         let presynaptic_neurotransmitters: Option<NeurotransmitterConcentrations> = match do_receptor_kinetics {
+//!             true => Some({
+//!                 let neurotransmitters_vec = (0..n) 
+//!                     .map(|i| {
+//!                         let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
+//!                         weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
+//! 
+//!                         presynaptic_neurotransmitter
+//!                     }
+//!                 ).collect::<Vec<NeurotransmitterConcentrations>>();
+//! 
+//!                 let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
+//! 
+//!                 weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f64); 
+//! 
+//!                 neurotransmitters
+//!             }),
+//!             false => None
+//!         };
+//!         
+//!         // adds noise to current inputs with normally distributed random noise
+//!         let noise_factor = postsynaptic_neuron.get_gaussian_factor();
+//!         let presynaptic_inputs: Vec<f64> = (0..n)
+//!             .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
+//!             .collect();
+//!         let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
+//!             .map(|(presynaptic_neuron, input_value)| {
+//!                 presynaptic_neuron.iterate_and_spike(*input_value)
+//!             })
+//!             .collect();
+//!         // iterates postsynaptic neuron based on calculated inputs
+//!         let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+//!             noise_factor * calculated_current,
+//!             presynaptic_neurotransmitters.as_ref(),
+//!         );
+//! 
+//!         update_isolated_presynaptic_neuron_weights(
+//!             presynaptic_neurons, 
+//!             &postsynaptic_neuron,
+//!             &mut weights, 
+//!             &mut delta_ws, 
+//!             timestep, 
+//!             is_spikings,
+//!         );
+//! 
+//!         // if postsynaptic neuron fires then update the firing time
+//!         // and update the weight accordingly
+//!         if is_spiking {
+//!             postsynaptic_neuron.set_last_firing_time(Some(timestep));
+//!             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
+//!                 delta_ws[n_neuron] = update_weight_stdp(i, postsynaptic_neuron);
+//!                 weights[n_neuron] += delta_ws[n_neuron];
+//!             }
+//!         }
+//! 
+//!         for (index, i) in presynaptic_neurons.iter().enumerate() {
+//!             output_hashmap.get_mut(&format!("presynaptic_voltage_{}", index))
+//!                 .expect("Could not find hashmap value")
+//!                 .push(i.get_current_voltage());
+//!         }
+//!         output_hashmap.get_mut("postsynaptic_voltage").expect("Could not find hashmap value")
+//!             .push(postsynaptic_neuron.get_current_voltage());
+//!         for (index, i) in weights.iter().enumerate() {
+//!             output_hashmap.get_mut(&format!("weight_{}", index))
+//!                 .expect("Could not find hashmap value")
+//!                 .push(*i);
+//!         }
+//!     }
+//! 
+//!     output_hashmap
 //! }
 //! ```
 //! 
@@ -262,12 +445,16 @@
 //! 
 //! ```rust
 //! #[derive(Debug, Clone)]
-//! pub struct FitzHughNagumo<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
+//! pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 //!     // should include bursting, should have parameter to set whether bursting occurs,
 //!     // like multiplying by 0 to get rid of bursting term
 //! }
 //! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> for FitzHugoNagumo {
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> for FitzHughNagumoNeuron {
+//! 
+//! }
+//! 
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzHughNagumoNeuron {
 //! 
 //! }
 //! ```
