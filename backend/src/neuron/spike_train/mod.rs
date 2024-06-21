@@ -9,7 +9,10 @@ use super::{
     Neurotransmitters, Potentiation, PotentiationType,
 };
 
-/// Handles dynamics of spike train effect or the neural refractoriness function
+/// Handles dynamics of spike train effect on another neuron given the current timestep
+/// of the simulation (neural refractoriness function), when the spike train spikes
+/// the total effect also spikes while every subsequent iteration after that spike
+/// results in the effect decaying back to a resting point mimicking an action potential
 pub trait NeuralRefractoriness: Default + Clone + Send + Sync {
     /// Sets decay value
     fn set_decay(&mut self, decay_factor: f64);
