@@ -258,7 +258,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     (spike_train_spiking, pre_spiking, post_spiking)
 }
 
-/// Calculates the change in weight based off of STDP (spike time dependent plasticity)
+/// Calculates and returns the change in weight based off of STDP (spike time dependent plasticity)
 /// given one presynaptic neuron that implements `LastFiringTime` to get the last time it fired
 /// as well as a postsynaptic neuron that implements `STDP`
 pub fn update_weight_stdp<T: LastFiringTime, U: STDP>(
