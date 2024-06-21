@@ -18,6 +18,24 @@ use crate::spiking_neural_networks::{
 };
 
 
+/// Generates keys in an ordered manner to ensure columns in file are ordered
+fn generate_keys(n: usize) -> Vec<String> {
+    let mut keys_vector: Vec<String> = vec![];
+
+    for i in 0..n {
+        keys_vector.push(format!("presynaptic_voltage_{}", i))
+    }
+    keys_vector.push(String::from("postsynaptic_voltage"));
+    for i in 0..n {
+        keys_vector.push(format!("weight_{}", i));
+    }
+
+    keys_vector
+}
+
+/// Updates each presynaptic neuron's weights given the timestep
+/// and whether the neuron is spiking along with the state of the
+/// postsynaptic neuron
 fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
     neurons: &mut Vec<T>,
     neuron: &T,
@@ -65,19 +83,19 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         .collect();
 
     let mut output_hashmap: HashMap<String, Vec<f64>> = HashMap::new();
-    for i in 0..n {
-        output_hashmap.insert(format!("presynaptic_neuron_{}", i), vec![]);
-    }
-    output_hashmap.insert(String::from("postsynaptic_voltage"), vec![]);
-    for i in 0..n {
-        output_hashmap.insert(format!("weight_{}", i), vec![]);
+    let keys_vector = generate_keys(n);
+    for i in keys_vector.iter() {
+        output_hashmap.insert(String::from(i), vec![]);
     }
 
     for timestep in 0..iterations {
-        let calculated_voltage: f64 = (0..n)
+        let calculated_current: f64 = (0..n)
             .map(
                 |i| {
-                    let output = weights[i] * signed_gap_junction(&presynaptic_neurons[i], &*postsynaptic_neuron);
+                    let output = weights[i] * signed_gap_junction(
+                        &presynaptic_neurons[i], 
+                        &*postsynaptic_neuron
+                    );
 
                     output / (n as f64)
                 }
@@ -115,7 +133,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
             })
             .collect();
         let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-            noise_factor * calculated_voltage,
+            noise_factor * calculated_current,
             presynaptic_neurotransmitters.as_ref(),
         );
 
@@ -137,7 +155,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         }
 
         for (index, i) in presynaptic_neurons.iter().enumerate() {
-            output_hashmap.get_mut(&format!("presynaptic_neuron_{}", index))
+            output_hashmap.get_mut(&format!("presynaptic_voltage_{}", index))
                 .expect("Could not find hashmap value")
                 .push(i.get_current_voltage());
         }
@@ -155,8 +173,18 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 
 type IzhikevichApproximateKinetics = IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
 
+// - Generates a set of presynaptic neurons and a postsynaptic neuron (Izhikevich)
+// - Couples presynaptic and postsynaptic neurons
+// - Sets input to presynaptic neurons as a static current and input to postsynaptic neuron
+// as a weighted input from the presynaptic neurons
+// - Updates weights based on spike time dependent plasticity when spiking occurs
+// - Writes the history of the simulation to working directory
 fn main() {
-    let mut izhikevich_neuron: IzhikevichApproximateKinetics  = IzhikevichNeuron::default();
+    let mut izhikevich_neuron: IzhikevichApproximateKinetics = IzhikevichNeuron {
+        c_m: 50.,
+        gap_conductance: 1.,
+        ..IzhikevichNeuron::default()
+    };
 
     let mut presynaptic_neurons = vec![izhikevich_neuron.clone(), izhikevich_neuron.clone()];
 
@@ -164,7 +192,7 @@ fn main() {
 
     let weight_params = GaussianParameters {
         mean: 1.5,
-        std: 0.3,
+        std: 0.1,
         min: 1.,
         max: 2.,
     };
@@ -179,19 +207,27 @@ fn main() {
         false,
     );
 
+    // could have option to directly plot in terminal
+
+    let keys_vector = generate_keys(presynaptic_neurons.len());
     let mut file = BufWriter::new(File::create("stdp.csv").expect("Could not create file"));
 
-    for i in output_hashmap.keys() {
-        write!(file, "{},", i).expect("Could not write to file");
-    }
-    writeln!(file).expect("Could not write to file");
-    for i in 0..iterations {
-        for key in output_hashmap.keys() {
-            write!(file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
-                .expect("Could not write to file");
+    for (n, i) in keys_vector.iter().enumerate() {
+        if n != keys_vector.len() - 1 {
+            write!(file, "{},", i).expect("Could not write to file");
+        } else {
+            writeln!(file, "{}", i).expect("Could not write to file");
         }
-        writeln!(file).expect("Could not write to file");
+    }
+    for i in 0..iterations {
+        for (n, key) in keys_vector.iter().enumerate() {
+            if n != keys_vector.len() - 1 {
+                write!(file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+                    .expect("Could not write to file");
+            } else {
+                writeln!(file, "{}", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+                    .expect("Could not write to file");
+            }
+        }
     }
 }
-
-// plot weights over time
