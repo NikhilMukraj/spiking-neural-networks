@@ -9,7 +9,6 @@ use crate::spiking_neural_networks::{
         integrate_and_fire::IzhikevichNeuron,
         iterate_and_spike::{
             IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
-            ApproximateNeurotransmitter, ApproximateReceptor,
             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
         },
         update_weight_stdp, signed_gap_junction,
@@ -171,8 +170,6 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     output_hashmap
 }
 
-type IzhikevichApproximateKinetics = IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
-
 // - Generates a set of presynaptic neurons and a postsynaptic neuron (Izhikevich)
 // - Couples presynaptic and postsynaptic neurons
 // - Sets input to presynaptic neurons as a static current and input to postsynaptic neuron
@@ -180,10 +177,10 @@ type IzhikevichApproximateKinetics = IzhikevichNeuron<ApproximateNeurotransmitte
 // - Updates weights based on spike time dependent plasticity when spiking occurs
 // - Writes the history of the simulation to working directory
 fn main() {
-    let mut izhikevich_neuron: IzhikevichApproximateKinetics = IzhikevichNeuron {
+    let mut izhikevich_neuron = IzhikevichNeuron {
         c_m: 50.,
         gap_conductance: 1.,
-        ..IzhikevichNeuron::default()
+        ..IzhikevichNeuron::default_impl()
     };
 
     let mut presynaptic_neurons = vec![izhikevich_neuron.clone(), izhikevich_neuron.clone()];
