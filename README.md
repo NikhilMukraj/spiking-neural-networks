@@ -28,7 +28,7 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Need way to detect bursts for Izhikevich fitting, probably something that has a burst tolerance (distance between spikes that differentiates either part of a burst group or the next set of bursts firing)
       - Then comparing the distance between burst groups and the intervals of the burst groups
       - **Can be done with correlation**
-        - Correlation of burst time between reference and fit could work for fitting bursting neurons could be tested with a bursting FitzHugh-Nagumo neuron
+        - Correlation of burst time between reference and fit could work for fitting bursting neurons could be tested with a bursting Hindmarsh-Rose neuron
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
 - **Subtract 70 mv (or n) from Hodgkin Huxley in fitting** for peak amplitudes
@@ -63,7 +63,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Neurotransmitter approximate refactor**
 - Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
-- **FitzHugh–Nagumo model (FHN) (with bursting)**
 
 - Spike trains and multiple lattices
   - Spike train trait should return a voltage and iterate with no given input
@@ -104,7 +103,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Integrate and fire split**
   - Write code changes in obsidian
-  - FitzHugo-Nagumo model with bursting
+  - FitzHugo-Nagumo model, Hindmarsh-Rose
   - Redo results with new neurotransmission coupling for Hodgkin Huxley models
 
 - **Cargo package**
@@ -194,8 +193,12 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Plasticity rule called at the end of each `iterate_and_spike`
     - STDP would then check if neuron is spiking and proceed with changing presynaptic and postsynaptic weights
     given the graph and respective lattice
-  - Could also refactor lattice such that a trait containing a struct with a function to calculate input given an arbitrary neuron
+    - Iterate and spike implements a method that takes in a struct (presynaptic neuron) that implements that plasticity trait
+    - Plasticity trait has a method that checks if weight should be updated given the neurons and then returns the change in weight, should include different but similar method for spike trains,
+    - These methods/traits may need adapting in a graph situation unless plasticity is called when spiking occurs and integrates into current STDP scheme directly by replacing the current `update_weight_stdp` function
+  - Could also refactor lattice such that a trait containing a struct with a function to calculate input given an arbitrary neuron that also implements that trait
     - Basically generalizing `gap_junction` functionality
+    - Refactor could be a lattice that implements `IterateAndSpike` but also requires another trait detailing the dynamics of the new gap junction
 
 - [Biologically plausible STDP based classifier](https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full)
   - Only STDP is used
