@@ -14,14 +14,15 @@ use std::{
 };
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
+pub mod fitzhugh_nagumo;
 pub mod attractors;
 pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, Potentiation, GaussianFactor, LastFiringTime, STDP,
-    IterateAndSpike, GaussianParameters, STDPParameters, PotentiationType, LigandGatedChannels,
-    Neurotransmitters, NeurotransmitterType, NeurotransmitterKinetics, NeurotransmitterConcentrations,
+    CurrentVoltage, GapConductance, Potentiation, LastFiringTime, STDP,
+    IterateAndSpike, PotentiationType, Neurotransmitters, 
+    NeurotransmitterType, NeurotransmitterConcentrations,
     weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
     impl_current_voltage_with_kinetics,
     impl_gap_conductance_with_kinetics,
