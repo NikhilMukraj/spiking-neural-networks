@@ -75,15 +75,17 @@ fn test_hopfield_network<T: GraphFunctionality>(
     Ok(())
 }
 
-fn main() -> Result<()> {
-    // creates a hopfield network from discrete neurons and given patterns
-    // distorts patterns, and inputs pattern into lattice
-    // then iterates lattice for set amount of iterations to converge 
-    // writes the history of the lattice over time from input to finish
+// - Creates a hopfield network from discrete neurons and given patterns
+// - Distorts patterns, and inputs pattern into lattice
+// then iterates lattice for set amount of iterations to converge 
+// - Writes the history of the lattice over time from input to finish
 
-    // list relative to patterns to read
-    // (assumes user is in examples folder, outputs will be written to examples folder)
-    // cargo run --example hopfield_example examples/hopfield_example/pattern1.txt examples/hopfield_example/pattern2.txt
+// - List relative to patterns to read, patterns must be bipolar and the same dimensions
+// - Bipolar patterns only have values -1 and 1 seperated by spaces and new lines
+// - (assumes user is in examples folder and working directory is examples folder) 
+// - (outputs will be written to working directory)
+// - cargo run --example hopfield_example examples/hopfield_example/pattern1.txt examples/hopfield_example/pattern2.txt
+fn main() -> Result<()> {
     let pattern_files: Vec<String> = args().skip(1).collect();
 
     if pattern_files.is_empty() {
