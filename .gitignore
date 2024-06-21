@@ -22,6 +22,7 @@
 /backend/target
 /backend/examples/hopfield_example/*_hopfield.txt
 /backend/examples/stdp_example/*.csv
+/backend/examples/fitzhugh_nagumo_example/*.csv
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
