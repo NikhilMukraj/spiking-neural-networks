@@ -244,7 +244,6 @@
 //! 
 //! ```rust
 //! use std::collections::HashMap;
-//! extern crate spiking_neural_networks;
 //! use crate::spiking_neural_networks::{
 //!     neuron::{
 //!         integrate_and_fire::IzhikevichNeuron,
