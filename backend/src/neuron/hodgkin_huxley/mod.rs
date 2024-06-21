@@ -11,6 +11,7 @@ use super::{
         GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
         LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
         NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
+        DestexheNeurotransmitter, DestexheReceptor,
     },
     impl_gaussian_factor_with_kinetics, 
     impl_current_voltage_with_kinetics, 
@@ -298,6 +299,13 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
     }
 }
 
+impl HodgkinHuxleyNeuron<DestexheNeurotransmitter, DestexheReceptor> {
+    /// Returns the default implementation of the neuron
+    pub fn default_impl() -> Self {
+        HodgkinHuxleyNeuron::default()
+    }
+}
+
 fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
     (1..x.len()).map(|i| x[i] - x[i-1])
         .collect()
@@ -443,7 +451,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
 
         let increasing_right_now = last_voltage < self.current_voltage;
         let threshold_crossed = self.current_voltage > self.v_th;
-        let is_spiking = threshold_crossed  && self.was_increasing && !increasing_right_now;
+        let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;
+
         self.is_spiking = is_spiking;
         self.was_increasing = increasing_right_now;
 
@@ -472,7 +481,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
 
         let increasing_right_now = last_voltage < self.current_voltage;
         let threshold_crossed = self.current_voltage > self.v_th;
-        let is_spiking = threshold_crossed  && self.was_increasing && !increasing_right_now;
+        let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;
 
         self.is_spiking = is_spiking;
         self.was_increasing = increasing_right_now;
