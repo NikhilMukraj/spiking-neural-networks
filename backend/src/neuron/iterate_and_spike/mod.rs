@@ -1035,12 +1035,12 @@ Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + STDP +
     /// Returns the neurotransmitters of the neuron
     fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     /// Gets the neurotransmitter concentrations of the neuron (mM)
-    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Takes in an input current and neurotransmitter input and returns whether the model
     /// is spiking after the membrane potential is updated
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
-        t_total: Option<&HashMap<NeurotransmitterType, f64>>,
+        t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool;
 }
