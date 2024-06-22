@@ -443,20 +443,18 @@
 //! ### Custom `IterateAndSpike` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::neuron::{ 
-//!     iterate_and_spike::{
-//!         GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
-//!         STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
-//!         LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
-//!         ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
-//!         ApproximateNeurotransmitter, ApproximateReceptor,
-//!     }, 
-//!     distribution,
+//! use spiking_neural_networks::iterate_and_spike_traits::IterateAndSpikeBase;
+//! use spiking_neural_networks::neuron::iterate_and_spike::{
+//!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+//!     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+//!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+//!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
+//!     ApproximateNeurotransmitter, ApproximateReceptor,
 //! };
 //! 
 //! 
 //! /// A FitzHugh-Nagumo neuron 
-//! #[derive(Debug, Clone)]
+//! #[derive(Debug, Clone, IterateAndSpikeBase)]
 //! pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 //!     /// Membrane potential
 //!     pub current_voltage: f64,
@@ -585,54 +583,6 @@
 //!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 //! 
 //!         self.handle_spiking(last_voltage)
-//!     }
-//! }
-//! 
-//! // necessary traits are implemented to integrate with other general methods
-//! // that use neuron models, like coupling and lattice methods
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for FitzHughNagumoNeuron<T, R> {
-//!     fn get_current_voltage(&self) -> f64 {
-//!         self.current_voltage
-//!     }
-//! }
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for FitzHughNagumoNeuron<T, R> {
-//!     fn get_gap_conductance(&self) -> f64 {
-//!         self.gap_conductance
-//!     }
-//! }
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Potentiation for FitzHughNagumoNeuron<T, R> {
-//!     fn get_potentiation_type(&self) -> PotentiationType {
-//!         self.potentiation_type
-//!     }
-//! }
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for FitzHughNagumoNeuron<T, R> {
-//!     fn get_gaussian_factor(&self) -> f64 {
-//!         distribution::limited_distr(
-//!             self.gaussian_params.mean, 
-//!             self.gaussian_params.std, 
-//!             self.gaussian_params.min, 
-//!             self.gaussian_params.max,
-//!         )
-//!     }
-//! }
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for FitzHughNagumoNeuron<T, R> {
-//!     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-//!         self.last_firing_time = timestep;
-//!     }
-//! 
-//!     fn get_last_firing_time(&self) -> Option<usize> {
-//!         self.last_firing_time
-//!     }
-//! }
-//! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> STDP for FitzHughNagumoNeuron<T, R> {        
-//!     fn get_stdp_params(&self) -> &STDPParameters {
-//!         &self.stdp_params
 //!     }
 //! }
 //! ```
