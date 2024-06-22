@@ -24,13 +24,6 @@ use iterate_and_spike::{
     IterateAndSpike, PotentiationType, Neurotransmitters, 
     NeurotransmitterType, NeurotransmitterConcentrations,
     weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
-    impl_current_voltage_with_kinetics,
-    impl_gap_conductance_with_kinetics,
-    impl_potentiation_with_kinetics,
-    impl_gaussian_factor_with_kinetics,
-    impl_last_firing_time_with_kinetics,
-    impl_stdp_with_kinetics,
-    impl_necessary_iterate_and_spike_traits,
 };
 use crate::graph::{GraphFunctionality, GraphPosition};
 
