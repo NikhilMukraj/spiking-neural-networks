@@ -1,6 +1,6 @@
-//! Various integrate and fire models that implement `IterateAndSpike` 
+//! Various integrate and fire models that implement [`IterateAndSpike`] 
 //! as well as neurotransmitter and receptor dynamics through
-//! `NeurotransmitterKinetics` and `ReceptorKinetics`.
+//! [`NeurotransmitterKinetics`] and [`ReceptorKinetics`].
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{

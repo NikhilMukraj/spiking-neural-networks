@@ -1,5 +1,5 @@
-//! The `IterateAndSpike` trait for encapsulating basic neuronal and spiking dynamics
-//! as well as `NeurotransmitterKinetics` for neurotransmission and `ReceptorKinetics`
+//! The [`IterateAndSpike`] trait for encapsulating basic neuronal and spiking dynamics
+//! as well as [`NeurotransmitterKinetics`] for neurotransmission and [`ReceptorKinetics`]
 //! for receptor dynamics over time.
 
 use rand::Rng;
@@ -289,7 +289,8 @@ impl_discrete_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
-/// slowly through exponential decay that scales based on the `decay_constant` and `dt`
+/// slowly through exponential decay that scales based on the 
+/// [`decay_constant`](Self::decay_constant) and [`dt`](Self::decay_constant)
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
@@ -825,7 +826,7 @@ pub enum PotentiationType {
 }
 
 impl PotentiationType {
-    /// Generates `PotentationType` from string
+    /// Generates [`PotentiationType`] from string
     pub fn from_str(string: &str) -> Result<PotentiationType> {
         match string.to_ascii_lowercase().as_str() {
             "excitatory" => Ok(PotentiationType::Excitatory),
@@ -834,7 +835,7 @@ impl PotentiationType {
         }
     }
 
-    /// Randomly generates a `PotentationType` based on a given probability
+    /// Randomly generates a [`PotentiationType`] based on a given probability
     pub fn weighted_random_type(prob: f64) -> PotentiationType {
         if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
             PotentiationType::Excitatory

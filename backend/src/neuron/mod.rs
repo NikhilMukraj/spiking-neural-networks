@@ -40,9 +40,9 @@ fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
 
 /// Calculates the current between two neurons based on the voltage,
 /// the gap conductance of the synapse, and the potentiation of the
-/// presynaptic neuron, both neurons should implement `CurrentVoltage`,
-/// the presynaptic neuron should implement `Potentation`, and
-/// the postsynaptic neuron should implemenent `GapConductance`
+/// presynaptic neuron, both neurons should implement [`CurrentVoltage`],
+/// the presynaptic neuron should implement [`Potentiation`], and
+/// the postsynaptic neuron should implemenent [`GapConductance`]
 pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
@@ -60,9 +60,9 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
 /// the current input and neurotransmitter input from the presynaptic neuron,
 /// returns whether each neuron is spiking
 /// 
-/// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// - `presynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
-/// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// - `postsynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
 /// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
 /// the neurons based on neurotransmitter input during the simulation
@@ -155,11 +155,11 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 /// also updates the last firing times of each neuron and spike train given the
 /// current timestep of the simulation, returns whether each neuron is spiking
 /// 
-/// - `spike_train` : a spike train that implements `Spiketrain`
+/// - `spike_train` : a spike train that implements [`Spiketrain`]
 /// 
-/// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// - `presynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
-/// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+/// - `postsynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
 /// - `timestep` : the current timestep of the simulation
 /// 
@@ -253,8 +253,8 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
 }
 
 /// Calculates and returns the change in weight based off of STDP (spike time dependent plasticity)
-/// given one presynaptic neuron that implements `LastFiringTime` to get the last time it fired
-/// as well as a postsynaptic neuron that implements `STDP`
+/// given one presynaptic neuron that implements [`LastFiringTime`] to get the last time it fired
+/// as well as a postsynaptic neuron that implements [`STDP`]
 pub fn update_weight_stdp<T: LastFiringTime, U: STDP>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
@@ -373,7 +373,7 @@ macro_rules! impl_reset_timing  {
     };
 }
 
-/// Lattice of `IterateAndSpike` neurons
+/// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
 pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> {
     /// Grid of neurons
@@ -678,7 +678,7 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
     }
 }
 
-/// Lattice of `SpikeTrain` neurons
+/// Lattice of [`SpikeTrain`] neurons
 #[derive(Debug, Clone)]
 pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
     /// Grid of spike trains

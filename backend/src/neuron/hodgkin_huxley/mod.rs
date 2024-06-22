@@ -149,7 +149,7 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 
 // }
 
-/// A basic gate for necessary ion channels in `HodgkinHuxleyNeuron`
+/// A basic gate for necessary ion channels
 #[derive(Debug, Clone, Copy)]
 pub struct Gate {
     /// Gating variable

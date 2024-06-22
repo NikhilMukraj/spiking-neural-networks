@@ -28,8 +28,8 @@ impl Default for DiscreteNeuron {
 }
 
 impl DiscreteNeuron {
-    /// Updates state of neuron based on input, if positive the neuron is 
-    /// set to `Active`, otherwise it becomes `Inactive`
+    /// Updates state of neuron based on input, if positive the neuron is set to 
+    /// [`DiscreteNeuronState::Active`], otherwise it becomes [`DiscreteNeuronState::Inactive`]
     pub fn update(&mut self, input: f64) {
         match input > 0. {
             true => self.state = DiscreteNeuronState::Active,
@@ -37,8 +37,8 @@ impl DiscreteNeuron {
         }
     }
 
-    /// Translates the state of the neuron to an `isize`,
-    /// either `1` if `Active` or `-1` if inactive
+    /// Translates the state of the neuron to an `isize`, either `1` if 
+    /// [`DiscreteNeuronState::Active`] or `-1` if [`DiscreteNeuronState::Inactive`]
     pub fn state_to_numeric(&self) -> isize {
         match &self.state {
             DiscreteNeuronState::Active => 1,
@@ -84,8 +84,8 @@ impl<T: GraphFunctionality> DiscreteNeuronLattice<T> {
     }
 
     /// Sets state of given grid of discrete neurons to the given, if value
-    /// in pattern is greater than 0 the corressponding state is set to `Active`,
-    /// otherwise it is set to `Inactive`
+    /// in pattern is greater than 0 the corressponding state is set to [`DiscreteNeuronState::Active`],
+    /// otherwise it is set to [`DiscreteNeuronState::Inactive`]
     pub fn input_pattern_into_discrete_grid(&mut self, pattern: Vec<Vec<isize>>) {
         for (i, pattern_vec) in pattern.iter().enumerate() {
             for (j, value) in pattern_vec.iter().enumerate() {

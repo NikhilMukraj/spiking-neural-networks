@@ -8,7 +8,7 @@ use std::{
 use rand::Rng;
 use rayon::prelude::*;
 
-/// Bitstring to use as a chromosome
+/// Bit string to use as a chromosome
 #[derive(Clone)]
 pub struct BitString {
     pub string: String
@@ -88,9 +88,9 @@ fn selection(pop: &Vec<BitString>, scores: &Vec<f64>, k: usize) -> BitString {
     return pop[selection_index].clone();
 }
 
-/// Decodes the given bitstring given the number of bits in each bit substring and scales 
+/// Decodes the given [`BitString`] given the number of bits in each bit substring and scales 
 /// the output based on the given `bounds`, the length of the `bounds` must match the number
-/// of substrings in the bitstring, `bounds` should be a vector of tuples where the first item is the 
+/// of substrings in the [`BitString`], `bounds` should be a vector of tuples where the first item is the 
 /// minimum value for scaling and the second item is the maximal value for scaling
 pub fn decode(bitstring: &BitString, bounds: &Vec<(f64, f64)>, n_bits: usize) -> Result<Vec<f64>> {
     // decode for non variable length
@@ -144,7 +144,7 @@ pub struct GeneticAlgorithmParameters {
     /// `bounds` should be a vector of tuples where the first item is the 
     /// minimum value for scaling and the second item is the maximal value for scaling
     pub bounds: Vec<(f64, f64)>, 
-    /// `n_bits` should be the number of bits per substring in each chromosomal bitstring
+    /// `n_bits` should be the number of bits per substring in each chromosomal [`BitString`]
     pub n_bits: usize, 
     /// `n_iter` should be the number of iterations to use
     pub n_iter: usize, 
@@ -173,11 +173,11 @@ impl Default for GeneticAlgorithmParameters {
 }
 
 /// Executes the genetic algorithm given a objective function, (`f`), that takes in parameters
-/// to decode the given bitstring as well as additional settings to use in the
-/// objective function, returns the best bit string in first item of tuple, the score of the
-/// bit string, and a vector of vectors containing the scores for each bit string over time
+/// to decode the given [`BitString`] as well as additional settings to use in the
+/// objective function, returns the best [`BitString`] in first item of tuple, the score of the
+/// [`BitString`], and a vector of vectors containing the scores for each [`BitString`] over time
 /// 
-/// - `f` : the objective function to minimize the output of, should take in the bitstring, bounds,
+/// - `f` : the objective function to minimize the output of, should take in the [`BitString`], bounds,
 /// number of bits per bit substring, and a hashmap of any necessary parameters as arguments
 /// 
 /// - `params` : a set of genetic algorithm parameters

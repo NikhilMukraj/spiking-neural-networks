@@ -92,7 +92,7 @@ pub fn get_summary(
 }
 
 /// A set of defaults to use for scaling if no spikes are
-/// found within inputs for `fit_izhikevich_to_hodgkin_huxley`
+/// found within inputs for [`fit_izhikevich_to_hodgkin_huxley`]
 pub struct SummaryScalingDefaults {
     /// Default scaling for height of spikes
     pub default_amplitude_scale: f64,
@@ -112,7 +112,7 @@ impl Default for SummaryScalingDefaults {
     }
 }
 
-/// Scaling factors for action potential summaries used in `fit_izhikevich_to_hodgkin_huxley`
+/// Scaling factors for action potential summaries used in [`fit_izhikevich_to_hodgkin_huxley`]
 #[derive(Clone, Copy)]
 pub struct SummaryScalingFactors {
     /// Scaling for height of spikes
@@ -293,7 +293,7 @@ pub fn get_hodgkin_huxley_summary<
     )
 }
 
-/// Settings used to scale action potential summary during `fit_izhikevich_to_hodgkin_huxley`
+/// Settings used to scale action potential summary during [`fit_izhikevich_to_hodgkin_huxley`]
 /// as well as settings used to run Izhikevich neuron during fitting process
 #[derive(Clone)]
 pub struct FittingSettings<
