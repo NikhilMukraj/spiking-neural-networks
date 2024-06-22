@@ -681,6 +681,20 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
         self.ligand_gates.values()
     }
 
+    /// Gets the ligand gate associated with the givenn [`NeurotransmitterType`]
+    pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
+        self.ligand_gates.get(neurotransmitter_type)
+    }
+
+    /// Inserts the given [`LigandGatedChannel`] with the associated [`NeurotransmitterType`]
+    pub fn insert(
+        &mut self, 
+        neurotransmitter_type: NeurotransmitterType, 
+        ligand_gate: LigandGatedChannel<T>
+    ) {
+        self.ligand_gates.insert(neurotransmitter_type, ligand_gate);
+    }
+
     /// Calculates the receptor currents for each channel based on a given voltage (mV)
     pub fn set_receptor_currents(&mut self, voltage: f64) {
         self.ligand_gates
@@ -752,6 +766,20 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     /// Returns a set of mutable neurotransmitters 
     pub fn values_mut(&mut self) -> ValuesMut<NeurotransmitterType, T> {
         self.neurotransmitters.values_mut()
+    }
+
+    /// Gets the neurotransmitter associated with the givenn [`NeurotransmitterType`]
+    pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&T> {
+        self.neurotransmitters.get(neurotransmitter_type)
+    }
+
+    /// Inserts the given neurotransmitter with the associated [`NeurotransmitterType`]
+    pub fn insert(
+        &mut self, 
+        neurotransmitter_type: NeurotransmitterType, 
+        neurotransmitter: T
+    ) {
+        self.neurotransmitters.insert(neurotransmitter_type, neurotransmitter);
     }
 
     /// Returns the neurotransmitter concentration (mM) with their associated types
