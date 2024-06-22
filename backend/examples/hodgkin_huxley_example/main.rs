@@ -13,6 +13,9 @@ use spiking_neural_networks::neuron::{
 };
 
 
+// Couples two Hodgkin Huxley neurons with neurotransmission and tracks relevant 
+// history regarding voltages, neurotransmitter values, and receptor values
+// which are written to a .csv file at the working directory
 fn main() {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
     presynaptic_neuron.ligand_gates
