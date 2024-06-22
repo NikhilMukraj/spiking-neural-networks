@@ -159,17 +159,17 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Iterate through each presynaptic graph position to get the weights and then grab the reference to the specific neuron to generate the inputs
 
 - Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
-  - **Neurotransmitter approximation refactor should come before Lixirnet**
   - Update by pulling from package
     - Should have methods that iterate one timestep for each kind of simulation
     - That way when exposed to Python there can be tqdm stuff
   - Maybe each struct could have a flag that says it implements a certain trait, the backend for that struct could then be passed to functions that take in that trait (creating cell grid, spiking neuron coupling tests, etc)
-  - **Check if struct has (private?) method `get_iterate_and_spike_backend`, if so call it and use it in a given function**, coupled testing, generating cell grid, etc
+  - Check if struct has (private?) method `get_iterate_and_spike_backend`, if so call it and use it in a given function, coupled testing, generating cell grid, etc
   - Use macros to generate getter and setter methods given the argument name
     - For integrate and fire cell and Hodgkin Huxley model
     - **Enable multiple-pymethods so the macro can be written**
     - [Reference for macro](https://github.com/PyO3/pyo3/discussions/3628)
   - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
+  - **Enum based implemenation might be might for now**
   - *Cell grid struct for now could just use an enum that specifies one of the integrate and fire neurons using approximate neurotransmitter kinetics and approximate receptor kinetics, only use matrix and grid history for now*
     - *Could also generate a different cell grid structure for each neuron using macros to get around lack of traits in Python*
     - *Could also try a method that given a grid of neurons generates the appropriate cell grid structure and wraps it in a box on the heap*
