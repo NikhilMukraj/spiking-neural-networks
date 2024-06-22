@@ -155,7 +155,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 /// also updates the last firing times of each neuron and spike train given the
 /// current timestep of the simulation, returns whether each neuron is spiking
 /// 
-/// - `spike_train` : a spike train that implements [`Spiketrain`]
+/// - `spike_train` : a spike train that implements [`SpikeTrain`]
 /// 
 /// - `presynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
