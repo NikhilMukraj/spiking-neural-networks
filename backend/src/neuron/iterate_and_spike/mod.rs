@@ -870,6 +870,19 @@ impl Default for GaussianParameters {
     }
 }
 
+impl GaussianParameters {
+    /// Generates a normally distributed random number clamped between
+    /// a minimum and a maximum
+    pub fn get_random_number(&self) -> f64 {
+        crate::distribution::limited_distr(
+            self.mean, 
+            self.std, 
+            self.min, 
+            self.max,
+        )
+    }
+}
+
 /// Parameters to use when calculating spike time dependent plasticity
 #[derive(Clone, Debug)]
 pub struct STDPParameters {
