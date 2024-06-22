@@ -2,21 +2,13 @@
 //! as well as neurotransmitter and receptor dynamics through
 //! `NeurotransmitterKinetics` and `ReceptorKinetics`.
 
-use super::{ 
-    iterate_and_spike::{
-        GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
-        STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
-        LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
-        ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
-        ApproximateNeurotransmitter, ApproximateReceptor,
-    }, 
-    impl_gaussian_factor_with_kinetics, 
-    impl_current_voltage_with_kinetics, 
-    impl_gap_conductance_with_kinetics, 
-    impl_last_firing_time_with_kinetics, 
-    impl_potentiation_with_kinetics, 
-    impl_stdp_with_kinetics, 
-    impl_necessary_iterate_and_spike_traits, 
+use iterate_and_spike_traits::IterateAndSpikeBase;
+use super::iterate_and_spike::{
+    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+    STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+    LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+    ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
+    ApproximateNeurotransmitter, ApproximateReceptor,
 };
 
 
@@ -78,7 +70,7 @@ macro_rules! impl_default_impl_integrate_and_fire {
 }
 
 /// A leaky integrate and fire neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64, 
@@ -122,7 +114,6 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
-impl_necessary_iterate_and_spike_traits!(LeakyIntegrateAndFireNeuron);
 impl_default_impl_integrate_and_fire!(LeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrateAndFireNeuron<T, R> {
@@ -253,7 +244,7 @@ macro_rules! impl_iterate_and_spike {
 }
 
 /// An adaptive leaky integrate and fire neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64, 
@@ -305,7 +296,6 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
-impl_necessary_iterate_and_spike_traits!(AdaptiveLeakyIntegrateAndFireNeuron);
 impl_default_impl_integrate_and_fire!(AdaptiveLeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
@@ -394,7 +384,7 @@ impl_iterate_and_spike!(
 );
 
 /// An adaptive exponential leaky integrate and fire neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64, 
@@ -448,7 +438,6 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
-impl_necessary_iterate_and_spike_traits!(AdaptiveExpLeakyIntegrateAndFireNeuron);
 impl_default_impl_integrate_and_fire!(AdaptiveExpLeakyIntegrateAndFireNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
@@ -507,7 +496,7 @@ impl_iterate_and_spike!(
 );
 
 /// An Izhikevich neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64, 
@@ -549,7 +538,6 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
-impl_necessary_iterate_and_spike_traits!(IzhikevichNeuron);
 impl_default_impl_integrate_and_fire!(IzhikevichNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeuron<T, R> {
@@ -627,7 +615,7 @@ impl_iterate_and_spike!(
 );
 
 /// A leaky Izhikevich neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64, 
@@ -671,7 +659,6 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     pub ligand_gates: LigandGatedChannels<R>,
 }
 
-impl_necessary_iterate_and_spike_traits!(LeakyIzhikevichNeuron);
 impl_default_impl_integrate_and_fire!(LeakyIzhikevichNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevichNeuron<T, R> {
