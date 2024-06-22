@@ -266,7 +266,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             current_voltage: 0.,
             gap_conductance: 7.,
             potentiation_type: PotentiationType::Excitatory,
-            dt: 0.1,
+            dt: 0.01,
             c_m: 1., 
             e_na: 115., 
             e_k: -12., 
