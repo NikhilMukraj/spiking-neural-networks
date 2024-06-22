@@ -36,12 +36,7 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
 
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for #name<T, R> {
             fn get_gaussian_factor(&self) -> f64 {
-                crate::distribution::limited_distr(
-                    self.gaussian_params.mean, 
-                    self.gaussian_params.std, 
-                    self.gaussian_params.min, 
-                    self.gaussian_params.max,
-                )
+                self.gaussian_params.get_random_number()
             }
         }
 
