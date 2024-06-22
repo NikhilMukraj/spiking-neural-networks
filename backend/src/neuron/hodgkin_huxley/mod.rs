@@ -5,21 +5,13 @@ use std::{
     collections::HashMap,
     ops::Sub,
 };
-use super::{ 
-    iterate_and_spike::{
-        IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage,
-        GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
-        LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
-        NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
-        DestexheNeurotransmitter, DestexheReceptor,
-    },
-    impl_gaussian_factor_with_kinetics, 
-    impl_current_voltage_with_kinetics, 
-    impl_gap_conductance_with_kinetics, 
-    impl_last_firing_time_with_kinetics, 
-    impl_necessary_iterate_and_spike_traits, 
-    impl_potentiation_with_kinetics, 
-    impl_stdp_with_kinetics, 
+use iterate_and_spike_traits::IterateAndSpikeBase;
+use super::iterate_and_spike::{
+    IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage,
+    GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
+    LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
+    NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
+    DestexheNeurotransmitter, DestexheReceptor,
 };
 
 
@@ -158,7 +150,7 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 // }
 
 /// A basic gate for necessary ion channels in `HodgkinHuxleyNeuron`
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub struct Gate {
     /// Gating variable
     pub alpha: f64,
@@ -180,6 +172,7 @@ impl Gate {
     }
 }
 
+#[derive(IterateAndSpikeBase)]
 pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f64,
@@ -260,8 +253,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
         }
     }
 }
-
-impl_necessary_iterate_and_spike_traits!(HodgkinHuxleyNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
     fn default() -> Self {
