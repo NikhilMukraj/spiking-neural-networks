@@ -205,6 +205,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Output is dictated as neuron that has the highest firing rate when data is presented
   - After the rates are measured the neurons are assigned a class label
   - [Code example](https://github.com/libgirlenterprise/WheatNNLeek/tree/master)
+  - [Kaggle example](https://www.kaggle.com/code/dlarionov/mnist-spiking-neural-network)
+  - Poisson neurons repreesent state of each pixel, Poisson neurons are connected to all of the neurons in the excitatory lattice,
+  all excitatory neurons are connected to each other but not itself (no self edges), excitatory neurons are each connected to one corresponding inhibitory neuron each, inhibitory neurons are each connected to all other excitatory neurons except their corresponding input excitatory neuron
+  - Poisson neurons are active for 350 ms, which is followed by a 150 ms resting period
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
 
