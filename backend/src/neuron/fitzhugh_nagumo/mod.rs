@@ -1,25 +1,17 @@
 //! An implementation of the FitzHugh-Nagumo neuron model.
 
-use super::{ 
-    iterate_and_spike::{
-        GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
-        STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
-        LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
-        ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
-        ApproximateNeurotransmitter, ApproximateReceptor,
-    }, 
-    impl_gaussian_factor_with_kinetics, 
-    impl_current_voltage_with_kinetics, 
-    impl_gap_conductance_with_kinetics, 
-    impl_last_firing_time_with_kinetics, 
-    impl_potentiation_with_kinetics, 
-    impl_stdp_with_kinetics, 
-    impl_necessary_iterate_and_spike_traits, 
+use iterate_and_spike_traits::IterateAndSpikeBase;
+use super::iterate_and_spike::{
+    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+    STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+    LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+    ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
+    ApproximateNeurotransmitter, ApproximateReceptor,
 };
 
 
 // A FitzHugh-Nagumo neuron 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential
     pub current_voltage: f64,
@@ -96,8 +88,6 @@ impl FitzHughNagumoNeuron<ApproximateNeurotransmitter, ApproximateReceptor> {
         FitzHughNagumoNeuron::default()
     }
 }
-
-impl_necessary_iterate_and_spike_traits!(FitzHughNagumoNeuron);
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> FitzHughNagumoNeuron<T, R> {
     fn get_dv_change(&self, i: f64) -> f64 {
