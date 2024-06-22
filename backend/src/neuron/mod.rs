@@ -12,6 +12,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Result,
 };
+// use rand::{Rng, seq::SliceRandom};
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
 pub mod fitzhugh_nagumo;
@@ -20,10 +21,10 @@ pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, Potentiation, LastFiringTime, STDP,
-    IterateAndSpike, PotentiationType, Neurotransmitters, 
-    NeurotransmitterType, NeurotransmitterConcentrations,
-    weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime,
+    Potentiation, PotentiationType, STDP, NeurotransmitterConcentrations, 
+    NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
+    weight_neurotransmitter_concentration, 
 };
 use crate::graph::{GraphFunctionality, GraphPosition};
 
@@ -373,6 +374,46 @@ macro_rules! impl_reset_timing  {
     };
 }
 
+// fn positions_within_square(
+//     center_row: usize, 
+//     center_col: usize, 
+//     extent: usize, 
+//     size: (usize, usize)
+// ) -> Vec<(usize, usize)> {
+//     let (row_length, col_length) = size;
+//     let mut positions = Vec::new();
+
+//     for row in center_row.saturating_sub(extent)..=(center_row + extent) {
+//         for col in center_col.saturating_sub(extent)..=(center_col + extent) {
+//             if (row != center_row || col != center_col) && (row < row_length && col < col_length) {
+//                 positions.push((row, col));
+//             }
+//         }
+//     }
+
+//     positions
+// }
+
+// fn randomly_select_positions(
+//     mut positions: Vec<(usize, usize)>, 
+//     id: usize, 
+//     num_to_select: usize
+// ) -> Vec<GraphPosition> {
+//     let mut rng = rand::thread_rng();
+
+//     positions.shuffle(&mut rng);
+//     positions.truncate(num_to_select);
+
+//     positions.iter()
+//         .map(|i| 
+//             GraphPosition { 
+//                 id: id, 
+//                 pos: *i,
+//             }
+//         )
+//         .collect()
+// }
+
 /// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
 pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> {
@@ -651,6 +692,65 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
 
         Ok(())
     }
+
+    // /// Generates a randomly connected lattice based on a single neuron to copy
+    // /// the parameters of throughout the lattice, the size of the lattice,
+    // /// and the radius from which neurons are allowed to be connected,
+    // /// use `&None` to connect every neuron with a weight of `1.` or
+    // /// provide gaussian parameters to generate randomly generated
+    // /// weights based on a normal distribution
+    // pub fn create_randomly_connected_lattice(
+    //     base_neuron: &T,
+    //     num_rows: usize, 
+    //     num_cols: usize,
+    //     radius: usize,
+    //     weight_params: &Option<GaussianParameters>,
+    // ) -> Self {
+    //     let mut rng = rand::thread_rng();
+
+    //     let cell_grid: Vec<Vec<T>> = (0..num_rows)
+    //         .map(|_| {
+    //             (0..num_cols)
+    //                 .map(|_| {
+    //                     base_neuron.clone()
+    //                 })
+    //                 .collect::<Vec<T>>()
+    //         })
+    //         .collect();
+
+    //     let mut init_graph = U::default();
+
+    //     for row in 0..num_rows {
+    //         for col in 0..num_cols {
+    //             let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
+
+    //             // let random_number: f64 = rng.gen_range(0..=1);
+    //             // let scaled_number = 1. + random_number * (positions.len() as f64 - 1.);
+    //             // let num_to_select = scaled_number as usize;
+
+    //             let num_to_select = rng.gen_range(1..positions.len());
+    //             let positions = randomly_select_positions(positions, init_graph.get_id(), num_to_select);
+    
+    //             init_graph.initialize_connections(
+    //                 GraphPosition { id: init_graph.get_id(), pos: (row, col)}, 
+    //                 positions, 
+    //                 weight_params
+    //             );
+    //         }
+    //     }
+
+    //     Lattice { 
+    //         cell_grid: cell_grid, 
+    //         graph: init_graph, 
+    //         grid_history: V::default(), 
+    //         update_graph_history: false, 
+    //         update_grid_history: false, 
+    //         do_stdp: false, 
+    //         do_receptor_kinetics: false, 
+    //         gaussian: false, 
+    //         internal_clock: 0,
+    //     }
+    // }
 }
 
 /// Handles history of a spike train lattice
