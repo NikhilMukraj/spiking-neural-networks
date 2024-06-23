@@ -12,13 +12,21 @@ use std::{
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
 #[derive(Debug, Clone, Copy)]
 pub struct BV {
-    /// Amount of magnesium present in mM
-    pub mg_conc: f64,
+    /// Calculates NMDA modifier based on voltage and magnesium concentration
+    /// given a function to calculate the modfier
+    pub bv_calc: fn(f64) -> f64,
+}
+
+fn default_bv_calc(voltage: f64) -> f64 {
+    // 1.5 mM of Mg
+    1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57)) 
 }
 
 impl Default for BV {
     fn default() -> Self {
-        BV { mg_conc: 1.5 } // mM
+        BV { 
+            bv_calc: default_bv_calc
+        }
     }
 }
 
@@ -26,7 +34,7 @@ impl BV {
     /// Calculates effect of magnesium and voltage on NMDA receptor,
     /// voltage should be in mV
     fn calculate_b(&self, voltage: f64) -> f64 {
-        1. / (1. + ((-0.062 * voltage).exp() * self.mg_conc / 3.57))
+        (self.bv_calc)(voltage)
     }
 }
 
