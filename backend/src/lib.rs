@@ -18,7 +18,7 @@
 //! 
 //! ### Hodgkin Huxley Model with Neurotransmission
 //! 
-//! ![Hodgkin Huxley model voltage and neurotransmitter over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/hodgkin_huxley.png?raw=true)
+//! ![Hodgkin Huxley model voltage and neurotransmitter over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/hodgkin_huxley_neurotransmitter.png?raw=true)
 //! 
 //! ### Spike Time Dependent Plasticity Weights over Time
 //! 
