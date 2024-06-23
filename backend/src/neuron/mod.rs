@@ -12,7 +12,7 @@ use std::{
     collections::{HashMap, HashSet},
     io::Result,
 };
-// use rand::{Rng, seq::SliceRandom};
+use rand::{Rng, seq::SliceRandom};
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
 pub mod fitzhugh_nagumo;
@@ -21,12 +21,12 @@ pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime,
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, GaussianParameters,
     Potentiation, PotentiationType, STDP, NeurotransmitterConcentrations, 
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
-use crate::graph::{GraphFunctionality, GraphPosition};
+use crate::graph::{GraphFunctionality, GraphPosition, AdjacencyMatrix};
 
 
 /// Calculates the current between two neurons based on the voltage and
@@ -290,13 +290,13 @@ pub trait LatticeHistory: Default {
 #[derive(Debug, Clone)]
 pub struct EEGHistory {
     /// EEG values
-    history: Vec<f64>,
+    pub history: Vec<f64>,
     /// Voltage from EEG equipment (mV)
-    reference_voltage: f64,
+    pub reference_voltage: f64,
     /// Distance from neurons to equipment (mm)
-    distance: f64,
+    pub distance: f64,
     /// Conductivity of medium (S/mm)
-    conductivity: f64,
+    pub conductivity: f64,
 }
 
 impl Default for EEGHistory {
@@ -309,7 +309,6 @@ impl Default for EEGHistory {
         }
     }
 }
-
 
 fn get_grid_voltages<T: CurrentVoltage>(grid: &Vec<Vec<T>>) -> Vec<Vec<f64>> {
     grid.iter()
@@ -342,7 +341,7 @@ impl LatticeHistory for EEGHistory {
 #[derive(Debug, Clone)]
 pub struct GridVoltageHistory {
     /// Voltage history
-    history: Vec<Vec<Vec<f64>>>
+    pub history: Vec<Vec<Vec<f64>>>
 }
 
 impl Default for GridVoltageHistory {
@@ -374,45 +373,45 @@ macro_rules! impl_reset_timing  {
     };
 }
 
-// fn positions_within_square(
-//     center_row: usize, 
-//     center_col: usize, 
-//     extent: usize, 
-//     size: (usize, usize)
-// ) -> Vec<(usize, usize)> {
-//     let (row_length, col_length) = size;
-//     let mut positions = Vec::new();
+fn positions_within_square(
+    center_row: usize, 
+    center_col: usize, 
+    extent: usize, 
+    size: (usize, usize)
+) -> Vec<(usize, usize)> {
+    let (row_length, col_length) = size;
+    let mut positions = Vec::new();
 
-//     for row in center_row.saturating_sub(extent)..=(center_row + extent) {
-//         for col in center_col.saturating_sub(extent)..=(center_col + extent) {
-//             if (row != center_row || col != center_col) && (row < row_length && col < col_length) {
-//                 positions.push((row, col));
-//             }
-//         }
-//     }
+    for row in center_row.saturating_sub(extent)..=(center_row + extent) {
+        for col in center_col.saturating_sub(extent)..=(center_col + extent) {
+            if (row != center_row || col != center_col) && (row < row_length && col < col_length) {
+                positions.push((row, col));
+            }
+        }
+    }
 
-//     positions
-// }
+    positions
+}
 
-// fn randomly_select_positions(
-//     mut positions: Vec<(usize, usize)>, 
-//     id: usize, 
-//     num_to_select: usize
-// ) -> Vec<GraphPosition> {
-//     let mut rng = rand::thread_rng();
+fn randomly_select_positions(
+    mut positions: Vec<(usize, usize)>, 
+    id: usize, 
+    num_to_select: usize
+) -> Vec<GraphPosition> {
+    let mut rng = rand::thread_rng();
 
-//     positions.shuffle(&mut rng);
-//     positions.truncate(num_to_select);
+    positions.shuffle(&mut rng);
+    positions.truncate(num_to_select);
 
-//     positions.iter()
-//         .map(|i| 
-//             GraphPosition { 
-//                 id: id, 
-//                 pos: *i,
-//             }
-//         )
-//         .collect()
-// }
+    positions.iter()
+        .map(|i| 
+            GraphPosition { 
+                id: id, 
+                pos: *i,
+            }
+        )
+        .collect()
+}
 
 /// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
@@ -435,6 +434,29 @@ pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory>
     pub gaussian: bool,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
+}
+
+impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Default for Lattice<T, U, V> {
+    fn default() -> Self {
+        Lattice {
+            cell_grid: vec![],
+            graph: U::default(),
+            grid_history: V::default(),
+            update_graph_history: false,
+            update_grid_history: false,
+            do_stdp: false,
+            do_receptor_kinetics: false,
+            gaussian: false,
+            internal_clock: 0,
+        }
+    }
+}
+
+impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix, GridVoltageHistory> {
+    // Generates a default lattice implementation given a neuron type
+    pub fn default_impl() -> Self {
+        Lattice::default()
+    }
 }
 
 impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U, V> {
@@ -693,68 +715,65 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
         Ok(())
     }
 
-    // /// Generates a randomly connected lattice based on a single neuron to copy
-    // /// the parameters of throughout the lattice, the size of the lattice,
-    // /// and the radius from which neurons are allowed to be connected,
-    // /// use `&None` to connect every neuron with a weight of `1.` or
-    // /// provide gaussian parameters to generate randomly generated
-    // /// weights based on a normal distribution
-    // pub fn create_randomly_connected_lattice(
-    //     base_neuron: &T,
-    //     num_rows: usize, 
-    //     num_cols: usize,
-    //     radius: usize,
-    //     weight_params: &Option<GaussianParameters>,
-    // ) -> Self {
-    //     let mut rng = rand::thread_rng();
+    fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
+        (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        base_neuron.clone()
+                    })
+                    .collect::<Vec<T>>()
+            })
+            .collect()
+    }
 
-    //     let cell_grid: Vec<Vec<T>> = (0..num_rows)
-    //         .map(|_| {
-    //             (0..num_cols)
-    //                 .map(|_| {
-    //                     base_neuron.clone()
-    //                 })
-    //                 .collect::<Vec<T>>()
-    //         })
-    //         .collect();
+    /// Populates a randomly connected lattice based on a single neuron to copy
+    /// the parameters of throughout the lattice, the size of the lattice,
+    /// and the radius from which neurons are allowed to be connected,
+    /// use `&None` to connect every neuron with a weight of `1.` or
+    /// provide gaussian parameters to generate randomly generated
+    /// weights based on a normal distribution
+    pub fn populate_and_randomly_connect_lattice(
+        &mut self,
+        base_neuron: &T,
+        num_rows: usize, 
+        num_cols: usize,
+        radius: usize,
+        weight_params: &Option<GaussianParameters>,
+    ) {
+        let mut rng = rand::thread_rng();
 
-    //     let mut init_graph = U::default();
+        self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
 
-    //     for row in 0..num_rows {
-    //         for col in 0..num_cols {
-    //             let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
+        for row in 0..num_rows {
+            for col in 0..num_cols {
+                let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
 
-    //             // let random_number: f64 = rng.gen_range(0..=1);
-    //             // let scaled_number = 1. + random_number * (positions.len() as f64 - 1.);
-    //             // let num_to_select = scaled_number as usize;
+                // let random_number: f64 = rng.gen_range(0..=1);
+                // let scaled_number = 1. + random_number * (positions.len() as f64 - 1.);
+                // let num_to_select = scaled_number as usize;
 
-    //             let num_to_select = rng.gen_range(1..positions.len());
-    //             let positions = randomly_select_positions(positions, init_graph.get_id(), num_to_select);
+                let num_to_select = rng.gen_range(1..positions.len());
+                let positions = randomly_select_positions(positions, self.graph.get_id(), num_to_select);
     
-    //             init_graph.initialize_connections(
-    //                 GraphPosition { id: init_graph.get_id(), pos: (row, col)}, 
-    //                 positions, 
-    //                 weight_params
-    //             );
-    //         }
-    //     }
+                self.graph.initialize_connections(
+                    GraphPosition { id: self.graph.get_id(), pos: (row, col)}, 
+                    positions, 
+                    weight_params
+                );
+            }
+        }
+    }
 
-    //     Lattice { 
-    //         cell_grid: cell_grid, 
-    //         graph: init_graph, 
-    //         grid_history: V::default(), 
-    //         update_graph_history: false, 
-    //         update_grid_history: false, 
-    //         do_stdp: false, 
-    //         do_receptor_kinetics: false, 
-    //         gaussian: false, 
-    //         internal_clock: 0,
-    //     }
-    // }
+    /// Populates a lattice given the dimensions and a base neuron to copy the parameters
+    /// of without generating any connections within the graph
+    pub fn populate_lattice(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+        self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
+    }
 }
 
 /// Handles history of a spike train lattice
-pub trait SpikeTrainLatticeHistory {
+pub trait SpikeTrainLatticeHistory: Default {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
 }
@@ -763,7 +782,7 @@ pub trait SpikeTrainLatticeHistory {
 #[derive(Debug, Clone)]
 pub struct SpikeTrainGridHistory {
     /// Voltage history
-    history: Vec<Vec<Vec<f64>>>,
+    pub history: Vec<Vec<Vec<f64>>>,
 }
 
 impl Default for SpikeTrainGridHistory {
@@ -782,13 +801,31 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
 #[derive(Debug, Clone)]
 pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
     /// Grid of spike trains
-    cell_grid: Vec<Vec<T>>,
+    pub cell_grid: Vec<Vec<T>>,
     /// History of grid states
-    grid_history: U,
+    pub grid_history: U,
     /// Whether to update grid history
-    update_grid_history: bool,
+    pub update_grid_history: bool,
     /// Internal clock keeping track of what timestep the lattice is at
-    internal_clock: usize,
+    pub internal_clock: usize,
+}
+
+impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<T, U> {
+    fn default() -> Self {
+        SpikeTrainLattice {
+            cell_grid: vec![],
+            grid_history: U::default(),
+            update_grid_history: false,
+            internal_clock: 0,
+        }
+    }
+}
+
+impl<T: SpikeTrain> SpikeTrainLattice<T, SpikeTrainGridHistory> {
+    // Generates a default lattice implementation given a spike train type
+    pub fn default_impl() -> Self {
+        SpikeTrainLattice::default()
+    }
 }
 
 impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
