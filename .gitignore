@@ -29,7 +29,7 @@
 /backend/examples/lattice_example/*.txt
 /backend/examples/lattice_example/*.ipynb
 /backend/examples/lattice_example/*.gif
-/backend/docs/images/data/*
+/images/data/*
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
