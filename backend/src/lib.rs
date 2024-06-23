@@ -7,8 +7,10 @@
 //! or neuron models. Currently implements system for spike trains, spike time depedent
 //! plasticity, basic attractors and dynamics for neurons connected in a lattice. 
 //! See below for examples and how to add custom models.
+//! 
+//! ![Voltage over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/examples/images/lattice.gif?raw=true)
 //!
-//! ## Examples:
+//! ## Example Code:
 //! 
 //! See examples folder for more examples.
 //! 
