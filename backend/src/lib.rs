@@ -10,27 +10,27 @@
 //! 
 //! ### FitzHugh-Nagumo Model with Static Input
 //! 
-//! ![FitzHugh-Nagumo with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/fhn_static.png?raw=true)
+//! ![FitzHugh-Nagumo with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/fhn_static.png?raw=true)
 //! 
 //! ### Coupled Izhikevich Neurons
 //! 
-//! ![Coupled Izhikevich models](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/izhikevich.png?raw=true)
+//! ![Coupled Izhikevich models](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/izhikevich.png?raw=true)
 //! 
 //! ### Hodgkin Huxley Model with Neurotransmission
 //! 
-//! ![Hodgkin Huxley model voltage and neurotransmitter over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/hodgkin_huxley_neurotransmission.png?raw=true)
+//! ![Hodgkin Huxley model voltage and neurotransmitter over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/hodgkin_huxley_neurotransmission.png?raw=true)
 //! 
 //! ### Spike Time Dependent Plasticity Weights over Time
 //! 
-//! ![STDP weights over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/stdp.png?raw=true)
+//! ![STDP weights over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/stdp.png?raw=true)
 //! 
 //! ### Hopfield Network Pattern Reconstruction
 //! 
-//! ![Discrete Hopfield network pattern reconstruction](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/hopfield.png?raw=true)
+//! ![Discrete Hopfield network pattern reconstruction](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/hopfield.png?raw=true)
 //! 
 //! ### Lattice
 //! 
-//! ![Voltage over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/backend/docs/images/lattice.gif?raw=true)
+//! ![Voltage over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/lattice.gif?raw=true)
 //!
 //! ## Example Code:
 //! 
