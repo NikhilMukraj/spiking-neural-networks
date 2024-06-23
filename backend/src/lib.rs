@@ -32,7 +32,7 @@
 //! 
 //! ![Voltage over time](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/lattice.gif?raw=true)
 //!
-//! ## Example Code:
+//! ## Example Code
 //! 
 //! See examples folder for more examples.
 //! 
