@@ -2,6 +2,11 @@
 name = "spiking_neural_networks"
 version = "0.9.0"
 edition = "2021"
+license = "Apache-2.0"
+description = "A package for designing and simulating biological neural network dynamics with neurotransmission"
+repository = "https://github.com/NikhilMukraj/spiking-neural-networks"
+keywords = ["neuron", "neurons", "neuroscience", "neurotransmission", "neurotransmitter"]
+categories = ["science::neuroscience"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
