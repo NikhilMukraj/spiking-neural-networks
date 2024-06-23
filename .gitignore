@@ -25,6 +25,9 @@
 /backend/examples/fitzhugh_nagumo_example/*.csv
 /backend/examples/hodgkin_huxley_example/*.csv
 /backend/examples/izhikevich_example/*.csv
+/backend/examples/lattice_example/*.txt
+/backend/examples/lattice_example/*.ipynb
+/backend/examples/lattice_example/*.gif
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
