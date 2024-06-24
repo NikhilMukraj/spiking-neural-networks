@@ -963,6 +963,11 @@ pub trait GaussianFactor {
     fn get_gaussian_factor(&self) -> f64;
 }
 
+/// Gets whether the neuron is spiking
+pub trait IsSpiking {
+    fn is_spiking(&self) -> bool;
+}
+
 /// Handles the firing times of the neuron
 pub trait LastFiringTime {
     /// Gets the last firing time of the neuron, (`None` if the neuron has not fired yet)
@@ -978,7 +983,7 @@ pub trait STDP: LastFiringTime {
 
 /// Handles dynamics neurons that can take in an input to update membrane potential
 pub trait IterateAndSpike: 
-Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + STDP + Send + Sync {
+Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpiking + STDP + Send + Sync {
     /// Type of neurotransmitter kinetics to use
     type T: NeurotransmitterKinetics;
     /// Type of receptor kinetics to use
