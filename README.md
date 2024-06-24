@@ -9,10 +9,11 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - (todo...)
 - (explanation of integrate and fire)
-- (explanation of izhikevich)
+- (explanation of izhikevich, show lattice diagram)
 - (explaination of hodgkin huxley)
 - (explanation of ion channels)
 - (explanation of neurotransmission, how hodgkin hux system is adapted for izhikevich, explain why receptor kinetics are fixed)
+- (explain hopfield network and attactors, show diagrams)
 
 ## Todo Notes
 
@@ -33,20 +34,9 @@ EEG processing with fourier transforms, and power spectral density calculations
         - Correlation of burst time between reference and fit could work for fitting bursting neurons could be tested with a bursting Hindmarsh-Rose neuron
 - Can also implement version that either adds neurotransmitter current or adds the current to stimulus
 
-- **Subtract 70 mv (or n) from Hodgkin Huxley in fitting** for peak amplitudes
-
-- Eventually remove old neurotransmitter system and replace it with new one
 - Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
 
-- **Another refactor for neurotransmission**, neurotransmitter and receptors should be a trait that structs can implement
-  - Approximation of neurotransmission for integrate and fire cells
-    - When presynaptic neuron spikes, receptor value is set to $r_max$ and then slowly decays over time (r change is basically just t change here where t, the neurotransmitter, decays over time)
-      - Spike detection could be done in same manner as Hodgkin Huxley spike detection where neurotrasmitter struct will keep track of the last voltage and whether it was increasing or not
-    - Modifier from receptor type (GABAb modifier and NMDA modifier) should still be applied to currents
-
 - **Redo obsidian notes with new code**
-
-- **When neurotransmitter refactor done, move to Hopfield network or lixirnet or Poisson/spike train or FitzHugh-Nagumo**
 
 - Add $\tau_m$ and $C_m$ to fitting parameters
 - Add option to subtract 70 mV to set resting potential for Hodgkin Huxley model in fitting
@@ -55,16 +45,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Update code in obsidian when refactor is done, maybe update results
 
 - Change `BufWriter` capacity from 8 kb to 4 mb or 8 mb and see if its faster (use `with_capacity` function)
-
-- Weighted neuron input should be the only input function
-
-- Have system to generate new neurotransmitter and receptors from TOML
-
-- Split `main.rs` functions into a few different files for readability
-- Printing should have colors
-
-- **Neurotransmitter approximate refactor**
-- Eventually split up integrate and fire types into seperate structs, use macros to share code between structs
 
 - Spike trains and multiple lattices
   - Spike train trait should return a voltage and iterate with no given input
@@ -89,8 +69,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Refactor fitting to use neurotransmission, assume that with neurotransmission may not be as accurate as fitting without neurotransmission
   - Or potentially use neurotransmission but assume recurrent connections, (a -> b -> a)
 - $\tau_m$ and $C_m$ fitting
-- Spike train should evenly divide timing of spikes throughout for consistency sake, less randomness should ensure more accuracy
-- Fitting should include neurotransmission again
 - Could extend for all integrate and fire neurons later
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
 - Maybe refactor so fitting only takes into account the presynaptic neuron
@@ -179,6 +157,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
   - **Lixirnet should expose EEG processing tools**
 
+- Astrocytes
+
 - EEG testing
   - Determine frequency band of EEG values over 30 seconds (could calculate frequencies seperately in Python with Numpy for now)
   - Leave room for convergence (about 500 steps with $dt=0.1$)
@@ -212,6 +192,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   all excitatory neurons are connected to each other but not itself (no self edges), excitatory neurons are each connected to one corresponding inhibitory neuron each, inhibitory neurons are each connected to all other excitatory neurons except their corresponding input excitatory neuron
   - Poisson neurons are active for 350 ms, which is followed by a 150 ms resting period
   - Firing rate determined by measuring number of spikes, which could be stored in history, history could be a hashmap of positions and a counter, counter is reset for each neuron after prediction, since state is stored as a single value that is pre-allocated the performance should be okay
+  - Cell grid voltages should be set within a range between the average minimum voltage and average maximum voltage after converging (averages determined by iterating network without any Poisson input), same with adaptive values
   - May need to refactor neurons to have a `IsSpiking` trait
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
@@ -558,7 +539,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] Parallel Hodgkin Huxley
 - [ ] Interfacing from Python
 
-## Results
+<!-- ## Results
 
 ### Lattice
 
@@ -576,13 +557,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ![NMDA](archive_backend/results/nmda.png)
 
-#### Additional Gates
-
-<!-- ![L-Type Calcium]() -->
-
 #### Hopfield Reconstruction
 
-![Hopfield Reconstruction of Input Patterns](archive_backend/results/hopfield_reconstructions.jpg)
+![Hopfield Reconstruction of Input Patterns](archive_backend/results/hopfield_reconstructions.jpg) -->
 
 ## Sources
 
