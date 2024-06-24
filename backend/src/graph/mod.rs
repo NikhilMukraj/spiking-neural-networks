@@ -6,10 +6,6 @@ use std::{
     io::{Write, BufWriter, Result, Error, ErrorKind}, 
     fmt::Display,
 };
-// use serde_json;
-#[path = "../distribution/mod.rs"]
-mod distribution;
-use distribution::limited_distr;
 use crate::neuron::iterate_and_spike::GaussianParameters;
 
 
@@ -159,12 +155,7 @@ impl GraphFunctionality for AdjacencyMatrix {
             let weight = match weight_params {
                 Some(value) => {
                     Some(
-                        limited_distr(
-                            value.mean, 
-                            value.std, 
-                            value.min, 
-                            value.max,
-                        )
+                        value.get_random_number()
                     )
                 },
                 None => Some(1.0),
@@ -348,12 +339,7 @@ impl GraphFunctionality for AdjacencyList {
         for i in connections.iter() {
             let weight = match weight_params {
                 Some(value) => {
-                    limited_distr(
-                        value.mean, 
-                        value.std, 
-                        value.min, 
-                        value.max,
-                    )
+                    value.get_random_number()
                 },
                 None => 1.0,
             };
