@@ -353,14 +353,8 @@
 //!         .collect();
 //! 
 //!     // generate random weights
-//!     let mut weights: Vec<f64> = (0..n).map(
-//!         |_| limited_distr(
-//!             weight_params.mean, 
-//!             weight_params.std, 
-//!             weight_params.min, 
-//!             weight_params.max,
-//!         )
-//!     ).collect();
+//!     let mut weights: Vec<f64> = (0..n).map(|_| weight_params.get_random_number())
+//!         .collect();
 //! 
 //!     let mut delta_ws: Vec<f64> = (0..n)
 //!         .map(|_| 0.0)
@@ -469,8 +463,8 @@
 //! ```rust
 //! use spiking_neural_networks::iterate_and_spike_traits::IterateAndSpikeBase;
 //! use spiking_neural_networks::neuron::iterate_and_spike::{
-//!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
-//!     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+//!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, STDPParameters,
+//!     IsSpiking, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
 //!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
