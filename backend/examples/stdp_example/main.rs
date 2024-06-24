@@ -68,14 +68,8 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         )
         .collect();
 
-    let mut weights: Vec<f64> = (0..n).map(
-        |_| limited_distr(
-            weight_params.mean, 
-            weight_params.std, 
-            weight_params.min, 
-            weight_params.max,
-        )
-    ).collect();
+    let mut weights: Vec<f64> = (0..n).map(|_| weight_params.get_random_number())
+        .collect();
 
     let mut delta_ws: Vec<f64> = (0..n)
         .map(|_| 0.0)
