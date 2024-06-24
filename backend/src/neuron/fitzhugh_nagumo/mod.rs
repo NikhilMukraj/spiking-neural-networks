@@ -2,7 +2,7 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
