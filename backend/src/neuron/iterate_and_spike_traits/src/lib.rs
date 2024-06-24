@@ -40,6 +40,12 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
             }
         }
 
+        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IsSpiking for #name<T, R> {
+            fn is_spiking(&self) -> bool {
+                self.is_spiking
+            }
+        }
+
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for #name<T, R> {
             fn set_last_firing_time(&mut self, timestep: Option<usize>) {
                 self.last_firing_time = timestep;
