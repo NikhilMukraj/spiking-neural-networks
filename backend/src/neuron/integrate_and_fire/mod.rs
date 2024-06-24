@@ -4,7 +4,7 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
+    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
@@ -100,6 +100,8 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     pub c_m: f64, 
     /// Time step (ms)
     pub dt: f64, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Potentiation type of neuron
@@ -133,6 +135,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
             e_l: -75., // leak reversal potential (mV)
             tref: 10., // refractory time (ms), could rename to refract_time
             dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
@@ -167,6 +170,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeur
             self.current_voltage = self.v_reset;
             self.refractory_count = self.tref / self.dt
         }
+
+        self.is_spiking = is_spiking;
 
         is_spiking
     }
@@ -282,6 +287,8 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
     pub c_m: f64, 
     /// Time step (ms)
     pub dt: f64, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Potentiation type of neuron
@@ -319,6 +326,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
             dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
@@ -355,6 +363,8 @@ macro_rules! impl_adaptive_default_methods {
                 self.w_value += self.beta;
                 self.refractory_count = self.tref / self.dt
             }
+
+            self.is_spiking = is_spiking;
     
             is_spiking
         }
@@ -424,6 +434,8 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
     pub c_m: f64, 
     /// Time step (ms)
     pub dt: f64, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Potentiation type of neuron
@@ -462,6 +474,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
             tref: 10., // refractory time (ms), could rename to refract_time
             w_init: 0., // initial w value
             dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
@@ -524,6 +537,8 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub c_m: f64, 
     /// Time step (ms)
     pub dt: f64, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Potentiation type of neuron
@@ -556,6 +571,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
             v_init: -65., // initial potential (mV)
             w_init: 30., // initial w value
             dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
@@ -587,6 +603,8 @@ macro_rules! impl_izhikevich_default_methods {
                 self.current_voltage = self.c;
                 self.w_value += self.d;
             }
+
+            self.is_spiking = is_spiking;
     
             is_spiking
         }
@@ -645,6 +663,8 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     pub c_m: f64, 
     /// Time step (ms)
     pub dt: f64, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Potentiation type of neuron
@@ -678,6 +698,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
             e_l: -65., // leak reversal potential (mV)
             w_init: 30., // initial w value
             dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
             last_firing_time: None,
             potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
