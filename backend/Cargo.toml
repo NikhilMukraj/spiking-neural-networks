@@ -1,14 +1,14 @@
 [package]
 name = "spiking_neural_networks"
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 license = "Apache-2.0"
 description = "A package for designing and simulating biological neural network dynamics with neurotransmission"
 homepage = "https://docs.rs/spiking_neural_networks/latest/spiking_neural_networks/"
 repository = "https://github.com/NikhilMukraj/spiking-neural-networks"
 readme = "README.md"
-keywords = ["neuron", "neurons", "neuroscience", "neurotransmission", "neurotransmitter"]
-categories = ["science::neuroscience"]
+keywords = ["neuron", "neurons", "neural", "neuroscience", "neurotransmission", "neurotransmitter"]
+categories = ["science::neuroscience", "science", "mathematics"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -23,7 +23,7 @@ rayon = "1.8.0"
 rustfft = "6.1.0"
 serde = "1.0.192"
 serde_json = "1.0.108"
-iterate_and_spike_traits = { path = "src/neuron/iterate_and_spike_traits", version = "0.1.0" }
+iterate_and_spike_traits = { path = "src/neuron/iterate_and_spike_traits", version = "0.2.0" }
 
 # [dev-dependencies]
 # ratatui = "0.26.3"
