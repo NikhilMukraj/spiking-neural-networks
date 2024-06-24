@@ -857,3 +857,61 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
         }
     }
 }
+
+// #[derive(Debug, Clone)]
+// pub struct LatticeNetwork
+// <T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
+// {
+//     lattices: HashMap<usize, Lattice<T, U, V>>,
+//     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
+//     connecting_graphs: Vec<U>,
+//     lattice_counter: usize,
+// }
+
+// impl<T, U, V, W, X> Default for LatticeNetwork<T, U, V, W, X>
+// where
+//     T: IterateAndSpike,
+//     U: GraphFunctionality,
+//     V: LatticeHistory,
+//     W: SpikeTrain,
+//     X: SpikeTrainLatticeHistory,
+// {
+//     fn default() -> Self { 
+//         LatticeNetwork {
+//             lattices: HashMap::new(),
+//             spike_train_lattices: HashMap::new(),
+//             connecting_graphs: Vec::new(),
+//             lattice_counter: 0,
+//         }
+//     }
+// }
+
+// impl<T, U, V, W, X> LatticeNetwork<T, U, V, W, X>
+// where
+//     T: IterateAndSpike,
+//     U: GraphFunctionality,
+//     V: LatticeHistory,
+//     W: SpikeTrain,
+//     X: SpikeTrainLatticeHistory,
+// {
+//     pub fn add_lattice(&mut self, lattice: Lattice<T, U, V>) {
+//         self.lattices.insert(self.lattice_counter, lattice);
+
+//         self.lattice_counter += 1;
+//     }
+
+//     pub fn add_spike_train_lattice(&mut self, spike_train_lattice: SpikeTrainLattice<W, X>) {
+//         self.spike_train_lattices.insert(self.lattice_counter, spike_train_lattice);
+
+//         self.lattice_counter += 1;
+//     }
+
+//     pub fn add_connecting_graph(&mut self, connector: U) {
+//         self.connecting_graphs.push(connector);
+//     }
+
+//     fn calculate_inputs(&self, pos: GraphPosition) {
+//         // check connecting graphs and internal graphs for all incoming neurons
+//         // then index each appropriate cell grid for the necessary data
+//     }
+// }
