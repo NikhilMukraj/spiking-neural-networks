@@ -4,7 +4,7 @@
 use std::io::{Error, ErrorKind, Result};
 use rand::Rng;
 use crate::graph;
-use graph::{GraphFunctionality, GraphPosition};
+use graph::{Graph, GraphPosition};
 
 
 /// State of a bipolar discrete neuron
@@ -48,14 +48,14 @@ impl DiscreteNeuron {
 }
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
-pub struct DiscreteNeuronLattice<T: GraphFunctionality>{
+pub struct DiscreteNeuronLattice<T: Graph>{
     /// 2 dimensional grid of discrete neurons
     pub cell_grid: Vec<Vec<DiscreteNeuron>>,
     /// Internal weights
     pub weights: T,
 }
 
-impl<T: GraphFunctionality> Default for DiscreteNeuronLattice<T> {
+impl<T: Graph> Default for DiscreteNeuronLattice<T> {
     fn default() -> Self {
         DiscreteNeuronLattice {
             cell_grid: vec![],
@@ -64,7 +64,7 @@ impl<T: GraphFunctionality> Default for DiscreteNeuronLattice<T> {
     }
 }
 
-impl<T: GraphFunctionality> DiscreteNeuronLattice<T> {
+impl<T: Graph> DiscreteNeuronLattice<T> {
     /// Generates a lattice with default weights given a number of rows and columns to use
     pub fn generate_lattice_from_dimension(num_rows: usize, num_cols: usize) -> Self {
         let cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
@@ -160,7 +160,7 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// Generates weights for a Hopfield network based on a given set of patterns, and 
 /// an id to assign to the graph, assumes the patterns have the same dimensions throughout,
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
-pub fn generate_hopfield_network<T: GraphFunctionality + Default>(
+pub fn generate_hopfield_network<T: Graph + Default>(
     // num_rows: usize, 
     // num_cols: usize, 
     graph_id: usize,
