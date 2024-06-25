@@ -34,7 +34,7 @@
 //!
 //! ## Example Code
 //! 
-//! See examples folder for more examples.
+//! See [`examples folder`](https://docs.rs/crate/spiking_neural_networks/latest/source/examples/) for more examples.
 //! 
 //! ### Coupling neurons with current input
 //! 
