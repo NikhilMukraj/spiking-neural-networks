@@ -5,7 +5,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 /// Derive macro to automatically implement many necessary traits for the `IterateAndSpike` trait,
 /// including `CurrentVoltage`, `GapConductance`, `Potentiation`, `GaussianFactor`, `LastFiringTime`,
-/// and `STDP`
+/// `IsSpiking`, and `STDP`
 #[proc_macro_derive(IterateAndSpikeBase)]
 pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
     // Parse the input tokens into a syntax tree
