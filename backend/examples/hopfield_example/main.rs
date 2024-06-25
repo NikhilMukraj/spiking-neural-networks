@@ -8,7 +8,7 @@ use crate::spiking_neural_networks::{
     neuron::attractors::{
         DiscreteNeuronLattice, generate_hopfield_network, distort_pattern,
     },
-    graph::{GraphFunctionality, AdjacencyMatrix}
+    graph::{Graph, AdjacencyMatrix}
 };
 
 
@@ -30,7 +30,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
     Ok(matrix)
 }
 
-fn test_hopfield_network<T: GraphFunctionality>(
+fn test_hopfield_network<T: Graph>(
     patterns: &Vec<Vec<Vec<isize>>>,
     noise_level: f64,
     iterations: usize,
