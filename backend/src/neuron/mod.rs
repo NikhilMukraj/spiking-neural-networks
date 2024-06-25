@@ -8,9 +8,12 @@
 //! with new ones without having to rewrite functionality.
 
 use std::{
+    collections::{
+        hash_map::{Values, ValuesMut}, 
+        HashMap, HashSet
+    }, 
     f64::consts::PI, 
-    collections::{HashMap, HashSet},
-    io::Result,
+    io::{Result, Error, ErrorKind},
 };
 use rand::{Rng, seq::SliceRandom};
 pub mod integrate_and_fire;
@@ -26,7 +29,7 @@ use iterate_and_spike::{
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
-use crate::graph::{GraphFunctionality, GraphPosition, AdjacencyMatrix};
+use crate::graph::{Graph, GraphPosition, AdjacencyMatrix};
 
 
 /// Calculates the current between two neurons based on the voltage and
@@ -415,7 +418,7 @@ fn randomly_select_positions(
 
 /// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
-pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> {
+pub struct Lattice<T: IterateAndSpike, U: Graph, V: LatticeHistory> {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -436,7 +439,7 @@ pub struct Lattice<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory>
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Default for Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Default for Lattice<T, U, V> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -459,8 +462,18 @@ impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix, GridVoltageHistory> {
     }
 }
 
-impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     impl_reset_timing!();
+
+    /// Gets id of lattice [`Graph`]
+    pub fn get_id(&self) -> usize {
+        self.graph.get_id()
+    }
+
+    /// Sets id of lattice [`Graph`] given an id
+    pub fn set_id(&mut self, id: usize) {
+        self.graph.set_id(id);
+    }
 
     /// Calculates electrical input value from positions
     fn calculate_internal_input_from_positions(
@@ -770,6 +783,34 @@ impl<T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory> Lattice<T, U,
     pub fn populate_lattice(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
         self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
     }
+
+    // /// Connects the neurons in a lattice together given a function to determine
+    // /// if the neurons should be connected given their position (usize, usize), and
+    // /// a function to determine what the weight between the neurons should be,
+    // /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    // /// if a connect should occur according to `connecting_conditional`
+    // pub fn connect(
+    //     &mut self, 
+    //     connecting_conditional: &fn((usize, usize), (usize, usize)) -> bool,
+    //     weight_logic: &Option<fn((usize, usize), (usize, usize)) -> f64>,
+    // ) {
+    //     self.graph.get_every_node()
+    //         .iter()
+    //         .for_each(|i| {
+    //             for j in self.graph.get_every_node().iter() {
+    //                 if (connecting_conditional)(i.pos, j.pos) {
+    //                     match weight_logic {
+    //                         Some(logic) => {
+    //                             self.graph.edit_weight(i, j, Some((logic)(i.pos, j.pos))).unwrap();
+    //                         },
+    //                         None => {
+    //                             self.graph.edit_weight(i, j, Some(1.)).unwrap();
+    //                         }
+    //                     };
+    //                 }
+    //             }
+    //         });
+    // }
 }
 
 /// Handles history of a spike train lattice
@@ -808,6 +849,8 @@ pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
     pub update_grid_history: bool,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
+    /// Id for lattice
+    pub id: usize,
 }
 
 impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<T, U> {
@@ -817,6 +860,7 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<T
             grid_history: U::default(),
             update_grid_history: false,
             internal_clock: 0,
+            id: 0,
         }
     }
 }
@@ -858,20 +902,33 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     }
 }
 
+// // #[derive(Debug, Clone)]
+// // pub enum LatticeType
+// // <T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
+// // {
+// //     IterateAndSpike(Lattice<T, U, V>),
+// //     SpikeTrain(SpikeTrainLattice<W, X>),
+// // }
+
 // #[derive(Debug, Clone)]
 // pub struct LatticeNetwork
-// <T: IterateAndSpike, U: GraphFunctionality, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
+// <T: IterateAndSpike, U: Graph, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
 // {
+//  // lattices: HashMap<usize, LatticeType<T, U, V, W, X>,
+//     /// A hashmap of [`Lattice`]s associated with their respective identifier
 //     lattices: HashMap<usize, Lattice<T, U, V>>,
+//     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
 //     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
-//     connecting_graphs: Vec<U>,
-//     lattice_counter: usize,
+//     /// An array of graphs connecting different lattices together
+//     pub connecting_graphs: Vec<U>,
+//     /// Internal clock keeping track of what timestep the lattice is at
+//     pub internal_clock: usize,
 // }
 
 // impl<T, U, V, W, X> Default for LatticeNetwork<T, U, V, W, X>
 // where
 //     T: IterateAndSpike,
-//     U: GraphFunctionality,
+//     U: Graph,
 //     V: LatticeHistory,
 //     W: SpikeTrain,
 //     X: SpikeTrainLatticeHistory,
@@ -881,7 +938,7 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 //             lattices: HashMap::new(),
 //             spike_train_lattices: HashMap::new(),
 //             connecting_graphs: Vec::new(),
-//             lattice_counter: 0,
+//             internal_clock: 0,
 //         }
 //     }
 // }
@@ -889,29 +946,296 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 // impl<T, U, V, W, X> LatticeNetwork<T, U, V, W, X>
 // where
 //     T: IterateAndSpike,
-//     U: GraphFunctionality,
+//     U: Graph,
 //     V: LatticeHistory,
 //     W: SpikeTrain,
 //     X: SpikeTrainLatticeHistory,
 // {
-//     pub fn add_lattice(&mut self, lattice: Lattice<T, U, V>) {
-//         self.lattices.insert(self.lattice_counter, lattice);
+//     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
+//     pub fn add_lattice(
+//         &mut self, 
+//         lattice: Lattice<T, U, V>
+//     ) -> Result<()> {
+//         if self.get_all_ids().contains(&lattice.get_id()) {
+//             return Err(Error::new(ErrorKind::InvalidInput, "Graph id already present in network"));
+//         }
+//         self.lattices.insert(lattice.get_id(), lattice);
 
-//         self.lattice_counter += 1;
+//         Ok(())
 //     }
 
-//     pub fn add_spike_train_lattice(&mut self, spike_train_lattice: SpikeTrainLattice<W, X>) {
-//         self.spike_train_lattices.insert(self.lattice_counter, spike_train_lattice);
+//     /// Adds a [`SpikeTrainLattice`] to the network if the lattice has an id that is 
+//     /// not already in the network
+//     pub fn add_spike_train_lattice(
+//         &mut self, 
+//         spike_train_lattice: SpikeTrainLattice<W, X>, 
+//     ) -> Result<()> {
+//         if self.get_all_ids().contains(&spike_train_lattice.id) {
+//             return Err(Error::new(ErrorKind::InvalidInput, "Graph id already present in network"));
+//         }
 
-//         self.lattice_counter += 1;
+//         self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
+
+//         Ok(())
 //     }
 
+//     /// Resets the clock and last firing times for the entire network
+//     pub fn reset_timing(&mut self) {
+//         self.internal_clock = 0;
+
+//         self.lattices.values_mut()
+//             .for_each(|i| i.reset_timing());
+//         self.spike_train_lattices.values_mut()
+//             .for_each(|i| i.reset_timing());
+//     }
+
+//     /// Returns an immutable reference to all the lattice hashmaps
+//     pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
+//         (&self.lattices, &self.spike_train_lattices)
+//     }
+
+//     /// Returns the set of [`Lattice`]s in the hashmap of lattices
+//     pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V>> {
+//         self.lattices.values()
+//     }
+
+//     /// Returns a mutable set [`Lattice`]s in the hashmap of lattices
+//     pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V>> {
+//         self.lattices.values_mut()
+//     }
+
+//     /// Returns the set of [`SpikeTrainLattice`]s in the hashmap of spike train lattices
+//     pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<W, X>> {
+//         self.spike_train_lattices.values()
+//     }
+
+//     /// Returns a mutable set [`SpikeTrainLattice`]s in the hashmap of spike train lattices    
+//     pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<W, X>> {
+//         self.spike_train_lattices.values_mut()
+//     }
+
+//     /// Returns a hashset of all the ids
+//     pub fn get_all_ids(&self) -> HashSet<usize> {
+//         let mut ids = HashSet::new();
+
+//         self.lattices.keys()
+//             .for_each(|i| { ids.insert(*i); });
+//         self.spike_train_lattices.keys()
+//             .for_each(|i| { ids.insert(*i); });
+
+//         ids
+//     }
+
+//     /// Adds a graph to connect lattices together
 //     pub fn add_connecting_graph(&mut self, connector: U) {
 //         self.connecting_graphs.push(connector);
 //     }
 
-//     fn calculate_inputs(&self, pos: GraphPosition) {
-//         // check connecting graphs and internal graphs for all incoming neurons
-//         // then index each appropriate cell grid for the necessary data
+//     // pub fn generate_connecting_graph(
+//     //     &mut self, 
+//     //     presynaptic_id: usize, 
+//     //     postsynaptic_id: usize, 
+//     //     connecting_conditional: &fn((usize, usize), (usize, usize)) -> bool,
+//     //     weight_logic: &Option<fn((usize, usize), (usize, usize)) -> f64>,
+//     // ) -> Result<()> {
+//     //     if self.spike_train_lattices.contains_key(&postsynaptic_id) {
+//     //         return Err(Error::new(
+//     //             ErrorKind::InvalidInput, 
+//     //             "postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs")
+//     //         );
+//     //     }
+
+//     //     if !self.get_all_ids().contains(&presynaptic_id) {
+//     //         return Err(Error::new(ErrorKind::InvalidInput, "presynaptic id not in lattices"));
+//     //     }
+
+//     //     if !self.lattices.contains_key(&postsynaptic_id) {
+//     //         return Err(Error::new(ErrorKind::InvalidInput, "postsynaptic id not in lattices"));
+//     //     }
+
+//     //     let mut connecting_graph = U::default();
+
+//     //     if self.lattices.contains_key(&presynaptic_id) {
+//     //         let postsynaptic_graph = &self.lattices.get(&postsynaptic_id)
+//     //             .unwrap()
+//     //             .graph;
+//     //         self.lattices.get(&presynaptic_id).unwrap()
+//     //             .graph
+//     //             .get_every_node()
+//     //             .iter()
+//     //             .for_each(|i| {
+//     //                 for j in postsynaptic_graph.get_every_node().iter() {
+//     //                     if (connecting_conditional)(i.pos, j.pos) {
+//     //                         match weight_logic {
+//     //                             Some(logic) => {
+//     //                                 connecting_graph.edit_weight(i, j, Some((logic)(i.pos, j.pos))).unwrap();
+//     //                             },
+//     //                             None => {
+//     //                                 connecting_graph.edit_weight(i, j, Some(1.)).unwrap();
+//     //                             }
+//     //                         };
+//     //                     }
+//     //                 }
+//     //             });
+//     //     } else {
+//     //         let presynaptic_positions = self.spike_train_lattices.get(&presynaptic_id)
+//     //             .unwrap()
+//     //             .cell_grid
+//     //             .iter()
+//     //             .enumerate()
+//     //             .flat_map(|(n1, i)| {
+//     //                 i.iter()
+//     //                     .enumerate()
+//     //                     .map(move |(n2, _)| 
+//     //                         GraphPosition {
+//     //                             id: presynaptic_id, 
+//     //                             pos: (n1, n2),
+//     //                         }
+//     //                     )
+//     //             })
+//     //             .collect::<Vec<GraphPosition>>();
+
+//     //         let postsynaptic_graph = &self.lattices.get(&postsynaptic_id).unwrap().graph;
+
+//     //         presynaptic_positions.iter()
+//     //             .for_each(|i| {
+//     //                 for j in postsynaptic_graph.get_every_node().iter() {
+//     //                     if (connecting_conditional)(i.pos, j.pos) {
+//     //                         match weight_logic {
+//     //                             Some(logic) => {
+//     //                                 connecting_graph.edit_weight(i, j, Some((logic)(i.pos, j.pos))).unwrap();
+//     //                             },
+//     //                             None => {
+//     //                                 connecting_graph.edit_weight(i, j, Some(1.)).unwrap();
+//     //                             }
+//     //                         };
+//     //                     }
+//     //                 }
+//     //             });
+//     //     }
+
+//     //     self.connecting_graphs.push(connecting_graph);
+
+//     //     Ok(())
+//     // }
+
+//     fn get_all_input_positions(&self, pos: GraphPosition) -> HashSet<GraphPosition> {
+//         let mut input_positions = self.lattices[&pos.id].graph.get_incoming_connections(&pos)
+//             .expect("Cannot find position");
+
+//         for i in self.connecting_graphs.iter() {
+//             match i.get_incoming_connections(&pos) {
+//                 Ok(value) => {
+//                     input_positions.extend(value)
+//                 },
+//                 Err(_) => {}
+//             };
+//         }
+    
+//         input_positions
+//     }
+
+//     fn calculate_electrical_input_from_positions(
+//         &self, 
+//         position: &GraphPosition,
+//         input_positions: HashSet<GraphPosition>
+//     ) -> f64 {
+//         let postsynaptic_neuron: &T = &self.lattices.get(&position.id)
+//             .unwrap()
+//             .cell_grid[position.pos.0][position.pos.1];
+
+//         let mut input_val = input_positions
+//             .iter()
+//             .map(|input_position| {
+//                 let (pos_x, pos_y) = input_position.pos;
+
+//                 let final_input = if self.lattices.contains_key(&position.id) {
+//                     let input_cell = &self.lattices.get(&position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     signed_gap_junction(input_cell, postsynaptic_neuron)
+//                 } else {
+//                     let input_cell = &self.spike_train_lattices.get(&position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
+//                 };
+                
+//                 let weight: f64 = self.connecting_graphs.iter()
+//                     .map(|i| i.lookup_weight(&input_position, position).unwrap_or(Some(0.)).unwrap())
+//                     .sum();
+
+//                 final_input * weight
+//             })
+//             .sum::<f64>();
+
+//         if self.lattices.get(&position.id).unwrap().gaussian {
+//             input_val *= postsynaptic_neuron.get_gaussian_factor();
+//         }
+
+//         input_val /= input_positions.len() as f64;
+
+//         return input_val;
+//     }
+
+//     fn calculate_neurotransmitter_input_from_positions(
+//         &self, 
+//         position: &GraphPosition,
+//         input_positions: HashSet<GraphPosition>
+//     ) -> NeurotransmitterConcentrations {
+//         let postsynaptic_neuron: &T = &self.lattices.get(&position.id)
+//             .unwrap()
+//             .cell_grid[position.pos.0][position.pos.1];
+
+//         let input_vals: Vec<NeurotransmitterConcentrations> = input_positions
+//             .iter()
+//             .map(|input_position| {
+//                 let (pos_x, pos_y) = input_position.pos;
+
+//                 let mut neurotransmitter_input = if self.lattices.contains_key(&position.id) {
+//                     let input_cell = &self.lattices.get(&position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     let final_input = input_cell.get_neurotransmitter_concentrations();
+
+//                     final_input
+//                 } else {
+//                     let input_cell = &self.spike_train_lattices.get(&position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     let final_input = input_cell.get_neurotransmitter_concentrations();
+
+//                     final_input
+//                 };
+                
+//                 let weight: f64 = self.connecting_graphs.iter()
+//                     .map(|i| i.lookup_weight(&input_position, position).unwrap_or(Some(0.)).unwrap())
+//                     .sum();
+
+//                 weight_neurotransmitter_concentration(&mut neurotransmitter_input, weight);
+
+//                 neurotransmitter_input
+//             })
+//             .collect();
+
+//         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+
+//         if self.lattices.get(&position.id).unwrap().gaussian {
+//             weight_neurotransmitter_concentration(
+//                 &mut input_val, 
+//                 postsynaptic_neuron.get_gaussian_factor()
+//             );
+//         }
+
+//         weight_neurotransmitter_concentration(
+//             &mut input_val, 
+//             (1 / input_positions.len()) as f64
+//         );
+
+//         return input_val;
 //     }
 // }
