@@ -20,7 +20,7 @@ pub struct GraphPosition {
 }
 
 /// Implementation of a basic graph
-pub trait GraphFunctionality: Default {
+pub trait Graph: Default {
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
@@ -109,7 +109,7 @@ impl AdjacencyMatrix {
     }
 }
 
-impl GraphFunctionality for AdjacencyMatrix {
+impl Graph for AdjacencyMatrix {
     fn set_id(&mut self, id: usize) {
         self.id = id;
     }
@@ -312,7 +312,7 @@ fn transform_incoming_connections(
 
 type KeyWeightPair = HashMap<String, f64>;
 
-impl GraphFunctionality for AdjacencyList {
+impl Graph for AdjacencyList {
     fn set_id(&mut self, id: usize) {
         self.id = id;
     }
