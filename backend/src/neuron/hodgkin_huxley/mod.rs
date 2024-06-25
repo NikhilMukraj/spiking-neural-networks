@@ -35,7 +35,7 @@ pub trait AdditionalGate: AdditionalGateClone + Sync + Send {
     /// Returns the current
     fn get_current(&self) -> f64;
     /// Returns the name of the gate
-    fn name(&self) -> &str;
+    fn gate_type(&self) -> &str;
 }
 
 /// Handles cloning of additional gates
@@ -131,7 +131,7 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
         self.current
     }
 
-    fn name(&self) -> &str {
+    fn gate_type(&self) -> &str {
         "HVA Ca"
     }
 }
