@@ -137,21 +137,29 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
+// https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/25282547/
 // https://github.com/antgon/msn-model/blob/main/msn/cell.py 
 // https://github.com/jrieke/NeuroSim
 // MULTICOMPARTMENT EXPLAINED
 // https://neuronaldynamics.epfl.ch/online/Ch3.S2.html
+
+// should abtract out na+, k+, and leak ion channel to be used in both
+// hodgkin huxley and two compartment model, ion channel basically has the following structure:
+// g * n * (v - e)
+// g being maximal conductance, n being gating variable, v being voltage, e being reversal potential
+
 // pub struct Soma {
 
 // }
 
-// pub struct Dendrite {
+// // dendrite should include neurotransmission while soma should not
+// pub struct Dendrite<T, R> {
 
 // }
 
-/// A basic gate for necessary ion channels
+/// A gating variable for necessary ion channels
 #[derive(Debug, Clone, Copy)]
-pub struct Gate {
+pub struct BasicGateVariable {
     /// Gating variable
     pub alpha: f64,
     /// Gating variable
@@ -160,7 +168,7 @@ pub struct Gate {
     pub state: f64,
 }
 
-impl Gate {
+impl BasicGateVariable {
     pub fn init_state(&mut self) {
         self.state = self.alpha / (self.alpha + self.beta);
     }
@@ -195,11 +203,11 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Maximal conductance of leak channel (nS)
     pub g_k_leak: f64,
     /// Gating variable
-    pub m: Gate,
+    pub m: BasicGateVariable,
     /// Gating variable
-    pub n: Gate,
+    pub n: BasicGateVariable,
     /// Gating variable
-    pub h: Gate,
+    pub h: BasicGateVariable,
     /// Voltage threshold for spike calculation (mV)
     pub v_th: f64,
     /// Last timestep the neuron has spiked
@@ -256,7 +264,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
     fn default() -> Self {
-        let default_gate = Gate {
+        let default_gate = BasicGateVariable {
             alpha: 0.,
             beta: 0.,
             state: 0.,
