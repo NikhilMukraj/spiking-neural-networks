@@ -679,9 +679,11 @@ impl ReceptorKinetics for ExponentialDecayReceptor {
         self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
         self.r = self.r_max.min(self.r.max(0.)); // clamp values
     }
+
     fn get_r(&self) -> f64 {
         self.r
     }
+    
     fn set_r(&mut self, r: f64) {
         self.r = r;
     }
@@ -697,7 +699,7 @@ macro_rules! impl_exp_decay_receptor_default {
                     r: 0.,
                     decay_constant: 2.,
                     dt: 0.1,
-                   }
+                }
             }
         }
     };
