@@ -1,6 +1,6 @@
 # Spiking Neural Networks
 
-`spiking_neural_networks` is a package focused on designing neuron models with neurotransmission and calculating dynamics between neurons over time. Neuronal dynamics are made using traits so they can be expanded via the type system to add new dynamics for different neurotransmitters, receptors or neuron models. Currently implements system for spike trains, spike time depedent plasticity, basic attractors and dynamics for neurons connected in a lattice. See below for examples and how to add custom models.
+`spiking_neural_networks` is a package focused on designing neuron models with neurotransmission and calculating dynamics between neurons over time. Neuronal dynamics are made using traits so they can be expanded via the type system to add new dynamics for different neurotransmitters, receptors or neuron models. Currently implements system for spike trains, spike time depedent plasticity, basic attractors, and dynamics for neurons connected in a lattice. See below for examples and how to add custom models.
 
 ## Quick Examples
 
@@ -30,7 +30,7 @@
 
 ## Example Code
 
-See examples folder for more examples.
+See [`examples folder`](https://docs.rs/crate/spiking_neural_networks/latest/source/examples/) for more examples.
 
 ### Coupling neurons with current input
 
@@ -58,59 +58,61 @@ use spiking_neural_networks::{
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
-   presynaptic_neuron: &mut T, 
-   postsynaptic_neuron: &mut T,
-   input_current: f64,
-   do_receptor_kinetics: bool,
-   gaussian: bool,
- -> (bool, bool) {
-   let (t_total, post_current, input_current) = if gaussian {
-       // gets normally distributed factor to add noise with by scaling
-       let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
-       let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
-       // scaling to add noise
-       let input_current = input_current * pre_gaussian_factor;
-       // calculates input current to postsynaptic neuron
-       let post_current = signed_gap_junction(
-           &*presynaptic_neuron,
-           &*postsynaptic_neuron,
-       );
-       // calculates postsynaptic neurotransmitter input
-       let t_total = if do_receptor_kinetics {
-           // weights neurotransmitter with random noise
-           let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-           weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
-           Some(t)
-       } else {
-           // returns None to indicate no update to receptor gating variables
-           None
-       };
-       (t_total, post_current, input_current)
-   } else {
-       // calculates input current to postsynaptic neuron
-       let post_current = signed_gap_junction(
-           &*presynaptic_neuron,
-           &*postsynaptic_neuron,
-       );
-      // calculates postsynaptic neurotransmitter input
-      let t_total = if do_receptor_kinetics {
-           let t = presynaptic_neuron.get_neurotransmitter_concentrations();
-           Some(t)
-       } else {
-           // returns None to indicate no update to receptor gating variables
-           None
-       };
-       (t_total, post_current, input_current)
-   };
-   // updates presynaptic neuron by one step
-   let pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
-   // updates postsynaptic neuron by one step
-   let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-       post_current,
-       t_total.as_ref(),
-   );
-   (pre_spiking, post_spiking)
+    presynaptic_neuron: &mut T, 
+    postsynaptic_neuron: &mut T,
+    input_current: f64,
+    do_receptor_kinetics: bool,
+    gaussian: bool,
+) -> (bool, bool) {
+    let (t_total, post_current, input_current) = if gaussian {
+        // gets normally distributed factor to add noise with by scaling
+        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
+        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
+        // scaling to add noise
+        let input_current = input_current * pre_gaussian_factor;
+        // calculates input current to postsynaptic neuron
+        let post_current = signed_gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        );
+        // calculates postsynaptic neurotransmitter input
+        let t_total = if do_receptor_kinetics {
+            // weights neurotransmitter with random noise
+            let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
+            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
+            Some(t)
+        } else {
+            // returns None to indicate no update to receptor gating variables
+            None
+        };
 
+        (t_total, post_current, input_current)
+    } else {
+        // calculates input current to postsynaptic neuron
+        let post_current = signed_gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        );
+        // calculates postsynaptic neurotransmitter input
+        let t_total = if do_receptor_kinetics {
+            let t = presynaptic_neuron.get_neurotransmitter_concentrations();
+            Some(t)
+        } else {
+            // returns None to indicate no update to receptor gating variables
+            None
+        };
+
+        (t_total, post_current, input_current)
+    };
+    // updates presynaptic neuron by one step
+    let pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
+    // updates postsynaptic neuron by one step
+    let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
+        post_current,
+        t_total.as_ref(),
+    );
+    (pre_spiking, post_spiking)
+}
 ```
 
 ### Coupling neurons with spike train input
@@ -340,12 +342,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 
     // generate random weights
     let mut weights: Vec<f64> = (0..n).map(
-        |_| limited_distr(
-            weight_params.mean, 
-            weight_params.std, 
-            weight_params.min, 
-            weight_params.max,
-        )
+        |_| weight_params.get_random_number()
     ).collect();
 
     let mut delta_ws: Vec<f64> = (0..n)
