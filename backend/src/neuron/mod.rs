@@ -1387,7 +1387,7 @@ where
                 if is_spiking {
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                     if lattice.do_stdp {
-                        spiking_positions.push((x, y, pos.clone()));
+                        spiking_positions.push((x, y, pos));
                     }
                 }
             }
@@ -1439,7 +1439,7 @@ where
                 if is_spiking {
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                     if lattice.do_stdp {
-                        spiking_positions.push((x, y, pos.clone()));
+                        spiking_positions.push((x, y, pos));
                     }
                 }
             }
