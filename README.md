@@ -198,7 +198,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Firing rate determined by measuring number of spikes, which could be stored in history, history could be a hashmap of positions and a counter, counter is reset for each neuron after prediction, since state is stored as a single value that is pre-allocated the performance should be okay
   - Cell grid voltages should be set within a range between the average minimum voltage and average maximum voltage after converging (averages determined by iterating network without any Poisson input), same with adaptive values
   - Could reduce timestep from `0.1` to `0.2` or `0.5` to decrease simulation time
-  - If performance is still an issue after using Rayon then try using WGPU with a compute shader or trying to remove allocations in as many areas as possible
+  - If performance is still an issue after using Rayon then try using WGPU with a compute shader or trying to remove allocations in as many areas as possible or pre allocate necessary space and mutate as simulation progresses
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
 
