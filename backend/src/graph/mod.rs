@@ -37,7 +37,9 @@ pub trait Graph: Default {
         weight_params: &Option<GaussianParameters>,
     );
     /// Returns every node or vertex on the graph
-    fn get_every_node(&self) -> Vec<GraphPosition>;
+    fn get_every_node(&self) -> HashSet<GraphPosition>;
+    /// Returns every node as a reference without cloning
+    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
     fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>>; 
@@ -165,8 +167,12 @@ impl Graph for AdjacencyMatrix {
         }
     }
 
-    fn get_every_node(&self) -> Vec<GraphPosition> {
+    fn get_every_node(&self) -> HashSet<GraphPosition> {
         self.position_to_index.keys().cloned().collect()
+    }
+
+    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition> {
+        self.position_to_index.keys().collect()
     }
 
     fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>> {
@@ -362,8 +368,12 @@ impl Graph for AdjacencyList {
         }
     }
 
-    fn get_every_node(&self) -> Vec<GraphPosition> {
+    fn get_every_node(&self) -> HashSet<GraphPosition> {
         self.incoming_connections.keys().cloned().collect()
+    }
+
+    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition> {
+        self.incoming_connections.keys().collect()
     }
 
     fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>> {
