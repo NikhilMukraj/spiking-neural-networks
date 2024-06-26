@@ -73,18 +73,9 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Refactor fitting to subtract -70 mV (or n) when generating Hodgkin Huxley summary
 - Maybe refactor so fitting only takes into account the presynaptic neuron
 
-- Use Rayon to thread lattice calculations
-  - Inputs should be calculated in parallel
-    - There should be a GraphFunctionalitySynced trait for the lookup weight function, get incoming connections, get outgoing connections, and get every node function, the rest can be under the regular GraphFunctionality trait, the weighted input function should have a `&dyn GraphFunctionalitySynced` argument
-  - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
-    - **Update cells by looping over grid**
-    - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
-  - Parallel functionality should also be benchmarked
-
 - **Integrate and fire split**
   - Write code changes in obsidian
-  - FitzHugo-Nagumo model, Hindmarsh-Rose
-  - Redo results with new neurotransmission coupling for Hodgkin Huxley models
+  - Hindmarsh-Rose
 
 - **Cargo package**
   - **Receptor kinetics refactor** (do this first so its less work refactoring later)
@@ -157,6 +148,15 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
   - **Lixirnet should expose EEG processing tools**
 
+- Use Rayon to thread lattice calculations
+  - Inputs should be calculated in parallel
+  - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
+    - **Update cells by looping over grid**
+    - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
+    - **STDP should be calculated differently**, all neurons that are spiking should added to a list of spiking neurons which should then be updated after neuron states are updated
+    - Both lattice struct and lattice network should use Rayon
+  - Parallel functionality should also be benchmarked
+
 - Astrocytes
 
 - EEG testing
@@ -193,7 +193,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Poisson neurons are active for 350 ms, which is followed by a 150 ms resting period
   - Firing rate determined by measuring number of spikes, which could be stored in history, history could be a hashmap of positions and a counter, counter is reset for each neuron after prediction, since state is stored as a single value that is pre-allocated the performance should be okay
   - Cell grid voltages should be set within a range between the average minimum voltage and average maximum voltage after converging (averages determined by iterating network without any Poisson input), same with adaptive values
-  - May need to refactor neurons to have a `IsSpiking` trait
+  - Could reduce timestep from `0.1` to `0.2` or `0.5` to decrease simulation time
+  - If performance is still an issue after using Rayon then try using WGPU with a compute shader or trying to remove allocations in as many areas as possible
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
 
