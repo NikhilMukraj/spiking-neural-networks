@@ -51,15 +51,16 @@ impl DiscreteNeuron {
 pub struct DiscreteNeuronLattice<T: Graph>{
     /// 2 dimensional grid of discrete neurons
     pub cell_grid: Vec<Vec<DiscreteNeuron>>,
-    /// Internal weights
-    pub weights: T,
+    /// Internal graph weights, position listed in graph must have a corresponding index
+    /// in the `cell_grid`, (for example position (0, 1) in graph corresponds to `cell_grid[0][1]`)
+    pub graph: T,
 }
 
 impl<T: Graph> Default for DiscreteNeuronLattice<T> {
     fn default() -> Self {
         DiscreteNeuronLattice {
             cell_grid: vec![],
-            weights: T::default(),
+            graph: T::default(),
         }
     }
 }
@@ -79,7 +80,7 @@ impl<T: Graph> DiscreteNeuronLattice<T> {
 
         DiscreteNeuronLattice {
             cell_grid: cell_grid,
-            weights: T::default(),
+            graph: T::default(),
         }
     }
 
@@ -112,26 +113,20 @@ impl<T: Graph> DiscreteNeuronLattice<T> {
 
     /// Iterates the discrete network of neurons based on the weights between neurons
     pub fn iterate(&mut self) -> Result<()> {
-        let id = self.weights.get_id();
+        for current_pos in self.graph.get_every_node() {
+            let input_positions = self.graph.get_incoming_connections(&current_pos)?;
 
-        for i in 0..self.cell_grid.len() {
-            for j in 0..self.cell_grid[0].len() {
-                let current_pos = GraphPosition { id: id, pos: (i, j)};
+            let input_value: f64 = input_positions.iter()
+                .map(|graph_pos| {
+                        let (pos_i, pos_j) = graph_pos.pos;
 
-                let input_positions = self.weights.get_incoming_connections(&current_pos)?;
+                        self.graph.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
+                        * self.cell_grid[pos_i][pos_j].state_to_numeric() as f64
+                    }
+                )
+                .sum();
 
-                let input_value: f64 = input_positions.iter()
-                    .map(|graph_pos| {
-                            let (pos_i, pos_j) = graph_pos.pos;
-
-                            self.weights.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
-                            * self.cell_grid[pos_i][pos_j].state_to_numeric() as f64
-                        }
-                    )
-                    .sum();
-
-                self.cell_grid[i][j].update(input_value);
-            }
+            self.cell_grid[current_pos.pos.0][current_pos.pos.1].update(input_value);
         }
 
         Ok(())
