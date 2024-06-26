@@ -148,6 +148,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
   - **Lixirnet should expose EEG processing tools**
 
+- **R-STDP**
+  - Reward calculation
+  - Dopamine calculation
+
 - Use Rayon to thread lattice calculations
   - Inputs should be calculated in parallel
   - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
