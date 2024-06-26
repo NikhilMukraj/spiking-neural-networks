@@ -40,7 +40,7 @@ fn test_hopfield_network<T: Graph>(
 
     let weights = generate_hopfield_network::<T>(0, &patterns)?;
     let mut discrete_lattice = DiscreteNeuronLattice::<T>::generate_lattice_from_dimension(num_rows, num_cols);
-    discrete_lattice.weights = weights;
+    discrete_lattice.graph = weights;
 
     for (n, pattern) in patterns.iter().enumerate() {
         let distorted_pattern = distort_pattern(&pattern, noise_level);
