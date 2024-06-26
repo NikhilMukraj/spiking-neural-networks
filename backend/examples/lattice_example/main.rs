@@ -24,7 +24,7 @@ fn main() -> Result<()> {
     // infers type based on base neuron and default implementation
     let mut lattice: Lattice<_, _, _> = Lattice::default_impl();
     
-    lattice.populate_and_randomly_connect_lattice(
+    lattice.populate_and_randomly_connect(
         &base_neuron, 
         num_rows, 
         num_cols, 
