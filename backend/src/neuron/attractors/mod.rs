@@ -1,10 +1,10 @@
 //! An set of tools to generate weights for attractors like a Hopfield network
 //! as well as a simplified neuron model for very basic testing of attractor dynamics.
 
-use std::io::{Error, ErrorKind, Result};
+use std::result;
 use rand::Rng;
-use crate::graph;
-use graph::{Graph, GraphPosition};
+use crate::error::{GraphError, PatternError, SpikingNeuralNetworksError};
+use crate::graph::{Graph, GraphPosition};
 
 
 /// State of a bipolar discrete neuron
@@ -112,7 +112,7 @@ impl<T: Graph> DiscreteNeuronLattice<T> {
     }
 
     /// Iterates the discrete network of neurons based on the weights between neurons
-    pub fn iterate(&mut self) -> Result<()> {
+    pub fn iterate(&mut self) -> result::Result<(), GraphError> {
         for current_pos in self.graph.get_every_node() {
             let input_positions = self.graph.get_incoming_connections(&current_pos)?;
 
@@ -156,27 +156,25 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// an id to assign to the graph, assumes the patterns have the same dimensions throughout,
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
 pub fn generate_hopfield_network<T: Graph + Default>(
-    // num_rows: usize, 
-    // num_cols: usize, 
     graph_id: usize,
     data: &Vec<Vec<Vec<isize>>>
-) -> Result<T> {
+) -> result::Result<T, SpikingNeuralNetworksError> {
     let num_rows = data[0].len();
     let num_cols = data[0][0].len();
 
     for pattern in data {
         for row in pattern {
             if row.iter().any(|i| *i != -1 && *i != 1) {
-                return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
+                return Err(SpikingNeuralNetworksError::PatternRelatedError(PatternError::PatternIsNotBipolar))
             }
         }
 
         if pattern.len() != num_rows {
-            return Err(Error::new(ErrorKind::InvalidInput, "Patterns must have the same size"));
+            return Err(SpikingNeuralNetworksError::PatternRelatedError(PatternError::PatternDimensionsAreNotEqual));
         }
     
         if pattern.iter().any(|row| row.len() != num_cols) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Patterns must have the same size"));
+            return Err(SpikingNeuralNetworksError::PatternRelatedError(PatternError::PatternDimensionsAreNotEqual));
         }
     }
 
