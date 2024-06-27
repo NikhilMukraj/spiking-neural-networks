@@ -3,9 +3,11 @@
 use std::{
     collections::{HashMap, HashSet}, 
     fs::File, 
-    io::{Write, BufWriter, Result, Error, ErrorKind}, 
-    fmt::Display,
+    result::Result,
+    io::{self, Write, BufWriter}, 
+    fmt::{Display, Debug},
 };
+use crate::error::GraphError;
 use crate::neuron::iterate_and_spike::GaussianParameters;
 
 
@@ -42,23 +44,23 @@ pub trait Graph: Default {
     fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>>; 
+    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError>; 
     /// Edits the weight between two neurons, errors if the positions are not in the graph,
     /// `None` represents no connection while `Some(f64)` represents some weight
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<()>;
+    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError>;
     /// Returns all presynaptic connections if the position is in the graph
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>>; 
+    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError>; 
     /// Returns all postsynaptic connections if the position is in the graph
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>>;
+    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError>;
     /// Updates the history of the graph with the current state
     fn update_history(&mut self);
     /// Writes current weights to files prefixed by the `tag` value
-    fn write_current_weights(&self, tag: &str);
+    fn write_current_weights(&self, tag: &str) -> io::Result<()>;
     /// Writes history of weights to files prefixed by the `tag` value
-    fn write_history(&self, tag: &str);
+    fn write_history(&self, tag: &str) -> io::Result<()>;
 }
 
-fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) {
+fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) -> io::Result<()> {
     for row in grid {
         for (n, i) in row.iter().enumerate() {
             let item_to_write = match i {
@@ -67,13 +69,15 @@ fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T
             };
 
             if n < row.len() - 1 {
-                write!(csv_file, "{},", item_to_write).expect("Could not write to file");
+                write!(csv_file, "{},", item_to_write)?;
             } else {
-                write!(csv_file, "{}", item_to_write).expect("Could not write to file");
+                write!(csv_file, "{}", item_to_write)?;
             }
         }
-        writeln!(csv_file).expect("Could not write to file");
+        writeln!(csv_file)?;
     }
+
+    Ok(())
 } 
 
 /// A graph implemented as an adjacency matrix where the positions of each node
@@ -175,23 +179,23 @@ impl Graph for AdjacencyMatrix {
         self.position_to_index.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>> {
+    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+            return Err(GraphError::PostsynapticNotFound);
         }
         if !self.position_to_index.contains_key(presynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+            return Err(GraphError::PresynapticNotFound);
         }
 
         Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
     }
 
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<()> {
+    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+            return Err(GraphError::PostsynapticNotFound);
         }
         if !self.position_to_index.contains_key(presynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+            return Err(GraphError::PresynapticNotFound);
         }
         
         self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]] = weight;
@@ -199,9 +203,9 @@ impl Graph for AdjacencyMatrix {
         Ok(())
     }
 
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
+    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+            return Err(GraphError::PositionNotFound);
         }
 
         let mut connections: HashSet<GraphPosition> = HashSet::new();
@@ -215,9 +219,9 @@ impl Graph for AdjacencyMatrix {
         Ok(connections)
     }
 
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
+    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+            return Err(GraphError::PositionNotFound);
         }
 
         let node = self.position_to_index[pos];
@@ -235,39 +239,39 @@ impl Graph for AdjacencyMatrix {
         self.history.push(self.matrix.clone());
     }
 
-    fn write_current_weights(&self, tag: &str) {
+    fn write_current_weights(&self, tag: &str) -> io::Result<()> {
         let serializable_map = transform_index_to_position(&self.index_to_position);
 
         let json_string = serde_json::to_string(&serializable_map)
                 .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))
-            .expect("Could not create file"));
+        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))?);
 
-        write!(json_file, "{}", json_string).expect("Could not create to file");
+        write!(json_file, "{}", json_string)?;
 
-        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))
-            .expect("Could not create file"));
+        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))?);
 
-        csv_write(&mut csv_file, &self.matrix);
+        csv_write(&mut csv_file, &self.matrix)?;
+
+        Ok(())
     }
 
-    fn write_history(&self, tag: &str) {
+    fn write_history(&self, tag: &str) -> io::Result<()> {
         let serializable_map = transform_index_to_position(&self.index_to_position);
 
         let json_string = serde_json::to_string(&serializable_map)
                 .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))
-            .expect("Could not create file"));
+        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))?);
 
-        write!(json_file, "{}", json_string).expect("Could not create to file");
+        write!(json_file, "{}", json_string)?;
 
-        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))
-            .expect("Could not create file"));
+        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))?);
 
         for grid in &self.history {
-            csv_write(&mut csv_file, &grid);
-            writeln!(csv_file, "-----").expect("Could not write to file");
+            csv_write(&mut csv_file, &grid)?;
+            writeln!(csv_file, "-----")?;
         }
+
+        Ok(())
     }
 }
 
@@ -376,27 +380,27 @@ impl Graph for AdjacencyList {
         self.incoming_connections.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>> {
+    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError> {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
 
         if !self.incoming_connections.contains_key(postsynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+            return Err(GraphError::PostsynapticNotFound);
         }
         if !self.incoming_connections.contains_key(presynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+            return Err(GraphError::PresynapticNotFound);
         }
 
         Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
     }
 
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<()> {
+    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError> {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
         if !self.incoming_connections.contains_key(postsynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Postsynaptic value not in graph"));
+            return Err(GraphError::PostsynapticNotFound);
         }
         if !self.incoming_connections.contains_key(presynaptic) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Presynaptic value not in graph"));
+            return Err(GraphError::PresynapticNotFound);
         }
         
         match weight {
@@ -432,9 +436,9 @@ impl Graph for AdjacencyList {
 
     // to be cached
     // or point to reference
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
+    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+            return Err(GraphError::PositionNotFound);
         }
 
         Ok(self.incoming_connections[pos].keys().cloned().collect::<HashSet<GraphPosition>>())
@@ -442,9 +446,9 @@ impl Graph for AdjacencyList {
 
     // to be cached
     // or point to reference
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>> {
+    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
-            return Err(Error::new(ErrorKind::InvalidInput, "Cannot find position in graph"));
+            return Err(GraphError::PositionNotFound);
         }
 
         // self.outgoing_connections[pos].clone()
@@ -459,18 +463,19 @@ impl Graph for AdjacencyList {
         self.history.push(self.incoming_connections.clone());
     }
 
-    fn write_current_weights(&self, tag: &str) {
+    fn write_current_weights(&self, tag: &str) -> io::Result<()> {
         let serialiable_map = transform_incoming_connections(&self.incoming_connections);
 
         let json_string = serde_json::to_string(&serialiable_map)
                 .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_incoming_connections.json", tag))
-            .expect("Could not create file"));
+        let mut json_file = BufWriter::new(File::create(format!("{}_incoming_connections.json", tag))?);
 
-        write!(json_file, "{}", json_string).expect("Could not create to file");
+        write!(json_file, "{}", json_string)?;
+
+        Ok(())
     }
 
-    fn write_history(&self, tag: &str) {
+    fn write_history(&self, tag: &str) -> io::Result<()> {
         let mut history_json: HashMap<String, HashMap<String, KeyWeightPair>> = HashMap::new();
 
         for (key, value) in self.history.iter().enumerate() {
@@ -498,10 +503,11 @@ impl Graph for AdjacencyList {
 
         let json_string = serde_json::to_string_pretty(&history_json)
             .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))
-            .expect("Could not create file"));
+        let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))?);
 
-        write!(json_file, "{}", json_string).expect("Could not create to file");
+        write!(json_file, "{}", json_string)?;
+
+        Ok(())
     }
 }
 
