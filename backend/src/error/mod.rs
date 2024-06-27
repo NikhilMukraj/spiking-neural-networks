@@ -129,9 +129,30 @@ impl Display for GeneticAlgorithmError {
 
 impl_debug_default!(GeneticAlgorithmError);
 
+/// A set of potential errors when using EEG processing tools
+#[derive(Clone, Copy)]
+pub enum EEGProcessingError {
+    /// Time series must be the same length when comparing power density
+    TimeSeriesAreNotSameLength
+}
+
+impl Display for EEGProcessingError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let err_msg = match self {
+            EEGProcessingError::TimeSeriesAreNotSameLength => "Lengths of input time series must match"
+        };
+
+        write!(f, "{}", err_msg)
+    }
+}
+
+impl_debug_default!(EEGProcessingError);
+
 /// A set of errors that may occur when using the library
 #[derive(Clone)]
 pub enum SpikingNeuralNetworksError {
+    /// Errors related to EEG processing
+    EEGProcessingRelatedError(EEGProcessingError),
     /// Errors related to genetic algorithm
     GeneticAlgorithmRelatedErrors(GeneticAlgorithmError),
     /// Errors related to graph processing
@@ -145,7 +166,8 @@ pub enum SpikingNeuralNetworksError {
 impl Display for SpikingNeuralNetworksError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            Self::GeneticAlgorithmRelatedErrors(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksError::EEGProcessingRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksError::GeneticAlgorithmRelatedErrors(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::GraphRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::PatternRelatedError(err) => write!(f, "{}", err),
@@ -165,6 +187,7 @@ macro_rules! impl_from_error_default {
     };
 }
 
+impl_from_error_default!(EEGProcessingError, EEGProcessingRelatedError);
 impl_from_error_default!(GeneticAlgorithmError, GeneticAlgorithmRelatedErrors);
 impl_from_error_default!(GraphError, GraphRelatedError);
 impl_from_error_default!(LatticeNetworkError, LatticeNetworkRelatedError);
