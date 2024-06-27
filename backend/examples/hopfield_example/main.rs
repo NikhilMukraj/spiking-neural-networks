@@ -1,4 +1,5 @@
 use std::{
+    result,
     env::{args, current_dir},
     fs::{read_to_string, File}, 
     io::{BufWriter, Error, ErrorKind, Result, Write}
@@ -8,7 +9,8 @@ use crate::spiking_neural_networks::{
     neuron::attractors::{
         DiscreteNeuronLattice, generate_hopfield_network, distort_pattern,
     },
-    graph::{Graph, AdjacencyMatrix}
+    graph::{Graph, AdjacencyMatrix},
+    error::SpikingNeuralNetworksError,
 };
 
 
@@ -34,7 +36,7 @@ fn test_hopfield_network<T: Graph>(
     patterns: &Vec<Vec<Vec<isize>>>,
     noise_level: f64,
     iterations: usize,
-) -> Result<()> {
+) -> result::Result<(), SpikingNeuralNetworksError> {
     let num_rows = patterns[0].len();
     let num_cols = patterns[0][0].len();
 
@@ -127,7 +129,7 @@ fn main() -> Result<()> {
     let iterations = 10;
     let noise_level = 0.25;
 
-    test_hopfield_network::<AdjacencyMatrix>(&patterns, noise_level, iterations)?;
+    test_hopfield_network::<AdjacencyMatrix>(&patterns, noise_level, iterations).expect("Error in graph");
 
     Ok(())
 }
