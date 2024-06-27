@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use rand::Rng;
 use super::{
-    iterate_and_spike::NeurotransmitterKinetics, 
+    iterate_and_spike::{ApproximateNeurotransmitter, NeurotransmitterKinetics}, 
     CurrentVoltage, LastFiringTime, NeurotransmitterType, 
     Neurotransmitters, Potentiation, PotentiationType,
 };
@@ -80,7 +80,7 @@ fn exponential_decay_effect(k: f64, a: f64, time_difference: f64, v_resting: f64
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 /// Handles spike train dynamics
-pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime {
+pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime + Clone {
     type T: NeurotransmitterKinetics;
     type U: NeuralRefractoriness;
     /// Updates spike train
@@ -202,6 +202,18 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNe
     }
 }
 
+impl PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+    /// Returns the default implementation of the spike train
+    pub fn default_impl() -> Self {
+        PoissonNeuron::default()
+    }
+
+    /// Returns the default implementation of the spike train given a firing rate
+    pub fn default_impl_from_firing_rate(hertz: f64, dt: f64) -> Self {
+        PoissonNeuron::from_firing_rate(hertz, dt)
+    }
+}
+
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PoissonNeuron<T, U> {
     /// Generates Poisson neuron with appropriate chance of firing based
     /// on the given hertz (Hz) and a given refractoriness timestep (ms)
@@ -284,6 +296,13 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             max_clock_value: 600,
             refractoriness_dt: 0.1,
         }
+    }
+}
+
+impl PresetSpikeTrain<ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+    /// Returns the default implementation of the spike train
+    pub fn default_impl() -> Self {
+        PresetSpikeTrain::default()
     }
 }
 
