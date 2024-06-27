@@ -1,18 +1,22 @@
 use std::{
     fs::File,
-    io::{BufWriter, Write, Result}
+    result::Result,
+    io::{BufWriter, Write}
 };
 use rand::Rng;
 extern crate spiking_neural_networks;
-use spiking_neural_networks::neuron::{
-    Lattice,
-    integrate_and_fire::IzhikevichNeuron,
+use spiking_neural_networks::{
+    error::SpikingNeuralNetworksError,
+    neuron::{
+        Lattice,
+        integrate_and_fire::IzhikevichNeuron,
+    }
 };
 
 
 /// Runs an example lattice with randomly connected neurons for 500 ms,
 /// writes the history of the grid to a file in working directory when finished
-fn main() -> Result<()> {
+fn main() -> Result<(), SpikingNeuralNetworksError> {
     let base_neuron = IzhikevichNeuron {
         gap_conductance: 10.,
         ..IzhikevichNeuron::default_impl()
@@ -43,7 +47,7 @@ fn main() -> Result<()> {
     lattice.update_grid_history = true;
 
     // iterates internal electrical connections
-    lattice.run_lattice_electrical_only(iterations)?;
+    lattice.run_lattice(iterations)?;
 
     let mut voltage_file = BufWriter::new(File::create("lattice_history.txt")
         .expect("Could not create file"));
