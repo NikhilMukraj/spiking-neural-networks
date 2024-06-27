@@ -155,26 +155,17 @@ impl Display for SpikingNeuralNetworksError {
 
 impl_debug_default!(SpikingNeuralNetworksError);
 
-impl From<GeneticAlgorithmError> for SpikingNeuralNetworksError {
-    fn from(err: GeneticAlgorithmError) -> SpikingNeuralNetworksError {
-        SpikingNeuralNetworksError::GeneticAlgorithmRelatedErrors(err)
-    }
+macro_rules! impl_from_error_default {
+    ($error_name:ident, $variant_name:ident) => {
+        impl From<$error_name> for SpikingNeuralNetworksError {
+            fn from(err: $error_name) -> SpikingNeuralNetworksError {
+                SpikingNeuralNetworksError::$variant_name(err)
+            }
+        }
+    };
 }
 
-impl From<GraphError> for SpikingNeuralNetworksError {
-    fn from(err: GraphError) -> SpikingNeuralNetworksError {
-        SpikingNeuralNetworksError::GraphRelatedError(err)
-    }
-}
-
-impl From<LatticeNetworkError> for SpikingNeuralNetworksError {
-    fn from(err: LatticeNetworkError) -> SpikingNeuralNetworksError {
-        SpikingNeuralNetworksError::LatticeNetworkRelatedError(err)
-    }
-}
-
-impl From<PatternError> for SpikingNeuralNetworksError {
-    fn from(err: PatternError) -> SpikingNeuralNetworksError {
-        SpikingNeuralNetworksError::PatternRelatedError(err)
-    }
-}
+impl_from_error_default!(GeneticAlgorithmError, GeneticAlgorithmRelatedErrors);
+impl_from_error_default!(GraphError, GraphRelatedError);
+impl_from_error_default!(LatticeNetworkError, LatticeNetworkRelatedError);
+impl_from_error_default!(PatternError, PatternRelatedError);
