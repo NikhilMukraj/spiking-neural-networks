@@ -1,12 +1,14 @@
 //! A basic parallelized genetic algorithm implementation.
 
 use std::{
-    io::{Error, ErrorKind, Result},
+    result,
     collections::HashMap,
     marker::Sync,
 };
 use rand::Rng;
 use rayon::prelude::*;
+use crate::error::GeneticAlgorithmError;
+
 
 /// Bit string to use as a chromosome
 #[derive(Clone)]
@@ -15,17 +17,24 @@ pub struct BitString {
 }
 
 impl BitString {
-    fn check(&self) -> Result<()> {
+    pub fn new(new_string: String) -> result::Result<Self, GeneticAlgorithmError> {
+        let bitstring = BitString { string: new_string };
+        bitstring.check()?;
+
+        Ok(bitstring)
+    }
+
+    fn check(&self) -> result::Result<(), GeneticAlgorithmError> {
         for i in self.string.chars() {
             if i != '1' && i != '0' {
-                return Err(Error::new(ErrorKind::Other, format!("Non binary found: {}", self.string)));
+                return Err(GeneticAlgorithmError::NonBinaryInBitstring(self.string.clone()));
             }
         }
 
         return Ok(());
     }
 
-    fn set(&mut self, new_string: String) -> Result<()> {
+    fn set(&mut self, new_string: String) -> result::Result<(), GeneticAlgorithmError> {
         self.string = new_string;
 
         return self.check();
@@ -92,15 +101,19 @@ fn selection(pop: &Vec<BitString>, scores: &Vec<f64>, k: usize) -> BitString {
 /// the output based on the given `bounds`, the length of the `bounds` must match the number
 /// of substrings in the [`BitString`], `bounds` should be a vector of tuples where the first item is the 
 /// minimum value for scaling and the second item is the maximal value for scaling
-pub fn decode(bitstring: &BitString, bounds: &Vec<(f64, f64)>, n_bits: usize) -> Result<Vec<f64>> {
+pub fn decode(
+    bitstring: 
+    &BitString, bounds: &Vec<(f64, f64)>, 
+    n_bits: usize
+) -> result::Result<Vec<f64>, GeneticAlgorithmError> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
     if bounds.len() != bitstring.length() / n_bits {
-        return Err(Error::new(ErrorKind::Other, "Bounds length does not match n_bits"));
+        return Err(GeneticAlgorithmError::InvalidBoundsLength);
     }
     if bitstring.length() % n_bits != 0 {
-        return Err(Error::new(ErrorKind::Other, "String length is indivisible by n_bits"));
+        return Err(GeneticAlgorithmError::InvalidBitstringLength);
     }
 
     let maximum = i32::pow(2, n_bits as u32) as f64 - 1.;
@@ -112,9 +125,7 @@ pub fn decode(bitstring: &BitString, bounds: &Vec<(f64, f64)>, n_bits: usize) ->
 
         let mut value = match i32::from_str_radix(substring, 2) {
             Ok(value_result) => value_result as f64,
-            Err(_e) => return Err(
-                Error::new(ErrorKind::Other, format!("Non binary substring found or overflow: {}", substring))
-            ),
+            Err(_e) => return Err(GeneticAlgorithmError::DecodingBitstringFailure(String::from(substring))),
         };
         value = value * (bounds[i].1 - bounds[i].0) / maximum + bounds[i].0;
 
@@ -186,13 +197,13 @@ impl Default for GeneticAlgorithmParameters {
 /// 
 /// - `verbose` : use `true` to print extra information
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<(f64, f64)>, usize, &HashMap<&str, T>) -> Result<f64>, 
+    f: fn(&BitString, &Vec<(f64, f64)>, usize, &HashMap<&str, T>) -> result::Result<f64, GeneticAlgorithmError>, 
     params: &GeneticAlgorithmParameters,
     settings: &HashMap<&str, T>,
     verbose: bool,
-) -> Result<(BitString, f64, Vec<Vec<f64>>)> {
+) -> result::Result<(BitString, f64, Vec<Vec<f64>>), GeneticAlgorithmError> {
     if params.n_pop % 2 != 0 {
-        return Err(Error::new(ErrorKind::InvalidInput, "n_pop should be even"))
+        return Err(GeneticAlgorithmError::PopulationMustBeEven)
     }
 
     let mut pop: Vec<BitString> = (0..params.n_pop)
@@ -202,7 +213,7 @@ pub fn genetic_algo<T: Sync>(
     let mut best = pop[0].clone();
     let mut best_eval = match f(&pop[0], &params.bounds, params.n_bits, &settings) {
         Ok(best_eval_result) => best_eval_result,
-        Err(e) => return Err(Error::new(ErrorKind::Other, e)),
+        Err(e) => return Err(e),
     };
 
     let mut all_scores = vec![vec![]];
@@ -212,7 +223,7 @@ pub fn genetic_algo<T: Sync>(
             println!("gen: {}", gen + 1);
         }
 
-        let scores_results: &Result<Vec<f64>> = &pop
+        let scores_results: &result::Result<Vec<f64>, GeneticAlgorithmError> = &pop
             .par_iter() 
             .map(|p| f(p, &params.bounds, params.n_bits, &settings))
             .collect(); 
@@ -220,7 +231,7 @@ pub fn genetic_algo<T: Sync>(
         // check if objective failed anywhere
         let scores = match scores_results {
             Ok(scores_results) => scores_results,
-            Err(e) => return Err(Error::new(ErrorKind::Other, e.to_string())),
+            Err(e) => return Err(e.clone()),
         };
 
         all_scores.push(scores.clone());
