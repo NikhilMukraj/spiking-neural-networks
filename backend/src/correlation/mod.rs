@@ -1,6 +1,7 @@
 //! A tool to calculate the Pearson correlation coefficient.
 
-use std::io::{Result, Error, ErrorKind};
+use std::result::Result;
+use crate::error::TimeSeriesProcessingError;
 
 
 fn mean(values: &Vec<f64>) -> f64 {
@@ -15,9 +16,9 @@ fn std(values: &Vec<f64>, values_mean: f64) -> f64 {
 
 /// Calculates the Pearson correlation coefficient given two vectors of the same length (if standard
 /// deviation of either of the vectors is 0, `f64::NAN` is returned)
-pub fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64> {
+pub fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64, TimeSeriesProcessingError> {
     if x.len() != y.len() {
-        return Err(Error::new(ErrorKind::InvalidInput, "x length must match y length"));
+        return Err(TimeSeriesProcessingError::SeriesAreNotSameLength);
     }
     
     let x_mean: f64 = mean(x);
