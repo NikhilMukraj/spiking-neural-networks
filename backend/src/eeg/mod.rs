@@ -1,11 +1,12 @@
 //! A set of tools to analyze power spectral density for EEG time series.
 
-use std::io::{Result, Error, ErrorKind};
+use std::result::Result;
 use ndarray::{Array1, s};
 use num_complex::Complex;
 use rustfft::{FftPlanner, FftDirection};
 mod emd;
 use emd::earth_moving_distance;
+use crate::error::EEGProcessingError;
 
 
 /// Retrieves the power density of the given time series based on the given timestep (ms)
@@ -51,9 +52,9 @@ fn find_max(arr: &Array1<f64>) -> Option<&f64> {
 /// Compares two power densities spectra using the earth moving distance, 
 /// it assumes the same frequency range for each argument, 
 /// (only compares the second item of [`get_power_density`])
-pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64> {
+pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64, EEGProcessingError> {
     if sxx1.len() != sxx2.len() {
-        return Err(Error::new(ErrorKind::InvalidInput, "Lengths of inputs must match"));
+        return Err(EEGProcessingError::TimeSeriesAreNotSameLength);
     }
 
     let values = (0..sxx1.len()).map(|x| x as f64)
