@@ -998,7 +998,10 @@ Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpik
     /// Gets the neurotransmitter concentrations of the neuron (mM)
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Takes in an input current and neurotransmitter input and returns whether the model
-    /// is spiking after the membrane potential is updated
+    /// is spiking after the membrane potential is updated, neurotransmitter input updates
+    /// receptor gating values if it is not `None`, the associated concentration will be applied
+    /// to the [`LigandGatedChannel`] of the same [`NeurotransmitterType`], the current from the 
+    /// receptors is also factored into the change in membrane potential
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f64, 
