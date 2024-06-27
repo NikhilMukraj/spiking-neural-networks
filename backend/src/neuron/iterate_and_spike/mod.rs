@@ -102,7 +102,7 @@ pub trait NMDADefault {
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum NeurotransmitterType {
-    /// Unspecific general (or glutamatergic) neurotransmitter
+    /// Unspecific general neurotransmitter
     Basic,
     /// Neurotransmitter type that effects only AMPA receptors
     AMPA,
