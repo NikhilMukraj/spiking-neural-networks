@@ -160,6 +160,7 @@ EEG processing with fourier transforms, and power spectral density calculations
     - **STDP should be calculated differently**, all neurons that are spiking should added to a list of spiking neurons which should then be updated after neuron states are updated
     - Both lattice struct and lattice network should use Rayon
   - Parallel functionality should also be benchmarked
+  - In order to improve performance, may want to phase out optional receptor kinetics with neurotransmitters, neurotransmitters should maybe always have an effect on receptors and makes option stuff cleaner, simpler coupling tests should have option to not use neurotransmitters (instead of receptor kinetics bool)
 
 - Astrocytes
 
@@ -186,6 +187,8 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Basically generalizing `gap_junction` functionality
     - Refactor could be a lattice that implements `IterateAndSpike` but also requires another trait detailing the dynamics of the new gap junction
 
+- **For now only run electrical only for classifiers and initial models**
+
 - [Biologically plausible STDP based classifier](https://www.frontiersin.org/articles/10.3389/fncom.2015.00099/full)
   - Only STDP is used
   - Output is dictated as neuron that has the highest firing rate when data is presented
@@ -200,6 +203,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Cell grid voltages should be set within a range between the average minimum voltage and average maximum voltage after converging (averages determined by iterating network without any Poisson input), same with adaptive values
   - Could reduce timestep from `0.1` to `0.2` or `0.5` to decrease simulation time
   - If performance is still an issue after using Rayon then try using WGPU with a compute shader or trying to remove allocations in as many areas as possible or pre allocate necessary space and mutate as simulation progresses
+    - May want to phase out optional receptor kinetics with neurotransmitters, neurotransmitters should maybe always have an effect on receptors and makes option stuff cleaner, simpler coupling tests should have option to not use neurotransmitters (instead of receptor kinetics bool)
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
 
@@ -295,6 +299,10 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Could try this with reinforcement learning models
 
 - Model of cognition
+  - Cognition modeled in the form of a navigation task
+  - Two phases: liquid without additional attractors and liquid state machine with additional attractors
+    - Initial navigation system could be a simple liquid state machine with no head direction cells or grid cells attractors
+      - Inputs could be what is ahead and distance/direction from target as well as direct obstacles (distance to any walls up ahead)
   - Use head direction attractor and grid cell attractor as input to a liquid reservoir in a liquid state machine, attempt to solve navigation task using this combination of liquid mechanics and attractor mechanics
   - Eventually expand this to a more general system where attractor forms patterns based on internals of liquid through STDP on sections of the liquid, this should allow for more long term memory storage or conceptual representations
     - Attractor would take input from the liquid and output back to the liquid
