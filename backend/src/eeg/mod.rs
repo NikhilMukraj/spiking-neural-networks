@@ -6,7 +6,7 @@ use num_complex::Complex;
 use rustfft::{FftPlanner, FftDirection};
 mod emd;
 use emd::earth_moving_distance;
-use crate::error::EEGProcessingError;
+use crate::error::TimeSeriesProcessingError;
 
 
 /// Retrieves the power density of the given time series based on the given timestep (ms)
@@ -52,9 +52,9 @@ fn find_max(arr: &Array1<f64>) -> Option<&f64> {
 /// Compares two power densities spectra using the earth moving distance, 
 /// it assumes the same frequency range for each argument, 
 /// (only compares the second item of [`get_power_density`])
-pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64, EEGProcessingError> {
+pub fn power_density_comparison(sxx1: &Array1<f64>, sxx2: &Array1<f64>) -> Result<f64, TimeSeriesProcessingError> {
     if sxx1.len() != sxx2.len() {
-        return Err(EEGProcessingError::TimeSeriesAreNotSameLength);
+        return Err(TimeSeriesProcessingError::SeriesAreNotSameLength);
     }
 
     let values = (0..sxx1.len()).map(|x| x as f64)
