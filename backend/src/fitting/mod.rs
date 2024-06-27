@@ -2,9 +2,11 @@
 
 use std::{
     collections::HashMap,
+    result,
     io::{Error, ErrorKind, Result},
     ops::Sub,
 };
+use crate::error::GeneticAlgorithmError;
 use crate::neuron::{   
     hodgkin_huxley::HodgkinHuxleyNeuron, 
     integrate_and_fire::IzhikevichNeuron, 
@@ -57,9 +59,11 @@ pub fn get_summary(
     pre_peaks: &Vec<usize>,
     post_peaks: &Vec<usize>,
     spike_amplitude_default: f64,
-) -> Result<ActionPotentialSummary> {
+) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
-        return Err(Error::new(ErrorKind::InvalidInput, "Voltage time series must be of the same length"));
+        return Err(GeneticAlgorithmError::ObjectiveFunctionFailure(
+            String::from("Voltage time series must be of the same length")
+        ));
     }
 
     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
@@ -242,7 +246,7 @@ pub fn get_hodgkin_huxley_summary<
     gaussian: bool, 
     spike_amplitude_default: f64,
     resting_potential: f64
-) -> Result<ActionPotentialSummary> {
+) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = input_spike_train.clone();
 
     let mut presynaptic_neuron = hodgkin_huxley_neuron.clone();
@@ -337,7 +341,7 @@ pub fn get_izhikevich_summary<
     postsynaptic_neuron: &mut IzhikevichNeuron<T, U>,
     settings: &FittingSettings<T, U, V, W>,
     index: usize,
-) -> Result<ActionPotentialSummary> {
+) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = settings.spike_trains[index].clone();
 
     let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
@@ -391,7 +395,7 @@ fn fitting_objective<
     bounds: &Vec<(f64, f64)>, 
     n_bits: usize, 
     settings: &HashMap<&str, FittingSettings<T, U, W, V>>
-) -> Result<f64> {
+) -> result::Result<f64, GeneticAlgorithmError> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
         Err(e) => return Err(e),
@@ -423,11 +427,15 @@ fn fitting_objective<
                 i
             )
         })
-        .collect::<Vec<Result<ActionPotentialSummary>>>();
+        .collect::<Vec<result::Result<ActionPotentialSummary, GeneticAlgorithmError>>>();
 
     for result in summaries_results.iter() {
         if let Err(_) = result {
-            return Err(Error::new(ErrorKind::InvalidData, "Summary calculation could not be completed"));
+            return Err(
+                GeneticAlgorithmError::ObjectiveFunctionFailure(
+                    String::from("Summary calculation could not be completed")
+                )
+            );
         }
     }
 
@@ -502,12 +510,15 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
     use_amplitude: bool,
     spike_amplitude_default: f64,
     debug: bool,
-) -> Result<(
-    (f64, f64, f64, f64, f64, f64), 
-    Vec<ActionPotentialSummary>, 
-    Vec<ActionPotentialSummary>,
-    Vec<Option<SummaryScalingFactors>>,
-)> {
+) -> result::Result<
+    (
+        (f64, f64, f64, f64, f64, f64), 
+        Vec<ActionPotentialSummary>, 
+        Vec<ActionPotentialSummary>,
+        Vec<Option<SummaryScalingFactors>>,
+    ),
+    GeneticAlgorithmError
+> {
     let (hodgkin_huxley_summaries, scaling_factors) = match scaling_defaults {
         Some(scaling_defaults_values) => {
             let mut hodgkin_huxley_summaries: Vec<ActionPotentialSummary> = vec![];
@@ -614,11 +625,11 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
                     i
                 )
             })
-            .collect::<Vec<Result<ActionPotentialSummary>>>();
+            .collect::<Vec<result::Result<ActionPotentialSummary, GeneticAlgorithmError>>>();
 
         for result in summaries_results.iter() {
-            if let Err(_) = result {
-                return Err(Error::new(ErrorKind::InvalidData, "Summary calculation could not be completed"));
+            if let Err(e) = result {
+                return Err(e.clone());
             }
         }
 
