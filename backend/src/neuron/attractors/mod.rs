@@ -183,7 +183,7 @@ pub fn generate_hopfield_network<T: Graph + Default>(
 
     for i in 0..num_rows {
         for j in 0..num_cols {
-            weights.add_vertex(GraphPosition { id: graph_id, pos: (i, j)});
+            weights.add_node(GraphPosition { id: graph_id, pos: (i, j)});
         }
     }
 
