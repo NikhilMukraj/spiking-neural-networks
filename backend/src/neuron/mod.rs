@@ -291,6 +291,8 @@ pub fn update_weight_stdp<T: LastFiringTime, U: STDP>(
 pub trait LatticeHistory: Default {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>);
+    /// Resets history
+    fn reset(&mut self);
 }
 
 /// Stores EEG value history
@@ -342,6 +344,10 @@ impl LatticeHistory for EEGHistory {
 
         self.history.push(eeg_value);
     }
+
+    fn reset(&mut self) {
+        self.history.clear();
+    }
 }
 
 /// Stores history as grid of voltages
@@ -360,6 +366,10 @@ impl Default for GridVoltageHistory {
 impl LatticeHistory for GridVoltageHistory {
     fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>) {
         self.history.push(get_grid_voltages::<T>(state));
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
     }
 }
 
@@ -834,6 +844,8 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
 pub trait SpikeTrainLatticeHistory: Default {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
+    /// Resets history
+    fn reset(&mut self);
 }
 
 /// Stores history as a grid of voltages
@@ -852,6 +864,10 @@ impl Default for SpikeTrainGridHistory {
 impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>) {
         self.history.push(get_grid_voltages::<T>(&state));
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
     }
 }
 
@@ -951,7 +967,7 @@ pub struct LatticeNetwork
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
     /// An array of graphs connecting different lattices together
-    pub connecting_graph: U,
+    connecting_graph: U,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
 }
