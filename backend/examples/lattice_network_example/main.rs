@@ -1,4 +1,8 @@
-use std::result::Result;
+use std::{
+    result::Result,
+    fs::File,
+    io::{BufWriter, Write},
+};
 extern crate spiking_neural_networks;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError,
@@ -26,7 +30,8 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let (num_rows, num_cols) = (3, 3);
 
-    let izhikevich_neuron = IzhikevichNeuron::default_impl();
+    let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
+    izhikevich_neuron.gap_conductance = 10.;
     let mut poisson_neuron = PoissonNeuron::default_impl();
     poisson_neuron.chance_of_firing = 0.;
 
@@ -43,7 +48,9 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     network.connect(0, 1, connection_conditional, None)?;
 
-    network.run_lattices(2500)?;
+    let iterations = 2500;
+
+    network.run_lattices(iterations)?;
 
     network.get_mut_spike_train_lattice(&0).unwrap().cell_grid
         .iter_mut()
@@ -54,9 +61,23 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
             })
         });
     
-    network.run_lattices(2500)?;
+    network.run_lattices(iterations)?;
 
-    // write history to file
+    let mut voltage_file = BufWriter::new(File::create("lattice_history.txt")
+        .expect("Could not create file"));
+
+    for grid in &network.get_lattice(&1).unwrap().grid_history.history {
+        for row in grid {
+            for value in row {
+                write!(voltage_file, "{} ", value)
+                    .expect("Could not write to file");
+            }
+            writeln!(voltage_file)
+                .expect("Could not write to file");
+        }
+        writeln!(voltage_file, "-----")
+            .expect("Could not write to file"); 
+    }
 
     Ok(())
 }
