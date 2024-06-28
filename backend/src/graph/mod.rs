@@ -27,7 +27,8 @@ pub trait Graph: Default {
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
     fn get_id(&self) -> usize;
-    /// Adds a new node to the graph, unconnected to other graphs
+    /// Adds a new node to the graph, unconnected to other nodes, no change if node
+    /// is already in graph
     fn add_node(&mut self, position: GraphPosition);
     /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
     /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
