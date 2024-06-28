@@ -148,13 +148,22 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 // g * n * (v - e)
 // g being maximal conductance, n being gating variable, v being voltage, e being reversal potential
 
+// dendrite should include receptors while soma should not
+// in two compartmental model neurotransmitters are seperate from soma and dendrite
+// in multicompartmental model with an axon neurotransmitters should be with the axon
+
 // pub struct Soma {
 
 // }
 
-// // dendrite should include neurotransmission while soma should not
-// pub struct Dendrite<T, R> {
+// pub struct Dendrite<R> {
 
+// }
+
+// pub TwoCompartmentNeuron<T, R> {
+    // pub soma: Soma,
+    // pub dendrite: Dendrite<R>,
+    // pub synaptic_neurotransmitters: Neurotransmitters<T>
 // }
 
 /// A gating variable for necessary ion channels
