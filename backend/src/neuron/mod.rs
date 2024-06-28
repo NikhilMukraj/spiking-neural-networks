@@ -752,7 +752,8 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// and the radius from which neurons are allowed to be connected,
     /// use `&None` to connect every neuron with a weight of `1.` or
     /// provide gaussian parameters to generate randomly generated
-    /// weights based on a normal distribution
+    /// weights based on a normal distribution, (overwrites any pre-existing
+    /// neurons or connections)
     pub fn populate_and_randomly_connect(
         &mut self,
         base_neuron: &T,
@@ -763,6 +764,7 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     ) {
         let mut rng = rand::thread_rng();
 
+        self.graph = U::default();
         self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
 
         for row in 0..num_rows {
@@ -786,8 +788,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     }
 
     /// Populates a lattice given the dimensions and a base neuron to copy the parameters
-    /// of without generating any connections within the graph
+    /// of without generating any connections within the graph, (overwrites any pre-existing
+    /// neurons or connections)
     pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+        self.graph = U::default();
         self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
 
         for i in 0..num_rows {
@@ -887,6 +891,16 @@ impl<T: SpikeTrain> SpikeTrainLattice<T, SpikeTrainGridHistory> {
 
 impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     impl_reset_timing!();
+
+    /// Returns the identifier of the lattice
+    pub fn get_id(&self) -> usize {
+        self.id
+    }
+
+    /// Sets the identifier of the lattice
+    pub fn set_id(&mut self, id: usize) {
+        self.id = id;
+    }    
 
     /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
@@ -1040,6 +1054,26 @@ where
         self.lattices.values_mut()
     }
 
+    /// Returns a reference to [`Lattice`] given the identifier
+    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V>> {
+        self.lattices.get(id)
+    }
+
+    /// Returns a mutable reference to a [`Lattice`] given the identifier
+    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V>> {
+        self.lattices.get_mut(id)
+    }
+
+    /// Returns a reference to [`SpikeTrainLattice`] given the identifier
+    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<W, X>> {
+        self.spike_train_lattices.get(id)
+    }
+
+    /// Returns a mutable reference to a [`SpikeTrainLattice`] given the identifier
+    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<W, X>> {
+        self.spike_train_lattices.get_mut(id)
+    }
+
     /// Returns the set of [`SpikeTrainLattice`]s in the hashmap of spike train lattices
     pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<W, X>> {
         self.spike_train_lattices.values()
@@ -1048,6 +1082,11 @@ where
     /// Returns a mutable set [`SpikeTrainLattice`]s in the hashmap of spike train lattices    
     pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<W, X>> {
         self.spike_train_lattices.values_mut()
+    }
+
+    /// Returns an immutable reference to the connecting graph
+    pub fn get_connecting_graph(&self) -> &U {
+        &self.connecting_graph
     }
 
     /// Returns a hashset of all the ids
@@ -1538,7 +1577,7 @@ where
     /// Iterates the lattice based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs, set `do_receptor_kinetics` to `true` to update
     /// receptor kinetics
-    pub fn run_lattice_with_neurotransmission(
+    pub fn run_lattices_with_neurotransmission(
         &mut self, 
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -1553,7 +1592,7 @@ where
 
     /// Iterates lattice based only on internal connections for a given amount of time using
     /// only electrical inputs
-    pub fn run_lattice(
+    pub fn run_lattices(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
