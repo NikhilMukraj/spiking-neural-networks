@@ -27,8 +27,8 @@ pub trait Graph: Default {
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
     fn get_id(&self) -> usize;
-    /// Adds a new vertex to the graph, unconnected to other graphs
-    fn add_vertex(&mut self, position: GraphPosition);
+    /// Adds a new node to the graph, unconnected to other graphs
+    fn add_node(&mut self, position: GraphPosition);
     /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
     /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
     /// is initialized as a normally distributed random value based on the inputted weight parameters
@@ -124,7 +124,7 @@ impl Graph for AdjacencyMatrix {
         self.id
     }
 
-    fn add_vertex(&mut self, position: GraphPosition) {
+    fn add_node(&mut self, position: GraphPosition) {
         if self.position_to_index.contains_key(&position) {
             return;
         }
@@ -151,11 +151,11 @@ impl Graph for AdjacencyMatrix {
         weight_params: &Option<GaussianParameters>,
     ) {
         if !self.position_to_index.contains_key(&postsynaptic) {
-            self.add_vertex(postsynaptic)
+            self.add_node(postsynaptic)
         }
         for i in connections.iter() {
             if !self.position_to_index.contains_key(i) {
-                self.add_vertex(*i);
+                self.add_node(*i);
             }
 
             let weight = match weight_params {
@@ -331,7 +331,7 @@ impl Graph for AdjacencyList {
         self.id
     }
 
-    fn add_vertex(&mut self, position: GraphPosition) {
+    fn add_node(&mut self, position: GraphPosition) {
         if self.incoming_connections.contains_key(&position) {
             return;
         }
