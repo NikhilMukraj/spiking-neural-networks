@@ -192,6 +192,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Kaggle example](https://www.kaggle.com/code/dlarionov/mnist-spiking-neural-network)
   - Poisson neurons repreesent state of each pixel, Poisson neurons are connected to all of the neurons in the excitatory lattice,
   all excitatory neurons are connected to each other but not itself (no self edges), excitatory neurons are each connected to one corresponding inhibitory neuron each, inhibitory neurons are each connected to all other excitatory neurons except their corresponding input excitatory neuron
+  - Regular neuron parameters may have to be tuned to get neuron to fire frequently in a 500 ms timespan
   - Poisson neurons are active for 350 ms, which is followed by a 150 ms resting period
     - **$\tau_m$ and $c_m$ may need to be set such that spiking occurs frequently**
   - Firing rate determined by measuring number of spikes, which could be stored in history, history could be a hashmap of positions and a counter, counter is reset for each neuron after prediction, since state is stored as a single value that is pre-allocated the performance should be okay
