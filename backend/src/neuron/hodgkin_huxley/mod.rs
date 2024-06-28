@@ -160,6 +160,8 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 
 // }
 
+// there should be a gap junction between the dendrite and the soma to calculate how current travels
+// for now current voltage could just be the sum of the two compartment's voltages
 // pub TwoCompartmentNeuron<T, R> {
     // pub soma: Soma,
     // pub dendrite: Dendrite<R>,
