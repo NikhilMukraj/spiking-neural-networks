@@ -189,9 +189,9 @@ impl_last_firing_time_spike_train!(PoissonNeuron);
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNeuron<T, U> {
     fn default() -> Self {
         PoissonNeuron {
-            current_voltage: -70.,
+            current_voltage: 0.,
             v_th: 30.,
-            v_resting: -70.,
+            v_resting: 0.,
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             potentiation_type: PotentiationType::Excitatory,
