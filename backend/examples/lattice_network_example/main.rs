@@ -6,7 +6,7 @@ use spiking_neural_networks::{
         Lattice, LatticeNetwork, SpikeTrainLattice,
         integrate_and_fire::IzhikevichNeuron, 
         spike_train::PoissonNeuron,
-    }
+    },
 };
 
 
@@ -27,18 +27,36 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let (num_rows, num_cols) = (3, 3);
 
     let izhikevich_neuron = IzhikevichNeuron::default_impl();
-    let poisson_neuron = PoissonNeuron::default_impl();
+    let mut poisson_neuron = PoissonNeuron::default_impl();
+    poisson_neuron.chance_of_firing = 0.;
 
     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+    spike_train_lattice.set_id(0);
     spike_train_lattice.populate(&poisson_neuron, num_rows, num_cols);
 
     let mut lattice = Lattice::default_impl();
-    lattice.populate(&izhikevich_neuron, num_rows, num_cols);
     lattice.set_id(1);
+    lattice.populate(&izhikevich_neuron, num_rows, num_cols);
+    lattice.update_grid_history = true;
 
     let mut network = LatticeNetwork::generate_network(vec![lattice], vec![spike_train_lattice])?;
 
     network.connect(0, 1, connection_conditional, None)?;
+
+    network.run_lattices(2500)?;
+
+    network.get_mut_spike_train_lattice(&0).unwrap().cell_grid
+        .iter_mut()
+        .for_each(|i| {
+            i.iter_mut()
+                .for_each(|j| {
+                    j.chance_of_firing = 0.004
+            })
+        });
+    
+    network.run_lattices(2500)?;
+
+    // write history to file
 
     Ok(())
 }
