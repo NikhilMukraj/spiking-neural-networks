@@ -94,12 +94,6 @@ EEG processing with fourier transforms, and power spectral density calculations
       - Could have a neuron type that combines discrete neuron and spike train, if discrete neuron is active there is a set (likely high) frequency the discrete neuron ouputs whereas a inactive discrete neuron would have a set low (or 0) frequency
         - Changes to discrete neurons may need to be slowed down in someway
           - *Should abstract this to another note in biological models*
-  - Cell grid struct should be placed within neuron `mod.rs`
-  - Should have method to either take in a pre-existing graph and cell grid or generate a random one given the dimensions
-    - Should also be able to generate a 3D lattice
-  - Methods should include
-    - **`iterate_lattice` which iterates the lattice `Option<usize>` times, if `None` assume iterations to be 1**, should be able to take in a hashmap of inputs, in this case both electrical and neurotransmitter
-    - **`iterate_lattice_electrical_only` which does the same as iterate lattice but only electrical synapses**, should be able to take in a hashmap of inputs, in this case only electrical
   - Multiple lattices
     - Should have cell grids and internal graphs in a hashmap, key is the id of the grid
     - Should have another field for graphs connecting lattices
@@ -109,16 +103,17 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should also expose evenly dividing method for preset spike train and random pattern generator for attractor networks
   - **Hodgkin Huxley model should refactor additional gates enum into a trait**
     - Could have an example with integrate and fire neuron that has an additional gate
-  - `IterateAndSpike` trait should be exposed (along with relevant macros)
-    - Example implementation of `IterateAndSpike` should be shown, likely with something like a Hindmarsh-Rose neuron or similar
-    - Potentially have a tool that translate a markdown file of equations into and `IterateAndSpike` trait implementation or a macro to translate equations to `IterateAndSpike` trait
-    - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
-  - **FitzHugo-Nagumo**
+  - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
+  - **Hindmarsh-Rose model**
   - **Documentation revamp**
     - [how to write documentation](https://blog.guillaume-gomez.fr/articles/2020-03-12+Guide+on+how+to+write+documentation+for+a+Rust+crate)
     - Update obsidian code and equations accordingly
-    - Redo results images
     - **Examples should be detailed in documentation as well**
+
+- **Randomly connecting neurons should be refactored using the `.connect` functionality**, after that remove the `initialize_connections` methods on the graph
+  - Graph trait refactored to store weights as `Option<T>`, this implementation would have T as (f64, bool) where bool is whether it is plastic
+    - This way certain connections could be marked as plastic or fixed
+    - T could be a trait that has a `set_weight` and `get_weight` function to keep in line with current connection funcitonality
 
 - Multiple lattices struct
   - Hashmap of lattice struct where key is graph id
@@ -206,10 +201,16 @@ EEG processing with fourier transforms, and power spectral density calculations
     - May want to phase out optional receptor kinetics with neurotransmitters, neurotransmitters should maybe always have an effect on receptors and makes option stuff cleaner, simpler coupling tests should have option to not use neurotransmitters (instead of receptor kinetics bool)
 
 - Liquid state machine or attractor based classifier using a similar principle to model above using only STDP
+  - Could start with MNIST
+  - [potential size of liquid](https://www.mdpi.com/2227-7390/10/11/1844)
+    - Liquid should have both inhibitory neurons and excitatory neurons
+  - Readout layer could be selected based on which neurons have the highest rate of firing when presented with a cue or randomly selected neurons, readout could also potentially be layered
+  - If readout layer is using a set of predetermined neurons, then output of readout layer could have the firing rate of each neuron measured and associated with a given class label similar to the unsupervised STDP classifier above
 
 - Attractor based classifier
 
 - R-STDP
+  - If reward modifer is 0, do not continue with STDP weight calculation
   - Lattices implementation
   - Classifier
   - Regression
