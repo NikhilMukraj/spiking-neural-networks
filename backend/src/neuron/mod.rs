@@ -153,8 +153,9 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     let refractoriness_function = presynaptic_neuron.get_refractoriness_function();
     let dt = presynaptic_neuron.get_refractoriness_timestep();
     let conductance = postsynaptic_neuron.get_gap_conductance();
+    let effect = refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt);
 
-    sign * conductance * refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
+    sign * conductance * effect
 }
 
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
@@ -1236,33 +1237,33 @@ where
 
     fn calculate_electrical_input_from_positions(
         &self, 
-        position: &GraphPosition,
+        postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> f64 {
-        let postsynaptic_neuron: &T = &self.lattices.get(&position.id)
+        let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
             .unwrap()
-            .cell_grid[position.pos.0][position.pos.1];
+            .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
 
         let mut input_val = input_positions
             .iter()
             .map(|input_position| {
                 let (pos_x, pos_y) = input_position.pos;
 
-                let final_input = if self.lattices.contains_key(&position.id) {
-                    let input_cell = &self.lattices.get(&position.id)
+                let final_input = if self.lattices.contains_key(&input_position.id) {
+                    let input_cell = &self.lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
                     signed_gap_junction(input_cell, postsynaptic_neuron)
                 } else {
-                    let input_cell = &self.spike_train_lattices.get(&position.id)
+                    let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
                 };
                 
-                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, position)
+                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
                     .unwrap_or(Some(0.))
                     .unwrap();
 
@@ -1270,7 +1271,7 @@ where
             })
             .sum::<f64>();
 
-        if self.lattices.get(&position.id).unwrap().gaussian {
+        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
             input_val *= postsynaptic_neuron.get_gaussian_factor();
         }
 
@@ -1281,20 +1282,20 @@ where
 
     fn calculate_neurotransmitter_input_from_positions(
         &self, 
-        position: &GraphPosition,
+        postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> NeurotransmitterConcentrations {
-        let postsynaptic_neuron: &T = &self.lattices.get(&position.id)
+        let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
             .unwrap()
-            .cell_grid[position.pos.0][position.pos.1];
+            .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
 
         let input_vals: Vec<NeurotransmitterConcentrations> = input_positions
             .iter()
             .map(|input_position| {
                 let (pos_x, pos_y) = input_position.pos;
 
-                let mut neurotransmitter_input = if self.lattices.contains_key(&position.id) {
-                    let input_cell = &self.lattices.get(&position.id)
+                let mut neurotransmitter_input = if self.lattices.contains_key(&input_position.id) {
+                    let input_cell = &self.lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
@@ -1302,7 +1303,7 @@ where
 
                     final_input
                 } else {
-                    let input_cell = &self.spike_train_lattices.get(&position.id)
+                    let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
@@ -1311,7 +1312,7 @@ where
                     final_input
                 };
                 
-                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, position)
+                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
                     .unwrap_or(Some(0.))
                     .unwrap();
 
@@ -1323,7 +1324,7 @@ where
 
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
-        if self.lattices.get(&position.id).unwrap().gaussian {
+        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
             weight_neurotransmitter_concentration(
                 &mut input_val, 
                 postsynaptic_neuron.get_gaussian_factor()
