@@ -32,7 +32,7 @@ use iterate_and_spike::{
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
-use crate::error::{GraphError, LatticeNetworkError};
+use crate::error::{GraphError, LatticeNetworkError, LatticeNetworkErrorKind};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix};
 
 
@@ -774,7 +774,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     ) {
         let mut rng = rand::thread_rng();
 
+        let id = self.get_id();
+
         self.graph = U::default();
+        self.graph.set_id(id);
         self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
 
         for row in 0..num_rows {
@@ -801,7 +804,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// of without generating any connections within the graph, (overwrites any pre-existing
     /// neurons or connections)
     pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+        let id = self.get_id();
+
         self.graph = U::default();
+        self.graph.set_id(id);
         self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
 
         for i in 0..num_rows {
@@ -1023,7 +1029,7 @@ where
         lattice: Lattice<T, U, V>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
+            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::GraphIDAlreadyPresent, file!(), line!()));
         }
         self.lattices.insert(lattice.get_id(), lattice);
 
@@ -1037,7 +1043,7 @@ where
         spike_train_lattice: SpikeTrainLattice<W, X>, 
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&spike_train_lattice.id) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
+            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::GraphIDAlreadyPresent, file!(), line!()));
         }
 
         self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
@@ -1133,15 +1139,15 @@ where
         weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
+            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PostsynapticLatticeCannotBeSpikeTrain, file!(), line!()));
         }
 
         if !self.get_all_ids().contains(&presynaptic_id) {
-            return Err(LatticeNetworkError::PresynapticIDNotFound);
+            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PresynapticIDNotFound, file!(), line!()));
         }
 
         if !self.lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::PostsynapticIDNotFound);
+            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PostsynapticIDNotFound, file!(), line!()));
         }
 
         if self.lattices.contains_key(&presynaptic_id) {
