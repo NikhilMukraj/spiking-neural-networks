@@ -29,7 +29,7 @@ macro_rules! impl_default_neural_refractoriness {
         impl Default for $name {
             fn default() -> Self {
                 $name {
-                    k: 1000.,
+                    k: 10000.,
                 }
             }
         }
