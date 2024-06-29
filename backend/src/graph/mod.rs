@@ -7,7 +7,7 @@ use std::{
     io::{self, Write, BufWriter}, 
     fmt::{Display, Debug},
 };
-use crate::error::GraphError;
+use crate::error::{GraphError, GraphErrorKind};
 use crate::neuron::iterate_and_spike::GaussianParameters;
 
 
@@ -182,10 +182,10 @@ impl Graph for AdjacencyMatrix {
 
     fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
-            return Err(GraphError::PostsynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
         if !self.position_to_index.contains_key(presynaptic) {
-            return Err(GraphError::PresynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PresynapticNotFound, file!(), line!()));
         }
 
         Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
@@ -193,10 +193,10 @@ impl Graph for AdjacencyMatrix {
 
     fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
-            return Err(GraphError::PostsynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
         if !self.position_to_index.contains_key(presynaptic) {
-            return Err(GraphError::PresynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PresynapticNotFound, file!(), line!()));
         }
         
         self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]] = weight;
@@ -206,7 +206,7 @@ impl Graph for AdjacencyMatrix {
 
     fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
-            return Err(GraphError::PositionNotFound);
+            return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
         let mut connections: HashSet<GraphPosition> = HashSet::new();
@@ -222,7 +222,7 @@ impl Graph for AdjacencyMatrix {
 
     fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
-            return Err(GraphError::PositionNotFound);
+            return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
         let node = self.position_to_index[pos];
@@ -385,10 +385,10 @@ impl Graph for AdjacencyList {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
 
         if !self.incoming_connections.contains_key(postsynaptic) {
-            return Err(GraphError::PostsynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
         if !self.incoming_connections.contains_key(presynaptic) {
-            return Err(GraphError::PresynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PresynapticNotFound, file!(), line!()));
         }
 
         Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
@@ -398,10 +398,10 @@ impl Graph for AdjacencyList {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
         if !self.incoming_connections.contains_key(postsynaptic) {
-            return Err(GraphError::PostsynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
         if !self.incoming_connections.contains_key(presynaptic) {
-            return Err(GraphError::PresynapticNotFound);
+            return Err(GraphError::new(GraphErrorKind::PresynapticNotFound, file!(), line!()));
         }
         
         match weight {
@@ -439,7 +439,7 @@ impl Graph for AdjacencyList {
     // or point to reference
     fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
-            return Err(GraphError::PositionNotFound);
+            return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
         Ok(self.incoming_connections[pos].keys().cloned().collect::<HashSet<GraphPosition>>())
@@ -449,7 +449,7 @@ impl Graph for AdjacencyList {
     // or point to reference
     fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
-            return Err(GraphError::PositionNotFound);
+            return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
         // self.outgoing_connections[pos].clone()

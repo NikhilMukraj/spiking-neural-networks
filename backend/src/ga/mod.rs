@@ -7,7 +7,7 @@ use std::{
 };
 use rand::Rng;
 use rayon::prelude::*;
-use crate::error::GeneticAlgorithmError;
+use crate::error::{GeneticAlgorithmError, GeneticAlgorithmErrorKind};
 
 
 /// Bit string to use as a chromosome
@@ -27,7 +27,13 @@ impl BitString {
     fn check(&self) -> result::Result<(), GeneticAlgorithmError> {
         for i in self.string.chars() {
             if i != '1' && i != '0' {
-                return Err(GeneticAlgorithmError::NonBinaryInBitstring(self.string.clone()));
+                return Err(
+                    GeneticAlgorithmError::new(
+                        GeneticAlgorithmErrorKind::NonBinaryInBitstring(self.string.clone()), 
+                        file!(), 
+                        line!(),
+                    )
+                );
             }
         }
 
@@ -110,10 +116,10 @@ pub fn decode(
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
     if bounds.len() != bitstring.length() / n_bits {
-        return Err(GeneticAlgorithmError::InvalidBoundsLength);
+        return Err(GeneticAlgorithmError::new(GeneticAlgorithmErrorKind::InvalidBoundsLength, file!(), line!()));
     }
     if bitstring.length() % n_bits != 0 {
-        return Err(GeneticAlgorithmError::InvalidBitstringLength);
+        return Err(GeneticAlgorithmError::new(GeneticAlgorithmErrorKind::InvalidBitstringLength, file!(), line!()));
     }
 
     let maximum = i32::pow(2, n_bits as u32) as f64 - 1.;
@@ -125,7 +131,13 @@ pub fn decode(
 
         let mut value = match i32::from_str_radix(substring, 2) {
             Ok(value_result) => value_result as f64,
-            Err(_e) => return Err(GeneticAlgorithmError::DecodingBitstringFailure(String::from(substring))),
+            Err(_e) => return Err(
+                GeneticAlgorithmError::new(
+                    GeneticAlgorithmErrorKind::DecodingBitstringFailure(String::from(substring)),
+                    file!(), 
+                    line!(),
+                )
+            ),
         };
         value = value * (bounds[i].1 - bounds[i].0) / maximum + bounds[i].0;
 
@@ -203,7 +215,7 @@ pub fn genetic_algo<T: Sync>(
     verbose: bool,
 ) -> result::Result<(BitString, f64, Vec<Vec<f64>>), GeneticAlgorithmError> {
     if params.n_pop % 2 != 0 {
-        return Err(GeneticAlgorithmError::PopulationMustBeEven)
+        return Err(GeneticAlgorithmError::new(GeneticAlgorithmErrorKind::PopulationMustBeEven, file!(), line!()))
     }
 
     let mut pop: Vec<BitString> = (0..params.n_pop)

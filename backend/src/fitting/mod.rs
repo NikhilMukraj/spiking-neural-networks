@@ -6,7 +6,7 @@ use std::{
     io::{Error, ErrorKind, Result},
     ops::Sub,
 };
-use crate::error::GeneticAlgorithmError;
+use crate::error::{GeneticAlgorithmError, GeneticAlgorithmErrorKind};
 use crate::neuron::{   
     hodgkin_huxley::HodgkinHuxleyNeuron, 
     integrate_and_fire::IzhikevichNeuron, 
@@ -61,9 +61,13 @@ pub fn get_summary(
     spike_amplitude_default: f64,
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
-        return Err(GeneticAlgorithmError::ObjectiveFunctionFailure(
-            String::from("Voltage time series must be of the same length")
-        ));
+        return Err(
+            GeneticAlgorithmError::new(
+                GeneticAlgorithmErrorKind::ObjectiveFunctionFailure(
+                    String::from("Voltage time series must be of the same length"),
+                ), file!(), line!()
+            )
+        );
     }
 
     let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
@@ -432,8 +436,10 @@ fn fitting_objective<
     for result in summaries_results.iter() {
         if let Err(_) = result {
             return Err(
-                GeneticAlgorithmError::ObjectiveFunctionFailure(
-                    String::from("Summary calculation could not be completed")
+                GeneticAlgorithmError::new(
+                    GeneticAlgorithmErrorKind::ObjectiveFunctionFailure(
+                        String::from("Summary calculation could not be completed")
+                    ), file!(), line!()
                 )
             );
         }
