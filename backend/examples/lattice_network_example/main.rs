@@ -53,7 +53,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let iterations = 2500;
 
-    network.run_lattices(iterations)?;
+    // network.run_lattices(iterations)?;
 
     network.get_mut_spike_train_lattice(&0).unwrap().cell_grid
         .iter_mut()
