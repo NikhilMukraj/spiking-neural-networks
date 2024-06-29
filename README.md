@@ -146,6 +146,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **R-STDP**
   - Reward calculation
   - Dopamine calculation
+  - Reward function is passed to `run_lattice`/`run_lattices` method to calculate weight changes
 
 - Use Rayon to thread lattice calculations
   - Inputs should be calculated in parallel
