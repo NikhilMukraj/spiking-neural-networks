@@ -964,7 +964,6 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     }
 }
 
-/// Lattice Network
 /// [`LatticeNetwork`] represents a series of lattices interconnected by a graph, each lattice
 /// is associated to a unique identifier, [`Lattice`]s and [`SpikeTrainLattice`]s cannot have
 /// the same identifiers, [`SpikeTrainLattice`]s cannot be postsynaptic because the spike trains
@@ -972,7 +971,6 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// 
 /// Use `connect` to generate connections between lattices:
 /// ```rust
-/// // assume lattice1 has id 0, lattice2 has id 1, and spike_train_lattice has id 2
 /// fn one_to_one(x: (usize, usize), y: (usize, usize)) -> bool {
 ///     x == y
 /// }
@@ -982,11 +980,22 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
-///     (x.powf(2.) + y.powf(2.)).sqrt()
+///     (((x.0 - y.0).pow(2) + (x.1 - y.1).pow(2)) as f64).sqrt()
 /// }
 /// 
 /// fn main() {
-///     ...
+///     let mut lattice1 = Lattice::default_impl();
+///     lattice1.set_id(0);
+///     let mut lattice2 = lattice1.clone();
+///     lattice2.set_id(1);
+/// 
+///     lattice1.populate(base_neuron, 3, 3);
+///     lattice2.populate(base_neuron, 3, 3);
+/// 
+///     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+///     spike_train_lattice.set_id(2);
+///     spike_train_lattice.populate(base_spike_train, 3, 3);
+/// 
 ///     let mut network = LatticeNetwork::generate_network(vec![lattice1, lattice2], vec![spike_train_lattice])?;
 ///     
 ///     // connects each corressponding neuron in the presynaptic lattice to a neuron in the
