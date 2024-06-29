@@ -36,11 +36,15 @@ pub enum GraphErrorKind {
     PositionNotFound,
 }
 
+/// Error type for graph calculations
 #[derive(Clone)]
 pub struct GraphError {
-    file: &'static str,
-    line: u32,
-    error: GraphErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: GraphErrorKind,
 }
 
 impl Display for GraphErrorKind {
@@ -72,11 +76,15 @@ pub enum LatticeNetworkErrorKind {
     PostsynapticLatticeCannotBeSpikeTrain,
 }
 
+/// Error type for lattice network calculations
 #[derive(Clone)]
 pub struct LatticeNetworkError {
-    file: &'static str,
-    line: u32,
-    error: LatticeNetworkErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: LatticeNetworkErrorKind,
 }
 
 impl Display for LatticeNetworkErrorKind {
@@ -104,11 +112,15 @@ pub enum PatternErrorKind {
     PatternDimensionsAreNotEqual,
 }
 
+/// Error type for pattern calculations
 #[derive(Clone)]
 pub struct PatternError {
-    file: &'static str,
-    line: u32,
-    error: PatternErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: PatternErrorKind,
 }
 
 impl Display for PatternErrorKind {
@@ -142,11 +154,15 @@ pub enum GeneticAlgorithmErrorKind {
     ObjectiveFunctionFailure(String),
 }
 
+/// Error type for genetic algorithm functionality
 #[derive(Clone)]
 pub struct GeneticAlgorithmError {
-    file: &'static str,
-    line: u32,
-    error: GeneticAlgorithmErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: GeneticAlgorithmErrorKind,
 }
 
 impl Display for GeneticAlgorithmErrorKind {
@@ -182,11 +198,15 @@ pub enum TimeSeriesProcessingErrorKind {
     SeriesAreNotSameLength
 }
 
+/// Error type for time series processing
 #[derive(Clone)]
 pub struct TimeSeriesProcessingError {
-    file: &'static str,
-    line: u32,
-    error: TimeSeriesProcessingErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: TimeSeriesProcessingErrorKind,
 }
 
 impl Display for TimeSeriesProcessingErrorKind {
@@ -217,11 +237,15 @@ pub enum SpikingNeuralNetworksErrorKind {
     PatternRelatedError(PatternErrorKind),
 }
 
+/// Error type for spiking neural network calculations
 #[derive(Clone)]
 pub struct SpikingNeuralNetworksError {
-    file: &'static str,
-    line: u32,
-    error: SpikingNeuralNetworksErrorKind,
+    /// File where error occurs
+    pub file: &'static str,
+    /// Line number where error occurs
+    pub line: u32,
+    /// Error kind
+    pub error: SpikingNeuralNetworksErrorKind,
 }
 
 impl Display for SpikingNeuralNetworksErrorKind {
