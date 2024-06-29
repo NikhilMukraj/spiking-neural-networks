@@ -5,7 +5,21 @@ macro_rules! impl_debug_default {
     ($name:ident) => {
         impl Debug for $name {
             fn fmt(&self, f: &mut Formatter) -> Result {
-                write!(f, "file: {}, line: {}, error: {}", file!(), line!(), self)
+                write!(f, "file: {}, line: {}, error: {}", self.file, self.line, self.error)
+            }
+        }
+    };
+}
+
+macro_rules! impl_error_new {
+    ($name:ident, $error_set:ident) => {
+        impl $name {
+            pub fn new(error: $error_set, file: &'static str, line: u32) -> Self {
+                $name {
+                    file: file,
+                    line: line,
+                    error: error,
+                }
             }
         }
     };
@@ -13,7 +27,7 @@ macro_rules! impl_debug_default {
 
 /// Error set for potential graph errors
 #[derive(Clone, Copy)]
-pub enum GraphError {
+pub enum GraphErrorKind {
     /// Presynaptic position cannot be found
     PresynapticNotFound,
     /// Postsynaptic position cannot be found
@@ -22,12 +36,19 @@ pub enum GraphError {
     PositionNotFound,
 }
 
-impl Display for GraphError {
+#[derive(Clone)]
+pub struct GraphError {
+    file: &'static str,
+    line: u32,
+    error: GraphErrorKind,
+}
+
+impl Display for GraphErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            GraphError::PostsynapticNotFound => "Postsynaptic position not found",
-            GraphError::PresynapticNotFound => "Presynaptic position not found",
-            GraphError::PositionNotFound => "Position not found",
+            GraphErrorKind::PostsynapticNotFound => "Postsynaptic position not found",
+            GraphErrorKind::PresynapticNotFound => "Presynaptic position not found",
+            GraphErrorKind::PositionNotFound => "Position not found",
         };
 
         write!(f, "{}", err_msg)
@@ -35,10 +56,11 @@ impl Display for GraphError {
 }
 
 impl_debug_default!(GraphError);
+impl_error_new!(GraphError, GraphErrorKind);
 
 /// Error set for potential lattice network errors
 #[derive(Clone, Copy)]
-pub enum LatticeNetworkError {
+pub enum LatticeNetworkErrorKind {
     /// Graph id already present in network (network must have graphs with unique identifiers)
     GraphIDAlreadyPresent,
     /// Postsynaptic id cannot be found
@@ -50,13 +72,20 @@ pub enum LatticeNetworkError {
     PostsynapticLatticeCannotBeSpikeTrain,
 }
 
-impl Display for LatticeNetworkError {
+#[derive(Clone)]
+pub struct LatticeNetworkError {
+    file: &'static str,
+    line: u32,
+    error: LatticeNetworkErrorKind,
+}
+
+impl Display for LatticeNetworkErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            LatticeNetworkError::GraphIDAlreadyPresent => "Graph id already present in network",
-            LatticeNetworkError::PostsynapticIDNotFound => "Postsynaptic id not present in network",
-            LatticeNetworkError::PresynapticIDNotFound => "Postsynaptic id not present in network",
-            LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs",
+            LatticeNetworkErrorKind::GraphIDAlreadyPresent => "Graph id already present in network",
+            LatticeNetworkErrorKind::PostsynapticIDNotFound => "Postsynaptic id not present in network",
+            LatticeNetworkErrorKind::PresynapticIDNotFound => "Postsynaptic id not present in network",
+            LatticeNetworkErrorKind::PostsynapticLatticeCannotBeSpikeTrain => "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs",
         };
 
         write!(f, "{}", err_msg)
@@ -64,21 +93,29 @@ impl Display for LatticeNetworkError {
 }
 
 impl_debug_default!(LatticeNetworkError);
+impl_error_new!(LatticeNetworkError, LatticeNetworkErrorKind);
 
 /// A set of errors for potential pattern errors
 #[derive(Clone, Copy)]
-pub enum PatternError {
+pub enum PatternErrorKind {
     /// Pattern is not bipolar (`-1` or `1`)
     PatternIsNotBipolar,
     /// Pattern does not have the same dimensions throughout
     PatternDimensionsAreNotEqual,
 }
 
-impl Display for PatternError {
+#[derive(Clone)]
+pub struct PatternError {
+    file: &'static str,
+    line: u32,
+    error: PatternErrorKind,
+}
+
+impl Display for PatternErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            PatternError::PatternIsNotBipolar => "Pattern must be bipolar (-1 or 1)",
-            PatternError::PatternDimensionsAreNotEqual => "Patterns must have the same dimensions",
+            PatternErrorKind::PatternIsNotBipolar => "Pattern must be bipolar (-1 or 1)",
+            PatternErrorKind::PatternDimensionsAreNotEqual => "Patterns must have the same dimensions",
         };
 
         write!(f, "{}", err_msg)
@@ -86,10 +123,11 @@ impl Display for PatternError {
 }
 
 impl_debug_default!(PatternError);
+impl_error_new!(PatternError, PatternErrorKind);
 
 /// A set of potential errors when using the genetic algorithm
 #[derive(Clone)]
-pub enum GeneticAlgorithmError {
+pub enum GeneticAlgorithmErrorKind {
     /// Non binary found in binary bitstring
     NonBinaryInBitstring(String),
     /// Bounds length is not compatible with `n_bits`
@@ -104,20 +142,27 @@ pub enum GeneticAlgorithmError {
     ObjectiveFunctionFailure(String),
 }
 
-impl Display for GeneticAlgorithmError {
+#[derive(Clone)]
+pub struct GeneticAlgorithmError {
+    file: &'static str,
+    line: u32,
+    error: GeneticAlgorithmErrorKind,
+}
+
+impl Display for GeneticAlgorithmErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            GeneticAlgorithmError::NonBinaryInBitstring(string) => format!(
+            GeneticAlgorithmErrorKind::NonBinaryInBitstring(string) => format!(
                 "Non binary found in bitstring: {}", string
             ),
-            GeneticAlgorithmError::InvalidBoundsLength => String::from("Bounds length does not match n_bits"),
-            GeneticAlgorithmError::InvalidBitstringLength => String::from("String length is indivisible by n_bits"),
-            GeneticAlgorithmError::DecodingBitstringFailure(string) => format!(
+            GeneticAlgorithmErrorKind::InvalidBoundsLength => String::from("Bounds length does not match n_bits"),
+            GeneticAlgorithmErrorKind::InvalidBitstringLength => String::from("String length is indivisible by n_bits"),
+            GeneticAlgorithmErrorKind::DecodingBitstringFailure(string) => format!(
                 "Bitstring could not be decoded from binary (non binary found or integer overflow): {}", 
                 string,
             ),
-            GeneticAlgorithmError::PopulationMustBeEven => String::from("n_pop should be even"),
-            GeneticAlgorithmError::ObjectiveFunctionFailure(string) => format!(
+            GeneticAlgorithmErrorKind::PopulationMustBeEven => String::from("n_pop should be even"),
+            GeneticAlgorithmErrorKind::ObjectiveFunctionFailure(string) => format!(
                 "Genetic algorithm objective function failed: {}", 
                 string,
             )
@@ -128,18 +173,26 @@ impl Display for GeneticAlgorithmError {
 }
 
 impl_debug_default!(GeneticAlgorithmError);
+impl_error_new!(GeneticAlgorithmError, GeneticAlgorithmErrorKind);
 
 /// A set of potential errors when using series processing tools
 #[derive(Clone, Copy)]
-pub enum TimeSeriesProcessingError {
+pub enum TimeSeriesProcessingErrorKind {
     /// Series must be the same length
     SeriesAreNotSameLength
 }
 
-impl Display for TimeSeriesProcessingError {
+#[derive(Clone)]
+pub struct TimeSeriesProcessingError {
+    file: &'static str,
+    line: u32,
+    error: TimeSeriesProcessingErrorKind,
+}
+
+impl Display for TimeSeriesProcessingErrorKind {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let err_msg = match self {
-            TimeSeriesProcessingError::SeriesAreNotSameLength => "Lengths of input series must match"
+            TimeSeriesProcessingErrorKind::SeriesAreNotSameLength => "Lengths of input series must match"
         };
 
         write!(f, "{}", err_msg)
@@ -147,41 +200,54 @@ impl Display for TimeSeriesProcessingError {
 }
 
 impl_debug_default!(TimeSeriesProcessingError);
+impl_error_new!(TimeSeriesProcessingError, TimeSeriesProcessingErrorKind);
 
 /// A set of errors that may occur when using the library
 #[derive(Clone)]
-pub enum SpikingNeuralNetworksError {
+pub enum SpikingNeuralNetworksErrorKind {
     /// Errors related to EEG processing
-    SeriesProcessingRelatedError(TimeSeriesProcessingError),
+    SeriesProcessingRelatedError(TimeSeriesProcessingErrorKind),
     /// Errors related to genetic algorithm
-    GeneticAlgorithmRelatedErrors(GeneticAlgorithmError),
+    GeneticAlgorithmRelatedErrors(GeneticAlgorithmErrorKind),
     /// Errors related to graph processing
-    GraphRelatedError(GraphError),
+    GraphRelatedError(GraphErrorKind),
     /// Errors related to lattice networks
-    LatticeNetworkRelatedError(LatticeNetworkError),
+    LatticeNetworkRelatedError(LatticeNetworkErrorKind),
     /// Errors related to patterns
-    PatternRelatedError(PatternError),
+    PatternRelatedError(PatternErrorKind),
 }
 
-impl Display for SpikingNeuralNetworksError {
+#[derive(Clone)]
+pub struct SpikingNeuralNetworksError {
+    file: &'static str,
+    line: u32,
+    error: SpikingNeuralNetworksErrorKind,
+}
+
+impl Display for SpikingNeuralNetworksErrorKind {
     fn fmt(&self, f: &mut Formatter) -> Result {
         match self {
-            SpikingNeuralNetworksError::SeriesProcessingRelatedError(err) => write!(f, "{}", err),
-            SpikingNeuralNetworksError::GeneticAlgorithmRelatedErrors(err) => write!(f, "{}", err),
-            SpikingNeuralNetworksError::GraphRelatedError(err) => write!(f, "{}", err),
-            SpikingNeuralNetworksError::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
-            SpikingNeuralNetworksError::PatternRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksErrorKind::SeriesProcessingRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksErrorKind::GeneticAlgorithmRelatedErrors(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksErrorKind::GraphRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksErrorKind::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksErrorKind::PatternRelatedError(err) => write!(f, "{}", err),
         }
     }
 }
 
 impl_debug_default!(SpikingNeuralNetworksError);
+impl_error_new!(SpikingNeuralNetworksError, SpikingNeuralNetworksErrorKind);
 
 macro_rules! impl_from_error_default {
     ($error_name:ident, $variant_name:ident) => {
         impl From<$error_name> for SpikingNeuralNetworksError {
             fn from(err: $error_name) -> SpikingNeuralNetworksError {
-                SpikingNeuralNetworksError::$variant_name(err)
+                SpikingNeuralNetworksError {
+                    error: SpikingNeuralNetworksErrorKind::$variant_name(err.error),
+                    file: err.file,
+                    line: err.line,
+                }
             }
         }
     };
