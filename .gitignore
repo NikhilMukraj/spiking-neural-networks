@@ -29,6 +29,8 @@
 /backend/examples/lattice_example/*.txt
 /backend/examples/lattice_example/*.ipynb
 /backend/examples/lattice_example/*.gif
+/backend/examples/lattice_network_example/*.txt
+/backend/examples/lattice_network_example/*.ipynb
 /images/data/*
 /interface/target
 /interface/.venv
