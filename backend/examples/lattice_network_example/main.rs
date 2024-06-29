@@ -18,16 +18,14 @@ fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
     x == y
 }
 
+/// Lattice network test
+/// - Set up 3x3 poisson grid and 3x3 izhikevich grid
+/// - Poisson should be presynaptic and connect to one other izhikevich neuron
+/// - Izhikevich neuron should have no postsynaptic connections
+/// - First set Poisson firing rate to 0, neurons should not spike often
+/// - Then set poisson firing rate to something higher, neurons should then spike more
+/// - Write history to working directory
 fn main() -> Result<(), SpikingNeuralNetworksError> {
-    // lattice network test
-    // set up 3x3 poisson grid and 3x3 izhikevich grid
-    // poisson should be presynaptic and connect to one other izhikevich neuron
-    // izhikevich neuron should have no postsynaptic connections
-    // test by first setting poisson firing rate to 0, neurons should not spike often
-    // then set poisson firing rate to something higher, neurons should then spike more
-    // if timestep == iterations / 2 change firing rate
-    // izhikevich_lattice.update_history = true;
-
     let (num_rows, num_cols) = (3, 3);
 
     let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
@@ -45,15 +43,13 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     lattice.populate(&izhikevich_neuron, num_rows, num_cols);
     lattice.update_grid_history = true;
 
-    println!("regular: {}, spike train: {}", lattice.get_id(), spike_train_lattice.get_id());
-
     let mut network = LatticeNetwork::generate_network(vec![lattice], vec![spike_train_lattice])?;
 
     network.connect(0, 1, connection_conditional, None)?;
 
     let iterations = 2500;
 
-    // network.run_lattices(iterations)?;
+    network.run_lattices(iterations)?;
 
     network.get_mut_spike_train_lattice(&0).unwrap().cell_grid
         .iter_mut()
