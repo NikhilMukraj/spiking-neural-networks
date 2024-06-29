@@ -964,11 +964,48 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     }
 }
 
+/// Lattice Network
+/// [`LatticeNetwork`] represents a series of lattices interconnected by a graph, each lattice
+/// is associated to a unique identifier, [`Lattice`]s and [`SpikeTrainLattice`]s cannot have
+/// the same identifiers, [`SpikeTrainLattice`]s cannot be postsynaptic because the spike trains
+/// cannot take in an input
+/// 
+/// Use `connect` to generate connections between lattices:
+/// ```rust
+/// // assume lattice1 has id 0, lattice2 has id 1, and spike_train_lattice has id 2
+/// fn one_to_one(x: (usize, usize), y: (usize, usize)) -> bool {
+///     x == y
+/// }
+/// 
+/// fn close_connect(x: (usize, usize), y: (usize, usize)) -> bool {
+///     (x.0 - y.0).abs() < 2. && (x.1 - y.1).abs() < 2.
+/// }
+/// 
+/// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
+///     (x.powf(2.) + y.powf(2.)).sqrt()
+/// }
+/// 
+/// fn main() {
+///     ...
+///     let mut network = LatticeNetwork::generate_network(vec![lattice1, lattice2], vec![spike_train_lattice])?;
+///     
+///     // connects each corressponding neuron in the presynaptic lattice to a neuron in the
+///     // postsynaptic lattice as long as their position is the same, scales the weight
+///     // of the connection depending on the distance from each neuron
+///     network.connect(0, 1, one_to_one, weight_function);
+/// 
+///     // connects the lattices in the same manner as before but does so in the opposite direction
+///     network.connect(1, 0, one_to_one, weight_function);
+/// 
+///     // connections each spike train to a postsynaptic neuron in the postsynaptic lattice if 
+///     // the neuron is close enough, sets each weight to 1.
+///     network.connect(2, 0, close_connect, None);
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct LatticeNetwork
 <T: IterateAndSpike, U: Graph, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
 {
- // lattices: HashMap<usize, LatticeType<T, U, V, W, X>,
     /// A hashmap of [`Lattice`]s associated with their respective identifier
     lattices: HashMap<usize, Lattice<T, U, V>>,
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
