@@ -38,11 +38,14 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
     spike_train_lattice.set_id(0);
     spike_train_lattice.populate(&poisson_neuron, num_rows, num_cols);
+    spike_train_lattice.update_grid_history = true;
 
     let mut lattice = Lattice::default_impl();
     lattice.set_id(1);
     lattice.populate(&izhikevich_neuron, num_rows, num_cols);
     lattice.update_grid_history = true;
+
+    println!("regular: {}, spike train: {}", lattice.get_id(), spike_train_lattice.get_id());
 
     let mut network = LatticeNetwork::generate_network(vec![lattice], vec![spike_train_lattice])?;
 
@@ -57,7 +60,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         .for_each(|i| {
             i.iter_mut()
                 .for_each(|j| {
-                    j.chance_of_firing = 0.004
+                    j.chance_of_firing = 0.01
             })
         });
     
@@ -76,6 +79,22 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
                 .expect("Could not write to file");
         }
         writeln!(voltage_file, "-----")
+            .expect("Could not write to file"); 
+    }
+
+    let mut spike_train_file = BufWriter::new(File::create("spike_train_history.txt")
+        .expect("Could not create file"));
+
+    for grid in &network.get_spike_train_lattice(&0).unwrap().grid_history.history {
+        for row in grid {
+            for value in row {
+                write!(spike_train_file, "{} ", value)
+                    .expect("Could not write to file");
+            }
+            writeln!(spike_train_file)
+                .expect("Could not write to file");
+        }
+        writeln!(spike_train_file, "-----")
             .expect("Could not write to file"); 
     }
 
