@@ -2,10 +2,10 @@
 
 use std::{
     collections::{HashMap, HashSet}, 
-    fs::File, 
     result::Result,
-    io::{self, Write, BufWriter}, 
-    fmt::{Display, Debug},
+    fmt::Debug,
+    hash::Hash,
+    cmp::Eq,
 };
 use crate::error::{GraphError, GraphErrorKind};
 use crate::neuron::iterate_and_spike::GaussianParameters;
@@ -23,72 +23,61 @@ pub struct GraphPosition {
 
 /// Implementation of a basic graph
 pub trait Graph: Default {
+    type T: Debug + Hash + Eq + PartialEq + Clone + Copy;
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
     fn get_id(&self) -> usize;
     /// Adds a new node to the graph, unconnected to other nodes, no change if node
     /// is already in graph
-    fn add_node(&mut self, position: GraphPosition);
+    fn add_node(&mut self, position: Self::T);
     /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
     /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
     /// is initialized as a normally distributed random value based on the inputted weight parameters
     fn initialize_connections(
         &mut self, 
-        postsynaptic: GraphPosition, 
-        presynaptic_connections: Vec<GraphPosition>, 
+        postsynaptic: Self::T, 
+        presynaptic_connections: Vec<Self::T>, 
         weight_params: &Option<GaussianParameters>,
     );
     /// Returns every node or vertex on the graph
-    fn get_every_node(&self) -> HashSet<GraphPosition>;
+    fn get_every_node(&self) -> HashSet<Self::T>;
     /// Returns every node as a reference without cloning
-    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition>;
+    fn get_every_node_as_ref(&self) -> HashSet<&Self::T>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError>; 
+    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<f64>, GraphError>; 
     /// Edits the weight between two neurons, errors if the positions are not in the graph,
     /// `None` represents no connection while `Some(f64)` represents some weight
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError>;
+    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<f64>) -> Result<(), GraphError>;
     /// Returns all presynaptic connections if the position is in the graph
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError>; 
+    fn get_incoming_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>; 
     /// Returns all postsynaptic connections if the position is in the graph
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError>;
+    fn get_outgoing_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>;
     /// Updates the history of the graph with the current state
     fn update_history(&mut self);
-    /// Writes current weights to files prefixed by the `tag` value
-    fn write_current_weights(&self, tag: &str) -> io::Result<()>;
-    /// Writes history of weights to files prefixed by the `tag` value
-    fn write_history(&self, tag: &str) -> io::Result<()>;
 }
 
-fn csv_write<T: Display>(csv_file: &mut BufWriter<File>, grid: &Vec<Vec<Option<T>>>) -> io::Result<()> {
-    for row in grid {
-        for (n, i) in row.iter().enumerate() {
-            let item_to_write = match i {
-                Some(value) => format!("{}", value),
-                None => String::from("None"),
-            };
+pub trait ToGraphPosition {
+    type GraphPos: Graph<T = GraphPosition>;
+}
 
-            if n < row.len() - 1 {
-                write!(csv_file, "{},", item_to_write)?;
-            } else {
-                write!(csv_file, "{}", item_to_write)?;
-            }
-        }
-        writeln!(csv_file)?;
-    }
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> ToGraphPosition for AdjacencyMatrix<T> {
+    type GraphPos = AdjacencyMatrix<GraphPosition>;
+}
 
-    Ok(())
-} 
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> ToGraphPosition for AdjacencyList<T> {
+    type GraphPos = AdjacencyMatrix<GraphPosition>;
+}
 
 /// A graph implemented as an adjacency matrix where the positions of each node
 /// are converted to `usize` to be index in a 2-dimensional matrix
 #[derive(Clone, Debug)]
-pub struct AdjacencyMatrix {
+pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy> {
     /// Converts position to a index for the matrix
-    pub position_to_index: HashMap<GraphPosition, usize>,
+    pub position_to_index: HashMap<T, usize>,
     /// Converts the index back to a position
-    pub index_to_position: HashMap<usize, GraphPosition>,
+    pub index_to_position: HashMap<usize, T>,
     /// Matrix of weights
     pub matrix: Vec<Vec<Option<f64>>>,
     /// History of matrix weights
@@ -97,26 +86,15 @@ pub struct AdjacencyMatrix {
     pub id: usize,
 }
 
-fn transform_index_to_position(
-    original_map: &HashMap<usize, GraphPosition>
-) -> HashMap<usize, (usize, usize, usize)> {
-    let mut new_map = HashMap::new();
-    
-    for (key, value) in original_map {
-        let tuple_value = (value.id, value.pos.0, value.pos.1);
-        new_map.insert(*key, tuple_value);
-    }
-    
-    new_map
-}
-
-impl AdjacencyMatrix {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> AdjacencyMatrix<T> {
     pub fn nodes_len(&self) -> usize {
         self.position_to_index.len()
     }
 }
 
-impl Graph for AdjacencyMatrix {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<T> {
+    type T = T;
+
     fn set_id(&mut self, id: usize) {
         self.id = id;
     }
@@ -125,7 +103,7 @@ impl Graph for AdjacencyMatrix {
         self.id
     }
 
-    fn add_node(&mut self, position: GraphPosition) {
+    fn add_node(&mut self, position: T) {
         if self.position_to_index.contains_key(&position) {
             return;
         }
@@ -147,8 +125,8 @@ impl Graph for AdjacencyMatrix {
 
     fn initialize_connections(
         &mut self, 
-        postsynaptic: GraphPosition, 
-        connections: Vec<GraphPosition>, 
+        postsynaptic: T, 
+        connections: Vec<T>, 
         weight_params: &Option<GaussianParameters>,
     ) {
         if !self.position_to_index.contains_key(&postsynaptic) {
@@ -172,15 +150,15 @@ impl Graph for AdjacencyMatrix {
         }
     }
 
-    fn get_every_node(&self) -> HashSet<GraphPosition> {
+    fn get_every_node(&self) -> HashSet<T> {
         self.position_to_index.keys().cloned().collect()
     }
 
-    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition> {
+    fn get_every_node_as_ref(&self) -> HashSet<&T> {
         self.position_to_index.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f64>, GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
@@ -191,7 +169,7 @@ impl Graph for AdjacencyMatrix {
         Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
     }
 
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f64>) -> Result<(), GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::new(GraphErrorKind::PostsynapticNotFound, file!(), line!()));
         }
@@ -204,12 +182,12 @@ impl Graph for AdjacencyMatrix {
         Ok(())
     }
 
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
+    fn get_incoming_connections(&self, pos: &T) -> Result<HashSet<T>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
             return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
-        let mut connections: HashSet<GraphPosition> = HashSet::new();
+        let mut connections: HashSet<T> = HashSet::new();
         for i in self.position_to_index.keys() {
             match self.lookup_weight(i, &pos).unwrap() {
                 Some(_) => { connections.insert(*i); },
@@ -220,7 +198,7 @@ impl Graph for AdjacencyMatrix {
         Ok(connections)
     }
 
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
+    fn get_outgoing_connections(&self, pos: &T) -> Result<HashSet<T>, GraphError> {
         if !self.position_to_index.contains_key(pos) {
             return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
@@ -231,7 +209,7 @@ impl Graph for AdjacencyMatrix {
             .enumerate()
             .filter(|(_, &val)| val.is_some())
             .map(|(n, _)| self.index_to_position[&n])
-            .collect::<HashSet<GraphPosition>>();
+            .collect::<HashSet<T>>();
             
         Ok(out_going_connections)
     }
@@ -239,44 +217,9 @@ impl Graph for AdjacencyMatrix {
     fn update_history(&mut self) {
         self.history.push(self.matrix.clone());
     }
-
-    fn write_current_weights(&self, tag: &str) -> io::Result<()> {
-        let serializable_map = transform_index_to_position(&self.index_to_position);
-
-        let json_string = serde_json::to_string(&serializable_map)
-                .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))?);
-
-        write!(json_file, "{}", json_string)?;
-
-        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))?);
-
-        csv_write(&mut csv_file, &self.matrix)?;
-
-        Ok(())
-    }
-
-    fn write_history(&self, tag: &str) -> io::Result<()> {
-        let serializable_map = transform_index_to_position(&self.index_to_position);
-
-        let json_string = serde_json::to_string(&serializable_map)
-                .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_positions.json", tag))?);
-
-        write!(json_file, "{}", json_string)?;
-
-        let mut csv_file = BufWriter::new(File::create(format!("{}_connections.csv", tag))?);
-
-        for grid in &self.history {
-            csv_write(&mut csv_file, &grid)?;
-            writeln!(csv_file, "-----")?;
-        }
-
-        Ok(())
-    }
 }
 
-impl Default for AdjacencyMatrix {
+impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
     fn default() -> Self {
         AdjacencyMatrix { 
             position_to_index: HashMap::new(), 
@@ -290,40 +233,20 @@ impl Default for AdjacencyMatrix {
 
 /// A graph implemented as an adjacency list
 #[derive(Clone, Debug)]
-pub struct AdjacencyList {
+pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy> {
     /// All presynaptic connections
-    pub incoming_connections: HashMap<GraphPosition, HashMap<GraphPosition, f64>>,
+    pub incoming_connections: HashMap<T, HashMap<T, f64>>,
     /// All postsynaptic connections
-    pub outgoing_connections: HashMap<GraphPosition, HashSet<GraphPosition>>,
+    pub outgoing_connections: HashMap<T, HashSet<T>>,
     /// History of presynaptic connection weights
-    pub history: Vec<HashMap<GraphPosition, HashMap<GraphPosition, f64>>>,
+    pub history: Vec<HashMap<T, HashMap<T, f64>>>,
     /// Identifier
     pub id: usize,
 }
 
-fn transform_incoming_connections(
-    original_map: &HashMap<GraphPosition, HashMap<GraphPosition, f64>>
-) -> HashMap<(usize, usize, usize), HashMap<(usize, usize, usize), f64>> {
-    let mut new_map: HashMap<(usize, usize, usize), HashMap<(usize, usize, usize), f64>> = HashMap::new();
-    
-    for (outer_key, inner_map) in original_map {
-        let outer_tuple_key = (outer_key.id, outer_key.pos.0, outer_key.pos.1);
-        let mut new_inner_map: HashMap<(usize, usize, usize), f64> = HashMap::new();
-        
-        for (inner_key, &value) in inner_map {
-            let inner_tuple_key = (inner_key.id, inner_key.pos.0, inner_key.pos.1);
-            new_inner_map.insert(inner_tuple_key, value);
-        }
-        
-        new_map.insert(outer_tuple_key, new_inner_map);
-    }
-    
-    new_map
-}
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T> {
+    type T = T;
 
-type KeyWeightPair = HashMap<String, f64>;
-
-impl Graph for AdjacencyList {
     fn set_id(&mut self, id: usize) {
         self.id = id;
     }
@@ -332,7 +255,7 @@ impl Graph for AdjacencyList {
         self.id
     }
 
-    fn add_node(&mut self, position: GraphPosition) {
+    fn add_node(&mut self, position: T) {
         if self.incoming_connections.contains_key(&position) {
             return;
         }
@@ -343,8 +266,8 @@ impl Graph for AdjacencyList {
 
     fn initialize_connections(
         &mut self, 
-        postsynaptic: GraphPosition, 
-        connections: Vec<GraphPosition>, 
+        postsynaptic: T, 
+        connections: Vec<T>, 
         weight_params: &Option<GaussianParameters>,
     ) {
         for i in connections.iter() {
@@ -373,15 +296,15 @@ impl Graph for AdjacencyList {
         }
     }
 
-    fn get_every_node(&self) -> HashSet<GraphPosition> {
+    fn get_every_node(&self) -> HashSet<T> {
         self.incoming_connections.keys().cloned().collect()
     }
 
-    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition> {
+    fn get_every_node_as_ref(&self) -> HashSet<&T> {
         self.incoming_connections.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition) -> Result<Option<f64>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f64>, GraphError> {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
 
         if !self.incoming_connections.contains_key(postsynaptic) {
@@ -394,7 +317,7 @@ impl Graph for AdjacencyList {
         Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
     }
 
-    fn edit_weight(&mut self, presynaptic: &GraphPosition, postsynaptic: &GraphPosition, weight: Option<f64>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f64>) -> Result<(), GraphError> {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
         if !self.incoming_connections.contains_key(postsynaptic) {
@@ -437,17 +360,17 @@ impl Graph for AdjacencyList {
 
     // to be cached
     // or point to reference
-    fn get_incoming_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
+    fn get_incoming_connections(&self, pos: &T) -> Result<HashSet<T>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
             return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
 
-        Ok(self.incoming_connections[pos].keys().cloned().collect::<HashSet<GraphPosition>>())
+        Ok(self.incoming_connections[pos].keys().cloned().collect::<HashSet<T>>())
     }
 
     // to be cached
     // or point to reference
-    fn get_outgoing_connections(&self, pos: &GraphPosition) -> Result<HashSet<GraphPosition>, GraphError> {
+    fn get_outgoing_connections(&self, pos: &T) -> Result<HashSet<T>, GraphError> {
         if !self.incoming_connections.contains_key(pos) {
             return Err(GraphError::new(GraphErrorKind::PositionNotFound, file!(), line!()));
         }
@@ -463,56 +386,9 @@ impl Graph for AdjacencyList {
     fn update_history(&mut self) {
         self.history.push(self.incoming_connections.clone());
     }
-
-    fn write_current_weights(&self, tag: &str) -> io::Result<()> {
-        let serialiable_map = transform_incoming_connections(&self.incoming_connections);
-
-        let json_string = serde_json::to_string(&serialiable_map)
-                .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_incoming_connections.json", tag))?);
-
-        write!(json_file, "{}", json_string)?;
-
-        Ok(())
-    }
-
-    fn write_history(&self, tag: &str) -> io::Result<()> {
-        let mut history_json: HashMap<String, HashMap<String, KeyWeightPair>> = HashMap::new();
-
-        for (key, value) in self.history.iter().enumerate() {
-            // let wrapped_key = PositionWrapper(key);
-            let mut inner_map: HashMap<String, KeyWeightPair> = HashMap::new();
-
-            for (inner_key, inner_value) in value {
-                let wrapped_inner_key = format!(
-                    "{}_{}_{}", inner_key.id, inner_key.pos.0, inner_key.pos.1
-                );
-                let mut innermost_map: KeyWeightPair = HashMap::new();
-
-                for (innermost_key, innermost_value) in inner_value {
-                    let wrapped_innermost_key = format!(
-                        "{}_{}_{}", innermost_key.id, innermost_key.pos.0, innermost_key.pos.1
-                    );
-                    innermost_map.insert(wrapped_innermost_key, *innermost_value);
-                }
-
-                inner_map.insert(wrapped_inner_key, innermost_map);
-            }
-
-            history_json.insert(key.to_string(), inner_map);
-        }
-
-        let json_string = serde_json::to_string_pretty(&history_json)
-            .expect("Failed to convert to JSON");
-        let mut json_file = BufWriter::new(File::create(format!("{}_history.json", tag))?);
-
-        write!(json_file, "{}", json_string)?;
-
-        Ok(())
-    }
 }
 
-impl Default for AdjacencyList {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyList<T> {
     fn default() -> Self {
         AdjacencyList { 
             incoming_connections: HashMap::new(), 
