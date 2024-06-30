@@ -32,7 +32,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
     Ok(matrix)
 }
 
-fn test_hopfield_network<T: Graph>(
+fn test_hopfield_network<T: Graph<T=(usize, usize)>>(
     patterns: &Vec<Vec<Vec<isize>>>,
     noise_level: f64,
     iterations: usize,
@@ -129,7 +129,7 @@ fn main() -> Result<()> {
     let iterations = 10;
     let noise_level = 0.25;
 
-    test_hopfield_network::<AdjacencyMatrix>(&patterns, noise_level, iterations).expect("Error in graph");
+    test_hopfield_network::<AdjacencyMatrix<(usize, usize)>>(&patterns, noise_level, iterations).expect("Error in graph");
 
     Ok(())
 }
