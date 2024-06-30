@@ -1192,7 +1192,9 @@ where
     /// if a connect should occur according to `connecting_conditional`,
     /// `presynaptic_id` refers to the lattice that should contain the presynaptic neurons
     /// (which can be a [`Lattice`] or a [`SpikeTrainLattice`]) and `postsynaptic_id` refers
-    /// to the lattice that should contain the postsynaptic connectins ([`Lattice`] only)
+    /// to the lattice that should contain the postsynaptic connections ([`Lattice`] only),
+    /// any pre-existing connections in the given direction (presynaptic -> postsynaptic)
+    /// will be overwritten based on the rule given in `connecting_conditional`
     pub fn connect(
         &mut self, 
         presynaptic_id: usize, 
