@@ -975,7 +975,7 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 ///     (((x.0 - y.0).pow(2) + (x.1 - y.1).pow(2)) as f64).sqrt()
 /// }
 /// 
-/// fn main() {
+/// fn main() -> Result<(), SpikingNeuralNetworkError>{
 ///     let mut lattice1 = Lattice::default_impl();
 ///     lattice1.set_id(0);
 ///     let mut lattice2 = lattice1.clone();
@@ -1004,6 +1004,9 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// 
 ///     // note that connect will overwrite any pre-existing connections between the given
 ///     // lattices in the direction specified (presynaptic -> postsynaptic will be overwritten)
+/// 
+///     // runs network for given amount of iterations
+///     network.run_lattices(5000)?;
 /// }
 /// ```
 #[derive(Debug, Clone)]
