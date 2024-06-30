@@ -33,7 +33,7 @@ use iterate_and_spike::{
     weight_neurotransmitter_concentration, 
 };
 use crate::error::{GraphError, LatticeNetworkError, LatticeNetworkErrorKind};
-use crate::graph::{Graph, GraphPosition, AdjacencyMatrix};
+use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 
 
 /// Calculates the current between two neurons based on the voltage and
@@ -413,27 +413,19 @@ fn positions_within_square(
 
 fn randomly_select_positions(
     mut positions: Vec<(usize, usize)>, 
-    id: usize, 
     num_to_select: usize
-) -> Vec<GraphPosition> {
+) -> Vec<(usize, usize)> {
     let mut rng = rand::thread_rng();
 
     positions.shuffle(&mut rng);
     positions.truncate(num_to_select);
 
-    positions.iter()
-        .map(|i| 
-            GraphPosition { 
-                id: id, 
-                pos: *i,
-            }
-        )
-        .collect()
+    positions
 }
 
 /// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
-pub struct Lattice<T: IterateAndSpike, U: Graph, V: LatticeHistory> {
+pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -454,7 +446,7 @@ pub struct Lattice<T: IterateAndSpike, U: Graph, V: LatticeHistory> {
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Default for Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Default for Lattice<T, U, V> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -470,14 +462,14 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Default for Lattice<T, U, 
     }
 }
 
-impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix, GridVoltageHistory> {
+impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize)>, GridVoltageHistory> {
     // Generates a default lattice implementation given a neuron type
     pub fn default_impl() -> Self {
         Lattice::default()
     }
 }
 
-impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<T, U, V> {
     impl_reset_timing!();
 
     /// Gets id of lattice [`Graph`]
@@ -493,17 +485,17 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// Calculates electrical input value from positions
     fn calculate_internal_input_from_positions(
         &self,
-        position: &GraphPosition,
-        input_positions: &HashSet<GraphPosition>, 
+        position: &(usize, usize),
+        input_positions: &HashSet<(usize, usize)>, 
     ) -> f64 {
-        let (x, y) = position.pos;
-        let postsynaptic_neuron = &self.cell_grid[x][y];
+        let (x, y) = position;
+        let postsynaptic_neuron = &self.cell_grid[*x][*y];
 
         let mut input_val = input_positions
             .iter()
             .map(|input_position| {
-                let (pos_x, pos_y) = input_position.pos;
-                let input_cell = &self.cell_grid[pos_x][pos_y];
+                let (pos_x, pos_y) = input_position;
+                let input_cell = &self.cell_grid[*pos_x][*pos_y];
 
                 let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
                 
@@ -512,7 +504,7 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
             .sum();
 
         if self.gaussian {
-            input_val *= self.cell_grid[x][y].get_gaussian_factor();
+            input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
         }
 
         input_val /= input_positions.len() as f64;
@@ -523,14 +515,14 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// Calculates neurotransmitter input value from positions
     fn calculate_internal_neurotransmitter_input_from_positions(
         &self,
-        position: &GraphPosition,
-        input_positions: &HashSet<GraphPosition>, 
+        position: &(usize, usize),
+        input_positions: &HashSet<(usize, usize)>, 
     ) -> NeurotransmitterConcentrations {
         let input_vals = input_positions
             .iter()
             .map(|input_position| {
-                let (pos_x, pos_y) = input_position.pos;
-                let input_cell = &self.cell_grid[pos_x][pos_y];
+                let (pos_x, pos_y) = input_position;
+                let input_cell = &self.cell_grid[*pos_x][*pos_y];
 
                 let mut final_input = input_cell.get_neurotransmitter_concentrations();
                 let weight = self.graph.lookup_weight(&input_position, position).unwrap().unwrap();
@@ -544,8 +536,8 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
         if self.gaussian {
-            let (x, y) = position.pos;
-            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[x][y].get_gaussian_factor());
+            let (x, y) = position;
+            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
 
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
@@ -554,7 +546,7 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     }
 
     /// Gets all internal electrical inputs 
-    fn get_internal_electrical_inputs(&self) -> HashMap<GraphPosition, f64> {
+    fn get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f64> {
         // eventually convert to this, same with neurotransmitter input
         // convert on lattice network too
         // let inputs: HashMap<Position, f64> = graph
@@ -584,10 +576,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
 
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f64>, Option<HashMap<GraphPosition, NeurotransmitterConcentrations>>) {
+    (HashMap<(usize, usize), f64>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
         let neurotransmitter_inputs = match self.do_receptor_kinetics {
             true => {
-                let neurotransmitters: HashMap<GraphPosition, NeurotransmitterConcentrations> = self.graph.get_every_node_as_ref()
+                let neurotransmitters: HashMap<(usize, usize), NeurotransmitterConcentrations> = self.graph.get_every_node_as_ref()
                     .iter()
                     .map(|&pos| {
                         let input_positions = self.graph.get_incoming_connections(&pos)
@@ -613,13 +605,13 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     }
 
     /// Updates internal weights based on STDP
-    fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
         let input_positions = self.graph.get_incoming_connections(&pos)?;
 
         for i in input_positions {
-            let (x_in, y_in) = i.pos;
+            let (x_in, y_in) = i;
             let current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
                                         
             self.graph.edit_weight(
@@ -632,7 +624,7 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
         let out_going_connections = self.graph.get_outgoing_connections(&pos)?;
 
         for i in out_going_connections {
-            let (x_out, y_out) = i.pos;
+            let (x_out, y_out) = i;
             let current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
 
             self.graph.edit_weight(
@@ -648,11 +640,11 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// Iterates one simulation timestep lattice given a set of electrical and neurotransmitter inputs
     pub fn iterate_with_neurotransmission(
         &mut self, 
-        inputs: &HashMap<GraphPosition, f64>, 
-        neurotransmitter_inputs: &Option<HashMap<GraphPosition, NeurotransmitterConcentrations>>,
+        inputs: &HashMap<(usize, usize), f64>, 
+        neurotransmitter_inputs: &Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
-            let (x, y) = pos.pos;
+            let (x, y) = pos;
             let input_value = *inputs.get(&pos).unwrap();
 
             let input_neurotransmitter = match neurotransmitter_inputs {
@@ -687,10 +679,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
     /// Iterates one simulation timestep lattice given a set of only electrical inputs
     pub fn iterate(
         &mut self,
-        inputs: &HashMap<GraphPosition, f64>,
+        inputs: &HashMap<(usize, usize), f64>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
-            let (x, y) = pos.pos;
+            let (x, y) = pos;
             let input_value = *inputs.get(&pos).unwrap();
 
             let is_spiking = self.cell_grid[x][y].iterate_and_spike(input_value);
@@ -790,10 +782,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
                 // let num_to_select = scaled_number as usize;
 
                 let num_to_select = rng.gen_range(1..positions.len());
-                let positions = randomly_select_positions(positions, self.graph.get_id(), num_to_select);
+                let positions = randomly_select_positions(positions, num_to_select);
     
                 self.graph.initialize_connections(
-                    GraphPosition { id: self.graph.get_id(), pos: (row, col)}, 
+                    (row, col), 
                     positions, 
                     weight_params
                 );
@@ -813,7 +805,7 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
 
         for i in 0..num_rows {
             for j in 0..num_cols {
-                self.graph.add_node(GraphPosition { id: self.graph.get_id(), pos: (i, j) })
+                self.graph.add_node((i, j))
             }
         }
     }
@@ -832,10 +824,10 @@ impl<T: IterateAndSpike, U: Graph, V: LatticeHistory> Lattice<T, U, V> {
             .iter()
             .for_each(|i| {
                 for j in self.graph.get_every_node().iter() {
-                    if (connecting_conditional)(i.pos, j.pos) {
+                    if (connecting_conditional)(*i, *j) {
                         match weight_logic {
                             Some(logic) => {
-                                self.graph.edit_weight(i, j, Some((logic)(i.pos, j.pos))).unwrap();
+                                self.graph.edit_weight(i, j, Some((logic)(*i, *j))).unwrap();
                             },
                             None => {
                                 self.graph.edit_weight(i, j, Some(1.)).unwrap();
@@ -1009,47 +1001,57 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 ///     // connections each spike train to a postsynaptic neuron in the postsynaptic lattice if 
 ///     // the neuron is close enough, sets each weight to 1.
 ///     network.connect(2, 0, close_connect, None);
+/// 
+///     // note that connect will overwrite any pre-existing connections between the given
+///     // lattices in the direction specified (presynaptic -> postsynaptic will be overwritten)
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct LatticeNetwork
-<T: IterateAndSpike, U: Graph, V: LatticeHistory, W: SpikeTrain, X: SpikeTrainLatticeHistory> 
-{
+pub struct LatticeNetwork<
+    T: IterateAndSpike, 
+    U: Graph<T=(usize, usize)>, 
+    V: LatticeHistory, 
+    W: SpikeTrain, 
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition>,
+> {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
     lattices: HashMap<usize, Lattice<T, U, V>>,
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
     /// An array of graphs connecting different lattices together
-    connecting_graph: U,
+    connecting_graph: Y,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
 }
 
-impl<T, U, V, W, X> Default for LatticeNetwork<T, U, V, W, X>
+impl<T, U, V, W, X, Y> Default for LatticeNetwork<T, U, V, W, X, Y>
 where
     T: IterateAndSpike,
-    U: Graph,
+    U: Graph<T=(usize, usize)>,
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition>,
 {
     fn default() -> Self { 
         LatticeNetwork {
             lattices: HashMap::new(),
             spike_train_lattices: HashMap::new(),
-            connecting_graph: U::default(),
+            connecting_graph: Y::default(),
             internal_clock: 0,
         }
     }
 }
 
-impl<T, U, V, W, X> LatticeNetwork<T, U, V, W, X>
+impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
 where
     T: IterateAndSpike,
-    U: Graph,
+    U: Graph<T = (usize, usize)> + ToGraphPosition<GraphPos = Y>,
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
+    Y: Graph<T = GraphPosition>,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
@@ -1069,7 +1071,17 @@ where
 
         Ok(network)
     }
+}
 
+impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
+where
+    T: IterateAndSpike,
+    U: Graph<T=(usize, usize)>,
+    V: LatticeHistory,
+    W: SpikeTrain,
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition>,
+{
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
         &mut self, 
@@ -1154,7 +1166,7 @@ where
     }
 
     /// Returns an immutable reference to the connecting graph
-    pub fn get_connecting_graph(&self) -> &U {
+    pub fn get_connecting_graph(&self) -> &Y {
         &self.connecting_graph
     }
 
@@ -1207,12 +1219,14 @@ where
                 .iter()
                 .for_each(|i| {
                     for j in postsynaptic_graph.get_every_node().iter() {
-                        if (connecting_conditional)(i.pos, j.pos) {
-                            self.connecting_graph.add_node(*i);
-                            self.connecting_graph.add_node(*j);
+                        if (connecting_conditional)(*i, *j) {
+                            let i_graph_pos = GraphPosition { id: presynaptic_id, pos: *i};
+                            let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                            self.connecting_graph.add_node(i_graph_pos);
+                            self.connecting_graph.add_node(j_graph_pos);
 
-                            let weight = weight_logic.map_or(1., |logic| (logic)(i.pos, j.pos));
-                            self.connecting_graph.edit_weight(i, j, Some(weight)).unwrap();
+                            let weight = weight_logic.map_or(1., |logic| (logic)(*i, *j));
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, Some(weight)).unwrap();
                         }
                     }
                 });
@@ -1239,12 +1253,13 @@ where
             presynaptic_positions.iter()
                 .for_each(|i| {
                     for j in postsynaptic_graph.get_every_node().iter() {
-                        if (connecting_conditional)(i.pos, j.pos) {
+                        if (connecting_conditional)(i.pos, *j) {
+                            let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
                             self.connecting_graph.add_node(*i);
-                            self.connecting_graph.add_node(*j);
+                            self.connecting_graph.add_node(j_graph_pos);
                             
-                            let weight = weight_logic.map_or(1., |logic| (logic)(i.pos, j.pos));
-                            self.connecting_graph.edit_weight(i, j, Some(weight)).unwrap();
+                            let weight = weight_logic.map_or(1., |logic| (logic)(i.pos, *j));
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, Some(weight)).unwrap();
                         }
                     }
                 });
@@ -1254,8 +1269,12 @@ where
     }
 
     fn get_all_input_positions(&self, pos: GraphPosition) -> HashSet<GraphPosition> {
-        let mut input_positions = self.lattices[&pos.id].graph.get_incoming_connections(&pos)
-            .expect("Cannot find position");
+        let mut input_positions: HashSet<GraphPosition> = self.lattices[&pos.id].graph
+            .get_incoming_connections(&pos.pos)
+            .expect("Cannot find position")
+            .iter()
+            .map(|i| GraphPosition { id: pos.id, pos: *i})
+            .collect();
 
         match self.connecting_graph.get_incoming_connections(&pos) {
             Ok(value) => {
@@ -1385,11 +1404,15 @@ where
         return input_val;
     }
 
-    fn get_every_node_as_ref(&self) -> HashSet<&GraphPosition> {
+    fn get_every_node(&self) -> HashSet<GraphPosition> {
         let mut nodes = HashSet::new();
 
         for i in self.lattices.values() {
-            nodes.extend(i.graph.get_every_node_as_ref());
+            let current_nodes: HashSet<GraphPosition> = i.graph.get_every_node_as_ref()
+                .iter()
+                .map(|j| GraphPosition { id: i.get_id(), pos: **j})
+                .collect();
+            nodes.extend(current_nodes);
         }
 
         nodes
@@ -1398,24 +1421,24 @@ where
     fn get_all_electrical_inputs(&self) -> HashMap<GraphPosition, f64> {
         // eventually paralellize
         // may need to remove the cloning in get every node
-        self.get_every_node_as_ref()
+        self.get_every_node()
             .iter()
             .map(|pos| {
-                let input_positions = self.get_all_input_positions(**pos);
+                let input_positions = self.get_all_input_positions(*pos);
 
                 let input = self.calculate_electrical_input_from_positions(
                     &pos,
                     &input_positions,
                 );
 
-                (**pos, input)
+                (*pos, input)
             })
             .collect()
     }
 
     fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
     (HashMap<GraphPosition, f64>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
-        let neurotransmitters_inputs = self.get_every_node_as_ref()
+        let neurotransmitters_inputs = self.get_every_node()
             .iter()
             .map(|pos| {
                 let input = match self.lattices.get(&pos.id).unwrap().do_receptor_kinetics {
@@ -1423,14 +1446,14 @@ where
                         Some(
                             self.calculate_neurotransmitter_input_from_positions(
                                 &pos,
-                                &self.get_all_input_positions(**pos),
+                                &self.get_all_input_positions(*pos),
                             )
                         )
                     },
                     false => None,
                 };
 
-                (**pos, input)
+                (*pos, input)
             })
             .collect();
 
@@ -1491,11 +1514,11 @@ where
         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
-        for input_pos in current_lattice.graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
-            let (x_in, y_in) = input_pos.pos;
+        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+            let (x_in, y_in) = input_pos;
 
             let current_weight: f64 = current_lattice.graph
-                .lookup_weight(&input_pos, &pos)
+                .lookup_weight(&input_pos, &pos.pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
@@ -1507,16 +1530,16 @@ where
             current_lattice.graph
                 .edit_weight(
                     &input_pos, 
-                    &pos, 
+                    &pos.pos, 
                     Some(current_weight + dw)
                 )?;
         }
 
-        for output_pos in current_lattice.graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
-            let (x_out, y_out) = output_pos.pos;
+        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+            let (x_out, y_out) = output_pos;
 
             let current_weight: f64 = current_lattice.graph
-                .lookup_weight(&pos, &output_pos)
+                .lookup_weight(&pos.pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
@@ -1527,7 +1550,7 @@ where
                                         
             current_lattice.graph
                 .edit_weight(
-                    &pos, 
+                    &pos.pos, 
                     &output_pos, 
                     Some(current_weight + dw)
                 )?;
@@ -1546,10 +1569,12 @@ where
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
-                let (x, y) = pos.pos;
-                let input_value = *inputs.get(&pos).unwrap();
+                let (x, y) = pos;
+                let graph_pos = GraphPosition {id: lattice.get_id(), pos: pos };
 
-                let input_neurotransmitter = neurotransmitter_inputs.get(&pos).unwrap();
+                let input_value = *inputs.get(&graph_pos).unwrap();
+
+                let input_neurotransmitter = neurotransmitter_inputs.get(&graph_pos).unwrap();
 
                 let is_spiking = lattice.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
                     input_value, input_neurotransmitter.as_ref(),
@@ -1558,7 +1583,7 @@ where
                 if is_spiking {
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                     if lattice.do_stdp {
-                        spiking_positions.push((x, y, pos));
+                        spiking_positions.push((x, y, graph_pos));
                     }
                 }
             }
@@ -1599,8 +1624,10 @@ where
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
-                let (x, y) = pos.pos;
-                let input_value = *inputs.get(&pos).unwrap();
+                let (x, y) = pos;
+                let graph_pos = GraphPosition {id: lattice.get_id(), pos: pos };
+
+                let input_value = *inputs.get(&graph_pos).unwrap();
 
                 let is_spiking = lattice.cell_grid[x][y].iterate_and_spike(input_value);
     
@@ -1611,7 +1638,7 @@ where
                 if is_spiking {
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                     if lattice.do_stdp {
-                        spiking_positions.push((x, y, pos));
+                        spiking_positions.push((x, y, graph_pos));
                     }
                 }
             }
