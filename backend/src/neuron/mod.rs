@@ -1573,7 +1573,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition {id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
@@ -1628,7 +1628,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition {id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
