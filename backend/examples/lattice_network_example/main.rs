@@ -62,7 +62,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     
     network.run_lattices(iterations)?;
 
-    let mut voltage_file = BufWriter::new(File::create("lattice_history.txt")
+    let mut voltage_file = BufWriter::new(File::create("lattice_network_history.txt")
         .expect("Could not create file"));
 
     for grid in &network.get_lattice(&1).unwrap().grid_history.history {
