@@ -6,7 +6,7 @@ use rand::Rng;
 use crate::error::{
     GraphError, PatternErrorKind, SpikingNeuralNetworksError, SpikingNeuralNetworksErrorKind
 };
-use crate::graph::{Graph, GraphPosition};
+use crate::graph::Graph;
 
 
 /// State of a bipolar discrete neuron
@@ -50,7 +50,7 @@ impl DiscreteNeuron {
 }
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
-pub struct DiscreteNeuronLattice<T: Graph>{
+pub struct DiscreteNeuronLattice<T: Graph<T=(usize, usize)>>{
     /// 2 dimensional grid of discrete neurons
     pub cell_grid: Vec<Vec<DiscreteNeuron>>,
     /// Internal graph weights, position listed in graph must have a corresponding index
@@ -58,7 +58,7 @@ pub struct DiscreteNeuronLattice<T: Graph>{
     pub graph: T,
 }
 
-impl<T: Graph> Default for DiscreteNeuronLattice<T> {
+impl<T: Graph<T=(usize, usize)>> Default for DiscreteNeuronLattice<T> {
     fn default() -> Self {
         DiscreteNeuronLattice {
             cell_grid: vec![],
@@ -67,7 +67,7 @@ impl<T: Graph> Default for DiscreteNeuronLattice<T> {
     }
 }
 
-impl<T: Graph> DiscreteNeuronLattice<T> {
+impl<T: Graph<T=(usize, usize)>> DiscreteNeuronLattice<T> {
     /// Generates a lattice with default weights given a number of rows and columns to use
     pub fn generate_lattice_from_dimension(num_rows: usize, num_cols: usize) -> Self {
         let cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
@@ -120,15 +120,15 @@ impl<T: Graph> DiscreteNeuronLattice<T> {
 
             let input_value: f64 = input_positions.iter()
                 .map(|graph_pos| {
-                        let (pos_i, pos_j) = graph_pos.pos;
+                        let (pos_i, pos_j) = graph_pos;
 
                         self.graph.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
-                        * self.cell_grid[pos_i][pos_j].state_to_numeric() as f64
+                        * self.cell_grid[*pos_i][*pos_j].state_to_numeric() as f64
                     }
                 )
                 .sum();
 
-            self.cell_grid[current_pos.pos.0][current_pos.pos.1].update(input_value);
+            self.cell_grid[current_pos.0][current_pos.1].update(input_value);
         }
 
         Ok(())
@@ -157,7 +157,7 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// Generates weights for a Hopfield network based on a given set of patterns, and 
 /// an id to assign to the graph, assumes the patterns have the same dimensions throughout,
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
-pub fn generate_hopfield_network<T: Graph + Default>(
+pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
     graph_id: usize,
     data: &Vec<Vec<Vec<isize>>>
 ) -> result::Result<T, SpikingNeuralNetworksError> {
@@ -203,7 +203,7 @@ pub fn generate_hopfield_network<T: Graph + Default>(
 
     for i in 0..num_rows {
         for j in 0..num_cols {
-            weights.add_node(GraphPosition { id: graph_id, pos: (i, j)});
+            weights.add_node((i, j));
         }
     }
 
@@ -218,9 +218,6 @@ pub fn generate_hopfield_network<T: Graph + Default>(
             for (j, value) in weight_vec.iter().enumerate() {
                 let coming = first_dimensional_index_to_position(i, num_cols);
                 let going = first_dimensional_index_to_position(j, num_cols);
-
-                let coming = GraphPosition { id: graph_id, pos: coming };
-                let going = GraphPosition { id: graph_id, pos: going };
 
                 //   1 2 3 ...
                 // 1 . . .
