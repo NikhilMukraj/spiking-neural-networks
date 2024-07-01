@@ -814,7 +814,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// if the neurons should be connected given their position (usize, usize), and
     /// a function to determine what the weight between the neurons should be,
     /// if the `weight_logic` function is `None`, the weights are set as `1.`
-    /// if a connect should occur according to `connecting_conditional`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
     pub fn connect(
         &mut self, 
         connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
@@ -833,6 +834,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
                                 self.graph.edit_weight(i, j, Some(1.)).unwrap();
                             }
                         };
+                    } else {
+                        self.graph.edit_weight(i, j, None).unwrap();
                     }
                 }
             });
@@ -1224,14 +1227,16 @@ where
                 .iter()
                 .for_each(|i| {
                     for j in postsynaptic_graph.get_every_node().iter() {
-                        if (connecting_conditional)(*i, *j) {
-                            let i_graph_pos = GraphPosition { id: presynaptic_id, pos: *i};
-                            let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
-                            self.connecting_graph.add_node(i_graph_pos);
-                            self.connecting_graph.add_node(j_graph_pos);
+                        let i_graph_pos = GraphPosition { id: presynaptic_id, pos: *i};
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(i_graph_pos);
+                        self.connecting_graph.add_node(j_graph_pos);
 
+                        if (connecting_conditional)(*i, *j) {
                             let weight = weight_logic.map_or(1., |logic| (logic)(*i, *j));
                             self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, None).unwrap();
                         }
                     }
                 });
@@ -1258,13 +1263,15 @@ where
             presynaptic_positions.iter()
                 .for_each(|i| {
                     for j in postsynaptic_graph.get_every_node().iter() {
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(*i);
+                        self.connecting_graph.add_node(j_graph_pos);
+                        
                         if (connecting_conditional)(i.pos, *j) {
-                            let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
-                            self.connecting_graph.add_node(*i);
-                            self.connecting_graph.add_node(j_graph_pos);
-                            
                             let weight = weight_logic.map_or(1., |logic| (logic)(i.pos, *j));
                             self.connecting_graph.edit_weight(i, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, None).unwrap();
                         }
                     }
                 });
