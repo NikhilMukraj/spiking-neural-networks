@@ -1,7 +1,7 @@
 //! A tool to calculate the Pearson correlation coefficient.
 
 use std::result::Result;
-use crate::error::{TimeSeriesProcessingError, TimeSeriesProcessingErrorKind};
+use crate::error::TimeSeriesProcessingError;
 
 
 fn mean(values: &Vec<f64>) -> f64 {
@@ -19,9 +19,7 @@ fn std(values: &Vec<f64>, values_mean: f64) -> f64 {
 pub fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64, TimeSeriesProcessingError> {
     if x.len() != y.len() {
         return Err(
-            TimeSeriesProcessingError::new(
-                TimeSeriesProcessingErrorKind::SeriesAreNotSameLength, file!(), line!()
-            )
+            TimeSeriesProcessingError::SeriesAreNotSameLength
         );
     }
     

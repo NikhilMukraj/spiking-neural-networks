@@ -6,7 +6,7 @@ use std::{
     io::{Error, ErrorKind, Result},
     ops::Sub,
 };
-use crate::error::{GeneticAlgorithmError, GeneticAlgorithmErrorKind};
+use crate::error::GeneticAlgorithmError;
 use crate::neuron::{   
     hodgkin_huxley::HodgkinHuxleyNeuron, 
     integrate_and_fire::IzhikevichNeuron, 
@@ -62,10 +62,8 @@ pub fn get_summary(
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
         return Err(
-            GeneticAlgorithmError::new(
-                GeneticAlgorithmErrorKind::ObjectiveFunctionFailure(
-                    String::from("Voltage time series must be of the same length"),
-                ), file!(), line!()
+            GeneticAlgorithmError::ObjectiveFunctionFailure(
+                String::from("Voltage time series must be of the same length")
             )
         );
     }
@@ -436,10 +434,8 @@ fn fitting_objective<
     for result in summaries_results.iter() {
         if let Err(_) = result {
             return Err(
-                GeneticAlgorithmError::new(
-                    GeneticAlgorithmErrorKind::ObjectiveFunctionFailure(
-                        String::from("Summary calculation could not be completed")
-                    ), file!(), line!()
+                GeneticAlgorithmError::ObjectiveFunctionFailure(
+                    String::from("Summary calculation could not be completed")
                 )
             );
         }

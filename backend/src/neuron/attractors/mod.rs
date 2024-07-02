@@ -3,9 +3,7 @@
 
 use std::result;
 use rand::Rng;
-use crate::error::{
-    GraphError, PatternErrorKind, SpikingNeuralNetworksError, SpikingNeuralNetworksErrorKind
-};
+use crate::error::{GraphError, PatternError, SpikingNeuralNetworksError};
 use crate::graph::Graph;
 
 
@@ -168,32 +166,20 @@ pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
         for row in pattern {
             if row.iter().any(|i| *i != -1 && *i != 1) {
                 return Err(
-                    SpikingNeuralNetworksError::new(
-                        SpikingNeuralNetworksErrorKind::PatternRelatedError(
-                            PatternErrorKind::PatternIsNotBipolar
-                        ), file!(), line!()
-                    )
+                    SpikingNeuralNetworksError::from(PatternError::PatternIsNotBipolar)
                 )
             }
         }
 
         if pattern.len() != num_rows {
             return Err(
-                SpikingNeuralNetworksError::new(
-                    SpikingNeuralNetworksErrorKind::PatternRelatedError(
-                        PatternErrorKind::PatternDimensionsAreNotEqual
-                    ), file!(), line!()
-                )
+                SpikingNeuralNetworksError::from(PatternError::PatternDimensionsAreNotEqual)
             );
         }
     
         if pattern.iter().any(|row| row.len() != num_cols) {
             return Err(
-                SpikingNeuralNetworksError::new(
-                    SpikingNeuralNetworksErrorKind::PatternRelatedError(
-                        PatternErrorKind::PatternDimensionsAreNotEqual
-                    ), file!(), line!()
-                )
+                SpikingNeuralNetworksError::from(PatternError::PatternDimensionsAreNotEqual)
             );
         }
     }

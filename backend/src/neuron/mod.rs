@@ -32,7 +32,7 @@ use iterate_and_spike::{
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
-use crate::error::{GraphError, LatticeNetworkError, LatticeNetworkErrorKind};
+use crate::error::{GraphError, LatticeNetworkError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 
 
@@ -1094,7 +1094,7 @@ where
         lattice: Lattice<T, U, V>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
-            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::GraphIDAlreadyPresent, file!(), line!()));
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
         }
         self.lattices.insert(lattice.get_id(), lattice);
 
@@ -1108,7 +1108,7 @@ where
         spike_train_lattice: SpikeTrainLattice<W, X>, 
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&spike_train_lattice.id) {
-            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::GraphIDAlreadyPresent, file!(), line!()));
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
         }
 
         self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
@@ -1206,15 +1206,15 @@ where
         weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PostsynapticLatticeCannotBeSpikeTrain, file!(), line!()));
+            return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
         }
 
         if !self.get_all_ids().contains(&presynaptic_id) {
-            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PresynapticIDNotFound, file!(), line!()));
+            return Err(LatticeNetworkError::PresynapticIDNotFound);
         }
 
         if !self.lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::new(LatticeNetworkErrorKind::PostsynapticIDNotFound, file!(), line!()));
+            return Err(LatticeNetworkError::PostsynapticIDNotFound);
         }
 
         if self.lattices.contains_key(&presynaptic_id) {
