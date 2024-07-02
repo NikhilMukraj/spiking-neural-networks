@@ -18,7 +18,6 @@ use std::{
     f64::consts::PI, 
     result::Result,
 };
-use rand::{Rng, seq::SliceRandom};
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
 pub mod fitzhugh_nagumo;
@@ -27,7 +26,7 @@ pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, GaussianParameters,
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime,
     Potentiation, PotentiationType, STDP, NeurotransmitterConcentrations, 
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
@@ -391,52 +390,49 @@ macro_rules! impl_reset_timing  {
     };
 }
 
-fn positions_within_square(
-    center_row: usize, 
-    center_col: usize, 
-    extent: usize, 
-    size: (usize, usize)
-) -> Vec<(usize, usize)> {
-    let (row_length, col_length) = size;
-    let mut positions = Vec::new();
-
-    for row in center_row.saturating_sub(extent)..=(center_row + extent) {
-        for col in center_col.saturating_sub(extent)..=(center_col + extent) {
-            if (row != center_row || col != center_col) && (row < row_length && col < col_length) {
-                positions.push((row, col));
-            }
-        }
-    }
-
-    positions
-}
-
-fn randomly_select_positions(
-    mut positions: Vec<(usize, usize)>, 
-    num_to_select: usize
-) -> Vec<(usize, usize)> {
-    let mut rng = rand::thread_rng();
-
-    positions.shuffle(&mut rng);
-    positions.truncate(num_to_select);
-
-    positions
-}
-
-/// A macro that creates a conditional function for connecting neurons based on the 
-/// radius around the neuron to allow connections and number representing the chance of a 
-/// connection occuring
-#[macro_export]
-macro_rules! random_connection_conditional {
-    ($radius:expr, $chance_of_connection:expr) => {
-        fn connection_conditional((usize, usize), (usize, usize)) -> bool {
-            (((x.0 - y.0).pow(2) + (x.1 - y.1).pow(2)) as f64).sqrt() <= radius && 
-            rand::thread_rng().gen_range(0.0..=1.0) <= chance_of_connection
-        }
-    }
-}
-
-/// Lattice of [`IterateAndSpike`] neurons
+/// Lattice of [`IterateAndSpike`] neurons, each lattice has a corresponding [`Graph`] that
+/// details the internal connections of the lattice as well as a field to track the history
+/// of the lattice over time, by default history is not updated, use `run_lattices` to run
+/// the electrical synapses of the lattice for the given number of iterations, use `populate`
+/// to fill the lattice with a given neuron and its associated parameters, use `connect` to
+/// generate connections between neurons in the lattice
+/// 
+/// ```rust
+/// # use rand::Rng;
+/// # use spiking_neural_networks::{
+/// #     neuron::{
+/// #         integrate_and_fire::IzhikevichNeuron,
+/// #         Lattice
+/// #     },
+/// #     error::SpikingNeuralNetworksError,
+/// # };
+/// #
+/// 
+/// fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
+///     (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 2. && 
+///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
+/// }
+/// 
+/// fn main() -> Result<(), SpikingNeuralNetworksError> {
+///     # let base_neuron = IzhikevichNeuron {
+///     #    gap_conductance: 10.,
+///     #    ..IzhikevichNeuron::default_impl()
+///     # };
+///     #
+///     let mut lattice = Lattice::default_impl();
+/// 
+///     // creates 5x5 grid of neurons
+///     lattice.populate(&base_neuron, 5, 5);
+///     // connects each neuron depending on whether the neuron is in a radius of 2 with
+///     // an 80% chance of connectiing, each neuron is connected with a default weight of 1.
+///     lattice.connect(connection_conditional, None);
+/// 
+///     // lattice is simulated for 500 iterations
+///     lattice.run_lattice(500)?;
+/// 
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> {
     /// Grid of neurons
@@ -763,49 +759,6 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
             .collect()
     }
 
-    /// Populates a randomly connected lattice based on a single neuron to copy
-    /// the parameters of throughout the lattice, the size of the lattice,
-    /// and the radius from which neurons are allowed to be connected,
-    /// use `&None` to connect every neuron with a weight of `1.` or
-    /// provide gaussian parameters to generate randomly generated
-    /// weights based on a normal distribution, (overwrites any pre-existing
-    /// neurons or connections)
-    pub fn populate_and_randomly_connect(
-        &mut self,
-        base_neuron: &T,
-        num_rows: usize, 
-        num_cols: usize,
-        radius: usize,
-        weight_params: &Option<GaussianParameters>,
-    ) {
-        let mut rng = rand::thread_rng();
-
-        let id = self.get_id();
-
-        self.graph = U::default();
-        self.graph.set_id(id);
-        self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
-
-        for row in 0..num_rows {
-            for col in 0..num_cols {
-                let positions = positions_within_square(row, col, radius, (num_rows, num_cols));
-
-                // let random_number: f64 = rng.gen_range(0..=1);
-                // let scaled_number = 1. + random_number * (positions.len() as f64 - 1.);
-                // let num_to_select = scaled_number as usize;
-
-                let num_to_select = rng.gen_range(1..positions.len());
-                let positions = randomly_select_positions(positions, num_to_select);
-    
-                self.graph.initialize_connections(
-                    (row, col), 
-                    positions, 
-                    weight_params
-                );
-            }
-        }
-    }
-
     /// Populates a lattice given the dimensions and a base neuron to copy the parameters
     /// of without generating any connections within the graph, (overwrites any pre-existing
     /// neurons or connections)
@@ -972,47 +925,64 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     }
 }
 
-/// [`LatticeNetwork`] represents a series of lattices interconnected by a graph, each lattice
+/// [`LatticeNetwork`] represents a series of lattices interconnected by a [`Graph`], each lattice
 /// is associated to a unique identifier, [`Lattice`]s and [`SpikeTrainLattice`]s cannot have
 /// the same identifiers, [`SpikeTrainLattice`]s cannot be postsynaptic because the spike trains
 /// cannot take in an input
 /// 
 /// Use `connect` to generate connections between lattices:
 /// ```rust
+/// # use spiking_neural_networks::{
+/// #     neuron::{
+/// #         integrate_and_fire::IzhikevichNeuron,
+/// #         spike_train::PoissonNeuron,
+/// #         Lattice, SpikeTrainLattice, LatticeNetwork,
+/// #     },
+/// #     error::SpikingNeuralNetworksError,
+/// # };
+/// #
 /// fn one_to_one(x: (usize, usize), y: (usize, usize)) -> bool {
 ///     x == y
 /// }
 /// 
 /// fn close_connect(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (x.0 as isize - y.0 as isize).abs() < 2. && (x.1 as isize - y.1 as isize).abs() < 2.
+///     (x.0 as f64 - y.0 as f64).abs() < 2. && (x.1 as f64 - y.1 as f64).abs() < 2.
 /// }
 /// 
 /// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
-///     (((x.0 as isize - y.0 as isize).pow(2) + (x.1 as isize - y.1 as isize).pow(2)) as f64).sqrt()
+///     (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt()
 /// }
 /// 
-/// fn main() -> Result<(), SpikingNeuralNetworkError>{
+/// fn main() -> Result<(), SpikingNeuralNetworksError>{
+///     # let base_neuron = IzhikevichNeuron {
+///     #    gap_conductance: 10.,
+///     #    ..IzhikevichNeuron::default_impl()
+///     # };
+///     #
+///     # let mut base_spike_train = PoissonNeuron::default_impl();
+///     # base_spike_train.chance_of_firing = 0.01;
+///     #
 ///     let mut lattice1 = Lattice::default_impl();
 ///     lattice1.set_id(0);
 ///     let mut lattice2 = lattice1.clone();
 ///     lattice2.set_id(1);
 /// 
-///     lattice1.populate(base_neuron, 3, 3);
-///     lattice2.populate(base_neuron, 3, 3);
+///     lattice1.populate(&base_neuron, 3, 3);
+///     lattice2.populate(&base_neuron, 3, 3);
 /// 
 ///     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
 ///     spike_train_lattice.set_id(2);
-///     spike_train_lattice.populate(base_spike_train, 3, 3);
+///     spike_train_lattice.populate(&base_spike_train, 3, 3);
 /// 
 ///     let mut network = LatticeNetwork::generate_network(vec![lattice1, lattice2], vec![spike_train_lattice])?;
 ///     
 ///     // connects each corressponding neuron in the presynaptic lattice to a neuron in the
 ///     // postsynaptic lattice as long as their position is the same, scales the weight
 ///     // of the connection depending on the distance from each neuron
-///     network.connect(0, 1, one_to_one, weight_function);
+///     network.connect(0, 1, one_to_one, Some(weight_function));
 /// 
 ///     // connects the lattices in the same manner as before but does so in the opposite direction
-///     network.connect(1, 0, one_to_one, weight_function);
+///     network.connect(1, 0, one_to_one, Some(weight_function));
 /// 
 ///     // connections each spike train to a postsynaptic neuron in the postsynaptic lattice if 
 ///     // the neuron is close enough, sets each weight to 1.
@@ -1022,7 +992,9 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 ///     // lattices in the direction specified (presynaptic -> postsynaptic will be overwritten)
 /// 
 ///     // runs network for given amount of iterations
-///     network.run_lattices(5000)?;
+///     network.run_lattices(500)?;
+/// 
+///     Ok(())
 /// }
 /// ```
 #[derive(Debug, Clone)]
