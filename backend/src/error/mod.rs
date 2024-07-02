@@ -12,22 +12,22 @@ macro_rules! impl_debug_default {
 }
 
 /// Error set for potential graph errors
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub enum GraphError {
     /// Presynaptic position cannot be found
-    PresynapticNotFound,
+    PresynapticNotFound(String),
     /// Postsynaptic position cannot be found
-    PostsynapticNotFound,
+    PostsynapticNotFound(String),
     /// Position cannot be found
-    PositionNotFound,
+    PositionNotFound(String),
 }
 
 impl Display for GraphError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            GraphError::PostsynapticNotFound => "Postsynaptic position not found",
-            GraphError::PresynapticNotFound => "Presynaptic position not found",
-            GraphError::PositionNotFound => "Position not found",
+            GraphError::PostsynapticNotFound(value) => format!("Postsynaptic position not found, position: {:#?}", value),
+            GraphError::PresynapticNotFound(value) => format!("Presynaptic position not found, position: {:#?}", value),
+            GraphError::PositionNotFound(value) => format!("Position not found, position: {:#?}", value),
         };
 
         write!(f, "{}", err_msg)
