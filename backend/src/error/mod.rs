@@ -40,11 +40,11 @@ impl_debug_default!(GraphError);
 #[derive(Clone, Copy)]
 pub enum LatticeNetworkError {
     /// Graph id already present in network (network must have graphs with unique identifiers)
-    GraphIDAlreadyPresent,
+    GraphIDAlreadyPresent(usize),
     /// Postsynaptic id cannot be found
-    PostsynapticIDNotFound,
+    PostsynapticIDNotFound(usize),
     /// Presynaptic id cannot be found
-    PresynapticIDNotFound,
+    PresynapticIDNotFound(usize),
     /// When connecting network, postsynaptic lattice cannot be a spike train lattice because spike trains
     /// cannot take inputs
     PostsynapticLatticeCannotBeSpikeTrain,
@@ -53,10 +53,18 @@ pub enum LatticeNetworkError {
 impl Display for LatticeNetworkError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
-            LatticeNetworkError::GraphIDAlreadyPresent => "Graph id already present in network",
-            LatticeNetworkError::PostsynapticIDNotFound => "Postsynaptic id not present in network",
-            LatticeNetworkError::PresynapticIDNotFound => "Postsynaptic id not present in network",
-            LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs",
+            LatticeNetworkError::GraphIDAlreadyPresent(value) => format!(
+                "Graph id already present in network, id: {}", value
+            ),
+            LatticeNetworkError::PostsynapticIDNotFound(value) => format!(
+                "Postsynaptic id not present in network, id: {}", value
+            ),
+            LatticeNetworkError::PresynapticIDNotFound(value) => format!(
+                "Postsynaptic id not present in network, id: {}", value
+            ),
+            LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => String::from(
+                "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs"
+            ),
         };
 
         write!(f, "{}", err_msg)
