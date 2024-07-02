@@ -8,7 +8,7 @@ use std::{
     cmp::Eq,
 };
 use crate::error::GraphError;
-use crate::neuron::iterate_and_spike::GaussianParameters;
+// use crate::neuron::iterate_and_spike::GaussianParameters;
 
 
 /// Cartesian coordinate represented as unsigned integers for x and y
@@ -31,15 +31,15 @@ pub trait Graph: Default {
     /// Adds a new node to the graph, unconnected to other nodes, no change if node
     /// is already in graph
     fn add_node(&mut self, position: Self::T);
-    /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
-    /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
-    /// is initialized as a normally distributed random value based on the inputted weight parameters
-    fn initialize_connections(
-        &mut self, 
-        postsynaptic: Self::T, 
-        presynaptic_connections: Vec<Self::T>, 
-        weight_params: &Option<GaussianParameters>,
-    );
+    // /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
+    // /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
+    // /// is initialized as a normally distributed random value based on the inputted weight parameters
+    // fn initialize_connections(
+    //     &mut self, 
+    //     postsynaptic: Self::T, 
+    //     presynaptic_connections: Vec<Self::T>, 
+    //     weight_params: &Option<GaussianParameters>,
+    // );
     /// Returns every node or vertex on the graph
     fn get_every_node(&self) -> HashSet<Self::T>;
     /// Returns every node as a reference without cloning
@@ -123,32 +123,32 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
         }
     }
 
-    fn initialize_connections(
-        &mut self, 
-        postsynaptic: T, 
-        connections: Vec<T>, 
-        weight_params: &Option<GaussianParameters>,
-    ) {
-        if !self.position_to_index.contains_key(&postsynaptic) {
-            self.add_node(postsynaptic)
-        }
-        for i in connections.iter() {
-            if !self.position_to_index.contains_key(i) {
-                self.add_node(*i);
-            }
+    // fn initialize_connections(
+    //     &mut self, 
+    //     postsynaptic: T, 
+    //     connections: Vec<T>, 
+    //     weight_params: &Option<GaussianParameters>,
+    // ) {
+    //     if !self.position_to_index.contains_key(&postsynaptic) {
+    //         self.add_node(postsynaptic)
+    //     }
+    //     for i in connections.iter() {
+    //         if !self.position_to_index.contains_key(i) {
+    //             self.add_node(*i);
+    //         }
 
-            let weight = match weight_params {
-                Some(value) => {
-                    Some(
-                        value.get_random_number()
-                    )
-                },
-                None => Some(1.0),
-            };
+    //         let weight = match weight_params {
+    //             Some(value) => {
+    //                 Some(
+    //                     value.get_random_number()
+    //                 )
+    //             },
+    //             None => Some(1.0),
+    //         };
 
-            self.edit_weight(i, &postsynaptic, weight).unwrap();
-        }
-    }
+    //         self.edit_weight(i, &postsynaptic, weight).unwrap();
+    //     }
+    // }
 
     fn get_every_node(&self) -> HashSet<T> {
         self.position_to_index.keys().cloned().collect()
@@ -264,37 +264,37 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
             .or_insert_with(HashMap::new);
     }
 
-    fn initialize_connections(
-        &mut self, 
-        postsynaptic: T, 
-        connections: Vec<T>, 
-        weight_params: &Option<GaussianParameters>,
-    ) {
-        for i in connections.iter() {
-            let weight = match weight_params {
-                Some(value) => {
-                    value.get_random_number()
-                },
-                None => 1.0,
-            };
+    // fn initialize_connections(
+    //     &mut self, 
+    //     postsynaptic: T, 
+    //     connections: Vec<T>, 
+    //     weight_params: &Option<GaussianParameters>,
+    // ) {
+    //     for i in connections.iter() {
+    //         let weight = match weight_params {
+    //             Some(value) => {
+    //                 value.get_random_number()
+    //             },
+    //             None => 1.0,
+    //         };
 
-            if !self.incoming_connections.contains_key(&postsynaptic) {
-                self.incoming_connections.entry(postsynaptic)
-                    .or_insert_with(HashMap::new)
-                    .insert(*i, weight);
-            } else {
-                if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
-                    positions_and_weights.insert(*i, weight);
-                }
-            }
+    //         if !self.incoming_connections.contains_key(&postsynaptic) {
+    //             self.incoming_connections.entry(postsynaptic)
+    //                 .or_insert_with(HashMap::new)
+    //                 .insert(*i, weight);
+    //         } else {
+    //             if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
+    //                 positions_and_weights.insert(*i, weight);
+    //             }
+    //         }
 
-            if let Some(vector) = self.outgoing_connections.get_mut(&i) {
-                vector.insert(postsynaptic);
-            } else {
-                self.outgoing_connections.insert(*i, HashSet::from([postsynaptic]));
-            }
-        }
-    }
+    //         if let Some(vector) = self.outgoing_connections.get_mut(&i) {
+    //             vector.insert(postsynaptic);
+    //         } else {
+    //             self.outgoing_connections.insert(*i, HashSet::from([postsynaptic]));
+    //         }
+    //     }
+    // }
 
     fn get_every_node(&self) -> HashSet<T> {
         self.incoming_connections.keys().cloned().collect()
