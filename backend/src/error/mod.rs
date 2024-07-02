@@ -45,6 +45,8 @@ pub enum LatticeNetworkError {
     PostsynapticIDNotFound(usize),
     /// Presynaptic id cannot be found
     PresynapticIDNotFound(usize),
+    /// Lattice id cannot be found, (non spike train lattice)
+    IDNotFoundInLattices(usize),
     /// When connecting network, postsynaptic lattice cannot be a spike train lattice because spike trains
     /// cannot take inputs
     PostsynapticLatticeCannotBeSpikeTrain,
@@ -61,6 +63,9 @@ impl Display for LatticeNetworkError {
             ),
             LatticeNetworkError::PresynapticIDNotFound(value) => format!(
                 "Postsynaptic id not present in network, id: {}", value
+            ),
+            LatticeNetworkError::IDNotFoundInLattices(value) => format!(
+                "Id not present in lattices, id: {}", value
             ),
             LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => String::from(
                 "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs"
