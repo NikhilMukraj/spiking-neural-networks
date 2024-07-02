@@ -391,12 +391,16 @@ macro_rules! impl_reset_timing  {
 }
 
 /// Lattice of [`IterateAndSpike`] neurons, each lattice has a corresponding [`Graph`] that
-/// details the internal connections of the lattice as well as a field to track the history
-/// of the lattice over time, by default history is not updated, use `run_lattices` to run
-/// the electrical synapses of the lattice for the given number of iterations, use `populate`
-/// to fill the lattice with a given neuron and its associated parameters, use `connect` to
-/// generate connections between neurons in the lattice
+/// details the internal connections of the lattice, a grid of neurons stored as a 2
+/// dimensional array, as well as a field to track the history of the lattice over time, 
+/// by default history is not updated, use `run_lattice` to run the electrical synapses 
+/// of the lattice for the given number of iterations, use `populate` to fill the lattice 
+/// with a given neuron and its associated parameters, use `connect` to generate connections 
+/// between neurons in the lattice, `connect` and `populate` should be used
+/// to generate connections and grid instead of modifying the graph and grid directly,
+/// after grid is generated, neuronal parameters and values can be freely edited
 /// 
+/// Use `connect` and `populate` to generate lattice:
 /// ```rust
 /// # use rand::Rng;
 /// # use spiking_neural_networks::{
@@ -407,28 +411,38 @@ macro_rules! impl_reset_timing  {
 /// #     error::SpikingNeuralNetworksError,
 /// # };
 /// #
-/// 
+/// // has an 80% chance of returning true if distance from neuron to neuron is less than 2.,
+/// // otherwise false
 /// fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
 ///     (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 2. && 
 ///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworksError> {
-///     # let base_neuron = IzhikevichNeuron {
-///     #    gap_conductance: 10.,
-///     #    ..IzhikevichNeuron::default_impl()
-///     # };
-///     #
+///     // generate base neuron
+///     let base_neuron = IzhikevichNeuron {
+///        gap_conductance: 10.,
+///        ..IzhikevichNeuron::default_impl()
+///     };
+///     
 ///     let mut lattice = Lattice::default_impl();
 /// 
 ///     // creates 5x5 grid of neurons
 ///     lattice.populate(&base_neuron, 5, 5);
-///     // connects each neuron depending on whether the neuron is in a radius of 2 with
+///     // connects each neuron depending on whether the neuron is in a radius of 2. with
 ///     // an 80% chance of connectiing, each neuron is connected with a default weight of 1.
 ///     lattice.connect(connection_conditional, None);
 /// 
 ///     // lattice is simulated for 500 iterations
 ///     lattice.run_lattice(500)?;
+/// 
+///     // randomly initialize starting values of neurons
+///     let mut rng = rand::thread_rng();
+///     for row in lattice.cell_grid.iter_mut() {
+///         for neuron in row {
+///             neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+///         }
+///     }
 /// 
 ///     Ok(())
 /// }
@@ -928,7 +942,9 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// [`LatticeNetwork`] represents a series of lattices interconnected by a [`Graph`], each lattice
 /// is associated to a unique identifier, [`Lattice`]s and [`SpikeTrainLattice`]s cannot have
 /// the same identifiers, [`SpikeTrainLattice`]s cannot be postsynaptic because the spike trains
-/// cannot take in an input
+/// cannot take in an input, lattices should be populated before moving them to the network,
+/// use the `connect` method instead of directly editing the connecting graph, use `run_lattices` 
+/// to run the electrical synapses of the lattice network for the given number of iterations
 /// 
 /// Use `connect` to generate connections between lattices:
 /// ```rust
@@ -946,7 +962,7 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn close_connect(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (x.0 as f64 - y.0 as f64).abs() < 2. && (x.1 as f64 - y.1 as f64).abs() < 2.
+///     (x.0 as f64 - y.0 as f64).abs() < 2. && (x.1 as f64 - y.1 as f64).abs() <= 2.
 /// }
 /// 
 /// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
@@ -954,14 +970,18 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworksError>{
-///     # let base_neuron = IzhikevichNeuron {
-///     #    gap_conductance: 10.,
-///     #    ..IzhikevichNeuron::default_impl()
-///     # };
-///     #
-///     # let mut base_spike_train = PoissonNeuron::default_impl();
-///     # base_spike_train.chance_of_firing = 0.01;
-///     #
+///     // generate base neuron
+///     let base_neuron = IzhikevichNeuron {
+///        gap_conductance: 10.,
+///        ..IzhikevichNeuron::default_impl()
+///     };
+///     
+///     // generate base spike train
+///     let mut base_spike_train = PoissonNeuron {
+///         chance_of_firing: 0.01,
+///         ..PoissonNeuron::default_impl()
+///     };
+/// 
 ///     let mut lattice1 = Lattice::default_impl();
 ///     lattice1.set_id(0);
 ///     let mut lattice2 = lattice1.clone();
