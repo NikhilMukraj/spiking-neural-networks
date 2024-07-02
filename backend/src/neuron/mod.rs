@@ -1280,6 +1280,27 @@ where
         Ok(())
     }
 
+    /// Connects the neurons in a [`Lattice`] within the [`LatticeNetwork`] together given a 
+    /// function to determine if the neurons should be connected given their position (usize, usize), 
+    /// and a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
+    pub fn connect_innterally(
+        &mut self, 
+        id: usize, 
+        connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
+        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
+    ) -> Result<(), LatticeNetworkError> {
+        if !self.lattices.contains_key(&id) {
+            return Err(LatticeNetworkError::IDNotFoundInLattices(id));
+        }
+
+        self.lattices.get_mut(&id).unwrap().connect(connecting_conditional, weight_logic);
+
+        Ok(())
+    }
+
     fn get_all_input_positions(&self, pos: GraphPosition) -> HashSet<GraphPosition> {
         let mut input_positions: HashSet<GraphPosition> = self.lattices[&pos.id].graph
             .get_incoming_connections(&pos.pos)
