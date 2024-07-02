@@ -14,6 +14,12 @@ use spiking_neural_networks::{
 };
 
 
+// connect neurons within a radius of 2 with an 80% chance of connection
+fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
+    (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 2. && 
+    rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
+}
+
 /// Runs an example lattice with randomly connected neurons for 500 ms,
 /// writes the history of the grid to a file in working directory when finished
 fn main() -> Result<(), SpikingNeuralNetworksError> {
@@ -23,18 +29,18 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     };
 
     let iterations = 5000;
-    let (num_rows, num_cols, radius) = (10, 10, 2);
+    let (num_rows, num_cols) = (10, 10);
    
     // infers type based on base neuron and default implementation
-    let mut lattice: Lattice<_, _, _> = Lattice::default_impl();
+    let mut lattice = Lattice::default_impl();
     
-    lattice.populate_and_randomly_connect(
+    lattice.populate(
         &base_neuron, 
         num_rows, 
         num_cols, 
-        radius, 
-        &None
     );
+
+    lattice.connect(connection_conditional, None);
 
     let mut rng = rand::thread_rng();
 
