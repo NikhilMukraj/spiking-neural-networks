@@ -423,6 +423,19 @@ fn randomly_select_positions(
     positions
 }
 
+/// A macro that creates a conditional function for connecting neurons based on the 
+/// radius around the neuron to allow connections and number representing the chance of a 
+/// connection occuring
+#[macro_export]
+macro_rules! random_connection_conditional {
+    ($radius:expr, $chance_of_connection:expr) => {
+        fn connection_conditional((usize, usize), (usize, usize)) -> bool {
+            (((x.0 - y.0).pow(2) + (x.1 - y.1).pow(2)) as f64).sqrt() <= radius && 
+            rand::thread_rng().gen_range(0.0..=1.0) <= chance_of_connection
+        }
+    }
+}
+
 /// Lattice of [`IterateAndSpike`] neurons
 #[derive(Debug, Clone)]
 pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> {
@@ -971,11 +984,11 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn close_connect(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (x.0 - y.0).abs() < 2. && (x.1 - y.1).abs() < 2.
+///     (x.0 as isize - y.0 as isize).abs() < 2. && (x.1 as isize - y.1 as isize).abs() < 2.
 /// }
 /// 
 /// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
-///     (((x.0 - y.0).pow(2) + (x.1 - y.1).pow(2)) as f64).sqrt()
+///     (((x.0 as isize - y.0 as isize).pow(2) + (x.1 as isize - y.1 as isize).pow(2)) as f64).sqrt()
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworkError>{
