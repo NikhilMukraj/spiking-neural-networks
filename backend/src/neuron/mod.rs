@@ -1094,7 +1094,7 @@ where
         lattice: Lattice<T, U, V>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
         }
         self.lattices.insert(lattice.get_id(), lattice);
 
@@ -1108,7 +1108,7 @@ where
         spike_train_lattice: SpikeTrainLattice<W, X>, 
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&spike_train_lattice.id) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent);
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(spike_train_lattice.id));
         }
 
         self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
@@ -1210,11 +1210,11 @@ where
         }
 
         if !self.get_all_ids().contains(&presynaptic_id) {
-            return Err(LatticeNetworkError::PresynapticIDNotFound);
+            return Err(LatticeNetworkError::PresynapticIDNotFound(presynaptic_id));
         }
 
         if !self.lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::PostsynapticIDNotFound);
+            return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
         }
 
         if self.lattices.contains_key(&presynaptic_id) {
