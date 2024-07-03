@@ -31,6 +31,7 @@ use iterate_and_spike::{
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
+/// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
 }
