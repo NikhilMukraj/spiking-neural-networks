@@ -136,7 +136,7 @@
 //!             IterateAndSpike, weight_neurotransmitter_concentration,
 //!         },
 //!         spike_train::SpikeTrain,
-//!         spike_train_gap_juncton,
+//!         spike_train_gap_juncton, signed_gap_junction,
 //!     }
 //! };
 //! 
@@ -461,7 +461,7 @@
 //! ### Custom `IterateAndSpike` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::iterate_and_spike_traits::IterateAndSpikeBase;
+//! use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 //! use spiking_neural_networks::neuron::iterate_and_spike::{
 //!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, STDPParameters,
 //!     IsSpiking, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
@@ -608,7 +608,7 @@
 //! ### Custom `NeurotransmitterKinetics` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::iterate_and_spike::NeurotransmitterKinetics;
+//! use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;
 //! 
 //! /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 //! /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
@@ -662,7 +662,9 @@
 //! ### Custom `ReceptorKinetics` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::iterate_and_spike::ReceptorKinetics;
+//! use spiking_neural_networks::neuron::iterate_and_spike::{
+//!     ReceptorKinetics, AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
+//! };
 //! 
 //! /// Receptor dynamics approximation that sets the receptor
 //! /// gating value to the inputted neurotransmitter concentration and
