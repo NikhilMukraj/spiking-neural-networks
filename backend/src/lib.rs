@@ -64,7 +64,7 @@
 //! pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 //!    presynaptic_neuron: &mut T, 
 //!    postsynaptic_neuron: &mut T,
-//!    input_current: f64,
+//!    input_current: f32,
 //!    do_receptor_kinetics: bool,
 //!    gaussian: bool,
 //!) -> (bool, bool) {
@@ -303,8 +303,8 @@
 //! fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
 //!     neurons: &mut Vec<T>,
 //!     neuron: &T,
-//!     weights: &mut Vec<f64>,
-//!     delta_ws: &mut Vec<f64>,
+//!     weights: &mut Vec<f32>,
+//!     delta_ws: &mut Vec<f32>,
 //!     timestep: usize,
 //!     is_spikings: Vec<bool>,
 //! ) {
@@ -339,29 +339,29 @@
 //!     presynaptic_neurons: &mut Vec<T>,
 //!     postsynaptic_neuron: &mut T,
 //!     iterations: usize,
-//!     input_current: f64,
-//!     input_current_deviation: f64,
+//!     input_current: f32,
+//!     input_current_deviation: f32,
 //!     weight_params: &GaussianParameters,
 //!     do_receptor_kinetics: bool,
-//! ) -> HashMap<String, Vec<f64>> {
+//! ) -> HashMap<String, Vec<f32>> {
 //!     let n = presynaptic_neurons.len();
 //! 
 //!     // generate different currents
-//!     let input_currents: Vec<f64> = (0..n).map(|_| 
+//!     let input_currents: Vec<f32> = (0..n).map(|_| 
 //!             input_current * limited_distr(1.0, input_current_deviation, 0., 2.)
 //!         )
 //!         .collect();
 //! 
 //!     // generate random weights
-//!     let mut weights: Vec<f64> = (0..n).map(|_| weight_params.get_random_number())
+//!     let mut weights: Vec<f32> = (0..n).map(|_| weight_params.get_random_number())
 //!         .collect();
 //! 
-//!     let mut delta_ws: Vec<f64> = (0..n)
+//!     let mut delta_ws: Vec<f32> = (0..n)
 //!         .map(|_| 0.0)
 //!         .collect();
 //! 
 //!     // generate hashmap to save history of simulation
-//!     let mut output_hashmap: HashMap<String, Vec<f64>> = HashMap::new();
+//!     let mut output_hashmap: HashMap<String, Vec<f32>> = HashMap::new();
 //!     let keys_vector = generate_keys(n);
 //!     for i in keys_vector.iter() {
 //!         output_hashmap.insert(String::from(i), vec![]);
@@ -370,7 +370,7 @@
 //!     for timestep in 0..iterations {
 //!         // calculates weighted current inputs and averages them to ensure input does not get too high,
 //!         // otherwise neuronal dynamics becomes unstable
-//!         let calculated_current: f64 = (0..n)
+//!         let calculated_current: f32 = (0..n)
 //!             .map(
 //!                 |i| {
 //!                     let output = weights[i] * signed_gap_junction(
@@ -378,10 +378,10 @@
 //!                         &*postsynaptic_neuron
 //!                     );
 //! 
-//!                     output / (n as f64)
+//!                     output / (n as f32)
 //!                 }
 //!             ) 
-//!             .collect::<Vec<f64>>()
+//!             .collect::<Vec<f32>>()
 //!             .iter()
 //!             .sum();
 //!         // calculates weighted neurotransmitter inputs
@@ -398,7 +398,7 @@
 //! 
 //!                 let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 //! 
-//!                 weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f64); 
+//!                 weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
 //! 
 //!                 neurotransmitters
 //!             }),
@@ -407,7 +407,7 @@
 //!         
 //!         // adds noise to current inputs with normally distributed random noise
 //!         let noise_factor = postsynaptic_neuron.get_gaussian_factor();
-//!         let presynaptic_inputs: Vec<f64> = (0..n)
+//!         let presynaptic_inputs: Vec<f32> = (0..n)
 //!             .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
 //!             .collect();
 //!         let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
@@ -475,29 +475,29 @@
 //! #[derive(Debug, Clone, IterateAndSpikeBase)]
 //! pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 //!     /// Membrane potential
-//!     pub current_voltage: f64,
+//!     pub current_voltage: f32,
 //!     /// Initial voltage
-//!     pub v_init: f64,
+//!     pub v_init: f32,
 //!     /// Voltage threshold for spike calculation (mV)
-//!     pub v_th: f64,
+//!     pub v_th: f32,
 //!     /// Adaptive value
-//!     pub w: f64,
+//!     pub w: f32,
 //!     // Initial adaptive value
-//!     pub w_init: f64,
+//!     pub w_init: f32,
 //!     /// Resistance value
-//!     pub resistance: f64,
+//!     pub resistance: f32,
 //!     /// Adaptive value modifier
-//!     pub a: f64,
+//!     pub a: f32,
 //!     /// Adaptive value integration constant
-//!     pub b: f64,
+//!     pub b: f32,
 //!     /// Controls conductance of input gap junctions
-//!     pub gap_conductance: f64, 
+//!     pub gap_conductance: f32, 
 //!     /// Membrane time constant (ms)
-//!     pub tau_m: f64,
+//!     pub tau_m: f32,
 //!     /// Membrane capacitance (nF)
-//!     pub c_m: f64, 
+//!     pub c_m: f32, 
 //!     /// Timestep (ms)
-//!     pub dt: f64, 
+//!     pub dt: f32, 
 //!     /// Last timestep the neuron has spiked 
 //!     pub last_firing_time: Option<usize>,
 //!     /// Whether the voltage was increasing in the last step
@@ -518,7 +518,7 @@
 //! 
 //! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> FitzHughNagumoNeuron<T, R> {
 //!     // calculates change in voltage
-//!     fn get_dv_change(&self, i: f64) -> f64 {
+//!     fn get_dv_change(&self, i: f32) -> f32 {
 //!         (  
 //!             self.current_voltage - (self.current_voltage.powf(3.) / 3.) 
 //!             - self.w + self.resistance * i
@@ -526,7 +526,7 @@
 //!     }
 //! 
 //!     // calculates change in adaptive value
-//!     fn get_dw_change(&self) -> f64 {
+//!     fn get_dw_change(&self) -> f32 {
 //!         (self.current_voltage + self.a + self.b * self.w) * (self.dt / self.tau_m)
 //!     }
 //! 
@@ -534,7 +534,7 @@
 //!     // reference to the last inputted voltage and if it is above a certain
 //!     // voltage threshold, if it is then the neuron is considered spiking
 //!     // and `true` is returned, otherwise `false` is returned
-//!     fn handle_spiking(&mut self, last_voltage: f64) -> bool {
+//!     fn handle_spiking(&mut self, last_voltage: f32) -> bool {
 //!         let increasing_right_now = last_voltage < self.current_voltage;
 //!         let threshold_crossed = self.current_voltage > self.v_th;
 //!         let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;
@@ -565,7 +565,7 @@
 //!     // updates voltage and adaptive values as well as the 
 //!     // neurotransmitters, receptor current is not factored in,
 //!     // and spiking is handled and returns whether it is currently spiking
-//!     fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+//!     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
 //!         let dv = self.get_dv_change(input_current);
 //!         let dw = self.get_dw_change();
 //!         let last_voltage = self.current_voltage;
@@ -584,7 +584,7 @@
 //!     // of the method and returns whether it is currently spiking
 //!     fn iterate_with_neurotransmitter_and_spike(
 //!         &mut self, 
-//!         input_current: f64, 
+//!         input_current: f32, 
 //!         t_total: Option<&NeurotransmitterConcentrations>,
 //!     ) -> bool {
 //!         self.ligand_gates.update_receptor_kinetics(t_total);
@@ -616,19 +616,19 @@
 //! #[derive(Debug, Clone, Copy)]
 //! pub struct ExponentialDecayNeurotransmitter {
 //!     /// Maximal neurotransmitter concentration (mM)
-//!     pub t_max: f64,
+//!     pub t_max: f32,
 //!     /// Current neurotransmitter concentration (mM)
-//!     pub t: f64,
+//!     pub t: f32,
 //!     /// Voltage threshold for detecting spikes (mV)
-//!     pub v_th: f64,
+//!     pub v_th: f32,
 //!     /// Amount to decay neurotransmitter concentration by
-//!     pub decay_constant: f64,
+//!     pub decay_constant: f32,
 //!     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-//!     pub dt: f64,
+//!     pub dt: f32,
 //! }
 //! 
 //! // used to determine when voltage spike occurs
-//! fn heaviside(x: f64) -> f64 {
+//! fn heaviside(x: f32) -> f32 {
 //!     if x > 0. {
 //!         1.
 //!     } else {
@@ -637,23 +637,23 @@
 //! }
 //! 
 //! // calculate change in concentration
-//! fn exp_decay(x: f64, l: f64, dt: f64) -> f64 {
+//! fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 //!     -x * (dt / -l).exp()
 //! }
 //! 
 //! impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-//!     fn apply_t_change(&mut self, voltage: f64) {
+//!     fn apply_t_change(&mut self, voltage: f32) {
 //!         let t_change = exp_decay(self.t, self.decay_constant, self.dt);
 //!         // add change and account for spike
 //!         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
 //!         self.t = self.t_max.min(self.t.max(0.)); // clamp values
 //!     }
 //! 
-//!     fn get_t(&self) -> f64 {
+//!     fn get_t(&self) -> f32 {
 //!         self.t
 //!     }
 //! 
-//!     fn set_t(&mut self, t: f64) {
+//!     fn set_t(&mut self, t: f32) {
 //!         self.t = t;
 //!     }
 //! }
@@ -670,32 +670,32 @@
 //! #[derive(Debug, Clone, Copy)]
 //! pub struct ExponentialDecayReceptor {
 //!     /// Maximal receptor gating value
-//!     pub r_max: f64,
+//!     pub r_max: f32,
 //!     /// Receptor gating value
-//!     pub r: f64,
+//!     pub r: f32,
 //!     /// Amount to decay neurotransmitter concentration by
-//!     pub decay_constant: f64,
+//!     pub decay_constant: f32,
 //!     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-//!     pub dt: f64,
+//!     pub dt: f32,
 //! }
 //! 
 //! // calculate change in receptor gating variable over time
-//! fn exp_decay(x: f64, l: f64, dt: f64) -> f64 {
+//! fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 //!     -x * (dt / -l).exp()
 //! }
 //! 
 //! impl ReceptorKinetics for ExponentialDecayReceptor {
-//!     fn apply_r_change(&mut self, t: f64) {
+//!     fn apply_r_change(&mut self, t: f32) {
 //!         // calculate and apply change
 //!         self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
 //!         self.r = self.r_max.min(self.r.max(0.)); // clamp values
 //!     }
 //!
-//!     fn get_r(&self) -> f64 {
+//!     fn get_r(&self) -> f32 {
 //!         self.r
 //!     }
 //!
-//!     fn set_r(&mut self, r: f64) {
+//!     fn set_r(&mut self, r: f32) {
 //!         self.r = r;
 //!     }
 //! }
