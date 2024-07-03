@@ -27,7 +27,7 @@ use super::iterate_and_spike::{
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
 /// Handles dynamics of any additional ion channels
-pub trait AdditionalGate: AdditionalGateClone + Sync + Send {
+pub trait IonChannel: IonChannelBoxClone + Sync + Send {
     /// Initializes parameters based on a starting voltage (mV)
     fn initialize(&mut self, voltage: f32);
     /// Updates current based on the current voltage (mV) and a timestep (ms)
@@ -39,21 +39,21 @@ pub trait AdditionalGate: AdditionalGateClone + Sync + Send {
 }
 
 /// Handles cloning of additional gates
-pub trait AdditionalGateClone {
-    fn clone_box(&self) -> Box<dyn AdditionalGate>;
+pub trait IonChannelBoxClone {
+    fn clone_box(&self) -> Box<dyn IonChannel>;
 }
 
-impl<T: ?Sized> AdditionalGateClone for T
+impl<T: ?Sized> IonChannelBoxClone for T
 where
-    T: 'static + AdditionalGate + Clone,
+    T: 'static + IonChannel + Clone,
 {
-    fn clone_box(&self) -> Box<dyn AdditionalGate> {
+    fn clone_box(&self) -> Box<dyn IonChannel> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn AdditionalGate> {
-    fn clone(&self) -> Box<dyn AdditionalGate> {
+impl Clone for Box<dyn IonChannel> {
+    fn clone(&self) -> Box<dyn IonChannel> {
         self.clone_box()
     }
 }
@@ -113,7 +113,7 @@ impl HighVoltageActivatedCalciumChannel {
     }
 }
 
-impl AdditionalGate for HighVoltageActivatedCalciumChannel {
+impl IonChannel for HighVoltageActivatedCalciumChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_m(voltage);
         self.update_h(voltage);
@@ -135,6 +135,21 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
         "HVA Ca"
     }
 }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct NaIonChannel {
+
+// }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct KIonChannel {
+
+// }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct KLeakChannel {
+    
+// }
 
 // multicomparment stuff, refer to dopamine modeling paper as well
 // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/25282547/
@@ -170,7 +185,7 @@ impl AdditionalGate for HighVoltageActivatedCalciumChannel {
 
 /// A gating variable for necessary ion channels
 #[derive(Debug, Clone, Copy)]
-pub struct BasicGateVariable {
+pub struct GatingVariable {
     /// Gating variable
     pub alpha: f32,
     /// Gating variable
@@ -179,7 +194,7 @@ pub struct BasicGateVariable {
     pub state: f32,
 }
 
-impl BasicGateVariable {
+impl GatingVariable {
     pub fn init_state(&mut self) {
         self.state = self.alpha / (self.alpha + self.beta);
     }
@@ -214,11 +229,11 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Maximal conductance of leak channel (nS)
     pub g_k_leak: f32,
     /// Gating variable
-    pub m: BasicGateVariable,
+    pub m: GatingVariable,
     /// Gating variable
-    pub n: BasicGateVariable,
+    pub n: GatingVariable,
     /// Gating variable
-    pub h: BasicGateVariable,
+    pub h: GatingVariable,
     /// Voltage threshold for spike calculation (mV)
     pub v_th: f32,
     /// Last timestep the neuron has spiked
@@ -230,7 +245,7 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
     /// Additional ion gates
-    pub additional_gates: Vec<Box<dyn AdditionalGate>>,
+    pub additional_gates: Vec<Box<dyn IonChannel>>,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -275,7 +290,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
     fn default() -> Self {
-        let default_gate = BasicGateVariable {
+        let default_gate = GatingVariable {
             alpha: 0.,
             beta: 0.,
             state: 0.,
