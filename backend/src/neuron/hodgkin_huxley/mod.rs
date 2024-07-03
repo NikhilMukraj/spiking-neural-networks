@@ -26,7 +26,7 @@ use super::iterate_and_spike::{
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod // high threshold calcium current (l type)
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
-/// Handles dynamics of any additional ion channels
+/// Handles dynamics of an ion channel
 pub trait IonChannel: IonChannelBoxClone + Sync + Send {
     /// Initializes parameters based on a starting voltage (mV)
     fn initialize(&mut self, voltage: f32);
@@ -38,7 +38,7 @@ pub trait IonChannel: IonChannelBoxClone + Sync + Send {
     fn gate_type(&self) -> &str;
 }
 
-/// Handles cloning of additional gates
+/// Handles cloning of boxed dynamic ion channels
 pub trait IonChannelBoxClone {
     fn clone_box(&self) -> Box<dyn IonChannel>;
 }
