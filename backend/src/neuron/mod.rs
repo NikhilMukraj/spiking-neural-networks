@@ -31,6 +31,9 @@ use iterate_and_spike::{
     NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
     weight_neurotransmitter_concentration, 
 };
+pub mod iterate_and_spike_traits {
+    pub use iterate_and_spike_traits::*;
+}
 use crate::error::{GraphError, LatticeNetworkError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 
@@ -414,7 +417,7 @@ macro_rules! impl_reset_timing  {
 /// // has an 80% chance of returning true if distance from neuron to neuron is less than 2.,
 /// // otherwise false
 /// fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.)) as f32).sqrt() <= 2. && 
+///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.))).sqrt() <= 2. && 
 ///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
 /// }
 /// 
@@ -966,7 +969,7 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f32 {
-///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.)) as f32).sqrt()
+///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.))).sqrt()
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworksError>{
