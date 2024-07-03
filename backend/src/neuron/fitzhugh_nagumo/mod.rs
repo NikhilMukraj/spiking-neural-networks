@@ -14,29 +14,29 @@ use super::iterate_and_spike::{
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential
-    pub current_voltage: f64,
+    pub current_voltage: f32,
     /// Initial voltage
-    pub v_init: f64,
+    pub v_init: f32,
     /// Voltage threshold for spike calculation (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Adaptive value
-    pub w: f64,
+    pub w: f32,
     // Initial adaptive value
-    pub w_init: f64,
+    pub w_init: f32,
     /// Resistance value
-    pub resistance: f64,
+    pub resistance: f32,
     /// Adaptive value modifier
-    pub a: f64,
+    pub a: f32,
     /// Adaptive value integration constant
-    pub b: f64,
+    pub b: f32,
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64,
+    pub tau_m: f32,
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Timestep (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Last timestep the neuron has spiked 
     pub last_firing_time: Option<usize>,
     /// Whether the voltage was increasing in the last step
@@ -90,18 +90,18 @@ impl FitzHughNagumoNeuron<ApproximateNeurotransmitter, ApproximateReceptor> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> FitzHughNagumoNeuron<T, R> {
-    fn get_dv_change(&self, i: f64) -> f64 {
+    fn get_dv_change(&self, i: f32) -> f32 {
         (  
             self.current_voltage - (self.current_voltage.powf(3.) / 3.) 
             - self.w + self.resistance * i
         ) * self.dt
     }
 
-    fn get_dw_change(&self) -> f64 {
+    fn get_dw_change(&self) -> f32 {
         (self.current_voltage + self.a + self.b * self.w) * (self.dt / self.tau_m)
     }
 
-    fn handle_spiking(&mut self, last_voltage: f64) -> bool {
+    fn handle_spiking(&mut self, last_voltage: f32) -> bool {
         let increasing_right_now = last_voltage < self.current_voltage;
         let threshold_crossed = self.current_voltage > self.v_th;
         let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;
@@ -129,7 +129,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzH
         self.synaptic_neurotransmitters.get_concentrations()
     }
 
-    fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool {
         let dv = self.get_dv_change(input_current);
         let dw = self.get_dw_change();
         let last_voltage = self.current_voltage;
@@ -144,7 +144,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzH
 
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
-        input_current: f64, 
+        input_current: f32, 
         t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total);

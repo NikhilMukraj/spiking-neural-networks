@@ -38,8 +38,8 @@ fn generate_keys(n: usize) -> Vec<String> {
 fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
     neurons: &mut Vec<T>,
     neuron: &T,
-    weights: &mut Vec<f64>,
-    delta_ws: &mut Vec<f64>,
+    weights: &mut Vec<f32>,
+    delta_ws: &mut Vec<f32>,
     timestep: usize,
     is_spikings: Vec<bool>,
 ) {
@@ -56,33 +56,33 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     presynaptic_neurons: &mut Vec<T>,
     postsynaptic_neuron: &mut T,
     iterations: usize,
-    input_current: f64,
-    input_current_deviation: f64,
+    input_current: f32,
+    input_current_deviation: f32,
     weight_params: &GaussianParameters,
     do_receptor_kinetics: bool,
-) -> HashMap<String, Vec<f64>> {
+) -> HashMap<String, Vec<f32>> {
     let n = presynaptic_neurons.len();
 
-    let input_currents: Vec<f64> = (0..n).map(|_| 
+    let input_currents: Vec<f32> = (0..n).map(|_| 
             input_current * limited_distr(1.0, input_current_deviation, 0., 2.)
         )
         .collect();
 
-    let mut weights: Vec<f64> = (0..n).map(|_| weight_params.get_random_number())
+    let mut weights: Vec<f32> = (0..n).map(|_| weight_params.get_random_number())
         .collect();
 
-    let mut delta_ws: Vec<f64> = (0..n)
+    let mut delta_ws: Vec<f32> = (0..n)
         .map(|_| 0.0)
         .collect();
 
-    let mut output_hashmap: HashMap<String, Vec<f64>> = HashMap::new();
+    let mut output_hashmap: HashMap<String, Vec<f32>> = HashMap::new();
     let keys_vector = generate_keys(n);
     for i in keys_vector.iter() {
         output_hashmap.insert(String::from(i), vec![]);
     }
 
     for timestep in 0..iterations {
-        let calculated_current: f64 = (0..n)
+        let calculated_current: f32 = (0..n)
             .map(
                 |i| {
                     let output = weights[i] * signed_gap_junction(
@@ -90,10 +90,10 @@ fn test_isolated_stdp<T: IterateAndSpike>(
                         &*postsynaptic_neuron
                     );
 
-                    output / (n as f64)
+                    output / (n as f32)
                 }
             ) 
-            .collect::<Vec<f64>>()
+            .collect::<Vec<f32>>()
             .iter()
             .sum();
         let presynaptic_neurotransmitters: Option<NeurotransmitterConcentrations> = match do_receptor_kinetics {
@@ -109,7 +109,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 
                 let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 
-                weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f64); 
+                weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
 
                 neurotransmitters
             }),
@@ -117,7 +117,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         };
         
         let noise_factor = postsynaptic_neuron.get_gaussian_factor();
-        let presynaptic_inputs: Vec<f64> = (0..n)
+        let presynaptic_inputs: Vec<f32> = (0..n)
             .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
             .collect();
         let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())

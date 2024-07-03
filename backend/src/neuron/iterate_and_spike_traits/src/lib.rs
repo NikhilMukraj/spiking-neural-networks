@@ -17,13 +17,13 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
     // Generate the implementation of the trait
     let expanded = quote! {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for #name<T, R> {
-            fn get_current_voltage(&self) -> f64 {
+            fn get_current_voltage(&self) -> f32 {
                 self.current_voltage
             }
         }
 
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for #name<T, R> {
-            fn get_gap_conductance(&self) -> f64 {
+            fn get_gap_conductance(&self) -> f32 {
                 self.gap_conductance
             }
         }
@@ -35,7 +35,7 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
         }
 
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for #name<T, R> {
-            fn get_gaussian_factor(&self) -> f64 {
+            fn get_gaussian_factor(&self) -> f32 {
                 self.gaussian_params.get_random_number()
             }
         }

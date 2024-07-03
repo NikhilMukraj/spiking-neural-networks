@@ -1,13 +1,13 @@
 use ndarray::{Array1, ArrayView1, Axis, concatenate, s};
 
 
-fn argsort(arr: &Array1<f64>) -> Vec<usize> {
+fn argsort(arr: &Array1<f32>) -> Vec<usize> {
     let mut indices: Vec<usize> = (0..arr.len()).collect();
     indices.sort_by(|&i, &j| arr[i].partial_cmp(&arr[j]).unwrap());
     indices
 }
 
-fn diff(arr: &Array1<f64>) -> Array1<f64> {
+fn diff(arr: &Array1<f32>) -> Array1<f32> {
     let mut result = arr.to_owned();
 
     let len = result.len();
@@ -22,11 +22,11 @@ fn diff(arr: &Array1<f64>) -> Array1<f64> {
     result
 }
 
-fn searchsorted(a: &ArrayView1<f64>, v: &ArrayView1<f64>) -> Array1<usize> {
+fn searchsorted(a: &ArrayView1<f32>, v: &ArrayView1<f32>) -> Array1<usize> {
     v.map(|&x| a.iter().position(|&y| y > x).unwrap_or(a.len()))
 }
 
-fn cumsum(array: &Array1<f64>) -> Array1<f64> {
+fn cumsum(array: &Array1<f32>) -> Array1<f32> {
     let mut running_sum = 0.0;
 
     let result = array.map(|&x| {
@@ -37,7 +37,7 @@ fn cumsum(array: &Array1<f64>) -> Array1<f64> {
     result
 }
 
-fn get_cdf(weights: &Array1<f64>, sorter: &Vec<usize>, indices: &Array1<usize>) -> Vec<f64> {
+fn get_cdf(weights: &Array1<f32>, sorter: &Vec<usize>, indices: &Array1<usize>) -> Vec<f32> {
     let sorted_cum_weights = concatenate![
         Axis(0), 
         Array1::from_vec(vec![0.]),
@@ -48,17 +48,17 @@ fn get_cdf(weights: &Array1<f64>, sorter: &Vec<usize>, indices: &Array1<usize>) 
         .map(|x| x / sorted_cum_weights.last().expect("Cannot get last weight"))
         .iter()
         .map(|x| *x)
-        .collect::<Vec<f64>>()
+        .collect::<Vec<f32>>()
 }
 
 // https://github.com/scipy/scipy/blob/v1.11.3/scipy/stats/_stats_py.py#L9896
 // made in reference to scipy implementation
 pub fn earth_moving_distance(
-    u_values: Array1<f64>,
-    v_values: Array1<f64>,
-    u_weights: Array1<f64>,
-    v_weights: Array1<f64>,
-) -> f64 {
+    u_values: Array1<f32>,
+    v_values: Array1<f32>,
+    u_weights: Array1<f32>,
+    v_weights: Array1<f32>,
+) -> f32 {
     // u_sorter = np.argsort(u_values)
     // v_sorter = np.argsort(v_values)
 

@@ -18,11 +18,11 @@ use super::iterate_and_spike::{
 /// returns the voltages from the neuron over time
 pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     cell: &mut T, 
-    input: f64, 
+    input: f32, 
     gaussian: bool, 
     iterations: usize
-) -> Vec<f64> {
-    let mut voltages: Vec<f64> = vec![];
+) -> Vec<f32> {
+    let mut voltages: Vec<f32> = vec![];
 
     for _ in 0..iterations {
         let _is_spiking = if gaussian {
@@ -73,33 +73,33 @@ macro_rules! impl_default_impl_integrate_and_fire {
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
-    pub current_voltage: f64, 
+    pub current_voltage: f32, 
     /// Voltage threshold (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Voltage reset value (mV)
-    pub v_reset: f64, 
+    pub v_reset: f32, 
     /// Voltage initialization value (mV)
-    pub v_init: f64, 
+    pub v_init: f32, 
     /// Counter for refractory period
-    pub refractory_count: f64, 
+    pub refractory_count: f32, 
     /// Total refractory period (ms)
-    pub tref: f64,
+    pub tref: f32,
     /// Leak constant 
-    pub leak_constant: f64, 
+    pub leak_constant: f32, 
     /// Input value modifier
-    pub integration_constant: f64, 
+    pub integration_constant: f32, 
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Leak reversal potential (mV)
-    pub e_l: f64, 
+    pub e_l: f32, 
     /// Leak conductance (nS)
-    pub g_l: f64, 
+    pub g_l: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64, 
+    pub tau_m: f32, 
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Time step (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Whether the neuron is spiking
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
@@ -148,7 +148,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeuron<T, R> {
     /// Calculates the change in voltage given an input current
-    pub fn leaky_get_dv_change(&self, i: f64) -> f64 {
+    pub fn leaky_get_dv_change(&self, i: f32) -> f32 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.integration_constant * (i / self.g_l))
@@ -180,7 +180,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeur
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for LeakyIntegrateAndFireNeuron<T, R> {
     impl_default_neurotransmitter_methods!();
 
-    fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool {
         let dv = self.leaky_get_dv_change(input_current);
         self.current_voltage += dv;
 
@@ -191,7 +191,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
 
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
-        input_current: f64, 
+        input_current: f32, 
         t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total);
@@ -213,7 +213,7 @@ macro_rules! impl_iterate_and_spike {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for $name<T, R> {
             impl_default_neurotransmitter_methods!();
 
-            fn iterate_and_spike(&mut self, input_current: f64) -> bool {
+            fn iterate_and_spike(&mut self, input_current: f32) -> bool {
                 let dv = self.$dv_method(input_current);
                 let dw = self.$dw_method();
 
@@ -227,7 +227,7 @@ macro_rules! impl_iterate_and_spike {
 
             fn iterate_with_neurotransmitter_and_spike(
                 &mut self, 
-                input_current: f64, 
+                input_current: f32, 
                 t_total: Option<&NeurotransmitterConcentrations>,
             ) -> bool {
                 self.ligand_gates.update_receptor_kinetics(t_total);
@@ -252,41 +252,41 @@ macro_rules! impl_iterate_and_spike {
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
-    pub current_voltage: f64, 
+    pub current_voltage: f32, 
     /// Voltage threshold (mV)
-    pub v_th: f64, 
+    pub v_th: f32, 
     /// Voltage reset value (mV)
-    pub v_reset: f64, 
+    pub v_reset: f32, 
     /// Voltage initialization value (mV)
-    pub v_init: f64, 
+    pub v_init: f32, 
     /// Counter for refractory period
-    pub refractory_count: f64, 
+    pub refractory_count: f32, 
     /// Total refractory period (ms)
-    pub tref: f64, 
+    pub tref: f32, 
     /// Controls effect of leak reverse potential on adaptive value update
-    pub alpha: f64, 
+    pub alpha: f32, 
     /// Controls how adaptive value is changed in spiking
-    pub beta: f64, 
+    pub beta: f32, 
     /// Adaptive value
-    pub w_value: f64, 
+    pub w_value: f32, 
     /// Adaptive value initialization
-    pub w_init: f64, 
+    pub w_init: f32, 
     /// Leak constant
-    pub leak_constant: f64, 
+    pub leak_constant: f32, 
     /// Input value modifier
-    pub integration_constant: f64, 
+    pub integration_constant: f32, 
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Leak reversal potential (mV)
-    pub e_l: f64, 
+    pub e_l: f32, 
     /// Leak conductance (nS)
-    pub g_l: f64, 
+    pub g_l: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64, 
+    pub tau_m: f32, 
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Time step (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Whether the neuron is spiking
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
@@ -340,7 +340,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
 macro_rules! impl_adaptive_default_methods {
     () => {
         /// Calculates how adaptive value changes
-        pub fn adaptive_get_dw_change(&self) -> f64 {
+        pub fn adaptive_get_dw_change(&self) -> f32 {
             let dw = (
                 self.alpha * (self.current_voltage - self.e_l) -
                 self.w_value
@@ -373,7 +373,7 @@ macro_rules! impl_adaptive_default_methods {
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
     /// Calculates the change in voltage given an input current
-    pub fn adaptive_get_dv_change(&mut self, i: f64) -> f64 {
+    pub fn adaptive_get_dv_change(&mut self, i: f32) -> f32 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.integration_constant * (i / self.g_l)) - 
@@ -397,43 +397,43 @@ impl_iterate_and_spike!(
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
-    pub current_voltage: f64, 
+    pub current_voltage: f32, 
     /// Voltage threshold (mV)
-    pub v_th: f64, 
+    pub v_th: f32, 
     /// Voltage reset value (mV)
-    pub v_reset: f64, 
+    pub v_reset: f32, 
     /// Voltage initialization value (mV)
-    pub v_init: f64, 
+    pub v_init: f32, 
     /// Counter for refractory period
-    pub refractory_count: f64, 
+    pub refractory_count: f32, 
     /// Total refractory period (ms)
-    pub tref: f64, 
+    pub tref: f32, 
     /// Controls effect of leak reverse potential on adaptive value update
-    pub alpha: f64, 
+    pub alpha: f32, 
     /// Controls how adaptive value is changed in spiking
-    pub beta: f64, 
+    pub beta: f32, 
     /// Controls steepness
-    pub slope_factor: f64, 
+    pub slope_factor: f32, 
     /// Adaptive value
-    pub w_value: f64, 
+    pub w_value: f32, 
     /// Adaptive value initialization
-    pub w_init: f64, 
+    pub w_init: f32, 
     /// Leak constant
-    pub leak_constant: f64, 
+    pub leak_constant: f32, 
     /// Input value modifier
-    pub integration_constant: f64, 
+    pub integration_constant: f32, 
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Leak reversal potential (mV)
-    pub e_l: f64, 
+    pub e_l: f32, 
     /// Leak conductance (nS)
-    pub g_l: f64, 
+    pub g_l: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64, 
+    pub tau_m: f32, 
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Time step (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Whether the neuron is spiking
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
@@ -487,7 +487,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
     /// Calculates the change in voltage given an input current
-    pub fn exp_adaptive_get_dv_change(&mut self, i: f64) -> f64 {
+    pub fn exp_adaptive_get_dv_change(&mut self, i: f32) -> f32 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.slope_factor * ((self.current_voltage - self.v_th) / self.slope_factor).exp()) +
@@ -512,31 +512,31 @@ impl_iterate_and_spike!(
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
-    pub current_voltage: f64, 
+    pub current_voltage: f32, 
     /// Voltage threshold (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Voltage initialization value (mV) 
-    pub v_init: f64, 
+    pub v_init: f32, 
     /// Controls speed
-    pub a: f64, 
+    pub a: f32, 
     /// Controls sensitivity to adaptive value
-    pub b: f64,
+    pub b: f32,
     /// After spike reset value for voltage 
-    pub c: f64,
+    pub c: f32,
     /// After spike reset value for adaptive value 
-    pub d: f64, 
+    pub d: f32, 
     /// Adaptive value
-    pub w_value: f64, 
+    pub w_value: f32, 
     /// Adaptive value initialization
-    pub w_init: f64, 
+    pub w_init: f32, 
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64, 
+    pub tau_m: f32, 
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Time step (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Whether the neuron is spiking
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
@@ -585,7 +585,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
 macro_rules! impl_izhikevich_default_methods {
     () => {
         // Calculates how adaptive value changes
-        pub fn izhikevich_get_dw_change(&self) -> f64 {
+        pub fn izhikevich_get_dw_change(&self) -> f32 {
             let dw = (
                 self.a * (self.b * self.current_voltage - self.w_value)
             ) * (self.dt / self.tau_m);
@@ -615,7 +615,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
     /// Calculates the change in voltage given an input current
-    pub fn izhikevich_get_dv_change(&mut self, i: f64) -> f64 {
+    pub fn izhikevich_get_dv_change(&mut self, i: f32) -> f32 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - self.w_value + i
@@ -636,33 +636,33 @@ impl_iterate_and_spike!(
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
-    pub current_voltage: f64, 
+    pub current_voltage: f32, 
     /// Voltage threshold (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Voltage initialization value (mV) 
-    pub v_init: f64, 
+    pub v_init: f32, 
     /// Controls speed
-    pub a: f64, 
+    pub a: f32, 
     /// Controls sensitivity to adaptive value
-    pub b: f64,
+    pub b: f32,
     /// After spike reset value for voltage 
-    pub c: f64,
+    pub c: f32,
     /// After spike reset value for adaptive value 
-    pub d: f64, 
+    pub d: f32, 
     /// Adaptive value
-    pub w_value: f64, 
+    pub w_value: f32, 
     /// Adaptive value initialization
-    pub w_init: f64, 
+    pub w_init: f32, 
     /// Leak reversal potential (mV)
-    pub e_l: f64,
+    pub e_l: f32,
     /// Controls conductance of input gap junctions
-    pub gap_conductance: f64, 
+    pub gap_conductance: f32, 
     /// Membrane time constant (ms)
-    pub tau_m: f64, 
+    pub tau_m: f32, 
     /// Membrane capacitance (nF)
-    pub c_m: f64, 
+    pub c_m: f32, 
     /// Time step (ms)
-    pub dt: f64, 
+    pub dt: f32, 
     /// Whether the neuron is spiking
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
@@ -713,7 +713,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIzhikevichNeuron<T, 
     impl_izhikevich_default_methods!();
 
     /// Calculates the change in voltage given an input current
-    pub fn izhikevich_leaky_get_dv_change(&mut self, i: f64) -> f64 {
+    pub fn izhikevich_leaky_get_dv_change(&mut self, i: f32) -> f32 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - 

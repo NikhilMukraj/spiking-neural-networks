@@ -4,36 +4,36 @@ use std::result::Result;
 use crate::error::TimeSeriesProcessingError;
 
 
-fn mean(values: &Vec<f64>) -> f64 {
-    values.iter().sum::<f64>() / values.len() as f64
+fn mean(values: &Vec<f32>) -> f32 {
+    values.iter().sum::<f32>() / values.len() as f32
 }
 
-fn std(values: &Vec<f64>, values_mean: f64) -> f64 {
+fn std(values: &Vec<f32>, values_mean: f32) -> f32 {
     values.iter()
         .map(|i| (i - values_mean).powf(2.0))
         .sum()
 }
 
 /// Calculates the Pearson correlation coefficient given two vectors of the same length (if standard
-/// deviation of either of the vectors is 0, `f64::NAN` is returned)
-pub fn pearsonr(x: &Vec<f64>, y: &Vec<f64>) -> Result<f64, TimeSeriesProcessingError> {
+/// deviation of either of the vectors is 0, `f32::NAN` is returned)
+pub fn pearsonr(x: &Vec<f32>, y: &Vec<f32>) -> Result<f32, TimeSeriesProcessingError> {
     if x.len() != y.len() {
         return Err(
             TimeSeriesProcessingError::SeriesAreNotSameLength
         );
     }
     
-    let x_mean: f64 = mean(x);
-    let y_mean: f64 = mean(y);
+    let x_mean: f32 = mean(x);
+    let y_mean: f32 = mean(y);
 
-    let numerator: f64 = x.iter().zip(y.iter())
+    let numerator: f32 = x.iter().zip(y.iter())
         .map(|(i, j)| (i - x_mean) * (j - y_mean))
         .sum();
 
-    let x_std: f64 = std(x, x_mean);
-    let y_std: f64 = std(y, y_mean);
+    let x_std: f32 = std(x, x_mean);
+    let y_std: f32 = std(y, y_mean);
 
-    let denominator: f64 = (x_std * y_std).powf(0.5);
+    let denominator: f32 = (x_std * y_std).powf(0.5);
 
     Ok(numerator / denominator) // returns nan x_std or y_std is 0
 }

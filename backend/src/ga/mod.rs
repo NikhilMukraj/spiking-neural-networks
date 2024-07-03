@@ -48,11 +48,11 @@ impl BitString {
     }
 }
 
-fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f64) -> (BitString, BitString) {
+fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f32) -> (BitString, BitString) {
     let mut rng_thread = rand::thread_rng(); 
     let (mut clone1, mut clone2) = (parent1.clone(), parent2.clone());
 
-    if rng_thread.gen::<f64>() <= r_cross {
+    if rng_thread.gen::<f32>() <= r_cross {
         let end_point = parent1.length();
         let crossover_point = rng_thread.gen_range(1..end_point); // change for variable length
        
@@ -66,10 +66,10 @@ fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f64) -> (BitStri
     return (clone1, clone2);
 }
 
-fn mutate(bitstring: &mut BitString, r_mut: f64) {
+fn mutate(bitstring: &mut BitString, r_mut: f32) {
     let mut rng_thread = rand::thread_rng(); 
     for i in 0..bitstring.length() {
-        let do_mut = rng_thread.gen::<f64>() <= r_mut;
+        let do_mut = rng_thread.gen::<f32>() <= r_mut;
 
         // does in place bit flip if do_mut
         if do_mut && bitstring.string.chars().nth(i).unwrap() == '1' {
@@ -80,7 +80,7 @@ fn mutate(bitstring: &mut BitString, r_mut: f64) {
     }
 }
 
-fn selection(pop: &Vec<BitString>, scores: &Vec<f64>, k: usize) -> BitString {
+fn selection(pop: &Vec<BitString>, scores: &Vec<f32>, k: usize) -> BitString {
     // default should be 3
     let mut rng_thread = rand::thread_rng(); 
     let mut selection_index = rng_thread.gen_range(1..pop.len());
@@ -105,9 +105,9 @@ fn selection(pop: &Vec<BitString>, scores: &Vec<f64>, k: usize) -> BitString {
 /// minimum value for scaling and the second item is the maximal value for scaling
 pub fn decode(
     bitstring: 
-    &BitString, bounds: &Vec<(f64, f64)>, 
+    &BitString, bounds: &Vec<(f32, f32)>, 
     n_bits: usize
-) -> result::Result<Vec<f64>, GeneticAlgorithmError> {
+) -> result::Result<Vec<f32>, GeneticAlgorithmError> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
@@ -118,7 +118,7 @@ pub fn decode(
         return Err(GeneticAlgorithmError::InvalidBitstringLength);
     }
 
-    let maximum = i32::pow(2, n_bits as u32) as f64 - 1.;
+    let maximum = i32::pow(2, n_bits as u32) as f32 - 1.;
     let mut decoded_vec = vec![0.; bounds.len()];
 
     for i in 0..bounds.len() {
@@ -126,7 +126,7 @@ pub fn decode(
         let substring = &bitstring.string[start..end];
 
         let mut value = match i32::from_str_radix(substring, 2) {
-            Ok(value_result) => value_result as f64,
+            Ok(value_result) => value_result as f32,
             Err(_e) => return Err(
                 GeneticAlgorithmError::DecodingBitstringFailure(String::from(substring))
             ),
@@ -143,7 +143,7 @@ fn create_random_string(length: usize) -> BitString {
     let mut rng_thread = rand::thread_rng(); 
     let mut random_string = String::from("");
     for _ in 0..length {
-        if rng_thread.gen::<f64>() <= 0.5 {
+        if rng_thread.gen::<f32>() <= 0.5 {
             random_string.push('0');
         } else {
             random_string.push('1');
@@ -158,7 +158,7 @@ fn create_random_string(length: usize) -> BitString {
 pub struct GeneticAlgorithmParameters {
     /// `bounds` should be a vector of tuples where the first item is the 
     /// minimum value for scaling and the second item is the maximal value for scaling
-    pub bounds: Vec<(f64, f64)>, 
+    pub bounds: Vec<(f32, f32)>, 
     /// `n_bits` should be the number of bits per substring in each chromosomal [`BitString`]
     pub n_bits: usize, 
     /// `n_iter` should be the number of iterations to use
@@ -166,9 +166,9 @@ pub struct GeneticAlgorithmParameters {
     /// `n_pop` should be the size of the population and even
     pub n_pop: usize, 
     /// `r_cross` should be the chance of cross over
-    pub r_cross: f64,
+    pub r_cross: f32,
     /// `r_mut` should be the chance of mutation
-    pub r_mut: f64, 
+    pub r_mut: f32, 
     /// `k` controls size of tournament during selection process, recommended to keep at `3`
     pub k: usize, 
 }
@@ -201,11 +201,11 @@ impl Default for GeneticAlgorithmParameters {
 /// 
 /// - `verbose` : use `true` to print extra information
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<(f64, f64)>, usize, &HashMap<&str, T>) -> result::Result<f64, GeneticAlgorithmError>, 
+    f: fn(&BitString, &Vec<(f32, f32)>, usize, &HashMap<&str, T>) -> result::Result<f32, GeneticAlgorithmError>, 
     params: &GeneticAlgorithmParameters,
     settings: &HashMap<&str, T>,
     verbose: bool,
-) -> result::Result<(BitString, f64, Vec<Vec<f64>>), GeneticAlgorithmError> {
+) -> result::Result<(BitString, f32, Vec<Vec<f32>>), GeneticAlgorithmError> {
     if params.n_pop % 2 != 0 {
         return Err(GeneticAlgorithmError::PopulationMustBeEven)
     }
@@ -227,7 +227,7 @@ pub fn genetic_algo<T: Sync>(
             println!("gen: {}", gen + 1);
         }
 
-        let scores_results: &result::Result<Vec<f64>, GeneticAlgorithmError> = &pop
+        let scores_results: &result::Result<Vec<f32>, GeneticAlgorithmError> = &pop
             .par_iter() 
             .map(|p| f(p, &params.bounds, params.n_bits, &settings))
             .collect(); 

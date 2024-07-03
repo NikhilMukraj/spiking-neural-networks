@@ -15,13 +15,13 @@ use super::{
 /// results in the effect decaying back to a resting point mimicking an action potential
 pub trait NeuralRefractoriness: Default + Clone + Send + Sync {
     /// Sets decay value
-    fn set_decay(&mut self, decay_factor: f64);
+    fn set_decay(&mut self, decay_factor: f32);
     /// Gets decay value
-    fn get_decay(&self) -> f64;
+    fn get_decay(&self) -> f32;
     /// Calculates neural refractoriness based on the current time of the simulation, the 
     /// last spiking time, the maximum and minimum voltage (mV)
     /// for scaling, and the simulation timestep (ms)
-    fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64;
+    fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32;
 }
 
 macro_rules! impl_default_neural_refractoriness {
@@ -35,17 +35,17 @@ macro_rules! impl_default_neural_refractoriness {
         }
 
         impl NeuralRefractoriness for $name {
-            fn set_decay(&mut self, decay_factor: f64) {
+            fn set_decay(&mut self, decay_factor: f32) {
                 self.k = decay_factor;
             }
 
-            fn get_decay(&self) -> f64 {
+            fn get_decay(&self) -> f32 {
                 self.k
             }
 
-            fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f64, v_resting: f64, dt: f64) -> f64 {
+            fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {
                 let a = v_max - v_resting;
-                let time_difference = (timestep - last_firing_time) as f64;
+                let time_difference = (timestep - last_firing_time) as f32;
 
                 $effect(self.k, a, time_difference, v_resting, dt)
             }
@@ -57,10 +57,10 @@ macro_rules! impl_default_neural_refractoriness {
 #[derive(Debug, Clone, Copy)]
 pub struct DeltaDiracRefractoriness {
     /// Decay value
-    pub k: f64,
+    pub k: f32,
 }
 
-fn delta_dirac_effect(k: f64, a: f64, time_difference: f64, v_resting: f64, dt: f64) -> f64 {
+fn delta_dirac_effect(k: f32, a: f32, time_difference: f32, v_resting: f32, dt: f32) -> f32 {
     a * ((-1. / (k / dt)) * time_difference.powf(2.)).exp() + v_resting
 }
 
@@ -70,10 +70,10 @@ impl_default_neural_refractoriness!(DeltaDiracRefractoriness, delta_dirac_effect
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayRefractoriness {
     /// Decay value
-    pub k: f64
+    pub k: f32
 }
 
-fn exponential_decay_effect(k: f64, a: f64, time_difference: f64, v_resting: f64, dt: f64) -> f64 {
+fn exponential_decay_effect(k: f32, a: f32, time_difference: f32, v_resting: f32, dt: f32) -> f32 {
     a * ((-1. / (k / dt)) * time_difference).exp() + v_resting
 }
 
@@ -86,13 +86,13 @@ pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime + Clone {
     /// Updates spike train
     fn iterate(&mut self) -> bool;
     /// Gets maximum and minimum voltage values
-    fn get_height(&self) -> (f64, f64);
+    fn get_height(&self) -> (f32, f32);
     /// Gets timestep or `dt` (ms)
-    fn get_refractoriness_timestep(&self) -> f64;
+    fn get_refractoriness_timestep(&self) -> f32;
     /// Returns neurotransmitters
     fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     /// Returns neurotransmitter concentrations
-    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64>;
+    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32>;
     /// Returns refractoriness dynamics
     fn get_refractoriness_function(&self) -> &Self::U;
 }
@@ -100,7 +100,7 @@ pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime + Clone {
 macro_rules! impl_current_voltage_spike_train {
     ($struct:ident) => {
         impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> CurrentVoltage for $struct<T, U> {
-            fn get_current_voltage(&self) -> f64 {
+            fn get_current_voltage(&self) -> f32 {
                 self.current_voltage
             }
         }
@@ -136,11 +136,11 @@ macro_rules! impl_last_firing_time_spike_train {
 #[derive(Debug, Clone)]
 pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Membrane potential (mV)
-    pub current_voltage: f64,
+    pub current_voltage: f32,
     /// Maximum voltage (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Minimum voltage (mV)
-    pub v_resting: f64,
+    pub v_resting: f32,
     /// Last firing time
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
@@ -150,9 +150,9 @@ pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Neural refactoriness dynamics
     pub neural_refractoriness: U,
     /// Chance of neuron firing at a given timestep
-    pub chance_of_firing: f64,
+    pub chance_of_firing: f32,
     /// Timestep for refractoriness (ms)
-    pub refractoriness_dt: f64,
+    pub refractoriness_dt: f32,
 }
 
 macro_rules! impl_default_spike_train_methods {
@@ -160,11 +160,11 @@ macro_rules! impl_default_spike_train_methods {
         type T = T;
         type U = U;
 
-        fn get_height(&self) -> (f64, f64) {
+        fn get_height(&self) -> (f32, f32) {
             (self.v_th, self.v_resting)
         }
     
-        fn get_refractoriness_timestep(&self) -> f64 {
+        fn get_refractoriness_timestep(&self) -> f32 {
             self.refractoriness_dt
         }
     
@@ -172,7 +172,7 @@ macro_rules! impl_default_spike_train_methods {
             &self.synaptic_neurotransmitters
         }
     
-        fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f64> {
+        fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32> {
             self.synaptic_neurotransmitters.get_concentrations()
         }
     
@@ -209,7 +209,7 @@ impl PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
     }
 
     /// Returns the default implementation of the spike train given a firing rate
-    pub fn default_impl_from_firing_rate(hertz: f64, dt: f64) -> Self {
+    pub fn default_impl_from_firing_rate(hertz: f32, dt: f32) -> Self {
         PoissonNeuron::from_firing_rate(hertz, dt)
     }
 }
@@ -217,7 +217,7 @@ impl PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PoissonNeuron<T, U> {
     /// Generates Poisson neuron with appropriate chance of firing based
     /// on the given hertz (Hz) and a given refractoriness timestep (ms)
-    pub fn from_firing_rate(hertz: f64, dt: f64) -> Self {
+    pub fn from_firing_rate(hertz: f32, dt: f32) -> Self {
         let mut poisson_neuron = PoissonNeuron::<T, U>::default();
 
         poisson_neuron.refractoriness_dt = dt;
@@ -254,11 +254,11 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Poisso
 #[derive(Debug, Clone)]
 pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Membrane potential (mV)
-    pub current_voltage: f64,
+    pub current_voltage: f32,
     /// Maximum voltage (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Minimum voltage (mV)
-    pub v_resting: f64,
+    pub v_resting: f32,
     /// Last spiking time
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
@@ -274,7 +274,7 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     /// Value to reset internal clock at
     pub max_clock_value: usize,
     /// Timestep for refractoriness (ms)
-    pub refractoriness_dt: f64,
+    pub refractoriness_dt: f32,
 }
 
 impl_current_voltage_spike_train!(PresetSpikeTrain);
@@ -310,9 +310,9 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PresetSpikeTrain<T, U
     /// Generates a spike train that evenly divides up a preset spike train's
     /// firing times across a timeframe given the number of spikes
     /// and the timestep (dt)
-    pub fn from_evenly_divided(num_spikes: usize, dt: f64) -> Self {
+    pub fn from_evenly_divided(num_spikes: usize, dt: f32) -> Self {
         let mut firing_times: HashSet<usize> =  HashSet::new();
-        let interval = ((1000. / dt) / (num_spikes as f64)) as usize;
+        let interval = ((1000. / dt) / (num_spikes as f32)) as usize;
 
         let mut current_timestep = 0;
         for _ in 0..num_spikes {

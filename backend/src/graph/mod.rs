@@ -46,10 +46,10 @@ pub trait Graph: Default {
     fn get_every_node_as_ref(&self) -> HashSet<&Self::T>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
-    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<f64>, GraphError>; 
+    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<f32>, GraphError>; 
     /// Edits the weight between two neurons, errors if the positions are not in the graph,
-    /// `None` represents no connection while `Some(f64)` represents some weight
-    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<f64>) -> Result<(), GraphError>;
+    /// `None` represents no connection while `Some(f32)` represents some weight
+    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<f32>) -> Result<(), GraphError>;
     /// Returns all presynaptic connections if the position is in the graph
     fn get_incoming_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>; 
     /// Returns all postsynaptic connections if the position is in the graph
@@ -79,9 +79,9 @@ pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy> {
     /// Converts the index back to a position
     pub index_to_position: HashMap<usize, T>,
     /// Matrix of weights
-    pub matrix: Vec<Vec<Option<f64>>>,
+    pub matrix: Vec<Vec<Option<f32>>>,
     /// History of matrix weights
-    pub history: Vec<Vec<Vec<Option<f64>>>>,
+    pub history: Vec<Vec<Vec<Option<f32>>>>,
     /// Identifier
     pub id: usize,
 }
@@ -158,7 +158,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
         self.position_to_index.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f64>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f32>, GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::PostsynapticNotFound(format!("{:#?}", postsynaptic)));
         }
@@ -169,7 +169,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
         Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
     }
 
-    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f64>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f32>) -> Result<(), GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::PostsynapticNotFound(format!("{:#?}", postsynaptic)));
         }
@@ -235,11 +235,11 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
 #[derive(Clone, Debug)]
 pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy> {
     /// All presynaptic connections
-    pub incoming_connections: HashMap<T, HashMap<T, f64>>,
+    pub incoming_connections: HashMap<T, HashMap<T, f32>>,
     /// All postsynaptic connections
     pub outgoing_connections: HashMap<T, HashSet<T>>,
     /// History of presynaptic connection weights
-    pub history: Vec<HashMap<T, HashMap<T, f64>>>,
+    pub history: Vec<HashMap<T, HashMap<T, f32>>>,
     /// Identifier
     pub id: usize,
 }
@@ -304,7 +304,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
         self.incoming_connections.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f64>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f32>, GraphError> {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
 
         if !self.incoming_connections.contains_key(postsynaptic) {
@@ -317,7 +317,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
         Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
     }
 
-    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f64>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f32>) -> Result<(), GraphError> {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
         if !self.incoming_connections.contains_key(postsynaptic) {

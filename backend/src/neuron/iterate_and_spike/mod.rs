@@ -14,10 +14,10 @@ use std::{
 pub struct BV {
     /// Calculates NMDA modifier based on voltage and magnesium concentration
     /// given a function to calculate the modfier
-    pub bv_calc: fn(f64) -> f64,
+    pub bv_calc: fn(f32) -> f32,
 }
 
-fn default_bv_calc(voltage: f64) -> f64 {
+fn default_bv_calc(voltage: f32) -> f32 {
     // 1.5 mM of Mg
     1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57)) 
 }
@@ -33,7 +33,7 @@ impl Default for BV {
 impl BV {
     /// Calculates effect of magnesium and voltage on NMDA receptor,
     /// voltage should be in mV
-    fn calculate_b(&self, voltage: f64) -> f64 {
+    fn calculate_b(&self, voltage: f32) -> f32 {
         (self.bv_calc)(voltage)
     }
 }
@@ -41,14 +41,14 @@ impl BV {
 /// Modifier for GABAb receptors
 #[derive(Debug, Clone)]
 pub struct GABAbDissociation {
-    pub g: f64,
-    pub n: f64,
-    pub kd: f64,
+    pub g: f32,
+    pub n: f32,
+    pub kd: f32,
     // k1: ,
     // k2: ,
-    pub k3: f64,
-    pub k4: f64,
-    pub dt: f64,
+    pub k3: f32,
+    pub k4: f32,
+    pub dt: f32,
 }
 
 impl Default for GABAbDissociation {
@@ -68,7 +68,7 @@ impl Default for GABAbDissociation {
 
 impl GABAbDissociation {
     /// Calculates effect of dissociation on GABAb receptor
-    fn calculate_modifer(&self) -> f64 {
+    fn calculate_modifer(&self) -> f32 {
         self.g.powf(self.n) / (self.g.powf(self.n) * self.kd)
     }
 }
@@ -130,11 +130,11 @@ impl NeurotransmitterType {
 /// Calculates neurotransmitter concentration over time based on voltage of neuron
 pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     /// Calculates change in neurotransmitter concentration based on voltage
-    fn apply_t_change(&mut self, voltage: f64);
+    fn apply_t_change(&mut self, voltage: f32);
     /// Returns neurotransmitter concentration
-    fn get_t(&self) -> f64;
+    fn get_t(&self) -> f32;
     /// Manually sets neurotransmitter concentration
-    fn set_t(&mut self, t: f64);
+    fn set_t(&mut self, t: f32);
 }
 
 /// Neurotransmitter concentration based off of approximation 
@@ -142,13 +142,13 @@ pub trait NeurotransmitterKinetics: Clone + Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub struct DestexheNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
-    pub t_max: f64,
+    pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
-    pub t: f64,
+    pub t: f32,
     /// Half activated voltage threshold (mV)
-    pub v_p: f64,
+    pub v_p: f32,
     /// Steepness (mV)
-    pub k_p: f64,
+    pub k_p: f32,
 }
 
 macro_rules! impl_destexhe_neurotransmitter_default {
@@ -173,15 +173,15 @@ impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 impl NeurotransmitterKinetics for DestexheNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f64) {
+    fn apply_t_change(&mut self, voltage: f32) {
         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
     }
 
-    fn get_t(&self) -> f64 {
+    fn get_t(&self) -> f32 {
         self.t
     }
 
-    fn set_t(&mut self, t: f64) {
+    fn set_t(&mut self, t: f32) {
         self.t = t;
     }
 }
@@ -192,15 +192,15 @@ impl NeurotransmitterKinetics for DestexheNeurotransmitter {
 #[derive(Debug, Clone, Copy)]
 pub struct ApproximateNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
-    pub t_max: f64,
+    pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
-    pub t: f64,
+    pub t: f32,
     /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Amount to decrease neurotransmitter concentration by
-    pub clearance_constant: f64,
+    pub clearance_constant: f32,
     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f64,
+    pub dt: f32,
 }
 
 macro_rules! impl_approximate_neurotransmitter_default {
@@ -225,7 +225,7 @@ impl_approximate_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
-fn heaviside(x: f64) -> f64 {
+fn heaviside(x: f32) -> f32 {
     if x > 0. {
         1.
     } else {
@@ -234,16 +234,16 @@ fn heaviside(x: f64) -> f64 {
 }
 
 impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f64) {
+    fn apply_t_change(&mut self, voltage: f32) {
         self.t += self.dt * -self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
 
-    fn get_t(&self) -> f64 {
+    fn get_t(&self) -> f32 {
         self.t
     }
 
-    fn set_t(&mut self, t: f64) {
+    fn set_t(&mut self, t: f32) {
         self.t = t;
     }
 }
@@ -254,23 +254,23 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 #[derive(Debug, Clone, Copy)]
 pub struct DiscreteSpikeNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
-    pub t_max: f64,
+    pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
-    pub t: f64,
+    pub t: f32,
     /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f64,
+    pub v_th: f32,
 }
 
 impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f64) {
+    fn apply_t_change(&mut self, voltage: f32) {
         self.t = self.t_max * heaviside(voltage - self.v_th);
     }
 
-    fn get_t(&self) -> f64 {
+    fn get_t(&self) -> f32 {
         self.t
     }
 
-    fn set_t(&mut self, t: f64) {
+    fn set_t(&mut self, t: f32) {
         self.t = t;
     }
 }
@@ -302,15 +302,15 @@ impl_discrete_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
-    pub t_max: f64,
+    pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
-    pub t: f64,
+    pub t: f32,
     /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f64,
+    pub v_th: f32,
     /// Amount to decay neurotransmitter concentration by
-    pub decay_constant: f64,
+    pub decay_constant: f32,
     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f64,
+    pub dt: f32,
 }
 
 macro_rules! impl_exp_decay_neurotransmitter_default {
@@ -335,22 +335,22 @@ impl_exp_decay_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_exp_decay_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_exp_decay_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
-fn exp_decay(x: f64, l: f64, dt: f64) -> f64 {
+fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
     -x * (dt / -l).exp()
 }
 
 impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f64) {
+    fn apply_t_change(&mut self, voltage: f32) {
         let t_change = exp_decay(self.t, self.decay_constant, self.dt);
         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
 
-    fn get_t(&self) -> f64 {
+    fn get_t(&self) -> f32 {
         self.t
     }
 
-    fn set_t(&mut self, t: f64) {
+    fn set_t(&mut self, t: f32) {
         self.t = t;
     }
 }
@@ -359,10 +359,10 @@ impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
 pub trait ReceptorKinetics: 
 Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync + Send {
     /// Calculates the change in receptor gating based on neurotransmitter input
-    fn apply_r_change(&mut self, t: f64);
+    fn apply_r_change(&mut self, t: f32);
     /// Gets the receptor gating value
-    fn get_r(&self) -> f64;
-    fn set_r(&mut self, r: f64);
+    fn get_r(&self) -> f32;
+    fn set_r(&mut self, r: f32);
 }
 
 /// Receptor dynamics based off of model 
@@ -370,25 +370,25 @@ Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync
 #[derive(Debug, Clone, Copy)]
 pub struct DestexheReceptor {
     /// Receptor gating value
-    pub r: f64,
+    pub r: f32,
     /// Forward rate constant (mM^-1 * ms^-1)
-    pub alpha: f64,
+    pub alpha: f32,
     /// Backwards rate constant (ms^-1)
-    pub beta: f64,
+    pub beta: f32,
     /// Timestep value (ms)
-    pub dt: f64,
+    pub dt: f32,
 }
 
 impl ReceptorKinetics for DestexheReceptor {
-    fn apply_r_change(&mut self, t: f64) {
+    fn apply_r_change(&mut self, t: f32) {
         self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * self.dt;
     }
 
-    fn get_r(&self) -> f64 {
+    fn get_r(&self) -> f32 {
         self.r
     }
 
-    fn set_r(&mut self, r: f64) {
+    fn set_r(&mut self, r: f32) {
         self.r = r;
     }
 }
@@ -419,19 +419,19 @@ impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
 /// gating value to the inputted neurotransmitter concentration
 #[derive(Debug, Clone, Copy)]
 pub struct ApproximateReceptor {
-    pub r: f64,
+    pub r: f32,
 }
 
 impl ReceptorKinetics for ApproximateReceptor {
-    fn apply_r_change(&mut self, t: f64) {
+    fn apply_r_change(&mut self, t: f32) {
         self.r = t;
     }
 
-    fn get_r(&self) -> f64 {
+    fn get_r(&self) -> f32 {
         self.r
     }
 
-    fn set_r(&mut self, r: f64) {
+    fn set_r(&mut self, r: f32) {
         self.r = r;
     }
 }
@@ -458,26 +458,26 @@ impl_approximate_receptor_default!(NMDADefault, nmda_default);
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayReceptor {
     /// Maximal receptor gating value
-    pub r_max: f64,
+    pub r_max: f32,
     /// Receptor gating value
-    pub r: f64,
+    pub r: f32,
     /// Amount to decay neurotransmitter concentration by
-    pub decay_constant: f64,
+    pub decay_constant: f32,
     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f64,
+    pub dt: f32,
 }
 
 impl ReceptorKinetics for ExponentialDecayReceptor {
-    fn apply_r_change(&mut self, t: f64) {
+    fn apply_r_change(&mut self, t: f32) {
         self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
         self.r = self.r_max.min(self.r.max(0.));
     }
 
-    fn get_r(&self) -> f64 {
+    fn get_r(&self) -> f32 {
         self.r
     }
 
-    fn set_r(&mut self, r: f64) {
+    fn set_r(&mut self, r: f32) {
         self.r = r;
     }
 }
@@ -508,11 +508,11 @@ impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 #[derive(Debug, Clone)]
 pub enum IonotropicLigandGatedReceptorType {
     /// Unspecified general ligand gated receptor
-    Basic(f64),
+    Basic(f32),
     /// AMPA receptor
-    AMPA(f64),
+    AMPA(f32),
     /// GABAa receptor
-    GABAa(f64),
+    GABAa(f32),
     /// GABAb receptor with dissociation modifier
     GABAb(GABAbDissociation),
     /// NMDA receptor with magnesium and voltage modifier
@@ -523,15 +523,15 @@ pub enum IonotropicLigandGatedReceptorType {
 #[derive(Debug, Clone)]
 pub struct LigandGatedChannel<T: ReceptorKinetics> {
     /// Maximal synaptic conductance (nS)
-    pub g: f64,
+    pub g: f32,
     /// Reveral potential (mV)
-    pub reversal: f64,
+    pub reversal: f32,
     // Receptor dynamics
     pub receptor: T,
     /// Type of receptor
     pub receptor_type: IonotropicLigandGatedReceptorType,
     /// Current generated by receptor
-    pub current: f64,
+    pub current: f32,
 }
 
 impl<T: ReceptorKinetics> Default for LigandGatedChannel<T> {
@@ -625,7 +625,7 @@ impl<T: ReceptorKinetics> NMDADefault for LigandGatedChannel<T> {
 
 impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     /// Calculates modifier for current calculation
-    fn get_modifier(&mut self, voltage: f64) -> f64 {
+    fn get_modifier(&mut self, voltage: f32) -> f32 {
         match &mut self.receptor_type {
             IonotropicLigandGatedReceptorType::AMPA(value) => *value,
             IonotropicLigandGatedReceptorType::GABAa(value) => *value,
@@ -639,7 +639,7 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     }
 
     /// Calculates current generated from receptor based on input `voltage` in mV
-    pub fn calculate_current(&mut self, voltage: f64) -> f64 {
+    pub fn calculate_current(&mut self, voltage: f32) -> f32 {
         let modifier = self.get_modifier(voltage);
 
         self.current = modifier * self.receptor.get_r() * self.g * (voltage - self.reversal);
@@ -704,7 +704,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Calculates the receptor currents for each channel based on a given voltage (mV)
-    pub fn set_receptor_currents(&mut self, voltage: f64) {
+    pub fn set_receptor_currents(&mut self, voltage: f32) {
         self.ligand_gates
             .values_mut()
             .for_each(|i| {
@@ -714,11 +714,11 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 
     /// Returns the total sum of the currents given the timestep (ms) value 
     /// and capacitance of the model (nF)
-    pub fn get_receptor_currents(&self, dt: f64, c_m: f64) -> f64 {
+    pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
         self.ligand_gates
             .values()
             .map(|i| i.current)
-            .sum::<f64>() * (dt / c_m)
+            .sum::<f32>() * (dt / c_m)
     }
 
     /// Updates the receptor gating values based on the neurotransitter concentrations (mM),
@@ -745,7 +745,7 @@ pub struct Neurotransmitters<T: NeurotransmitterKinetics> {
 }
 
 /// A hashmap of neurotransmitter types and their associated concentration
-pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f64>;
+pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f32>;
 
 impl<T: NeurotransmitterKinetics> Default for Neurotransmitters<T> {
     fn default() -> Self {
@@ -798,7 +798,7 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     }
 
     /// Calculates the neurotransmitter concentrations based on the given voltage (mV)
-    pub fn apply_t_changes(&mut self, voltage: f64) {
+    pub fn apply_t_changes(&mut self, voltage: f32) {
         self.neurotransmitters.values_mut()
             .for_each(|value| value.apply_t_change(voltage));
     }
@@ -807,7 +807,7 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
 /// Multiplies multiple neurotransmitters concentrations by a single scalar value
 pub fn weight_neurotransmitter_concentration(
     neurotransmitter_hashmap: &mut NeurotransmitterConcentrations, 
-    weight: f64
+    weight: f32
 ) {
     neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
@@ -872,7 +872,7 @@ impl PotentiationType {
     }
 
     /// Randomly generates a [`PotentiationType`] based on a given probability
-    pub fn weighted_random_type(prob: f64) -> PotentiationType {
+    pub fn weighted_random_type(prob: f32) -> PotentiationType {
         if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
             PotentiationType::Excitatory
         } else {
@@ -886,13 +886,13 @@ impl PotentiationType {
 #[derive(Debug, Clone)]
 pub struct GaussianParameters {
     /// Mean of distribution
-    pub mean: f64,
+    pub mean: f32,
     /// Standard deviation of distribution
-    pub std: f64,
+    pub std: f32,
     /// Maximum cutoff value
-    pub max: f64,
+    pub max: f32,
     /// Minimum cutoff value
-    pub min: f64,
+    pub min: f32,
 }
 
 impl Default for GaussianParameters {
@@ -909,7 +909,7 @@ impl Default for GaussianParameters {
 impl GaussianParameters {
     /// Generates a normally distributed random number clamped between
     /// a minimum and a maximum
-    pub fn get_random_number(&self) -> f64 {
+    pub fn get_random_number(&self) -> f32 {
         crate::distribution::limited_distr(
             self.mean, 
             self.std, 
@@ -923,13 +923,13 @@ impl GaussianParameters {
 #[derive(Clone, Debug)]
 pub struct STDPParameters {
     /// Postitive STDP modifier 
-    pub a_plus: f64,
+    pub a_plus: f32,
     /// Negative STDP modifier  
-    pub a_minus: f64,
+    pub a_minus: f32,
     /// Postitive STDP decay modifier  
-    pub tau_plus: f64, 
+    pub tau_plus: f32, 
     /// Negative STDP decay modifier 
-    pub tau_minus: f64, 
+    pub tau_minus: f32, 
 }
 
 impl Default for STDPParameters {
@@ -945,12 +945,12 @@ impl Default for STDPParameters {
 
 /// Gets current voltage (mV) of model
 pub trait CurrentVoltage {
-    fn get_current_voltage(&self) -> f64;
+    fn get_current_voltage(&self) -> f32;
 }
 
 /// Gets conductance of the synapse of a given neuron
 pub trait GapConductance {
-    fn get_gap_conductance(&self) -> f64;
+    fn get_gap_conductance(&self) -> f32;
 }
 
 /// Gets a the potentiation of the neuron 
@@ -960,7 +960,7 @@ pub trait Potentiation {
 
 /// Gets the noise factor for the neuron
 pub trait GaussianFactor {
-    fn get_gaussian_factor(&self) -> f64;
+    fn get_gaussian_factor(&self) -> f32;
 }
 
 /// Gets whether the neuron is spiking
@@ -990,7 +990,7 @@ Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpik
     type R: ReceptorKinetics;
     /// Takes in an input current and returns whether the model is spiking
     /// after the membrane potential is updated
-    fn iterate_and_spike(&mut self, input_current: f64) -> bool;
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool;
     /// Returns the ligand gated channels of the neuron
     fn get_ligand_gates(&self) -> &LigandGatedChannels<Self::R>;
     /// Returns the neurotransmitters of the neuron
@@ -1004,7 +1004,7 @@ Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpik
     /// receptors is also factored into the change in membrane potential
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
-        input_current: f64, 
+        input_current: f32, 
         t_total: Option<&NeurotransmitterConcentrations>,
     ) -> bool;
 }

@@ -30,7 +30,7 @@ impl Default for DiscreteNeuron {
 impl DiscreteNeuron {
     /// Updates state of neuron based on input, if positive the neuron is set to 
     /// [`DiscreteNeuronState::Active`], otherwise it becomes [`DiscreteNeuronState::Inactive`]
-    pub fn update(&mut self, input: f64) {
+    pub fn update(&mut self, input: f32) {
         match input > 0. {
             true => self.state = DiscreteNeuronState::Active,
             false => self.state = DiscreteNeuronState::Inactive,
@@ -90,7 +90,7 @@ impl<T: Graph<T=(usize, usize)>> DiscreteNeuronLattice<T> {
     pub fn input_pattern_into_discrete_grid(&mut self, pattern: Vec<Vec<isize>>) {
         for (i, pattern_vec) in pattern.iter().enumerate() {
             for (j, value) in pattern_vec.iter().enumerate() {
-                self.cell_grid[i][j].update(*value as f64);
+                self.cell_grid[i][j].update(*value as f32);
             }
         }
     }
@@ -116,12 +116,12 @@ impl<T: Graph<T=(usize, usize)>> DiscreteNeuronLattice<T> {
         for current_pos in self.graph.get_every_node() {
             let input_positions = self.graph.get_incoming_connections(&current_pos)?;
 
-            let input_value: f64 = input_positions.iter()
+            let input_value: f32 = input_positions.iter()
                 .map(|graph_pos| {
                         let (pos_i, pos_j) = graph_pos;
 
                         self.graph.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
-                        * self.cell_grid[*pos_i][*pos_j].state_to_numeric() as f64
+                        * self.cell_grid[*pos_i][*pos_j].state_to_numeric() as f32
                     }
                 )
                 .sum();
@@ -227,7 +227,7 @@ pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
                     None => 0.
                 };
 
-                weights.edit_weight(&coming, &going, Some(current_weight + *value as f64))?;
+                weights.edit_weight(&coming, &going, Some(current_weight + *value as f32))?;
             }
         }  
     }
@@ -236,7 +236,7 @@ pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
 }
 
 /// Adds random noise to a given pattern based on a given `noise_level` between `0.` and `1.`
-pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f64) -> Vec<Vec<isize>> {
+pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f32) -> Vec<Vec<isize>> {
     let mut output: Vec<Vec<isize>> = Vec::new();
 
     for i in pattern.iter() {
@@ -266,7 +266,7 @@ pub fn generate_random_patterns(
     num_rows: usize, 
     num_cols: usize, 
     num_patterns: usize, 
-    noise_level: f64
+    noise_level: f32
 ) -> Vec<Vec<Vec<isize>>> {
     let base_pattern = (0..num_rows).map(|_| {
         (0..num_cols)

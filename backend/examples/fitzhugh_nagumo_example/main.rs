@@ -18,8 +18,8 @@ fn main() {
     let iterations = 5000;
     let input = 0.5;
 
-    let mut voltages: Vec<f64> = vec![];
-    let mut ws: Vec<f64> = vec![];
+    let mut voltages: Vec<f32> = vec![];
+    let mut ws: Vec<f32> = vec![];
 
     for _ in 0..iterations {
         fitzhugh_nagumo_neuron.iterate_and_spike(input);

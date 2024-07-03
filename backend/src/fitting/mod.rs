@@ -22,14 +22,14 @@ fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
         .collect()
 }
 
-fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f64>, default: f64) -> f64 {
+fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f32>, default: f32) -> f32 {
     if peaks.len() == 0 {
         return default;
     }
 
     peaks.iter()
         .map(|n| voltages[*n])
-        .sum::<f64>() / (peaks.len() as f64)
+        .sum::<f32>() / (peaks.len() as f32)
 }
 
 /// Summarizes various characteristics of two voltage time series,
@@ -37,28 +37,28 @@ fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f64>, default: f64) -> f
 #[derive(Debug)]
 pub struct ActionPotentialSummary {
     /// Average height of the presynaptic spikes (mV)
-    pub average_pre_spike_amplitude: f64,
+    pub average_pre_spike_amplitude: f32,
     /// Average height of the postynaptic spikes (mV)
-    pub average_post_spike_amplitude: f64,
+    pub average_post_spike_amplitude: f32,
     /// Average difference in timing between spikes from the presynaptic neuron
-    pub average_pre_spike_time_difference: f64,
+    pub average_pre_spike_time_difference: f32,
     /// Average difference in timing between spikes from the postsynaptic neuron
-    pub average_post_spike_time_difference: f64,
+    pub average_post_spike_time_difference: f32,
     /// Number of spikes throughout voltage time series from presynaptic neuron
-    pub num_pre_spikes: f64,
+    pub num_pre_spikes: f32,
     /// Number of spikes throughout voltage time series from postsynaptic neuron
-    pub num_post_spikes: f64,
+    pub num_post_spikes: f32,
 }
 
 /// Generates an action potential summary given two voltage time series
 /// and a list of times where the neurons have spiked, `spike_amplitude_default`
 /// refers to the default voltage to be used if no peaks are found
 pub fn get_summary(
-    pre_voltages: &Vec<f64>, 
-    post_voltages: &Vec<f64>, 
+    pre_voltages: &Vec<f32>, 
+    post_voltages: &Vec<f32>, 
     pre_peaks: &Vec<usize>,
     post_peaks: &Vec<usize>,
-    spike_amplitude_default: f64,
+    spike_amplitude_default: f32,
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
         return Err(
@@ -68,19 +68,19 @@ pub fn get_summary(
         );
     }
 
-    let average_pre_spike: f64 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
-    let average_post_spike: f64 = get_average_spike(&post_peaks, post_voltages, spike_amplitude_default);
+    let average_pre_spike: f32 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
+    let average_post_spike: f32 = get_average_spike(&post_peaks, post_voltages, spike_amplitude_default);
 
-    let average_pre_spike_difference: f64 = if pre_peaks.len() != 0 {
+    let average_pre_spike_difference: f32 = if pre_peaks.len() != 0 {
         diff(&pre_peaks).iter()
-            .sum::<usize>() as f64 / (pre_peaks.len() as f64)
+            .sum::<usize>() as f32 / (pre_peaks.len() as f32)
     } else {
         0.
     };
 
-    let average_post_spike_difference: f64 = if post_peaks.len() != 0 {
+    let average_post_spike_difference: f32 = if post_peaks.len() != 0 {
         diff(&post_peaks).iter()
-            .sum::<usize>() as f64 / (post_peaks.len() as f64)
+            .sum::<usize>() as f32 / (post_peaks.len() as f32)
     } else {
         0.
     };
@@ -91,8 +91,8 @@ pub fn get_summary(
             average_post_spike_amplitude: average_post_spike,
             average_pre_spike_time_difference: average_pre_spike_difference,
             average_post_spike_time_difference: average_post_spike_difference,
-            num_pre_spikes: pre_peaks.len() as f64,
-            num_post_spikes: post_peaks.len() as f64,
+            num_pre_spikes: pre_peaks.len() as f32,
+            num_post_spikes: post_peaks.len() as f32,
         }
     )
 }
@@ -101,11 +101,11 @@ pub fn get_summary(
 /// found within inputs for [`fit_izhikevich_to_hodgkin_huxley`]
 pub struct SummaryScalingDefaults {
     /// Default scaling for height of spikes
-    pub default_amplitude_scale: f64,
+    pub default_amplitude_scale: f32,
     /// Default scaling for times between spikes
-    pub default_time_difference_scale: f64,
+    pub default_time_difference_scale: f32,
     /// Default scaling for number of spikes
-    pub default_num_peaks_scale: f64,
+    pub default_num_peaks_scale: f32,
 }
 
 impl Default for SummaryScalingDefaults {
@@ -122,19 +122,19 @@ impl Default for SummaryScalingDefaults {
 #[derive(Clone, Copy)]
 pub struct SummaryScalingFactors {
     /// Scaling for height of spikes
-    pub amplitude_scale: f64,
+    pub amplitude_scale: f32,
     /// Scaling for times between spikes
-    pub time_difference_scale: f64,
+    pub time_difference_scale: f32,
     /// Scaling for number of spikes
-    pub num_peaks_scale: f64,
+    pub num_peaks_scale: f32,
 }
 
-fn get_f64_max(x: &Vec<f64>) -> Option<&f64> {
+fn get_f32_max(x: &Vec<f32>) -> Option<&f32> {
     x.iter()
         .max_by(|a, b| a.total_cmp(b))
 }
 
-fn replace_with_default(value: f64, default: f64) -> f64 {
+fn replace_with_default(value: f32, default: f32) -> f32 {
     if value == 0. {
         default
     } else {
@@ -160,13 +160,13 @@ pub fn get_reference_scale(
     ];
 
     let amplitude_scale = replace_with_default(
-        *get_f64_max(&amplitudes).unwrap(), scaling_defaults.default_amplitude_scale
+        *get_f32_max(&amplitudes).unwrap(), scaling_defaults.default_amplitude_scale
     );
     let time_difference_scale = replace_with_default(
-        *get_f64_max(&time_differences).unwrap(), scaling_defaults.default_time_difference_scale
+        *get_f32_max(&time_differences).unwrap(), scaling_defaults.default_time_difference_scale
     );
     let num_peaks_scale = replace_with_default(
-        *get_f64_max(&peaks_lens).unwrap(), scaling_defaults.default_num_peaks_scale
+        *get_f32_max(&peaks_lens).unwrap(), scaling_defaults.default_num_peaks_scale
     );
 
     let scaled_reference = ActionPotentialSummary {
@@ -204,8 +204,8 @@ pub fn scale_summary(
 
 /// Compares the spike amplitudes, spike time differences, and number of spikes between action potentials
 /// by summing the square of the difference between each field across summaries, if any value is not a number
-/// `f64::INFINITY` is returned
-pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary, use_amplitudes: bool) -> f64 {
+/// `f32::INFINITY` is returned
+pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary, use_amplitudes: bool) -> f32 {
     let mut score = 0.;
 
     if use_amplitudes {
@@ -224,7 +224,7 @@ pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPoten
     score += pre_spike_difference + post_spike_difference + num_pre_spikes + num_post_spikes;
 
     if score.is_nan() {
-        f64::INFINITY
+        f32::INFINITY
     } else {
         score
     }
@@ -246,8 +246,8 @@ pub fn get_hodgkin_huxley_summary<
     iterations: usize,
     do_receptor_kinetics: bool,
     gaussian: bool, 
-    spike_amplitude_default: f64,
-    resting_potential: f64
+    spike_amplitude_default: f32,
+    resting_potential: f32
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = input_spike_train.clone();
 
@@ -257,8 +257,8 @@ pub fn get_hodgkin_huxley_summary<
     presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
     postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
 
-    let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
-    let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
+    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.current_voltage];
+    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.current_voltage];
 
     let mut pre_peaks: Vec<usize> = vec![];
     let mut post_peaks: Vec<usize> = vec![];
@@ -321,7 +321,7 @@ pub struct FittingSettings<
     /// calculating similarity of action potential summaries
     pub use_amplitude: bool,
     /// Default value to use if no spikes are found
-    pub spike_amplitude_default: f64,
+    pub spike_amplitude_default: f32,
     /// Number of iterations to run simulation for
     pub iterations: usize,
     /// Use `true` to add normally distributed random noise to inputs of simulation
@@ -346,8 +346,8 @@ pub fn get_izhikevich_summary<
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = settings.spike_trains[index].clone();
 
-    let mut pre_voltages: Vec<f64> = vec![presynaptic_neuron.current_voltage];
-    let mut post_voltages: Vec<f64> = vec![postsynaptic_neuron.current_voltage];
+    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.current_voltage];
+    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.current_voltage];
 
     let mut pre_peaks: Vec<usize> = vec![];
     let mut post_peaks: Vec<usize> = vec![];
@@ -394,21 +394,21 @@ fn fitting_objective<
     V: NeuralRefractoriness,
 >(
     bitstring: &BitString, 
-    bounds: &Vec<(f64, f64)>, 
+    bounds: &Vec<(f32, f32)>, 
     n_bits: usize, 
     settings: &HashMap<&str, FittingSettings<T, U, W, V>>
-) -> result::Result<f64, GeneticAlgorithmError> {
+) -> result::Result<f32, GeneticAlgorithmError> {
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
         Err(e) => return Err(e),
     };
 
-    let a: f64 = decoded[0];
-    let b: f64 = decoded[1];
-    let c: f64 = decoded[2];
-    let d: f64 = decoded[3];
-    let v_th: f64 = decoded[4];
-    let gap_conductance: f64 = decoded[5];
+    let a: f32 = decoded[0];
+    let b: f32 = decoded[1];
+    let c: f32 = decoded[2];
+    let d: f32 = decoded[3];
+    let v_th: f32 = decoded[4];
+    let gap_conductance: f32 = decoded[5];
 
     let settings = settings.get("settings").unwrap();
 
@@ -448,7 +448,7 @@ fn fitting_objective<
         .map(|i| {
             compare_summary(&settings.action_potential_summary[i], &summaries[i], settings.use_amplitude)
         })
-        .sum::<f64>();
+        .sum::<f32>();
 
     Ok(score)
 }
@@ -507,14 +507,14 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
     genetic_algo_params: &GeneticAlgorithmParameters,
     hodgkin_huxley_do_receptor_kinetics: bool,
     izhikevich_do_receptor_kinetics: bool,
-    resting_potential: f64,
+    resting_potential: f32,
     gaussian: bool,
     use_amplitude: bool,
-    spike_amplitude_default: f64,
+    spike_amplitude_default: f32,
     debug: bool,
 ) -> result::Result<
     (
-        (f64, f64, f64, f64, f64, f64), 
+        (f32, f32, f32, f32, f32, f32), 
         Vec<ActionPotentialSummary>, 
         Vec<ActionPotentialSummary>,
         Vec<Option<SummaryScalingFactors>>,
@@ -602,12 +602,12 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
         Err(e) => return Err(e),
     };
 
-    let a: f64 = decoded[0];
-    let b: f64 = decoded[1];
-    let c: f64 = decoded[2];
-    let d: f64 = decoded[3];
-    let v_th: f64 = decoded[4];
-    let gap_conductance: f64 = decoded[5];
+    let a: f32 = decoded[0];
+    let b: f32 = decoded[1];
+    let c: f32 = decoded[2];
+    let d: f32 = decoded[3];
+    let v_th: f32 = decoded[4];
+    let gap_conductance: f32 = decoded[5];
 
     let mut test_cell = izhikevich_neuron.clone();
 
@@ -655,12 +655,12 @@ pub fn print_action_potential_summaries(
         return Err(Error::new(ErrorKind::InvalidInput, "summaries and scaling_factors length must be the same"));
     }
 
-    let mut pre_spike_amplitudes: Vec<f64> = Vec::new();
-    let mut post_spike_amplitudes: Vec<f64> = Vec::new();
-    let mut pre_spike_time_differences: Vec<f64> = Vec::new();
-    let mut post_spike_time_differences: Vec<f64> = Vec::new();
-    let mut num_pre_spikes: Vec<f64> = Vec::new();
-    let mut num_post_spikes: Vec<f64> = Vec::new();
+    let mut pre_spike_amplitudes: Vec<f32> = Vec::new();
+    let mut post_spike_amplitudes: Vec<f32> = Vec::new();
+    let mut pre_spike_time_differences: Vec<f32> = Vec::new();
+    let mut post_spike_time_differences: Vec<f32> = Vec::new();
+    let mut num_pre_spikes: Vec<f32> = Vec::new();
+    let mut num_post_spikes: Vec<f32> = Vec::new();
 
     for (summary, scaling) in summaries.iter().zip(scaling_factors) {
         let (amplitude_scaling, time_scaling, peaks_scaling) = match scaling {

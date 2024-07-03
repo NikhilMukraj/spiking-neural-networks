@@ -30,9 +30,9 @@ fn main() {
     let do_receptor_kinetics = true;
     let gaussian = false;
 
-    let mut postsynaptic_voltages: Vec<f64> = Vec::new();
-    let mut presynaptic_neurotransmitter_concs: Vec<f64> = Vec::new();
-    let mut receptor_values: Vec<f64> = Vec::new();
+    let mut postsynaptic_voltages: Vec<f32> = Vec::new();
+    let mut presynaptic_neurotransmitter_concs: Vec<f32> = Vec::new();
+    let mut receptor_values: Vec<f32> = Vec::new();
 
     for _ in 0..iterations {
         iterate_coupled_spiking_neurons(

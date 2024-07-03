@@ -15,7 +15,7 @@ use std::{
         hash_map::{Values, ValuesMut}, 
         HashMap, HashSet
     }, 
-    f64::consts::PI, 
+    f32::consts::PI, 
     result::Result,
 };
 pub mod integrate_and_fire;
@@ -40,7 +40,7 @@ use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
-) -> f64 {
+) -> f32 {
     postsynaptic_neuron.get_gap_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
 }
@@ -53,7 +53,7 @@ fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
 pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
-) -> f64 {
+) -> f32 {
     let sign = match presynaptic_neuron.get_potentiation_type() {
         PotentiationType::Excitatory => 1.,
         PotentiationType::Inhibitory => -1.,
@@ -78,7 +78,7 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
-    input_current: f64,
+    input_current: f32,
     do_receptor_kinetics: bool,
     gaussian: bool,
 ) -> (bool, bool) {
@@ -136,7 +136,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
     presynaptic_neuron: &T,
     postsynaptic_neuron: &U,
     timestep: usize,
-) -> f64 {
+) -> f32 {
     let (v_max, v_resting) = presynaptic_neuron.get_height();
 
     if let None = presynaptic_neuron.get_last_firing_time() {
@@ -266,12 +266,12 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
 pub fn update_weight_stdp<T: LastFiringTime, U: STDP>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
-) -> f64 {
-    let mut delta_w: f64 = 0.;
+) -> f32 {
+    let mut delta_w: f32 = 0.;
 
     match (presynaptic_neuron.get_last_firing_time(), postsynaptic_neuron.get_last_firing_time()) {
         (Some(t_pre), Some(t_post)) => {
-            let (t_pre, t_post): (f64, f64) = (t_pre as f64, t_post as f64);
+            let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
 
             if t_pre < t_post {
                 delta_w = postsynaptic_neuron.get_stdp_params().a_plus * 
@@ -299,13 +299,13 @@ pub trait LatticeHistory: Default {
 #[derive(Debug, Clone)]
 pub struct EEGHistory {
     /// EEG values
-    pub history: Vec<f64>,
+    pub history: Vec<f32>,
     /// Voltage from EEG equipment (mV)
-    pub reference_voltage: f64,
+    pub reference_voltage: f32,
     /// Distance from neurons to equipment (mm)
-    pub distance: f64,
+    pub distance: f32,
     /// Conductivity of medium (S/mm)
-    pub conductivity: f64,
+    pub conductivity: f32,
 }
 
 impl Default for EEGHistory {
@@ -319,14 +319,14 @@ impl Default for EEGHistory {
     }
 }
 
-fn get_grid_voltages<T: CurrentVoltage>(grid: &Vec<Vec<T>>) -> Vec<Vec<f64>> {
+fn get_grid_voltages<T: CurrentVoltage>(grid: &Vec<Vec<T>>) -> Vec<Vec<f32>> {
     grid.iter()
         .map(|i| {
             i.iter()
                 .map(|j| j.get_current_voltage())
-                .collect::<Vec<f64>>()
+                .collect::<Vec<f32>>()
         })
-        .collect::<Vec<Vec<f64>>>()
+        .collect::<Vec<Vec<f32>>>()
 }
 
 impl LatticeHistory for EEGHistory {
@@ -354,7 +354,7 @@ impl LatticeHistory for EEGHistory {
 #[derive(Debug, Clone)]
 pub struct GridVoltageHistory {
     /// Voltage history
-    pub history: Vec<Vec<Vec<f64>>>
+    pub history: Vec<Vec<Vec<f32>>>
 }
 
 impl Default for GridVoltageHistory {
@@ -414,7 +414,7 @@ macro_rules! impl_reset_timing  {
 /// // has an 80% chance of returning true if distance from neuron to neuron is less than 2.,
 /// // otherwise false
 /// fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 2. && 
+///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.)) as f32).sqrt() <= 2. && 
 ///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
 /// }
 /// 
@@ -510,7 +510,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
         &self,
         position: &(usize, usize),
         input_positions: &HashSet<(usize, usize)>, 
-    ) -> f64 {
+    ) -> f32 {
         let (x, y) = position;
         let postsynaptic_neuron = &self.cell_grid[*x][*y];
 
@@ -530,7 +530,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
             input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
         }
 
-        input_val /= input_positions.len() as f64;
+        input_val /= input_positions.len() as f32;
 
         return input_val;
     }
@@ -563,16 +563,16 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
             weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
 
-        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f64);
+        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
 
         return input_val;
     }
 
     /// Gets all internal electrical inputs 
-    fn get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f64> {
+    fn get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
         // eventually convert to this, same with neurotransmitter input
         // convert on lattice network too
-        // let inputs: HashMap<Position, f64> = graph
+        // let inputs: HashMap<Position, f32> = graph
         //     .get_every_node()
         //     .par_iter()
         //     .map(|&pos| {
@@ -599,7 +599,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
 
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f64>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
+    (HashMap<(usize, usize), f32>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
         let neurotransmitter_inputs = match self.do_receptor_kinetics {
             true => {
                 let neurotransmitters: HashMap<(usize, usize), NeurotransmitterConcentrations> = self.graph.get_every_node_as_ref()
@@ -663,7 +663,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// Iterates one simulation timestep lattice given a set of electrical and neurotransmitter inputs
     pub fn iterate_with_neurotransmission(
         &mut self, 
-        inputs: &HashMap<(usize, usize), f64>, 
+        inputs: &HashMap<(usize, usize), f32>, 
         neurotransmitter_inputs: &Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
@@ -702,7 +702,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// Iterates one simulation timestep lattice given a set of only electrical inputs
     pub fn iterate(
         &mut self,
-        inputs: &HashMap<(usize, usize), f64>,
+        inputs: &HashMap<(usize, usize), f32>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
@@ -799,7 +799,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     pub fn connect(
         &mut self, 
         connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
+        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
     ) {
         self.graph.get_every_node()
             .iter()
@@ -834,7 +834,7 @@ pub trait SpikeTrainLatticeHistory: Default {
 #[derive(Debug, Clone)]
 pub struct SpikeTrainGridHistory {
     /// Voltage history
-    pub history: Vec<Vec<Vec<f64>>>,
+    pub history: Vec<Vec<Vec<f32>>>,
 }
 
 impl Default for SpikeTrainGridHistory {
@@ -962,11 +962,11 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// }
 /// 
 /// fn close_connect(x: (usize, usize), y: (usize, usize)) -> bool {
-///     (x.0 as f64 - y.0 as f64).abs() < 2. && (x.1 as f64 - y.1 as f64).abs() <= 2.
+///     (x.0 as f32 - y.0 as f32).abs() < 2. && (x.1 as f32 - y.1 as f32).abs() <= 2.
 /// }
 /// 
-/// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f64 {
-///     (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt()
+/// fn weight_function(x: (usize, usize), y: (usize, usize)) -> f32 {
+///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.)) as f32).sqrt()
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworksError>{
@@ -1208,7 +1208,7 @@ where
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
         connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
+        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -1295,7 +1295,7 @@ where
         &mut self, 
         id: usize, 
         connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f64>,
+        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -1342,7 +1342,7 @@ where
         &self, 
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
-    ) -> f64 {
+    ) -> f32 {
         let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
             .unwrap()
             .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
@@ -1366,19 +1366,19 @@ where
                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
                 };
                 
-                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
                     .unwrap_or(Some(0.))
                     .unwrap();
 
                 final_input * weight
             })
-            .sum::<f64>();
+            .sum::<f32>();
 
         if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
             input_val *= postsynaptic_neuron.get_gaussian_factor();
         }
 
-        input_val /= input_positions.len() as f64;
+        input_val /= input_positions.len() as f32;
 
         return input_val;
     }
@@ -1415,7 +1415,7 @@ where
                     final_input
                 };
                 
-                let weight: f64 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
                     .unwrap_or(Some(0.))
                     .unwrap();
 
@@ -1436,7 +1436,7 @@ where
 
         weight_neurotransmitter_concentration(
             &mut input_val, 
-            (1 / input_positions.len()) as f64
+            (1 / input_positions.len()) as f32
         );
 
         return input_val;
@@ -1456,7 +1456,7 @@ where
         nodes
     }
 
-    fn get_all_electrical_inputs(&self) -> HashMap<GraphPosition, f64> {
+    fn get_all_electrical_inputs(&self) -> HashMap<GraphPosition, f32> {
         // eventually paralellize
         // may need to remove the cloning in get every node
         self.get_every_node()
@@ -1475,7 +1475,7 @@ where
     }
 
     fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f64>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
         let neurotransmitters_inputs = self.get_every_node()
             .iter()
             .map(|pos| {
@@ -1506,7 +1506,7 @@ where
         for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
             let (x_in, y_in) = input_pos.pos;
 
-            let current_weight: f64 = self.connecting_graph
+            let current_weight: f32 = self.connecting_graph
                 .lookup_weight(&input_pos, &pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
@@ -1527,7 +1527,7 @@ where
         for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
             let (x_out, y_out) = output_pos.pos;
 
-            let current_weight: f64 = self.connecting_graph
+            let current_weight: f32 = self.connecting_graph
                 .lookup_weight(&pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
@@ -1555,7 +1555,7 @@ where
         for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
             let (x_in, y_in) = input_pos;
 
-            let current_weight: f64 = current_lattice.graph
+            let current_weight: f32 = current_lattice.graph
                 .lookup_weight(&input_pos, &pos.pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
@@ -1576,7 +1576,7 @@ where
         for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
             let (x_out, y_out) = output_pos;
 
-            let current_weight: f64 = current_lattice.graph
+            let current_weight: f32 = current_lattice.graph
                 .lookup_weight(&pos.pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
@@ -1600,7 +1600,7 @@ where
     /// Iterates one simulation timestep lattice given a set of electrical and neurotransmitter inputs
     pub fn iterate_with_neurotransmission(
         &mut self, 
-        inputs: &HashMap<GraphPosition, f64>, 
+        inputs: &HashMap<GraphPosition, f32>, 
         neurotransmitter_inputs: &HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>,
     ) -> Result<(), GraphError> {
         let mut spiking_positions = Vec::new();
@@ -1656,7 +1656,7 @@ where
     /// Iterates one simulation timestep lattice given a set of only electrical inputs
     pub fn iterate(
         &mut self,
-        inputs: &HashMap<GraphPosition, f64>,
+        inputs: &HashMap<GraphPosition, f32>,
     ) -> Result<(), GraphError> {
         let mut spiking_positions = Vec::new();
 

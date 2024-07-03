@@ -34,7 +34,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
 
 fn test_hopfield_network<T: Graph<T=(usize, usize)>>(
     patterns: &Vec<Vec<Vec<isize>>>,
-    noise_level: f64,
+    noise_level: f32,
     iterations: usize,
 ) -> result::Result<(), SpikingNeuralNetworksError> {
     let num_rows = patterns[0].len();
