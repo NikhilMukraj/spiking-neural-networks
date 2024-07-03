@@ -68,13 +68,16 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
         // gets normally distributed factor to add noise with by scaling
         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
+
         // scaling to add noise
         let input_current = input_current * pre_gaussian_factor;
+
         // calculates input current to postsynaptic neuron
         let post_current = signed_gap_junction(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
+
         // calculates postsynaptic neurotransmitter input
         let t_total = if do_receptor_kinetics {
             // weights neurotransmitter with random noise
@@ -93,6 +96,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
+
         // calculates postsynaptic neurotransmitter input
         let t_total = if do_receptor_kinetics {
             let t = presynaptic_neuron.get_neurotransmitter_concentrations();
@@ -106,11 +110,13 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     };
     // updates presynaptic neuron by one step
     let pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
+
     // updates postsynaptic neuron by one step
     let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
         post_current,
         t_total.as_ref(),
     );
+
     (pre_spiking, post_spiking)
 }
 ```
@@ -124,7 +130,7 @@ use spiking_neural_networks::{
             IterateAndSpike, weight_neurotransmitter_concentration,
         },
         spike_train::SpikeTrain,
-        spike_train_gap_juncton,
+        spike_train_gap_juncton, signed_gap_junction,
     }
 };
 
@@ -162,7 +168,6 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
         // gets normally distributed factor to add noise with by scaling
         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
-    
 
         // calculates presynaptic neurotransmitter input
         let pre_t_total = if do_receptor_kinetics {
@@ -181,7 +186,6 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
             &*presynaptic_neuron,
             &*postsynaptic_neuron,
         );
-    
 
         // calculates postsynaptic neurotransmitter input
         let post_t_total = if do_receptor_kinetics {
@@ -450,7 +454,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 ### Custom `IterateAndSpike` implementation
 
 ```rust
-use spiking_neural_networks::iterate_and_spike_traits::IterateAndSpikeBase;
+use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, 
     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
@@ -597,7 +601,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzH
 ### Custom `NeurotransmitterKinetics` implementation
 
 ```rust
-use spiking_neural_networks::iterate_and_spike::NeurotransmitterKinetics;
+use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
@@ -651,7 +655,9 @@ impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
 ### Custom `ReceptorKinetics` implementation
 
 ```rust
-use spiking_neural_networks::iterate_and_spike::ReceptorKinetics;
+use spiking_neural_networks::neuron::iterate_and_spike::{
+    ReceptorKinetics, AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
+};
 
 /// Receptor dynamics approximation that sets the receptor
 /// gating value to the inputted neurotransmitter concentration and
@@ -688,6 +694,7 @@ impl ReceptorKinetics for ExponentialDecayReceptor {
         self.r = r;
     }
 }
+
 // automatically generate defaults so `LigandGatedChannels`
 // can use default receptor settings in construction
 macro_rules! impl_exp_decay_receptor_default {
@@ -704,6 +711,7 @@ macro_rules! impl_exp_decay_receptor_default {
         }
     };
 }
+
 impl_exp_decay_receptor_default!(Default, default);
 impl_exp_decay_receptor_default!(AMPADefault, ampa_default);
 impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
