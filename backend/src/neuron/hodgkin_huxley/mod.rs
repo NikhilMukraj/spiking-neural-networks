@@ -239,9 +239,7 @@ impl Default for KLeakChannel {
 }
 
 impl IonChannel for KLeakChannel {
-    fn initialize(&mut self, _: f32) {
-        
-    }
+    fn initialize(&mut self, _: f32) {}
 
     fn update_current(&mut self, voltage: f32, _: f32) {
         self.current = self.g_k_leak * (voltage - self.e_k_leak);
