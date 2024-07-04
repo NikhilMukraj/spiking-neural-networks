@@ -174,7 +174,6 @@
 //!         // gets normally distributed factor to add noise with by scaling
 //!         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
 //!         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
-//!     
 //! 
 //!         // calculates presynaptic neurotransmitter input
 //!         let pre_t_total = if do_receptor_kinetics {
@@ -193,7 +192,6 @@
 //!             &*presynaptic_neuron,
 //!             &*postsynaptic_neuron,
 //!         );
-//!     
 //! 
 //!         // calculates postsynaptic neurotransmitter input
 //!         let post_t_total = if do_receptor_kinetics {
