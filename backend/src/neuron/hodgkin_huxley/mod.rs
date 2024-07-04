@@ -26,8 +26,18 @@ use super::iterate_and_spike::{
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod // high threshold calcium current (l type)
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
-/// Handles dynamics of an ion channel
-pub trait IonChannel: IonChannelBoxClone + Sync + Send {
+/// Handles dynamics of an ungated ion channel
+pub trait UngatedIonChannel: UngatedIonChannelBoxClone + Sync + Send {
+    /// Updates current based on the current voltage (mV)
+    fn update_current(&mut self, voltage: f32);
+    /// Returns the current
+    fn get_current(&self) -> f32;
+    /// Returns the name of the gate
+    fn gate_type(&self) -> &str;
+}
+
+/// Handles dynamics of a gated ion channel
+pub trait GatedIonChannel: IonChannelBoxClone + Sync + Send {
     /// Initializes parameters based on a starting voltage (mV)
     fn initialize(&mut self, voltage: f32);
     /// Updates current based on the current voltage (mV) and a timestep (ms)
@@ -38,22 +48,42 @@ pub trait IonChannel: IonChannelBoxClone + Sync + Send {
     fn gate_type(&self) -> &str;
 }
 
-/// Handles cloning of boxed dynamic ion channels
+/// Handles cloning of boxed dynamic gated ion channels
 pub trait IonChannelBoxClone {
-    fn clone_box(&self) -> Box<dyn IonChannel>;
+    fn clone_box(&self) -> Box<dyn GatedIonChannel>;
 }
 
 impl<T: ?Sized> IonChannelBoxClone for T
 where
-    T: 'static + IonChannel + Clone,
+    T: 'static + GatedIonChannel + Clone,
 {
-    fn clone_box(&self) -> Box<dyn IonChannel> {
+    fn clone_box(&self) -> Box<dyn GatedIonChannel> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn IonChannel> {
-    fn clone(&self) -> Box<dyn IonChannel> {
+impl Clone for Box<dyn GatedIonChannel> {
+    fn clone(&self) -> Box<dyn GatedIonChannel> {
+        self.clone_box()
+    }
+}
+
+/// Handles cloning of boxed dynamic ungated ion channels
+pub trait UngatedIonChannelBoxClone {
+    fn clone_box(&self) -> Box<dyn UngatedIonChannel>;
+}
+
+impl<T: ?Sized> UngatedIonChannelBoxClone for T
+where
+    T: 'static + UngatedIonChannel + Clone,
+{
+    fn clone_box(&self) -> Box<dyn UngatedIonChannel> {
+        Box::new(self.clone())
+    }
+}
+
+impl Clone for Box<dyn UngatedIonChannel> {
+    fn clone(&self) -> Box<dyn UngatedIonChannel> {
         self.clone_box()
     }
 }
@@ -91,7 +121,7 @@ impl Clone for Box<dyn IonChannel> {
 //     }
 // }
 
-// impl IonChannel for CalciumIonChannel {
+// impl GatedIonChannel for CalciumIonChannel {
 //     fn initialize(&mut self, voltage: f32) {
 //         self.update_gate_states(voltage);
 
@@ -103,7 +133,7 @@ impl Clone for Box<dyn IonChannel> {
 
 //         self.s.update(dt);
 
-//         self.current = self.s.state.powf(2.) * self.g_ca * (voltage - self.e_ca);
+//         self.current = -self.s.state.powf(2.) * self.g_ca * (voltage - self.e_ca);
 //     }
 
 //     fn get_current(&self) -> f32 {
@@ -152,7 +182,7 @@ impl NaIonChannel {
     }
 }
 
-impl IonChannel for NaIonChannel {
+impl GatedIonChannel for NaIonChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_gate_states(voltage);
 
@@ -210,7 +240,7 @@ impl KIonChannel {
     }
 }
 
-impl IonChannel for KIonChannel {
+impl GatedIonChannel for KIonChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_gate_states(voltage);
 
@@ -255,12 +285,9 @@ impl Default for KLeakChannel {
     }
 }
 
-impl IonChannel for KLeakChannel {
-    /// Initializes channel
-    fn initialize(&mut self, _: f32) {}
-
+impl UngatedIonChannel for KLeakChannel {
     /// Updates current based on the given voltage (mV)
-    fn update_current(&mut self, voltage: f32, _: f32) {
+    fn update_current(&mut self, voltage: f32) {
         self.current = self.g_k_leak * (voltage - self.e_k_leak);
     }
 
@@ -367,7 +394,9 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
     /// Additional ion gates
-    pub additional_gates: Vec<Box<dyn IonChannel>>,
+    pub additional_gates: Vec<Box<dyn GatedIonChannel>>,
+    /// Additional ungated ion channels
+    pub additional_channels: Vec<Box<dyn UngatedIonChannel>>,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -396,6 +425,9 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
             additional_gates: self.additional_gates.iter()
                 .map(|gate| gate.clone_box())
                 .collect(),
+            additional_channels: self.additional_channels.iter()
+                .map(|channel| channel.clone_box())
+                .collect(),
             synaptic_neurotransmitters: self.synaptic_neurotransmitters.clone(),
             ligand_gates: self.ligand_gates.clone(),
             gaussian_params: self.gaussian_params.clone(),
@@ -422,6 +454,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
+            additional_channels: vec![],
             gaussian_params: GaussianParameters::default(),
             stdp_params: STDPParameters::default(),
         }
@@ -487,7 +520,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         self.current_voltage = starting_voltage;
         self.na_channel.initialize(self.current_voltage);
         self.k_channel.initialize(self.current_voltage);
-        self.k_leak_channel.initialize(self.current_voltage);
 
         self.additional_gates.iter_mut()
             .for_each(|i| i.initialize(starting_voltage));
@@ -507,8 +539,14 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
                 i.get_current()
             ) 
             .sum::<f32>();
+        let i_additional_channels = self.additional_channels
+            .iter()
+            .map(|i| 
+                i.get_current()
+            ) 
+            .sum::<f32>();
 
-        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates;
+        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates + i_additional_gates + i_additional_channels;
         self.current_voltage += self.dt * i_sum / self.c_m;
     }
 
@@ -530,7 +568,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     pub fn update_gates(&mut self) {
         self.na_channel.update_current(self.current_voltage, self.dt);
         self.k_channel.update_current(self.current_voltage, self.dt);
-        self.k_leak_channel.update_current(self.current_voltage, self.dt);
+        self.k_leak_channel.update_current(self.current_voltage);
 
         self.additional_gates.iter_mut()
             .for_each(|i| {
@@ -607,7 +645,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
 /// neuron for a given duration, set `gaussian` to true to add 
 /// normally distributed noise to the input as it iterates,
 /// returns various state variables over time including voltages
-/// and gating states
+/// and gating states, output hashmap has keys `""`,
+/// `"m"`, `"n"`, and `"h"`
 pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorKinetics>(
     hodgkin_huxley_neuron: &mut HodgkinHuxleyNeuron<T, R>,
     input: f32,
