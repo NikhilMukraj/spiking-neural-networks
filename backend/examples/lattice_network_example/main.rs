@@ -45,7 +45,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let mut network = LatticeNetwork::generate_network(vec![lattice], vec![spike_train_lattice])?;
 
-    network.connect(0, 1, connection_conditional, None)?;
+    network.connect(0, 1, &connection_conditional, None)?;
 
     let iterations = 2500;
 

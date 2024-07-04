@@ -40,7 +40,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         num_cols, 
     );
 
-    lattice.connect(connection_conditional, None);
+    lattice.connect(&connection_conditional, None);
 
     let mut rng = rand::thread_rng();
 
