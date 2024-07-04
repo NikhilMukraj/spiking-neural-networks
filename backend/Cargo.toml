@@ -1,6 +1,6 @@
 [package]
 name = "spiking_neural_networks"
-version = "0.15.0"
+version = "0.15.1"
 edition = "2021"
 license = "Apache-2.0"
 description = "A package for designing and simulating biological neural network dynamics with neurotransmission"
