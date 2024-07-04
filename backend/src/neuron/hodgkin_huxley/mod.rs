@@ -286,7 +286,6 @@ impl Default for KLeakChannel {
 }
 
 impl UngatedIonChannel for KLeakChannel {
-    /// Updates current based on the given voltage (mV)
     fn update_current(&mut self, voltage: f32) {
         self.current = self.g_k_leak * (voltage - self.e_k_leak);
     }
