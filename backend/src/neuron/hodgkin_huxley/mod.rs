@@ -115,12 +115,18 @@ impl Clone for Box<dyn IonChannel> {
 //     }
 // }
 
+/// A sodium ion channel
 #[derive(Debug, Clone, Copy)]
 pub struct NaIonChannel {
+    /// Maximal conductance (nS)
     pub g_na: f32,
+    /// Reversal potential (mV)
     pub e_na: f32,
+    /// Gating variable that changes based on voltage
     pub m: GatingVariable,
+    /// Gating variable that changes based on voltage
     pub h: GatingVariable,
+    /// Current output
     pub current: f32,
 }
 
@@ -137,6 +143,7 @@ impl Default for NaIonChannel {
 }
 
 impl NaIonChannel {
+    /// Updates the state of the gating variable based on voltage
     fn update_gate_states(&mut self, voltage: f32) {
         self.m.alpha = 0.1 * ((25. - voltage) / (((25. - voltage) / 10.).exp() - 1.));
         self.m.beta = 4. * (-voltage / 18.).exp();
@@ -171,11 +178,16 @@ impl IonChannel for NaIonChannel {
     }
 }
 
+/// A potassium ion channel
 #[derive(Debug, Clone, Copy)]
 pub struct KIonChannel {
+    /// Maximal conductance (nS)
     g_k: f32,
+    /// Reversal potential (mV)
     e_k: f32,
+    /// Gating variable that changes based on voltage
     n: GatingVariable,
+    /// Current output
     current: f32,
 }
 
@@ -191,6 +203,7 @@ impl Default for KIonChannel {
 }
 
 impl KIonChannel {
+    /// Updates the state of the gating variable based on voltage
     fn update_gate_states(&mut self, voltage: f32) {
         self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
         self.n.beta = 0.125 * (-voltage / 80.).exp();
@@ -221,10 +234,14 @@ impl IonChannel for KIonChannel {
     }
 }
 
+/// A potassium leak channel
 #[derive(Debug, Clone, Copy)]
 pub struct KLeakChannel {
+    /// Maximal conductance (nS)
     pub g_k_leak: f32,
+    /// Reversal potential (mV)
     pub e_k_leak: f32,
+    /// Current output
     pub current: f32,
 }
 
