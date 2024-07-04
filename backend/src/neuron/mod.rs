@@ -802,8 +802,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// assumes lattice is already populated using the `populate` method
     pub fn connect(
         &mut self, 
-        connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
+        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
     ) {
         self.graph.get_every_node()
             .iter()
@@ -1211,8 +1211,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
+        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -1298,8 +1298,8 @@ where
     pub fn connect_innterally(
         &mut self, 
         id: usize, 
-        connecting_conditional: fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
+        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
