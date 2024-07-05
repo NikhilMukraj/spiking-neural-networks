@@ -115,6 +115,7 @@ impl Default for CalciumIonChannel {
 // https://github.com/ModelDBRepository/121060/blob/master/chan_CaL12.mod
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod
 impl CalciumIonChannel {
+    /// Updates the state of the gating variable based on voltage
     fn update_gate_states(&mut self, voltage: f32) {
         self.s.alpha = 1.6 / (1. + (-0.072 * (voltage - 5.)).exp());
         self.s.beta = (0.02 * (voltage + 8.9)) / (((voltage + 8.9).exp() / 5.) - 1.);
