@@ -3,8 +3,6 @@
 Generalized spiking neural network system with various intergrate and fire models as well as Hodgkin Huxley models,
 EEG processing with fourier transforms, and power spectral density calculations
 
-## See docs.rs page for documentation
-
 ## Biological Neuron Models Broken Down
 
 - (todo...)
