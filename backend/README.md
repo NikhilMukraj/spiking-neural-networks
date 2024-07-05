@@ -44,6 +44,7 @@ use spiking_neural_networks::{
     }
 };
 
+
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
 /// has a static input current while the postsynaptic neuron takes
 /// the current input and neurotransmitter input from the presynaptic neuron,
@@ -133,6 +134,7 @@ use spiking_neural_networks::{
         spike_train_gap_juncton, signed_gap_junction,
     }
 };
+
 
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
 /// has a spike train input while the postsynaptic neuron takes
@@ -603,6 +605,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzH
 ```rust
 use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;
 
+
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
 /// slowly through exponential decay that scales based on the `decay_constant` and `dt`
@@ -658,6 +661,7 @@ impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
 use spiking_neural_networks::neuron::iterate_and_spike::{
     ReceptorKinetics, AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
 };
+
 
 /// Receptor dynamics approximation that sets the receptor
 /// gating value to the inputted neurotransmitter concentration and
