@@ -19,6 +19,7 @@ use std::{
     result::Result,
 };
 pub mod integrate_and_fire;
+pub mod ion_channels;
 pub mod hodgkin_huxley;
 pub mod fitzhugh_nagumo;
 pub mod morris_lecar;
