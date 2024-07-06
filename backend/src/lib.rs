@@ -8,9 +8,9 @@
 //! plasticity, basic attractors, and dynamics for neurons connected in a lattice. 
 //! See below for examples and how to add custom models.
 //! 
-//! ### FitzHugh-Nagumo Model with Static Input
+//! ### Morris-Lecar Model with Static Input
 //! 
-//! ![FitzHugh-Nagumo with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/fhn_static.png?raw=true)
+//! ![Morris-Lecar with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/ml_static.png?raw=true)
 //! 
 //! ### Coupled Izhikevich Neurons
 //! 
@@ -461,47 +461,64 @@
 //! ```rust
 //! use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 //! use spiking_neural_networks::neuron::iterate_and_spike::{
-//!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, STDPParameters,
-//!     IsSpiking, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+//!     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
+//!     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
 //!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
 //! };
 //! 
 //! 
-//! /// A FitzHugh-Nagumo neuron 
 //! #[derive(Debug, Clone, IterateAndSpikeBase)]
-//! pub struct FitzHughNagumoNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
-//!     /// Membrane potential
-//!     pub current_voltage: f32,
-//!     /// Initial voltage
-//!     pub v_init: f32,
-//!     /// Voltage threshold for spike calculation (mV)
+//! pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
+//!     /// Membrane potential (mV)
+//!     pub current_voltage: f32, 
+//!     /// Voltage threshold (mV)
 //!     pub v_th: f32,
-//!     /// Adaptive value
-//!     pub w: f32,
-//!     // Initial adaptive value
-//!     pub w_init: f32,
-//!     /// Resistance value
-//!     pub resistance: f32,
-//!     /// Adaptive value modifier
-//!     pub a: f32,
-//!     /// Adaptive value integration constant
-//!     pub b: f32,
+//!     /// Initial voltage value (mV)
+//!     pub v_init: f32,
 //!     /// Controls conductance of input gap junctions
-//!     pub gap_conductance: f32, 
-//!     /// Membrane time constant (ms)
-//!     pub tau_m: f32,
+//!     pub gap_conductance: f32,
+//!     /// Conductance of leak channel (nS)
+//!     pub g_l: f32,
+//!     /// Conductance of calcium channel (nS)
+//!     pub g_ca: f32,
+//!     /// Conductance of potassium channel (nS)
+//!     pub g_k: f32,
+//!     /// Leak channel reversal potential (mV)
+//!     pub v_l: f32,
+//!     /// Calcium channel reversal potential (mV)
+//!     pub v_ca: f32,
+//!     /// Potassium channel reversal potential (mV)
+//!     pub v_k: f32,
+//!     /// Calcium gating variable
+//!     pub m_ss: f32,
+//!     /// Potassium gating variable
+//!     pub n: f32,
+//!     /// Potassium gating variable modifier
+//!     pub n_ss: f32,
+//!     /// Decay of potassium gating variable
+//!     pub t_n: f32,
+//!     /// Tuning parameter for gating variable
+//!     pub v_1: f32,
+//!     /// Tuning parameter for gating variable
+//!     pub v_2: f32,
+//!     /// Tuning parameter for gating variable
+//!     pub v_3: f32,
+//!     /// Tuning parameter for gating variable
+//!     pub v_4: f32,
+//!     /// Reference frequency
+//!     pub phi: f32,
 //!     /// Membrane capacitance (nF)
-//!     pub c_m: f32, 
-//!     /// Timestep (ms)
-//!     pub dt: f32, 
-//!     /// Last timestep the neuron has spiked 
-//!     pub last_firing_time: Option<usize>,
+//!     pub c_m: f32,
+//!     /// Timestep in (ms)
+//!     pub dt: f32,
+//!     /// Whether the neuron is spiking
+//!     pub is_spiking: bool,
 //!     /// Whether the voltage was increasing in the last step
 //!     pub was_increasing: bool,
-//!     /// Whether the neuron is currently spiking
-//!     pub is_spiking: bool,
+//!     /// Last timestep the neuron has spiked
+//!     pub last_firing_time: Option<usize>,
 //!     /// Potentiation type of neuron
 //!     pub potentiation_type: PotentiationType,
 //!     /// STDP parameters
@@ -514,18 +531,37 @@
 //!     pub ligand_gates: LigandGatedChannels<R>,
 //! }
 //! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> FitzHughNagumoNeuron<T, R> {
-//!     // calculates change in voltage
-//!     fn get_dv_change(&self, i: f32) -> f32 {
-//!         (  
-//!             self.current_voltage - (self.current_voltage.powf(3.) / 3.) 
-//!             - self.w + self.resistance * i
-//!         ) * self.dt
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
+//!     fn update_m_ss(&mut self) {
+//!         self.m_ss = 0.5 * (1. + ((self.current_voltage - self.v_1) / self.v_2).tanh())
 //!     }
 //! 
-//!     // calculates change in adaptive value
-//!     fn get_dw_change(&self) -> f32 {
-//!         (self.current_voltage + self.a + self.b * self.w) * (self.dt / self.tau_m)
+//!     fn update_n_ss(&mut self) {
+//!         self.n_ss = 0.5 * (1. + ((self.current_voltage - self.v_3) / self.v_4).tanh())
+//!     }
+//! 
+//!     fn update_t_n(&mut self) {
+//!         self.t_n = 1. / (self.phi * ((self.current_voltage - self.v_3) / (2. * self.v_4)).cosh())
+//!     }
+//! 
+//!     fn get_n_change(&mut self) -> f32 {
+//!         ((self.n_ss - self.n) / self.t_n) * self.dt
+//!     }
+//! 
+//!     fn update_gating_variables(&mut self) {
+//!         self.update_m_ss();
+//!         self.update_n_ss();
+//!         self.update_t_n();
+//! 
+//!         self.n += self.get_n_change();
+//!     }
+//! 
+//!     // calculates change in voltage
+//!     fn get_dv_change(&mut self, i: f32) -> f32 {
+//!         (i - (self.g_l * (self.current_voltage - self.v_l)) - 
+//!         (self.g_ca * self.m_ss * (self.current_voltage - self.v_ca)) - 
+//!         (self.g_k * self.n * (self.current_voltage - self.v_k)))
+//!         * (self.dt / self.c_m)
 //!     }
 //! 
 //!     // checks if neuron is currently spiking but seeing if the neuron is increasing in
@@ -544,32 +580,30 @@
 //!     }
 //! }
 //! 
-//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for FitzHughNagumoNeuron<T, R> {
+//! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
 //!     type T = T;
 //!     type R = R;
 //! 
-//!     fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
+//!     fn get_ligand_gates(&self) -> &LigandGatedChannels<Self::R> {
 //!         &self.ligand_gates
 //!     }
 //! 
-//!     fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
+//!     fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T> {
 //!         &self.synaptic_neurotransmitters
 //!     }
 //! 
 //!     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
 //!         self.synaptic_neurotransmitters.get_concentrations()
 //!     }
-//!     
+//! 
 //!     // updates voltage and adaptive values as well as the 
 //!     // neurotransmitters, receptor current is not factored in,
 //!     // and spiking is handled and returns whether it is currently spiking
 //!     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
-//!         let dv = self.get_dv_change(input_current);
-//!         let dw = self.get_dw_change();
-//!         let last_voltage = self.current_voltage;
+//!         self.update_gating_variables();
 //! 
-//!         self.current_voltage += dv;
-//!         self.w += dw;
+//!         let last_voltage = self.current_voltage;
+//!         self.current_voltage += self.get_dv_change(input_current);
 //! 
 //!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 //! 
@@ -587,14 +621,12 @@
 //!     ) -> bool {
 //!         self.ligand_gates.update_receptor_kinetics(t_total);
 //!         self.ligand_gates.set_receptor_currents(self.current_voltage);
+//!         
+//!         self.update_gating_variables();
 //! 
-//!         let dv = self.get_dv_change(input_current);
-//!         let dw = self.get_dw_change();
-//!         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 //!         let last_voltage = self.current_voltage;
-//! 
-//!         self.current_voltage += dv + neurotransmitter_dv;
-//!         self.w += dw;
+//!         let receptor_current = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+//!         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 //! 
 //!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 //! 
