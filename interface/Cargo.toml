@@ -9,4 +9,5 @@ name = "lixirnet"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.21.1"
+pyo3 = { version = "0.18.3", features = ["multiple-pymethods"] }
+spiking_neural_networks = "0.15.2"
