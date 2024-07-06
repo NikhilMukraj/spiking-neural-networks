@@ -21,7 +21,6 @@ use std::{
 pub mod integrate_and_fire;
 pub mod ion_channels;
 pub mod hodgkin_huxley;
-pub mod fitzhugh_nagumo;
 pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
@@ -437,7 +436,7 @@ macro_rules! impl_reset_timing  {
 ///     lattice.populate(&base_neuron, 5, 5);
 ///     // connects each neuron depending on whether the neuron is in a radius of 2. with
 ///     // an 80% chance of connectiing, each neuron is connected with a default weight of 1.
-///     lattice.connect(connection_conditional, None);
+///     lattice.connect(&connection_conditional, None);
 /// 
 ///     // lattice is simulated for 500 iterations
 ///     lattice.run_lattice(500)?;
@@ -1005,14 +1004,14 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 ///     // connects each corressponding neuron in the presynaptic lattice to a neuron in the
 ///     // postsynaptic lattice as long as their position is the same, scales the weight
 ///     // of the connection depending on the distance from each neuron
-///     network.connect(0, 1, one_to_one, Some(weight_function));
+///     network.connect(0, 1, &one_to_one, Some(&weight_function));
 /// 
 ///     // connects the lattices in the same manner as before but does so in the opposite direction
-///     network.connect(1, 0, one_to_one, Some(weight_function));
+///     network.connect(1, 0, &one_to_one, Some(&weight_function));
 /// 
 ///     // connections each spike train to a postsynaptic neuron in the postsynaptic lattice if 
 ///     // the neuron is close enough, sets each weight to 1.
-///     network.connect(2, 0, close_connect, None);
+///     network.connect(2, 0, &close_connect, None);
 /// 
 ///     // note that connect will overwrite any pre-existing connections between the given
 ///     // lattices in the direction specified (presynaptic -> postsynaptic will be overwritten)
