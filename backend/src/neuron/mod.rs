@@ -21,6 +21,7 @@ use std::{
 pub mod integrate_and_fire;
 pub mod hodgkin_huxley;
 pub mod fitzhugh_nagumo;
+pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
