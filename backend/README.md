@@ -4,9 +4,9 @@
 
 ## Quick Examples
 
-### FitzHugh-Nagumo Model with Static Input
+### Morris-Lecar Model with Static Input
 
-![FitzHugh-Nagumo with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/fhn_static.png?raw=true)
+![Morris-Lecar model with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/ml_static.png?raw=true)
 
 ### Coupled Izhikevich Neurons
 
