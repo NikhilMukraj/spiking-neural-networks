@@ -26,8 +26,8 @@ use super::iterate_and_spike::{
 // https://github.com/gpapamak/snl/blob/master/IL_gutnick.mod // high threshold calcium current (l type)
 // https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9373714/ // assume [Ca2+]in,inf is initial [Ca2+] value
 
-/// Handles dynamics of an ungated ion channel
-pub trait UngatedIonChannel: UngatedIonChannelBoxClone + Sync + Send {
+/// Handles dynamics of an ion channel that does not need timestep information
+pub trait TimestepIndependentIonChannel: TimestepIndependentIonChannelBoxClone + Sync + Send {
     /// Updates current based on the current voltage (mV)
     fn update_current(&mut self, voltage: f32);
     /// Returns the current
@@ -36,8 +36,8 @@ pub trait UngatedIonChannel: UngatedIonChannelBoxClone + Sync + Send {
     fn gate_type(&self) -> &str;
 }
 
-/// Handles dynamics of a gated ion channel
-pub trait GatedIonChannel: IonChannelBoxClone + Sync + Send {
+/// Handles dynamics of an ion channel
+pub trait IonChannel: IonChannelBoxClone + Sync + Send {
     /// Initializes parameters based on a starting voltage (mV)
     fn initialize(&mut self, voltage: f32);
     /// Updates current based on the current voltage (mV) and a timestep (ms)
@@ -50,40 +50,40 @@ pub trait GatedIonChannel: IonChannelBoxClone + Sync + Send {
 
 /// Handles cloning of boxed dynamic gated ion channels
 pub trait IonChannelBoxClone {
-    fn clone_box(&self) -> Box<dyn GatedIonChannel>;
+    fn clone_box(&self) -> Box<dyn IonChannel>;
 }
 
 impl<T: ?Sized> IonChannelBoxClone for T
 where
-    T: 'static + GatedIonChannel + Clone,
+    T: 'static + IonChannel + Clone,
 {
-    fn clone_box(&self) -> Box<dyn GatedIonChannel> {
+    fn clone_box(&self) -> Box<dyn IonChannel> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn GatedIonChannel> {
-    fn clone(&self) -> Box<dyn GatedIonChannel> {
+impl Clone for Box<dyn IonChannel> {
+    fn clone(&self) -> Box<dyn IonChannel> {
         self.clone_box()
     }
 }
 
 /// Handles cloning of boxed dynamic ungated ion channels
-pub trait UngatedIonChannelBoxClone {
-    fn clone_box(&self) -> Box<dyn UngatedIonChannel>;
+pub trait TimestepIndependentIonChannelBoxClone {
+    fn clone_box(&self) -> Box<dyn TimestepIndependentIonChannel>;
 }
 
-impl<T: ?Sized> UngatedIonChannelBoxClone for T
+impl<T: ?Sized> TimestepIndependentIonChannelBoxClone for T
 where
-    T: 'static + UngatedIonChannel + Clone,
+    T: 'static + TimestepIndependentIonChannel + Clone,
 {
-    fn clone_box(&self) -> Box<dyn UngatedIonChannel> {
+    fn clone_box(&self) -> Box<dyn TimestepIndependentIonChannel> {
         Box::new(self.clone())
     }
 }
 
-impl Clone for Box<dyn UngatedIonChannel> {
-    fn clone(&self) -> Box<dyn UngatedIonChannel> {
+impl Clone for Box<dyn TimestepIndependentIonChannel> {
+    fn clone(&self) -> Box<dyn TimestepIndependentIonChannel> {
         self.clone_box()
     }
 }
@@ -124,7 +124,7 @@ impl CalciumIonChannel {
 
 // https://sci-hub.se/https://pubmed.ncbi.nlm.nih.gov/25282547/
 // https://link.springer.com/referenceworkentry/10.1007/978-1-4614-7320-6_230-1
-impl GatedIonChannel for CalciumIonChannel {
+impl IonChannel for CalciumIonChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_gate_states(voltage);
 
@@ -185,7 +185,7 @@ impl NaIonChannel {
     }
 }
 
-impl GatedIonChannel for NaIonChannel {
+impl IonChannel for NaIonChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_gate_states(voltage);
 
@@ -243,7 +243,7 @@ impl KIonChannel {
     }
 }
 
-impl GatedIonChannel for KIonChannel {
+impl IonChannel for KIonChannel {
     fn initialize(&mut self, voltage: f32) {
         self.update_gate_states(voltage);
 
@@ -288,7 +288,7 @@ impl Default for KLeakChannel {
     }
 }
 
-impl UngatedIonChannel for KLeakChannel {
+impl TimestepIndependentIonChannel for KLeakChannel {
     fn update_current(&mut self, voltage: f32) {
         self.current = self.g_k_leak * (voltage - self.e_k_leak);
     }
@@ -396,9 +396,9 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Potentiation type of neuron
     pub potentiation_type: PotentiationType,
     /// Additional ion gates
-    pub additional_gates: Vec<Box<dyn GatedIonChannel>>,
-    /// Additional ungated ion channels
-    pub additional_channels: Vec<Box<dyn UngatedIonChannel>>,
+    pub additional_gates: Vec<Box<dyn IonChannel>>,
+    /// Additional timestep indpendent ion channels
+    pub additional_channels: Vec<Box<dyn TimestepIndependentIonChannel>>,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
