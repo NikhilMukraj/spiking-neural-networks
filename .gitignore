@@ -32,6 +32,9 @@
 /backend/examples/lattice_network_example/*.txt
 /backend/examples/lattice_network_example/*.ipynb
 /images/data/*
+/archive_interface/target
+/archive_interface/.venv
+/archive_interface/generate_methods.py
 /interface/target
 /interface/.venv
 /interface/generate_methods.py
