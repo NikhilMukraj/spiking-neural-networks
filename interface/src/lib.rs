@@ -1,14 +1,29 @@
 use pyo3::prelude::*;
+use spiking_neural_networks::neuron::{
+    iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor},
+    integrate_and_fire::IzhikevichNeuron,
+};
 
-/// Formats the sum of two numbers as string.
-#[pyfunction]
-fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
-    Ok((a + b).to_string())
+
+#[pylcass]
+pub struct PyApproximateNeurotransmitter {
+    neurotransmitter: ApproximateNeurotransmitter
 }
 
-/// A Python module implemented in Rust.
+#[pyclass]
+pub struct PyIzhikevichNeuron {
+    model: IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
+}
+
+// macro for getter and setter methods on izhikevich neuron
+// macro for getter and setter methods on neurotransmitter
+
 #[pymodule]
-fn oxidized_neural_networks(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_function(wrap_pyfunction!(sum_as_string, m)?)?;
+fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
+    // pip install target/wheels/lixirnet-0.1.0-cp310-cp310-manylinux_2_34_x86_64.whl
+    // m.add_function(wrap_pyfunction!(func, m)?)?;
+
+    m.add_class::<PyIzhikevichNeuron>()?;
+
     Ok(())
 }
