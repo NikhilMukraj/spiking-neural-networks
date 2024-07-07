@@ -83,13 +83,15 @@ impl MorrisLecarNeuron<DestexheNeurotransmitter, DestexheReceptor> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
-    fn update_channels(&mut self) {
+    /// Updates channel states based on current voltage
+    pub fn update_channels(&mut self) {
         self.ca_channel.update_current(self.current_voltage);
         self.k_channel.update_current(self.current_voltage, self.dt);
         self.leak_channel.update_current(self.current_voltage);
     }
 
-    fn get_dv_change(&self, i: f32) -> f32 {
+    /// Calculates change in voltage given an input current
+    pub fn get_dv_change(&self, i: f32) -> f32 {
         (i - self.leak_channel.current - self.ca_channel.current - self.k_channel.current)
         * (self.dt / self.c_m)
     }
