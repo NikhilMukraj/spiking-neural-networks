@@ -373,7 +373,7 @@ macro_rules! impl_adaptive_default_methods {
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveLeakyIntegrateAndFireNeuron<T, R> {
     /// Calculates the change in voltage given an input current
-    pub fn adaptive_get_dv_change(&mut self, i: f32) -> f32 {
+    pub fn adaptive_get_dv_change(&self, i: f32) -> f32 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.integration_constant * (i / self.g_l)) - 
@@ -487,7 +487,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> AdaptiveExpLeakyIntegrateAndFireNeuron<T, R> {
     /// Calculates the change in voltage given an input current
-    pub fn exp_adaptive_get_dv_change(&mut self, i: f32) -> f32 {
+    pub fn exp_adaptive_get_dv_change(&self, i: f32) -> f32 {
         let dv = (
             (self.leak_constant * (self.current_voltage - self.e_l)) +
             (self.slope_factor * ((self.current_voltage - self.v_th) / self.slope_factor).exp()) +
@@ -615,7 +615,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IzhikevichNeuron<T, R> {
     impl_izhikevich_default_methods!();
 
     /// Calculates the change in voltage given an input current
-    pub fn izhikevich_get_dv_change(&mut self, i: f32) -> f32 {
+    pub fn izhikevich_get_dv_change(&self, i: f32) -> f32 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - self.w_value + i
@@ -713,7 +713,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIzhikevichNeuron<T, 
     impl_izhikevich_default_methods!();
 
     /// Calculates the change in voltage given an input current
-    pub fn izhikevich_leaky_get_dv_change(&mut self, i: f32) -> f32 {
+    pub fn izhikevich_leaky_get_dv_change(&self, i: f32) -> f32 {
         let dv = (
             0.04 * self.current_voltage.powf(2.0) + 
             5. * self.current_voltage + 140. - 
