@@ -321,3 +321,151 @@ impl TimestepIndependentIonChannel for KLeakChannel {
         "K Leak"
     }
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct ReducedCalciumChannel {
+    /// Conductance of calcium channel (nS)
+    pub g_ca: f32,
+    /// Reversal potential (mV)
+    pub v_ca: f32,
+    /// Gating variable steady state
+    pub m_ss: f32,
+    /// Tuning parameter
+    pub v_1: f32,
+    /// Tuning parameter
+    pub v_2: f32,
+    /// Current output
+    pub current: f32,
+}
+
+impl Default for ReducedCalciumChannel {
+    fn default() -> Self {
+        ReducedCalciumChannel {
+            g_ca: 4.,
+            v_ca: 120.,
+            m_ss: 0.,
+            v_1: -1.2,
+            v_2: 18.,
+            current: 0.,
+        }
+    }
+}
+
+impl TimestepIndependentIonChannel for ReducedCalciumChannel {
+    fn update_current(&mut self, voltage: f32) {
+        self.m_ss = 0.5 * (1. + ((voltage - self.v_1) / self.v_2).tanh());
+
+        self.current = self.g_ca * self.m_ss * (voltage - self.v_ca);
+    }
+
+    fn get_current(&self) -> f32 {
+        self.current
+    }
+
+    fn gate_type(&self) -> &str {
+        "Reduced Ca"
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct KSteadyStateChannel {
+    /// Conductance of potassium channel (nS)
+    pub g_k: f32,
+    /// Reversal potential (mV)
+    pub v_k: f32,
+    /// Gating variable
+    pub n: f32,
+    /// Gating variable steady state
+    pub n_ss: f32,
+    /// Gating decay
+    pub t_n: f32,
+    /// Reference frequency
+    pub phi: f32,
+    /// Tuning parameter
+    pub v_3: f32,
+    /// Tuning parameter
+    pub v_4: f32,
+    /// Current output
+    pub current: f32
+}
+
+impl Default for KSteadyStateChannel {
+    fn default() -> Self {
+        KSteadyStateChannel { 
+            g_k: 8., 
+            v_k: -84., 
+            n: 0., 
+            n_ss: 0., 
+            t_n: 0.,
+            phi: 0.067, 
+            v_3: 12., 
+            v_4: 17.4, 
+            current: 0.,
+        }
+    }
+}
+
+impl KSteadyStateChannel {
+    fn update_gating_variables(&mut self, voltage: f32) {
+        self.n_ss = 0.5 * (1. + ((voltage - self.v_3) / self.v_4).tanh());
+        self.t_n = 1. / (self.phi * ((voltage - self.v_3) / (2. * self.v_4)).cosh());
+    }
+}
+
+impl IonChannel for KSteadyStateChannel {
+    fn initialize(&mut self, voltage: f32) {
+        self.update_gating_variables(voltage);
+    }
+    
+    fn update_current(&mut self, voltage: f32, dt: f32) {
+        self.update_gating_variables(voltage);
+
+        let n_change = ((self.n_ss - self.n) / self.t_n) * dt;
+
+        self.n += n_change;
+
+        self.current = self.g_k * self.n * (voltage - self.v_k);
+    }
+
+    fn get_current(&self) -> f32 {
+        self.current
+    }
+
+    fn gate_type(&self) -> &str {
+        "Steady State K"
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LeakChannel {
+    /// Conductance of leak channel (nS)
+    pub g_l: f32,
+    /// Reversal potential (mV)
+    pub v_l: f32,
+    /// Current output
+    pub current: f32
+}
+
+impl Default for LeakChannel {
+    fn default() -> Self {
+        LeakChannel { 
+            g_l: 2., 
+            v_l: -60., 
+            current: 0.,
+        }
+    }
+}
+
+impl TimestepIndependentIonChannel for LeakChannel {
+    fn update_current(&mut self, voltage: f32) {
+        self.current = self.g_l * (voltage - self.v_l);
+    }
+
+    fn get_current(&self) -> f32 {
+        self.current
+    }
+
+    fn gate_type(&self) -> &str {
+        "Leak"
+    }
+}
