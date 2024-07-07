@@ -558,7 +558,7 @@ impl_default_impl_integrate_and_fire!(IzhikevichNeuron);
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeuron<T, R> {
     fn default() -> Self {
         IzhikevichNeuron {
-            current_voltage: -75., 
+            current_voltage: -65., 
             gap_conductance: 7.,
             w_value: 0.,
             a: 0.02,
@@ -684,7 +684,7 @@ impl_default_impl_integrate_and_fire!(LeakyIzhikevichNeuron);
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevichNeuron<T, R> {
     fn default() -> Self {
         LeakyIzhikevichNeuron {
-            current_voltage: -75., 
+            current_voltage: -65., 
             gap_conductance: 7.,
             w_value: 0.,
             a: 0.02,
