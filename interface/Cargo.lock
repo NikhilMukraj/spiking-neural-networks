@@ -402,9 +402,9 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "spiking_neural_networks"
-version = "0.15.2"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "159c90db1949a4a33ae0bc27dedbe4299cd26d13a6e8e61b7208fd6b21339658"
+checksum = "9f3a0647dc41bf5edbf13af2797acc42da19c71b4c44722008c078d74cb5b4c7"
 dependencies = [
  "iterate_and_spike_traits",
  "ndarray",
