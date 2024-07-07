@@ -5,13 +5,14 @@ use spiking_neural_networks::neuron::{
 };
 
 
-#[pylcass]
+#[pyclass]
 pub struct PyApproximateNeurotransmitter {
     neurotransmitter: ApproximateNeurotransmitter
 }
 
 #[pyclass]
 pub struct PyIzhikevichNeuron {
+    // could try dyn neurotransmitter kinetics
     model: IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
 }
 
