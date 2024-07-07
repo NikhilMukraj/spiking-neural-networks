@@ -7,6 +7,10 @@ use super::iterate_and_spike::{
     LigandGatedChannels, Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics,
     NeurotransmitterConcentrations, DestexheNeurotransmitter, DestexheReceptor,
 };
+use super::ion_channels::{
+    TimestepIndependentIonChannel, IonChannel, ReducedCalciumChannel, 
+    KSteadyStateChannel, LeakChannel,
+};
 
 
 #[derive(Debug, Clone, IterateAndSpikeBase)]
@@ -19,36 +23,12 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub v_init: f32,
     /// Controls conductance of input gap junctions
     pub gap_conductance: f32,
-    /// Conductance of leak channel (nS)
-    pub g_l: f32,
-    /// Conductance of calcium channel (nS)
-    pub g_ca: f32,
-    /// Conductance of potassium channel (nS)
-    pub g_k: f32,
-    /// Leak channel reversal potential (mV)
-    pub v_l: f32,
-    /// Calcium channel reversal potential (mV)
-    pub v_ca: f32,
-    /// Potassium channel reversal potential (mV)
-    pub v_k: f32,
-    /// Calcium gating variable
-    pub m_ss: f32,
-    /// Potassium gating variable
-    pub n: f32,
-    /// Potassium gating variable modifier
-    pub n_ss: f32,
-    /// Decay of potassium gating variable
-    pub t_n: f32,
-    /// Tuning parameter for gating variable
-    pub v_1: f32,
-    /// Tuning parameter for gating variable
-    pub v_2: f32,
-    /// Tuning parameter for gating variable
-    pub v_3: f32,
-    /// Tuning parameter for gating variable
-    pub v_4: f32,
-    /// Reference frequency
-    pub phi: f32,
+    /// Calcium channel
+    pub ca_channel: ReducedCalciumChannel,
+    /// Potassium channel
+    pub k_channel: KSteadyStateChannel,
+    /// Leak channel
+    pub leak_channel: LeakChannel,
     /// Membrane capacitance (nF)
     pub c_m: f32,
     /// Timestep in (ms)
@@ -78,22 +58,10 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             v_init: -70.,
             v_th: 25.,
             gap_conductance: 10.,
-            g_l: 2.,
-            g_ca: 4.,
-            g_k: 8.,
-            v_l: -60.,
-            v_ca: 120.,
-            v_k: -84.,
-            m_ss: 0.,
-            n_ss: 0.,
-            t_n: 0.,
-            n: 0.,
-            v_1: -1.2,
-            v_2: 18.,
-            v_3: 12.,
-            v_4: 17.4,
-            phi: 0.067,
-            c_m: 20.,
+            ca_channel: ReducedCalciumChannel::default(),
+            k_channel: KSteadyStateChannel::default(),
+            leak_channel: LeakChannel::default(),
+            c_m: 6.6,
             dt: 0.01,
             is_spiking: false,
             was_increasing: false,
@@ -115,34 +83,14 @@ impl MorrisLecarNeuron<DestexheNeurotransmitter, DestexheReceptor> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
-    fn update_m_ss(&mut self) {
-        self.m_ss = 0.5 * (1. + ((self.current_voltage - self.v_1) / self.v_2).tanh())
+    fn update_channels(&mut self) {
+        self.ca_channel.update_current(self.current_voltage);
+        self.k_channel.update_current(self.current_voltage, self.dt);
+        self.leak_channel.update_current(self.current_voltage);
     }
 
-    fn update_n_ss(&mut self) {
-        self.n_ss = 0.5 * (1. + ((self.current_voltage - self.v_3) / self.v_4).tanh())
-    }
-
-    fn update_t_n(&mut self) {
-        self.t_n = 1. / (self.phi * ((self.current_voltage - self.v_3) / (2. * self.v_4)).cosh())
-    }
-
-    fn get_n_change(&mut self) -> f32 {
-        ((self.n_ss - self.n) / self.t_n) * self.dt
-    }
-
-    fn update_gating_variables(&mut self) {
-        self.update_m_ss();
-        self.update_n_ss();
-        self.update_t_n();
-
-        self.n += self.get_n_change();
-    }
-
-    fn get_dv_change(&mut self, i: f32) -> f32 {
-        (i - (self.g_l * (self.current_voltage - self.v_l)) - 
-        (self.g_ca * self.m_ss * (self.current_voltage - self.v_ca)) - 
-        (self.g_k * self.n * (self.current_voltage - self.v_k)))
+    fn get_dv_change(&self, i: f32) -> f32 {
+        (i - self.leak_channel.current - self.ca_channel.current - self.k_channel.current)
         * (self.dt / self.c_m)
     }
 
@@ -175,7 +123,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
     }
 
     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
-        self.update_gating_variables();
+        self.update_channels();
 
         let last_voltage = self.current_voltage;
         self.current_voltage += self.get_dv_change(input_current);
@@ -193,7 +141,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
         
-        self.update_gating_variables();
+        self.update_channels();
 
         let last_voltage = self.current_voltage;
         let receptor_current = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
