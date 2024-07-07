@@ -560,7 +560,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
         IzhikevichNeuron {
             current_voltage: -65., 
             gap_conductance: 7.,
-            w_value: 0.,
+            w_value: 30.,
             a: 0.02,
             b: 0.2,
             c: -55.0,
@@ -686,7 +686,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
         LeakyIzhikevichNeuron {
             current_voltage: -65., 
             gap_conductance: 7.,
-            w_value: 0.,
+            w_value: 30.,
             a: 0.02,
             b: 0.2,
             c: -55.0,
