@@ -689,8 +689,13 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
         self.ligand_gates.values()
     }
 
-    /// Gets the ligand gate associated with the givenn [`NeurotransmitterType`]
+    /// Gets the ligand gate associated with the given [`NeurotransmitterType`]
     pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
+        self.ligand_gates.get(neurotransmitter_type)
+    }
+
+    /// Gets a mutable reference to the ligand gate associated with the given [`NeurotransmitterType`]
+    pub fn get_mut(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
         self.ligand_gates.get(neurotransmitter_type)
     }
 
@@ -776,8 +781,13 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
         self.neurotransmitters.values_mut()
     }
 
-    /// Gets the neurotransmitter associated with the givenn [`NeurotransmitterType`]
+    /// Gets the neurotransmitter associated with the given [`NeurotransmitterType`]
     pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&T> {
+        self.neurotransmitters.get(neurotransmitter_type)
+    }
+
+    /// Gets a mutable reference to the neurotransmitter associated with the given [`NeurotransmitterType`]
+    pub fn get_mut(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&mut T> {
         self.neurotransmitters.get(neurotransmitter_type)
     }
 
