@@ -31,15 +31,6 @@ pub trait Graph: Default {
     /// Adds a new node to the graph, unconnected to other nodes, no change if node
     /// is already in graph
     fn add_node(&mut self, position: Self::T);
-    // /// Initializes connections between a set of presynaptic neurons and one postsynaptic neuron, 
-    // /// if `weight_params` is `None`, then each connection is initialized as `1.`, otherwise it
-    // /// is initialized as a normally distributed random value based on the inputted weight parameters
-    // fn initialize_connections(
-    //     &mut self, 
-    //     postsynaptic: Self::T, 
-    //     presynaptic_connections: Vec<Self::T>, 
-    //     weight_params: &Option<GaussianParameters>,
-    // );
     /// Returns every node or vertex on the graph
     fn get_every_node(&self) -> HashSet<Self::T>;
     /// Returns every node as a reference without cloning
@@ -72,6 +63,33 @@ impl ToGraphPosition for AdjacencyList<Position> {
 
 /// A graph implemented as an adjacency matrix where the positions of each node
 /// are converted to `usize` to be index in a 2-dimensional matrix
+/// 
+/// Example functionality:
+/// ```rust
+/// # use std::collections::HashSet;
+/// use spiking_neural_networks::graph::{Graph, AdjacencyMatrix};
+/// 
+/// 
+/// let mut adjacency_matrix = AdjacencyMatrix::<(usize, usize)>::default();
+/// adjacency_matrix.add_node((0, 0));
+/// adjacency_matrix.add_node((0, 1));
+/// adjacency_matrix.add_node((1, 2));
+/// 
+/// adjacency_matrix.edit_weight(&(0, 0), &(0, 1), Some(0.5));
+/// adjacency_matrix.edit_weight(&(1, 2), &(0, 1), Some(1.));
+/// assert!(adjacency_matrix.edit_weight(&(0, 1), &(4, 4), Some(1.)).is_err());
+/// 
+/// assert!(adjacency_matrix.lookup_weight(&(0, 0), &(0, 1)) == Ok(Some(0.5)));
+/// assert!(adjacency_matrix.lookup_weight(&(0, 1), &(0, 0)) == Ok(None));
+/// assert!(adjacency_matrix.lookup_weight(&(3, 3), &(0, 0)).is_err());
+/// 
+/// assert!(adjacency_matrix.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(0, 0), (1, 2)])));
+/// assert!(adjacency_matrix.get_outgoing_connections(&(1, 2)) == Ok(HashSet::from([(0, 1)])));
+/// 
+/// adjacency_matrix.edit_weight(&(0, 0), &(0, 1), None);
+/// assert!(adjacency_matrix.lookup_weight(&(0, 0), &(0, 1)) == Ok(None));
+/// assert!(adjacency_matrix.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
+/// ```
 #[derive(Clone, Debug)]
 pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy> {
     /// Converts position to a index for the matrix
@@ -122,33 +140,6 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
             self.matrix = vec![vec![None]];
         }
     }
-
-    // fn initialize_connections(
-    //     &mut self, 
-    //     postsynaptic: T, 
-    //     connections: Vec<T>, 
-    //     weight_params: &Option<GaussianParameters>,
-    // ) {
-    //     if !self.position_to_index.contains_key(&postsynaptic) {
-    //         self.add_node(postsynaptic)
-    //     }
-    //     for i in connections.iter() {
-    //         if !self.position_to_index.contains_key(i) {
-    //             self.add_node(*i);
-    //         }
-
-    //         let weight = match weight_params {
-    //             Some(value) => {
-    //                 Some(
-    //                     value.get_random_number()
-    //                 )
-    //             },
-    //             None => Some(1.0),
-    //         };
-
-    //         self.edit_weight(i, &postsynaptic, weight).unwrap();
-    //     }
-    // }
 
     fn get_every_node(&self) -> HashSet<T> {
         self.position_to_index.keys().cloned().collect()
@@ -232,6 +223,33 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
 }
 
 /// A graph implemented as an adjacency list
+/// 
+/// Example functionality:
+/// ```rust
+/// # use std::collections::HashSet;
+/// use spiking_neural_networks::graph::{Graph, AdjacencyList};
+/// 
+/// 
+/// let mut adjacency_list = AdjacencyList::<(usize, usize)>::default();
+/// adjacency_list.add_node((0, 0));
+/// adjacency_list.add_node((0, 1));
+/// adjacency_list.add_node((1, 2));
+/// 
+/// adjacency_list.edit_weight(&(0, 0), &(0, 1), Some(0.5));
+/// adjacency_list.edit_weight(&(1, 2), &(0, 1), Some(1.));
+/// assert!(adjacency_list.edit_weight(&(0, 1), &(4, 4), Some(1.)).is_err());
+/// 
+/// assert!(adjacency_list.lookup_weight(&(0, 0), &(0, 1)) == Ok(Some(0.5)));
+/// assert!(adjacency_list.lookup_weight(&(0, 1), &(0, 0)) == Ok(None));
+/// assert!(adjacency_list.lookup_weight(&(3, 3), &(0, 0)).is_err());
+/// 
+/// assert!(adjacency_list.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(0, 0), (1, 2)])));
+/// assert!(adjacency_list.get_outgoing_connections(&(1, 2)) == Ok(HashSet::from([(0, 1)])));
+/// 
+/// adjacency_list.edit_weight(&(0, 0), &(0, 1), None);
+/// assert!(adjacency_list.lookup_weight(&(0, 0), &(0, 1)) == Ok(None));
+/// assert!(adjacency_list.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
+/// ```
 #[derive(Clone, Debug)]
 pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy> {
     /// All presynaptic connections
@@ -263,38 +281,6 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
         self.incoming_connections.entry(position)
             .or_insert_with(HashMap::new);
     }
-
-    // fn initialize_connections(
-    //     &mut self, 
-    //     postsynaptic: T, 
-    //     connections: Vec<T>, 
-    //     weight_params: &Option<GaussianParameters>,
-    // ) {
-    //     for i in connections.iter() {
-    //         let weight = match weight_params {
-    //             Some(value) => {
-    //                 value.get_random_number()
-    //             },
-    //             None => 1.0,
-    //         };
-
-    //         if !self.incoming_connections.contains_key(&postsynaptic) {
-    //             self.incoming_connections.entry(postsynaptic)
-    //                 .or_insert_with(HashMap::new)
-    //                 .insert(*i, weight);
-    //         } else {
-    //             if let Some(positions_and_weights) = self.incoming_connections.get_mut(&postsynaptic) {
-    //                 positions_and_weights.insert(*i, weight);
-    //             }
-    //         }
-
-    //         if let Some(vector) = self.outgoing_connections.get_mut(&i) {
-    //             vector.insert(postsynaptic);
-    //         } else {
-    //             self.outgoing_connections.insert(*i, HashSet::from([postsynaptic]));
-    //         }
-    //     }
-    // }
 
     fn get_every_node(&self) -> HashSet<T> {
         self.incoming_connections.keys().cloned().collect()
