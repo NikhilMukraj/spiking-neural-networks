@@ -12,7 +12,7 @@ macro_rules! impl_debug_default {
 }
 
 /// Error set for potential graph errors
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum GraphError {
     /// Presynaptic position cannot be found
     PresynapticNotFound(String),
@@ -37,7 +37,7 @@ impl Display for GraphError {
 impl_debug_default!(GraphError);
 
 /// Error set for potential lattice network errors
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum LatticeNetworkError {
     /// Graph id already present in network (network must have graphs with unique identifiers)
     GraphIDAlreadyPresent(usize),
@@ -79,7 +79,7 @@ impl Display for LatticeNetworkError {
 impl_debug_default!(LatticeNetworkError);
 
 /// A set of errors for potential pattern errors
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PatternError {
     /// Pattern is not bipolar (`-1` or `1`)
     PatternIsNotBipolar,
@@ -101,7 +101,7 @@ impl Display for PatternError {
 impl_debug_default!(PatternError);
 
 /// A set of potential errors when using the genetic algorithm
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum GeneticAlgorithmError {
     /// Non binary found in binary bitstring
     NonBinaryInBitstring(String),
@@ -143,7 +143,7 @@ impl Display for GeneticAlgorithmError {
 impl_debug_default!(GeneticAlgorithmError);
 
 /// A set of potential errors when using series processing tools
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub enum TimeSeriesProcessingError {
     /// Series must be the same length
     SeriesAreNotSameLength
@@ -162,7 +162,7 @@ impl Display for TimeSeriesProcessingError {
 impl_debug_default!(TimeSeriesProcessingError);
 
 /// A set of errors that may occur when using the library
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum SpikingNeuralNetworksError {
     /// Errors related to EEG processing
     SeriesProcessingRelatedError(TimeSeriesProcessingError),
