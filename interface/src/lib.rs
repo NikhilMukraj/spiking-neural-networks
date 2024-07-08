@@ -134,7 +134,8 @@ impl PyApproximateNeurotransmitter {
 
 // #[pymethods]
 // impl PyApproximateNeurotransmitters {
-//     fn get_neurotransmitter(&mut self, neurotransmitter_type)
+//     fn get_neurotransmitter(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyApproximateNeurotransmitter
+//     fn set_neurotransmitter(&mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter)
 // }
 
 #[pyclass]
