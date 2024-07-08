@@ -69,6 +69,29 @@ macro_rules! impl_default_impl_integrate_and_fire {
     }
 }
 
+macro_rules! impl_default_handle_spiking {
+    () => {
+        /// Determines whether the neuron is spiking and resets the voltage
+        /// if so, also handles refractory period
+        pub fn handle_spiking(&mut self) -> bool {
+            let mut is_spiking = false;
+
+            if self.refractory_count > 0. {
+                self.current_voltage = self.v_reset;
+                self.refractory_count -= 1.;
+            } else if self.current_voltage >= self.v_th {
+                is_spiking = !is_spiking;
+                self.current_voltage = self.v_reset;
+                self.refractory_count = self.tref / self.dt
+            }
+
+            self.is_spiking = is_spiking;
+
+            is_spiking
+        }
+    }
+}
+
 /// A leaky integrate and fire neuron
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
@@ -157,24 +180,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LeakyIntegrateAndFireNeur
         dv
     }
 
-    /// Determines whether the neuron is spiking and resets the voltage
-    /// if so, also handles refractory period
-    pub fn basic_handle_spiking(&mut self) -> bool {
-        let mut is_spiking = false;
-
-        if self.refractory_count > 0. {
-            self.current_voltage = self.v_reset;
-            self.refractory_count -= 1.;
-        } else if self.current_voltage >= self.v_th {
-            is_spiking = !is_spiking;
-            self.current_voltage = self.v_reset;
-            self.refractory_count = self.tref / self.dt
-        }
-
-        self.is_spiking = is_spiking;
-
-        is_spiking
-    }
+    impl_default_handle_spiking!();
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for LeakyIntegrateAndFireNeuron<T, R> {
@@ -186,7 +192,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 
-        self.basic_handle_spiking()
+        self.handle_spiking()
     }
 
     fn iterate_with_neurotransmitter_and_spike(
@@ -204,7 +210,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 
-        self.basic_handle_spiking()
+        self.handle_spiking()
     }
 }
 
@@ -247,6 +253,120 @@ macro_rules! impl_iterate_and_spike {
         }
     };
 }
+
+#[derive(Debug, Clone, IterateAndSpikeBase)]
+pub struct QuadraticIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
+    /// Membrane potential (mV)
+    pub current_voltage: f32, 
+    /// Voltage threshold (mV)
+    pub v_th: f32, 
+    /// Voltage reset value/resting membrane potential (mV)
+    pub v_reset: f32, 
+    /// Voltage initialization value (mV)
+    pub v_init: f32, 
+    /// Counter for refractory period
+    pub refractory_count: f32, 
+    /// Total refractory period (ms)
+    pub tref: f32, 
+    /// Steepness of slope
+    pub alpha: f32, 
+    /// Critical voltage for spike initiation (mV)
+    pub v_c: f32,
+    /// Input value modifier
+    pub integration_constant: f32, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f32, 
+    /// Membrane time constant (ms)
+    pub tau_m: f32, 
+    /// Membrane capacitance (nF)
+    pub c_m: f32, 
+    /// Time step (ms)
+    pub dt: f32, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
+    /// Last timestep the neuron has spiked
+    pub last_firing_time: Option<usize>,
+    /// Potentiation type of neuron
+    pub potentiation_type: PotentiationType,
+    /// STDP parameters
+    pub stdp_params: STDPParameters,
+    /// Parameters used in generating noise
+    pub gaussian_params: GaussianParameters,
+    /// Postsynaptic neurotransmitters in cleft
+    pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    /// Ionotropic receptor ligand gated channels
+    pub ligand_gates: LigandGatedChannels<R>,
+}
+
+impl_default_impl_integrate_and_fire!(QuadraticIntegrateAndFireNeuron);
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for QuadraticIntegrateAndFireNeuron<T, R> {
+    fn default() -> Self {
+        QuadraticIntegrateAndFireNeuron {
+            current_voltage: -75., 
+            refractory_count: 0.0,
+            integration_constant: 1.,
+            gap_conductance: 7.,
+            alpha: 1.,
+            v_th: -55., // spike threshold (mV)
+            v_reset: -75., // resting potential (mV)
+            v_c: -60., // spike initiation threshold (mV)
+            tau_m: 100., // membrane time constant (ms)
+            c_m: 100., // membrane capacitance (nF)
+            v_init: -75., // initial potential (mV)
+            tref: 10., // refractory time (ms), could rename to refract_time
+            dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
+            last_firing_time: None,
+            potentiation_type: PotentiationType::Excitatory,
+            stdp_params: STDPParameters::default(),
+            gaussian_params: GaussianParameters::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
+            ligand_gates: LigandGatedChannels::default(),
+        }
+    }
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> QuadraticIntegrateAndFireNeuron<T, R> {
+    /// Calculates the change in voltage given an input current
+    fn quadratic_get_dv_change(&self, i: f32) -> f32 {
+        ((self.alpha * (self.current_voltage - self.v_reset) * (self.current_voltage - self.v_c)) + 
+        self.integration_constant * i) * (self.dt / self.tau_m)
+    }
+
+    impl_default_handle_spiking!();
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for QuadraticIntegrateAndFireNeuron<T, R> {
+    impl_default_neurotransmitter_methods!();
+
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool {
+        let dv = self.quadratic_get_dv_change(input_current);
+        self.current_voltage += dv;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+
+        self.handle_spiking()
+    }
+
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f32, 
+        t_total: Option<&NeurotransmitterConcentrations>,
+    ) -> bool {
+        self.ligand_gates.update_receptor_kinetics(t_total);
+        self.ligand_gates.set_receptor_currents(self.current_voltage);
+
+        let dv = self.quadratic_get_dv_change(input_current);
+        let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+
+        self.current_voltage += dv + neurotransmitter_dv;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+
+        self.handle_spiking()
+    }
+} 
 
 /// An adaptive leaky integrate and fire neuron
 #[derive(Debug, Clone, IterateAndSpikeBase)]
