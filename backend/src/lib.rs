@@ -467,7 +467,118 @@
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
 //! };
+//! use spiking_neural_networks::neuron::ion_channels::{
+//!     BasicGatingVariable, IonChannel, TimestepIndependentIonChannel,
+//! };
+//!  
 //! 
+//! /// A calcium channel with reduced dimensionality
+//! #[derive(Debug, Clone, Copy)]
+//! pub struct ReducedCalciumChannel {
+//!     /// Conductance of calcium channel (nS)
+//!     pub g_ca: f32,
+//!     /// Reversal potential (mV)
+//!     pub v_ca: f32,
+//!     /// Gating variable steady state
+//!     pub m_ss: f32,
+//!     /// Tuning parameter
+//!     pub v_1: f32,
+//!     /// Tuning parameter
+//!     pub v_2: f32,
+//!     /// Current output
+//!     pub current: f32,
+//! }
+//! 
+//! impl TimestepIndependentIonChannel for ReducedCalciumChannel {
+//!     fn update_current(&mut self, voltage: f32) {
+//!         self.m_ss = 0.5 * (1. + ((voltage - self.v_1) / self.v_2).tanh());
+//! 
+//!         self.current = self.g_ca * self.m_ss * (voltage - self.v_ca);
+//!     }
+//! 
+//!     fn get_current(&self) -> f32 {
+//!         self.current
+//!     }
+//! 
+//!     fn gate_type(&self) -> &str {
+//!         "Reduced Ca"
+//!     }
+//! }
+//! 
+//! /// A potassium channel based on steady state calculations
+//! #[derive(Debug, Clone, Copy)]
+//! pub struct KSteadyStateChannel {
+//!     /// Conductance of potassium channel (nS)
+//!     pub g_k: f32,
+//!     /// Reversal potential (mV)
+//!     pub v_k: f32,
+//!     /// Gating variable
+//!     pub n: f32,
+//!     /// Gating variable steady state
+//!     pub n_ss: f32,
+//!     /// Gating decay
+//!     pub t_n: f32,
+//!     /// Reference frequency
+//!     pub phi: f32,
+//!     /// Tuning parameter
+//!     pub v_3: f32,
+//!     /// Tuning parameter
+//!     pub v_4: f32,
+//!     /// Current output
+//!     pub current: f32
+//! }
+//! 
+//! impl KSteadyStateChannel {
+//!     fn update_gating_variables(&mut self, voltage: f32) {
+//!         self.n_ss = 0.5 * (1. + ((voltage - self.v_3) / self.v_4).tanh());
+//!         self.t_n = 1. / (self.phi * ((voltage - self.v_3) / (2. * self.v_4)).cosh());
+//!     }
+//! }
+//! 
+//! impl IonChannel for KSteadyStateChannel { 
+//!     fn update_current(&mut self, voltage: f32, dt: f32) {
+//!         self.update_gating_variables(voltage);
+//! 
+//!         let n_change = ((self.n_ss - self.n) / self.t_n) * dt;
+//! 
+//!         self.n += n_change;
+//! 
+//!         self.current = self.g_k * self.n * (voltage - self.v_k);
+//!     }
+//! 
+//!     fn get_current(&self) -> f32 {
+//!         self.current
+//!     }
+//! 
+//!     fn gate_type(&self) -> &str {
+//!         "Steady State K"
+//!     }
+//! }
+//! 
+//! /// An implementation of a leak channel
+//! #[derive(Debug, Clone, Copy)]
+//! pub struct LeakChannel {
+//!     /// Conductance of leak channel (nS)
+//!     pub g_l: f32,
+//!     /// Reversal potential (mV)
+//!     pub v_l: f32,
+//!     /// Current output
+//!     pub current: f32
+//! }
+//! 
+//! impl TimestepIndependentIonChannel for LeakChannel {
+//!     fn update_current(&mut self, voltage: f32) {
+//!         self.current = self.g_l * (voltage - self.v_l);
+//!     }
+//! 
+//!     fn get_current(&self) -> f32 {
+//!         self.current
+//!     }
+//! 
+//!     fn gate_type(&self) -> &str {
+//!         "Leak"
+//!     }
+//! }
 //! 
 //! #[derive(Debug, Clone, IterateAndSpikeBase)]
 //! pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
@@ -479,36 +590,12 @@
 //!     pub v_init: f32,
 //!     /// Controls conductance of input gap junctions
 //!     pub gap_conductance: f32,
-//!     /// Conductance of leak channel (nS)
-//!     pub g_l: f32,
-//!     /// Conductance of calcium channel (nS)
-//!     pub g_ca: f32,
-//!     /// Conductance of potassium channel (nS)
-//!     pub g_k: f32,
-//!     /// Leak channel reversal potential (mV)
-//!     pub v_l: f32,
-//!     /// Calcium channel reversal potential (mV)
-//!     pub v_ca: f32,
-//!     /// Potassium channel reversal potential (mV)
-//!     pub v_k: f32,
-//!     /// Calcium gating variable
-//!     pub m_ss: f32,
-//!     /// Potassium gating variable
-//!     pub n: f32,
-//!     /// Potassium gating variable modifier
-//!     pub n_ss: f32,
-//!     /// Decay of potassium gating variable
-//!     pub t_n: f32,
-//!     /// Tuning parameter for gating variable
-//!     pub v_1: f32,
-//!     /// Tuning parameter for gating variable
-//!     pub v_2: f32,
-//!     /// Tuning parameter for gating variable
-//!     pub v_3: f32,
-//!     /// Tuning parameter for gating variable
-//!     pub v_4: f32,
-//!     /// Reference frequency
-//!     pub phi: f32,
+//!     /// Calcium channel
+//!     pub ca_channel: ReducedCalciumChannel,
+//!     /// Potassium channel
+//!     pub k_channel: KSteadyStateChannel,
+//!     /// Leak channel
+//!     pub leak_channel: LeakChannel,
 //!     /// Membrane capacitance (nF)
 //!     pub c_m: f32,
 //!     /// Timestep in (ms)
@@ -532,35 +619,16 @@
 //! }
 //! 
 //! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
-//!     fn update_m_ss(&mut self) {
-//!         self.m_ss = 0.5 * (1. + ((self.current_voltage - self.v_1) / self.v_2).tanh())
+//!     /// Updates channel states based on current voltage
+//!     pub fn update_channels(&mut self) {
+//!         self.ca_channel.update_current(self.current_voltage);
+//!         self.k_channel.update_current(self.current_voltage, self.dt);
+//!         self.leak_channel.update_current(self.current_voltage);
 //!     }
-//! 
-//!     fn update_n_ss(&mut self) {
-//!         self.n_ss = 0.5 * (1. + ((self.current_voltage - self.v_3) / self.v_4).tanh())
-//!     }
-//! 
-//!     fn update_t_n(&mut self) {
-//!         self.t_n = 1. / (self.phi * ((self.current_voltage - self.v_3) / (2. * self.v_4)).cosh())
-//!     }
-//! 
-//!     fn get_n_change(&mut self) -> f32 {
-//!         ((self.n_ss - self.n) / self.t_n) * self.dt
-//!     }
-//! 
-//!     fn update_gating_variables(&mut self) {
-//!         self.update_m_ss();
-//!         self.update_n_ss();
-//!         self.update_t_n();
-//! 
-//!         self.n += self.get_n_change();
-//!     }
-//! 
-//!     // calculates change in voltage
-//!     fn get_dv_change(&mut self, i: f32) -> f32 {
-//!         (i - (self.g_l * (self.current_voltage - self.v_l)) - 
-//!         (self.g_ca * self.m_ss * (self.current_voltage - self.v_ca)) - 
-//!         (self.g_k * self.n * (self.current_voltage - self.v_k)))
+//!     
+//!     /// Calculates change in voltage given an input current
+//!     pub fn get_dv_change(&self, i: f32) -> f32 {
+//!         (i - self.leak_channel.current - self.ca_channel.current - self.k_channel.current)
 //!         * (self.dt / self.c_m)
 //!     }
 //! 
@@ -600,7 +668,7 @@
 //!     // neurotransmitters, receptor current is not factored in,
 //!     // and spiking is handled and returns whether it is currently spiking
 //!     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
-//!         self.update_gating_variables();
+//!         self.update_channels();
 //! 
 //!         let last_voltage = self.current_voltage;
 //!         self.current_voltage += self.get_dv_change(input_current);
@@ -622,7 +690,7 @@
 //!         self.ligand_gates.update_receptor_kinetics(t_total);
 //!         self.ligand_gates.set_receptor_currents(self.current_voltage);
 //!         
-//!         self.update_gating_variables();
+//!         self.update_channels();
 //! 
 //!         let last_voltage = self.current_voltage;
 //!         let receptor_current = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
