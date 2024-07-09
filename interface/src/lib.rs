@@ -1,14 +1,17 @@
-use pyo3::{exceptions::PyValueError, prelude::*};
+use std::collections::HashMap;
+use pyo3::{exceptions::{PyKeyError, PyValueError}, types::PyList, prelude::*};
 use spiking_neural_networks::neuron::{
     integrate_and_fire::IzhikevichNeuron, 
     iterate_and_spike::{
         ApproximateNeurotransmitter, ApproximateReceptor, IterateAndSpike, 
-        NeurotransmitterType, PotentiationType
+        NeurotransmitterType, Neurotransmitters, PotentiationType,
+        AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
     }
 };
 
 
 #[pyclass]
+#[pyo3(name = "PotentiationType")]
 #[derive(Clone, Copy)]
 pub struct PyPotentiationType {
     potentiation: PotentiationType
@@ -53,7 +56,8 @@ impl PyPotentiationType {
 }
 
 #[pyclass]
-#[derive(Clone, Copy)]
+#[pyo3(name = "NeurotransmitterType")]
+#[derive(Debug, Clone, Copy)]
 pub enum PyNeurotransmitterType {
     Basic,
     AMPA,
@@ -94,6 +98,7 @@ macro_rules! implement_basic_getter_and_setter {
 }
 
 #[pyclass]
+#[pyo3(name = "ApproximateNeurotransmitter")]
 #[derive(Clone, Copy)]
 pub struct PyApproximateNeurotransmitter {
     neurotransmitter: ApproximateNeurotransmitter,
@@ -126,19 +131,68 @@ impl PyApproximateNeurotransmitter {
     }
 }
 
-// #[pyclass]
-// #[derive(Clone)]
-// pub struct PyApproximateNeurotransmitters {
-//     neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>
-// }
+#[pyclass]
+#[pyo3(name = "ApproximateNeurotransmitters")]
+#[derive(Clone)]
+pub struct PyApproximateNeurotransmitters {
+    neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>
+}
 
-// #[pymethods]
-// impl PyApproximateNeurotransmitters {
-//     fn get_neurotransmitter(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyApproximateNeurotransmitter
-//     fn set_neurotransmitter(&mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter)
-// }
+#[pymethods]
+impl PyApproximateNeurotransmitters {
+    #[new]
+    #[pyo3(signature = (neurotransmitter_types=None))]
+    fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
+        let mut neurotransmitters: HashMap<NeurotransmitterType, ApproximateNeurotransmitter> = HashMap::new();
+
+        match neurotransmitter_types {
+            Some(values) => {
+                for i in values.iter() {
+                    let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                    let neurotransmitter = match current_type {
+                        NeurotransmitterType::Basic => ApproximateNeurotransmitter::default(),
+                        NeurotransmitterType::AMPA => ApproximateNeurotransmitter::ampa_default(),
+                        NeurotransmitterType::GABAa => ApproximateNeurotransmitter::gabaa_default(),
+                        NeurotransmitterType::GABAb => ApproximateNeurotransmitter::gabab_default(),
+                        NeurotransmitterType::NMDA => ApproximateNeurotransmitter::nmda_default(),
+                    };
+        
+                    neurotransmitters.insert(current_type, neurotransmitter);
+                }
+            },
+            None => {}
+        };
+
+        Ok(
+            PyApproximateNeurotransmitters {
+                neurotransmitters: Neurotransmitters { neurotransmitters: neurotransmitters }
+            }
+        )
+    }
+
+    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyApproximateNeurotransmitter> {
+        if let Some(value) = self.neurotransmitters.get(&neurotransmitter_type.convert_type()) {
+            Ok(
+                PyApproximateNeurotransmitter { 
+                    neurotransmitter: *value 
+                }
+            )
+        } else {
+            Err(PyKeyError::new_err(format!("{:#?} not found", neurotransmitter_type)))
+        }
+    }
+
+    fn set_neurotransmitter(
+        &mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter
+    ) {
+        self.neurotransmitters.neurotransmitters.insert(
+            neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
+        );
+    }
+}
 
 #[pyclass]
+#[pyo3(name = "IzhikevichNeuron")]
 #[derive(Clone)]
 pub struct PyIzhikevichNeuron {
     // could try dyn neurotransmitter kinetics
@@ -200,7 +254,6 @@ impl PyIzhikevichNeuron {
         self.model.iterate_and_spike(i)
     }
 
-    // expose neurotransmitter types
     // fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_conc: Option<PyDict>) -> bool {
 
     // }
@@ -210,6 +263,7 @@ impl PyIzhikevichNeuron {
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
+    m.add_class::<PyApproximateNeurotransmitters>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
 
     Ok(())
