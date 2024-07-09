@@ -1,11 +1,9 @@
 use std::collections::HashMap;
-use pyo3::{exceptions::{PyKeyError, PyValueError}, types::PyList, prelude::*};
+use pyo3::{exceptions::{PyKeyError, PyValueError}, types::{PyList, PyDict}, prelude::*};
 use spiking_neural_networks::neuron::{
     integrate_and_fire::IzhikevichNeuron, 
     iterate_and_spike::{
-        ApproximateNeurotransmitter, ApproximateReceptor, IterateAndSpike, 
-        NeurotransmitterType, Neurotransmitters, PotentiationType,
-        AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LigandGatedChannel, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, PotentiationType
     }
 };
 
@@ -189,6 +187,155 @@ impl PyApproximateNeurotransmitters {
             neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
         );
     }
+
+    fn apply_t_changes(&mut self, voltage: f32) {
+        self.neurotransmitters.apply_t_changes(voltage);
+    }
+}
+
+// #[pyclass]
+// #[pyo3(name = "ApproximateReceptor")]
+// #[derive(Clone)]
+// pub struct PyApproximateReceptor {
+//     receptor: ApproximateReceptor
+// }
+
+// implement_basic_getter_and_setter!(
+//     PyApproximateReceptor, 
+//     receptor,
+//     r, get_r, set_r 
+// );
+
+// #[pymethods]
+// impl PyApproximateReceptor {
+//     #[new]
+//     #[pyo3(signature = (r=0.))]
+//     fn new(r: f32) -> Self {
+//         PyApproximateReceptor {
+//             receptor: ApproximateReceptor {
+//                 r: r
+//             }
+//         }
+//     }
+// }
+
+#[pyclass]
+#[pyo3(name = "ApproximateLigandGatedChannel")]
+#[derive(Clone)]
+pub struct PyApproximateLigandGatedChannel {
+    ligand_gate: LigandGatedChannel<ApproximateReceptor>
+}
+
+implement_basic_getter_and_setter!(
+    PyApproximateLigandGatedChannel, 
+    ligand_gate,
+    g, get_g, set_g,
+    reversal, get_reversal, set_reversal,
+    current, get_current, set_current
+);
+
+#[pymethods]
+impl PyApproximateLigandGatedChannel {
+    #[new]
+    #[pyo3(signature = (receptor_type=PyNeurotransmitterType::Basic))]
+    fn new(receptor_type: PyNeurotransmitterType) -> Self {
+        let ligand_gate = match receptor_type.convert_type() {
+            NeurotransmitterType::Basic => LigandGatedChannel::default(),
+            NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+            NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+            NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+            NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+        };
+
+        PyApproximateLigandGatedChannel {
+            ligand_gate: ligand_gate
+        }
+    }
+
+    #[getter]
+    fn get_r(&self) -> f32 {
+        self.ligand_gate.receptor.r
+    }
+
+    #[setter]
+    fn set_r(&mut self, new_r: f32) {
+        self.ligand_gate.receptor.r = new_r;
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "ApproximateLigandGatedChannels")]
+#[derive(Clone)]
+pub struct PyApproximateLigandGatedChannels {
+    ligand_gates: LigandGatedChannels<ApproximateReceptor>
+}
+
+#[pymethods]
+impl PyApproximateLigandGatedChannels {
+    #[new]
+    #[pyo3(signature = (neurotransmitter_types=None))]
+    fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
+        let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<ApproximateReceptor>> = HashMap::new();
+
+        match neurotransmitter_types {
+            Some(values) => {
+                for i in values.iter() {
+                    let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                    let neurotransmitter = match current_type {
+                        NeurotransmitterType::Basic => LigandGatedChannel::default(),
+                        NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+                        NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+                        NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+                        NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    };
+        
+                    ligand_gates.insert(current_type, neurotransmitter);
+                }
+            },
+            None => {}
+        };
+
+        Ok(
+            PyApproximateLigandGatedChannels {
+                ligand_gates: LigandGatedChannels { ligand_gates: ligand_gates }
+            }
+        )
+    }
+
+    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyApproximateLigandGatedChannel> {
+        if let Some(value) = self.ligand_gates.get(&neurotransmitter_type.convert_type()) {
+            Ok(
+                PyApproximateLigandGatedChannel { 
+                    ligand_gate: value.clone() 
+                }
+            )
+        } else {
+            Err(PyKeyError::new_err(format!("{:#?} not found", neurotransmitter_type)))
+        }
+    }
+
+    fn set_ligand_gate(
+        &mut self, neurotransmitter_type: PyNeurotransmitterType, ligand_gate: PyApproximateLigandGatedChannel
+    ) {
+        self.ligand_gates.ligand_gates.insert(
+            neurotransmitter_type.convert_type(), ligand_gate.ligand_gate
+        );
+    }
+}
+
+fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<NeurotransmitterConcentrations> {
+    let mut neurotransmitter_concs: HashMap<NeurotransmitterType, f32> = HashMap::new();
+
+    for (key, value) in dict.iter() {
+        let current_type = key.extract::<PyNeurotransmitterType>()?.convert_type();
+        let conc = value.extract::<f32>()?;
+
+        neurotransmitter_concs.insert(current_type, conc);
+    }
+
+    Ok(
+        neurotransmitter_concs
+    )
 }
 
 #[pyclass]
@@ -254,9 +401,31 @@ impl PyIzhikevichNeuron {
         self.model.iterate_and_spike(i)
     }
 
-    // fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_conc: Option<PyDict>) -> bool {
+    #[pyo3(signature = (i, neurotransmitter_concs=None))]
+    fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: Option<&PyDict>) -> PyResult<bool> {
+        let concs = match neurotransmitter_concs {
+            Some(ref value) => Some(pydict_to_neurotransmitters_concentration(value)?),
+            None => None,
+        };
 
-    // }
+        Ok(self.model.iterate_with_neurotransmitter_and_spike(i, concs.as_ref()))
+    }
+
+    fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
+        PyApproximateNeurotransmitters { neurotransmitters: self.model.get_neurotransmitters().clone() }
+    }
+
+    fn set_neurotransmitters(&mut self, neurotransmitters: PyApproximateNeurotransmitters) {
+        self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
+    }
+
+    fn get_ligand_gates(&self) -> PyApproximateLigandGatedChannels {
+        PyApproximateLigandGatedChannels { ligand_gates: self.model.get_ligand_gates().clone() }
+    }
+
+    fn set_ligand_gates(&mut self, ligand_gates: PyApproximateLigandGatedChannels) {
+        self.model.ligand_gates = ligand_gates.ligand_gates;
+    }
 }
 
 #[pymodule]
