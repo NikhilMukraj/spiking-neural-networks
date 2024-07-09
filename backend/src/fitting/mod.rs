@@ -254,9 +254,6 @@ pub fn get_hodgkin_huxley_summary<
     let mut presynaptic_neuron = hodgkin_huxley_neuron.clone();
     let mut postsynaptic_neuron = hodgkin_huxley_neuron.clone();
 
-    presynaptic_neuron.initialize_parameters(presynaptic_neuron.current_voltage);
-    postsynaptic_neuron.initialize_parameters(postsynaptic_neuron.current_voltage);
-
     let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.current_voltage];
     let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.current_voltage];
 
