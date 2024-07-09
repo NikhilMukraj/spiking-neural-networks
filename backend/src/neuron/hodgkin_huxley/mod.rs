@@ -193,16 +193,6 @@ pub fn find_peaks(voltages: &Vec<f32>, tolerance: f32) -> Vec<usize> {
 
 // https://github.com/swharden/pyHH/blob/master/src/pyhh/models.py
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R> {
-    /// Initializes parameters based on a starting voltage (mV)
-    pub fn initialize_parameters(&mut self, starting_voltage: f32) {
-        self.current_voltage = starting_voltage;
-        self.na_channel.initialize(self.current_voltage);
-        self.k_channel.initialize(self.current_voltage);
-
-        self.additional_gates.iter_mut()
-            .for_each(|i| i.initialize(starting_voltage));
-    }
-
     /// Updates cell voltage given an input current
     pub fn update_cell_voltage(&mut self, input_current: f32) {
         let i_na = self.na_channel.current;
