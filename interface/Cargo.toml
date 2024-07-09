@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.18.3", features = ["multiple-pymethods"] }
-spiking_neural_networks = "0.16.0"
+spiking_neural_networks = "0.16.1"
