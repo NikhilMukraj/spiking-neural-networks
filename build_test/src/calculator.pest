@@ -9,11 +9,12 @@ unary_minus = { "-" }
 primary = _{ number | "(" ~ expr ~ ")" | name }
 atom = _{ unary_minus? ~ primary }
 
-bin_op = _{ add | subtract | multiply | divide }
+bin_op = _{ add | subtract | multiply | divide | power }
 	add = { "+" }
 	subtract = { "-" }
 	multiply = { "*" }
 	divide = { "/" }
+	power = { "^" }
 
 expr = { atom ~ (bin_op ~ atom)* }
 
