@@ -39,3 +39,4 @@
 /interface/target
 /interface/.venv/*
 /interface/generate_methods.py
+/build_test/target
