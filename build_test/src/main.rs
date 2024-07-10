@@ -16,7 +16,7 @@ lazy_static::lazy_static! {
 
         PrattParser::new()
             .op(Op::infix(add, Left) | Op::infix(subtract, Left))
-            .op(Op::infix(multiply, Left) | Op::infix(divide, Left))
+            .op(Op::infix(multiply, Left) | Op::infix(divide, Left) | Op::infix(power, Left))
             .op(Op::prefix(unary_minus))
     };
 }
@@ -47,6 +47,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 Rule::subtract => Op::Subtract,
                 Rule::multiply => Op::Multiply,
                 Rule::divide => Op::Divide,
+                Rule::power => Op::Power,
                 rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
             };
             Expr::BinOp {
@@ -68,6 +69,7 @@ pub enum Op {
     Subtract,
     Multiply,
     Divide,
+    Power,
 }
 
 impl Expr {
@@ -82,6 +84,7 @@ impl Expr {
                     Op::Subtract => "-",
                     Op::Multiply => "*",
                     Op::Divide => "/",
+                    Op::Power => "^",
                 };
                 format!("({} {} {})", lhs.to_string(), op_str, rhs.to_string())
             }
