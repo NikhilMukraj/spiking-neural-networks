@@ -35,6 +35,7 @@ pub enum Expr {
 
 // check function
 // make sure functions are not recursive
+// then try writing rust code from expr
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
