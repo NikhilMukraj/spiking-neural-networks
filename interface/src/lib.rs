@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::{hash_map::DefaultHasher, HashMap}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::{PyKeyError, PyValueError}, types::{PyList, PyDict}, prelude::*};
 use spiking_neural_networks::neuron::{
     integrate_and_fire::IzhikevichNeuron, 
@@ -55,7 +55,7 @@ impl PyPotentiationType {
 
 #[pyclass]
 #[pyo3(name = "NeurotransmitterType")]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum PyNeurotransmitterType {
     Basic,
     AMPA,
@@ -73,6 +73,15 @@ impl PyNeurotransmitterType {
             PyNeurotransmitterType::GABAb => NeurotransmitterType::GABAb,
             PyNeurotransmitterType::NMDA => NeurotransmitterType::NMDA,
         }
+    }
+}
+
+#[pymethods]
+impl PyNeurotransmitterType {
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
     }
 }
 
@@ -282,6 +291,22 @@ impl PyApproximateLigandGatedChannel {
     }
 }
 
+fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<NeurotransmitterConcentrations> {
+    let mut neurotransmitter_concs: HashMap<NeurotransmitterType, f32> = HashMap::new();
+
+    for (key, value) in dict.iter() {
+        let current_type = key.extract::<PyNeurotransmitterType>()?.convert_type();
+        let conc = value.extract::<f32>()?;
+
+        neurotransmitter_concs.insert(current_type, conc);
+    }
+
+    Ok(
+        neurotransmitter_concs
+    )
+}
+
+
 #[pyclass]
 #[pyo3(name = "ApproximateLigandGatedChannels")]
 #[derive(Clone)]
@@ -340,21 +365,17 @@ impl PyApproximateLigandGatedChannels {
             neurotransmitter_type.convert_type(), ligand_gate.ligand_gate
         );
     }
-}
 
-fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<NeurotransmitterConcentrations> {
-    let mut neurotransmitter_concs: HashMap<NeurotransmitterType, f32> = HashMap::new();
+    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: Option<&PyDict>) -> PyResult<()> {
+        let concs = match neurotransmitter_concs {
+            Some(ref value) => Some(pydict_to_neurotransmitters_concentration(value)?),
+            None => None,
+        };
 
-    for (key, value) in dict.iter() {
-        let current_type = key.extract::<PyNeurotransmitterType>()?.convert_type();
-        let conc = value.extract::<f32>()?;
+        self.ligand_gates.update_receptor_kinetics(concs.as_ref());
 
-        neurotransmitter_concs.insert(current_type, conc);
+        Ok(())
     }
-
-    Ok(
-        neurotransmitter_concs
-    )
 }
 
 #[pyclass]
@@ -479,9 +500,12 @@ impl PyIzhikevichNeuron {
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
+    m.add_class::<PyPotentiationType>()?;
     m.add_class::<PyNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
     m.add_class::<PyApproximateNeurotransmitters>()?;
+    m.add_class::<PyApproximateLigandGatedChannel>()?;
+    m.add_class::<PyApproximateLigandGatedChannels>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
 
     Ok(())
