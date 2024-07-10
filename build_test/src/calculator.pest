@@ -28,9 +28,9 @@ WHITESPACE = _{ " " }
 // integer = @{ ASCII_DIGIT+ }
 // decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
 // number = @{ decimal | integer }
-// alpha_numeric = @{ 'a'..'z' | 'A'..'z' | "_" }
+// name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
 
-// name = @{ alpha_numeric ~ (alpha_numeric | integer)* }
+// name = @{ name_characters ~ (name_characters | integer)* }
 
 // args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
 // function = { name ~ ("(" ~ args ~ ")") }
