@@ -31,10 +31,12 @@ pub enum Expr {
         op: Op,
         rhs: Box<Expr>,
     },
+    Function {
+        name: String,
+        args: Vec<Box<Expr>>
+    },
 }
 
-// check function
-// make sure functions are not recursive
 // then try writing rust code from expr
 pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
     PRATT_PARSER
@@ -42,6 +44,15 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
             Rule::number => Expr::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => Expr::Name(String::from(primary.as_str())),
             Rule::expr => parse_expr(primary.into_inner()),
+            // Rule::function => {
+            //     let mut inner_rules = primary.into_inner(); // { name ~ "=" ~ value }
+
+            //     let name: String = String::from(inner_rules.next().unwrap().as_str());
+            //     // this needs to aggregate each expr for each inner
+            //     let args: Expr = parse_expr(inner_rules.next().unwrap().into_inner());
+
+            //     Expr::Function { name: name, args: args }
+            // }, // get name and inner for each expr
             rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
         })
         .map_infix(|lhs, op, rhs| {
@@ -90,6 +101,16 @@ impl Expr {
                     Op::Power => "^",
                 };
                 format!("({} {} {})", lhs.to_string(), op_str, rhs.to_string())
+            }
+            Expr::Function { name, args } => {
+                format!(
+                    "{}({})",
+                    name, 
+                    args.iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    )
             }
         }
     }
