@@ -3,7 +3,7 @@ use pyo3::{exceptions::{PyKeyError, PyValueError}, types::{PyList, PyDict}, prel
 use spiking_neural_networks::neuron::{
     integrate_and_fire::IzhikevichNeuron, 
     iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LigandGatedChannel, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, PotentiationType
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, PotentiationType
     }
 };
 
@@ -89,6 +89,25 @@ macro_rules! implement_basic_getter_and_setter {
                 #[setter]
                 fn $set_name(&mut self, new_param: f32) {
                     self.$field.$param = new_param;
+                }
+            )+
+        }
+    };
+}
+
+macro_rules! implement_nested_getter_and_setter {
+    ($name:ident, $field:ident, $nested_field:ident, $($param:ident, $py_name:ident, $get_name:ident, $set_name:ident),+) => {
+        #[pymethods]
+        impl $name {
+            $(
+                #[getter($py_name)]
+                fn $get_name(&self) -> f32 {
+                    self.$field.$nested_field.$param
+                }
+
+                #[setter($py_name)]
+                fn $set_name(&mut self, new_param: f32) {
+                    self.$field.$nested_field.$param = new_param;
                 }
             )+
         }
@@ -364,6 +383,26 @@ implement_basic_getter_and_setter!(
     c_m, get_c_m, set_c_m
 );
 
+implement_nested_getter_and_setter!(
+    PyIzhikevichNeuron,
+    model,
+    gaussian_params,
+    mean, gaussian_mean, get_gaussian_mean, set_gaussian_mean,
+    std, gaussian_std, get_gaussian_std, set_gaussian_std,
+    min, gaussian_min, get_gaussian_min, set_gaussian_min,
+    max, gaussian_max, get_gaussian_max, set_gaussian_max
+);
+
+implement_nested_getter_and_setter!(
+    PyIzhikevichNeuron,
+    model,
+    stdp_params,
+    a_plus, a_plus, get_a_plis, set_a_plis,
+    a_minus, a_minus, get_a_minus, set_a_minus,
+    tau_minus, tau_minus, get_tau_minus, set_tau_minus,
+    tau_plus, tau_plus, get_tau_plus, set_tau_plus
+);
+
 #[pymethods]
 impl PyIzhikevichNeuron {
     #[new]
@@ -425,6 +464,16 @@ impl PyIzhikevichNeuron {
 
     fn set_ligand_gates(&mut self, ligand_gates: PyApproximateLigandGatedChannels) {
         self.model.ligand_gates = ligand_gates.ligand_gates;
+    }
+
+    #[getter(last_firing_time)]
+    fn get_last_firing_time(&self) -> Option<usize> {
+        self.model.get_last_firing_time()
+    }
+
+    #[setter(last_firing_time)]
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.model.set_last_firing_time(timestep);
     }
 }
 
