@@ -4,6 +4,7 @@ decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
 number = @{ decimal | integer }
 
 name = @{ ('a'..'z' | 'A'..'z' | "_")+ }
+// func takes in expr too?
 
 unary_minus = { "-" }
 primary = _{ number | "(" ~ expr ~ ")" | name }
@@ -22,3 +23,34 @@ expr = { atom ~ (bin_op ~ atom)* }
 equation = _{ SOI ~ expr ~ EOI }
 
 WHITESPACE = _{ " " }
+
+// // No whitespace allowed between digits
+// integer = @{ ASCII_DIGIT+ }
+// decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+// number = @{ decimal | integer }
+// alpha_numeric = @{ 'a'..'z' | 'A'..'z' | "_" }
+
+// name = @{ alpha_numeric ~ (alpha_numeric | integer)* }
+
+// args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
+// function = { name ~ ("(" ~ args ~ ")") }
+
+// unary_minus = { "-" }
+// primary = _{ function | number | name | "(" ~ expr ~ ")" }
+
+// atom = _{ unary_minus? ~ primary }
+
+// bin_op = _{ add | subtract | multiply | divide | power }
+// 	add = { "+" }
+// 	subtract = { "-" }
+// 	multiply = { "*" }
+// 	divide = { "/" }
+// 	power = { "^" }
+
+// expr = { atom ~ (bin_op ~ atom)* }
+
+// // We can't have SOI and EOI on expr directly, because it is used recursively (e.g. with parentheses)
+// equation = _{ SOI ~ expr ~ EOI }
+
+// WHITESPACE = _{ " " }
+
