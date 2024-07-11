@@ -8,12 +8,25 @@ use spiking_neural_networks::neuron::{
 };
 
 
+macro_rules! impl_repr {
+    ($name:ident, $field:ident) => {
+        #[pymethods]
+        impl $name {
+            fn __repr__(&self) -> PyResult<String> {
+                Ok(format!("{:#?}", self.$field))
+            }
+        }
+    };
+}
+
 #[pyclass]
 #[pyo3(name = "PotentiationType")]
 #[derive(Clone, Copy)]
 pub struct PyPotentiationType {
     potentiation: PotentiationType
 }
+
+impl_repr!(PyPotentiationType, potentiation);
 
 #[pymethods]
 impl PyPotentiationType {
@@ -157,12 +170,16 @@ impl PyApproximateNeurotransmitter {
     }
 }
 
+impl_repr!(PyApproximateNeurotransmitter, neurotransmitter);
+
 #[pyclass]
 #[pyo3(name = "ApproximateNeurotransmitters")]
 #[derive(Clone)]
 pub struct PyApproximateNeurotransmitters {
     neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>
 }
+
+impl_repr!(PyApproximateNeurotransmitters, neurotransmitters);
 
 #[pymethods]
 impl PyApproximateNeurotransmitters {
@@ -262,6 +279,8 @@ implement_basic_getter_and_setter!(
     current, get_current, set_current
 );
 
+impl_repr!(PyApproximateLigandGatedChannel, ligand_gate);
+
 #[pymethods]
 impl PyApproximateLigandGatedChannel {
     #[new]
@@ -313,6 +332,8 @@ fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<Neurotra
 pub struct PyApproximateLigandGatedChannels {
     ligand_gates: LigandGatedChannels<ApproximateReceptor>
 }
+
+impl_repr!(PyApproximateLigandGatedChannels, ligand_gates);
 
 #[pymethods]
 impl PyApproximateLigandGatedChannels {
@@ -423,6 +444,8 @@ implement_nested_getter_and_setter!(
     tau_minus, tau_minus, get_tau_minus, set_tau_minus,
     tau_plus, tau_plus, get_tau_plus, set_tau_plus
 );
+
+impl_repr!(PyIzhikevichNeuron, model);
 
 #[pymethods]
 impl PyIzhikevichNeuron {
