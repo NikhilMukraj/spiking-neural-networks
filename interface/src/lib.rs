@@ -525,6 +525,8 @@ impl PyIzhikevichNeuron {
 }
 
 // eventually use macro to generate lattices for each neuronal type
+// could have user precompile or dynamically dispatch neuron lattice type
+// depending on user input and wrap relevant functions
 type LatticeNeuron = IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
 type PyLatticeNeuron = PyIzhikevichNeuron;
 
@@ -579,7 +581,7 @@ impl PyIzhikevichLattice {
 
         if let Some(existing_neuron) = row_cells.get_mut(col) {
             *existing_neuron = neuron.model.clone();
-            
+
             Ok(())
         } else {
             Err(PyKeyError::new_err(format!("Column at {} not found", col)))
