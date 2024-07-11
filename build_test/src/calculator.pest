@@ -1,13 +1,17 @@
-// No whitespace allowed between digits
 integer = @{ ASCII_DIGIT+ }
 decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
 number = @{ decimal | integer }
+name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
 
-name = @{ ('a'..'z' | 'A'..'z' | "_")+ }
-// func takes in expr too?
+name = @{ name_characters ~ (name_characters | integer)* }
+
+args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
+function = { name ~ ("(" ~ args ~ ")") }
+empty_function = { name ~ "()" }
 
 unary_minus = { "-" }
-primary = _{ number | "(" ~ expr ~ ")" | name }
+primary = _{ empty_function | function | number | name | "(" ~ expr ~ ")" }
+
 atom = _{ unary_minus? ~ primary }
 
 bin_op = _{ add | subtract | multiply | divide | power }
@@ -19,38 +23,7 @@ bin_op = _{ add | subtract | multiply | divide | power }
 
 expr = { atom ~ (bin_op ~ atom)* }
 
-// We can't have SOI and EOI on expr directly, because it is used recursively (e.g. with parentheses)
 equation = _{ SOI ~ expr ~ EOI }
 
 WHITESPACE = _{ " " }
-
-// // No whitespace allowed between digits
-// integer = @{ ASCII_DIGIT+ }
-// decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
-// number = @{ decimal | integer }
-// name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
-
-// name = @{ name_characters ~ (name_characters | integer)* }
-
-// args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
-// function = { name ~ ("(" ~ args ~ ")") }
-
-// unary_minus = { "-" }
-// primary = _{ function | number | name | "(" ~ expr ~ ")" }
-
-// atom = _{ unary_minus? ~ primary }
-
-// bin_op = _{ add | subtract | multiply | divide | power }
-// 	add = { "+" }
-// 	subtract = { "-" }
-// 	multiply = { "*" }
-// 	divide = { "/" }
-// 	power = { "^" }
-
-// expr = { atom ~ (bin_op ~ atom)* }
-
-// // We can't have SOI and EOI on expr directly, because it is used recursively (e.g. with parentheses)
-// equation = _{ SOI ~ expr ~ EOI }
-
-// WHITESPACE = _{ " " }
 
