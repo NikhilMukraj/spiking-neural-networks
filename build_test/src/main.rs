@@ -49,6 +49,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
 
             //     let name: String = String::from(inner_rules.next().unwrap().as_str());
             //     // this needs to aggregate each expr for each inner
+            //     // keep hitting next until there is no next, then aggregate into args
             //     let args: Expr = parse_expr(inner_rules.next().unwrap().into_inner());
 
             //     Expr::Function { name: name, args: args }
