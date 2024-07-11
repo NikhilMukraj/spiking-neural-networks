@@ -31,6 +31,7 @@ pub enum Expr {
         op: Op,
         rhs: Box<Expr>,
     },
+    EmptyFunction(String),
     Function {
         name: String,
         args: Vec<Box<Expr>>
@@ -44,16 +45,31 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
             Rule::number => Expr::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => Expr::Name(String::from(primary.as_str())),
             Rule::expr => parse_expr(primary.into_inner()),
-            // Rule::function => {
-            //     let mut inner_rules = primary.into_inner(); // { name ~ "=" ~ value }
+            Rule::empty_function => {
+                Expr::EmptyFunction(
+                    String::from(
+                        primary.into_inner()
+                            .next()
+                            .expect("Cannot get empty function")
+                            .as_str()
+                    )
+                )
+            }
+            Rule::function => {
+                let mut inner_rules = primary.into_inner();
 
-            //     let name: String = String::from(inner_rules.next().unwrap().as_str());
-            //     // this needs to aggregate each expr for each inner
-            //     // keep hitting next until there is no next, then aggregate into args
-            //     let args: Expr = parse_expr(inner_rules.next().unwrap().into_inner());
+                let name: String = String::from(inner_rules.next()
+                    .expect("Could not get function name").as_str()
+                );
 
-            //     Expr::Function { name: name, args: args }
-            // }, // get name and inner for each expr
+                let args: Vec<Box<Expr>> = inner_rules.next()
+                    .expect("No arguments found")
+                    .into_inner()
+                    .map(|i| Box::new(parse_expr(i.into_inner())))
+                    .collect();
+                
+                Expr::Function { name: name, args: args }
+            },
             rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
         })
         .map_infix(|lhs, op, rhs| {
@@ -103,6 +119,7 @@ impl Expr {
                 };
                 format!("({} {} {})", lhs.to_string(), op_str, rhs.to_string())
             }
+            Expr::EmptyFunction(name) => name.clone(),
             Expr::Function { name, args } => {
                 format!(
                     "{}({})",
@@ -125,7 +142,12 @@ fn main() -> io::Result<()> {
     }
 
     for line in io::stdin().lock().lines() {
-        match CalculatorParser::parse(Rule::equation, &line?) {
+        let line = line?;
+        if line.trim() == "q" {
+            break;
+        }
+
+        match CalculatorParser::parse(Rule::equation, &line) {
             Ok(mut pairs) => {
                 let current_expr = parse_expr(pairs.next().unwrap().into_inner());
                 println!(
@@ -143,5 +165,3 @@ fn main() -> io::Result<()> {
 
     Ok(())
 }
-
-// todo support functions in expression
