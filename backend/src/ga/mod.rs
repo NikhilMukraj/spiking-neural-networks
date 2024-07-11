@@ -1,7 +1,7 @@
 //! A basic parallelized genetic algorithm implementation.
 
 use std::{
-    result,
+    result::Result,
     collections::HashMap,
     marker::Sync,
 };
@@ -17,14 +17,14 @@ pub struct BitString {
 }
 
 impl BitString {
-    pub fn new(new_string: String) -> result::Result<Self, GeneticAlgorithmError> {
+    pub fn new(new_string: String) -> Result<Self, GeneticAlgorithmError> {
         let bitstring = BitString { string: new_string };
         bitstring.check()?;
 
         Ok(bitstring)
     }
 
-    fn check(&self) -> result::Result<(), GeneticAlgorithmError> {
+    fn check(&self) -> Result<(), GeneticAlgorithmError> {
         for i in self.string.chars() {
             if i != '1' && i != '0' {
                 return Err(
@@ -36,7 +36,7 @@ impl BitString {
         return Ok(());
     }
 
-    fn set(&mut self, new_string: String) -> result::Result<(), GeneticAlgorithmError> {
+    fn set(&mut self, new_string: String) -> Result<(), GeneticAlgorithmError> {
         self.string = new_string;
 
         return self.check();
@@ -107,7 +107,7 @@ pub fn decode(
     bitstring: 
     &BitString, bounds: &Vec<(f32, f32)>, 
     n_bits: usize
-) -> result::Result<Vec<f32>, GeneticAlgorithmError> {
+) -> Result<Vec<f32>, GeneticAlgorithmError> {
     // decode for non variable length
     // for variable length just keep bounds consistent across all
     // determine substrings by calculating string.len() / n_bits
@@ -201,11 +201,11 @@ impl Default for GeneticAlgorithmParameters {
 /// 
 /// - `verbose` : use `true` to print extra information
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<(f32, f32)>, usize, &HashMap<&str, T>) -> result::Result<f32, GeneticAlgorithmError>, 
+    f: fn(&BitString, &Vec<(f32, f32)>, usize, &HashMap<&str, T>) -> Result<f32, GeneticAlgorithmError>, 
     params: &GeneticAlgorithmParameters,
     settings: &HashMap<&str, T>,
     verbose: bool,
-) -> result::Result<(BitString, f32, Vec<Vec<f32>>), GeneticAlgorithmError> {
+) -> Result<(BitString, f32, Vec<Vec<f32>>), GeneticAlgorithmError> {
     if params.n_pop % 2 != 0 {
         return Err(GeneticAlgorithmError::PopulationMustBeEven)
     }
@@ -227,7 +227,7 @@ pub fn genetic_algo<T: Sync>(
             println!("gen: {}", gen + 1);
         }
 
-        let scores_results: &result::Result<Vec<f32>, GeneticAlgorithmError> = &pop
+        let scores_results: &Result<Vec<f32>, GeneticAlgorithmError> = &pop
             .par_iter() 
             .map(|p| f(p, &params.bounds, params.n_bits, &settings))
             .collect(); 
