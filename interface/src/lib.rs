@@ -1,11 +1,14 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::{PyKeyError, PyValueError}, types::{PyList, PyDict}, prelude::*};
-use spiking_neural_networks::neuron::{
-    integrate_and_fire::IzhikevichNeuron, 
-    iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, PotentiationType
-    }
-};
+use spiking_neural_networks::{graph::AdjacencyMatrix, neuron::{
+    integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
+        GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
+        LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
+        NeurotransmitterType, Neurotransmitters, 
+        PotentiationType
+    }, GridVoltageHistory, Lattice
+}};
 
 
 macro_rules! impl_repr {
@@ -521,6 +524,69 @@ impl PyIzhikevichNeuron {
     }
 }
 
+// eventually use macro to generate lattices for each neuronal type
+type LatticeNeuron = IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
+type PyLatticeNeuron = PyIzhikevichNeuron;
+
+#[pyclass]
+#[pyo3(name = "IzhikevichLattice")]
+pub struct PyIzhikevichLattice {
+    lattice: Lattice<
+        LatticeNeuron,
+        AdjacencyMatrix<(usize, usize)>,
+        GridVoltageHistory,
+    >
+}
+
+#[pymethods]
+impl PyIzhikevichLattice {
+    #[new]
+    fn new() -> Self {
+        PyIzhikevichLattice { lattice: Lattice::default() }
+    }
+
+    fn populate(&mut self, neuron: PyLatticeNeuron, num_rows: usize, num_cols: usize) {
+        self.lattice.populate(&neuron.model, num_rows, num_cols);
+    }
+
+    fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyLatticeNeuron> {
+        let neuron = match self.lattice.cell_grid.get(row) {
+            Some(row_cells) => match row_cells.get(col) {
+                Some(neuron) => neuron.clone(),
+                None => {
+                    return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                }
+            },
+            None => {
+                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+            }
+        };
+
+        Ok(
+            PyIzhikevichNeuron { 
+                model: neuron
+            }
+        )
+    }
+
+    fn set_neuron(&mut self, row: usize, col: usize, neuron: PyLatticeNeuron) -> PyResult<()> {
+        let row_cells = match self.lattice.cell_grid.get_mut(row) {
+            Some(row_cells) => row_cells,
+            None => {
+                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+            }
+        };
+
+        if let Some(existing_neuron) = row_cells.get_mut(col) {
+            *existing_neuron = neuron.model.clone();
+            
+            Ok(())
+        } else {
+            Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+        }
+    }
+}
+
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPotentiationType>()?;
@@ -530,6 +596,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyApproximateLigandGatedChannel>()?;
     m.add_class::<PyApproximateLigandGatedChannels>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
+    m.add_class::<PyIzhikevichLattice>()?;
 
     Ok(())
 }
