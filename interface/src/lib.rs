@@ -551,6 +551,10 @@ impl PyIzhikevichLattice {
         self.lattice.populate(&neuron.model, num_rows, num_cols);
     }
 
+    // fn connect(&mut self, connection_conditional: PyAny, weight_logc: PyAny) -> PyResult<()> {
+
+    // }
+
     fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyLatticeNeuron> {
         let neuron = match self.lattice.cell_grid.get(row) {
             Some(row_cells) => match row_cells.get(col) {
@@ -589,6 +593,12 @@ impl PyIzhikevichLattice {
     }
 }
 
+// #[pyclass]
+// #[pyo3(name = "IzhikevichNetwork")]
+// pub struct PyIzhikevichNetwork {
+//     network: LatticeNetwork<LatticeNeuron, >
+// }
+
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPotentiationType>()?;
@@ -599,6 +609,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyApproximateLigandGatedChannels>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
     m.add_class::<PyIzhikevichLattice>()?;
+    // m.add_class::<PyIzhikevichNetwork>()?;
 
     Ok(())
 }
