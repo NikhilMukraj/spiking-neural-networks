@@ -603,9 +603,9 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     }
 
     /// Gets all internal neurotransmitter inputs 
-    fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
-        let neurotransmitter_inputs = match self.do_receptor_kinetics {
+    fn get_internal_neurotransmitter_inputs(&self) -> 
+    Option<HashMap<(usize, usize), NeurotransmitterConcentrations>> {
+        match self.do_receptor_kinetics {
             true => {
                 let neurotransmitters: HashMap<(usize, usize), NeurotransmitterConcentrations> = self.graph.get_every_node_as_ref()
                     .iter()
@@ -625,7 +625,13 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
                 Some(neurotransmitters)
             },
             false => None,
-        };
+        }
+    }
+
+    /// Gets all internal electrical and neurotransmitter inputs 
+    fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
+    (HashMap<(usize, usize), f32>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
+        let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
 
@@ -665,7 +671,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
         Ok(())
     }
 
-    /// Iterates one simulation timestep lattice given a set of electrical and neurotransmitter inputs
+    /// Iterates lattice one simulation timestep given a set of electrical and neurotransmitter inputs
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
@@ -704,7 +710,44 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
         Ok(())
     }
 
-    /// Iterates one simulation timestep lattice given a set of only electrical inputs
+    /// Iterates one simulation timestep given only chemical inputs
+    pub fn iterate_chemical_synapses_only(
+        &mut self, 
+        inputs: &Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>
+    ) -> Result<(), GraphError> {
+        for pos in self.graph.get_every_node() {
+            let (x, y) = pos;
+
+            let input_neurotransmitter = match inputs {
+                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
+                None => None,
+            };
+
+            let is_spiking = self.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+                0., input_neurotransmitter,
+            );
+
+            if is_spiking {
+                self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+            }
+
+            if self.do_stdp && is_spiking {
+                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+            } 
+        }
+
+        if self.update_graph_history {
+            self.graph.update_history();
+        }
+        if self.update_grid_history {
+            self.grid_history.update(&self.cell_grid);
+        }
+        self.internal_clock += 1;
+
+        Ok(())
+    }
+
+    /// Iterates lattice one simulation timestep given a set of only electrical inputs
     pub fn iterate(
         &mut self,
         inputs: &HashMap<(usize, usize), f32>,
@@ -738,7 +781,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// Iterates the lattice based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs, set `do_receptor_kinetics` to `true` to update
     /// receptor kinetics
-    pub fn run_lattice_with_neurotransmission(
+    pub fn run_lattice_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -746,6 +789,21 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
             let (inputs, neurotransmitter_inputs) = self.get_internal_electrical_and_neurotransmitter_inputs();
     
             self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs)?;        
+        }
+
+        Ok(())
+    }
+
+    /// Iterates the lattice based only on internal connections for a given amount of time using
+    /// neurotransmitter inputs alone, set `do_receptor_kinetics` to `true` to update receptor kinetics
+    pub fn run_lattice_chemical_synapses_only(
+        &mut self,
+        iterations: usize,
+    ) -> Result<(), GraphError> {
+        for _ in 0..iterations {       
+            let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
+    
+            self.iterate_chemical_synapses_only(&neurotransmitter_inputs)?;        
         }
 
         Ok(())
@@ -1479,9 +1537,9 @@ where
             .collect()
     }
 
-    fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
-        let neurotransmitters_inputs = self.get_every_node()
+    fn get_all_neurotransmitter_inputs(&self) -> 
+    HashMap<GraphPosition, Option<NeurotransmitterConcentrations>> {
+        self.get_every_node()
             .iter()
             .map(|pos| {
                 let input = match self.lattices.get(&pos.id).unwrap().do_receptor_kinetics {
@@ -1498,7 +1556,12 @@ where
 
                 (*pos, input)
             })
-            .collect();
+            .collect()
+    }
+
+    fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
+        let neurotransmitters_inputs = self.get_all_neurotransmitter_inputs();
 
         let inputs = self.get_all_electrical_inputs();
 
@@ -1658,6 +1721,63 @@ where
         Ok(())
     }
 
+    /// Iterates one simulation timestep lattice given a set of only chemical inputs
+    pub fn iterate_chemical_synapses_only(
+        &mut self,
+        inputs: &HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>,
+    ) -> Result<(), GraphError> {
+        let mut spiking_positions = Vec::new();
+
+        for lattice in self.lattices.values_mut() {
+            for pos in lattice.graph.get_every_node() {
+                let (x, y) = pos;
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+
+                let input_neurotransmitter = inputs.get(&graph_pos).unwrap();
+
+                let is_spiking = lattice.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+                    0., input_neurotransmitter.as_ref(),
+                );
+    
+                if is_spiking {
+                    lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+                }
+    
+                if is_spiking {
+                    lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+                    if lattice.do_stdp {
+                        spiking_positions.push((x, y, graph_pos));
+                    }
+                }
+            }
+    
+            if lattice.update_graph_history {
+                lattice.graph.update_history();
+            }
+            if lattice.update_grid_history {
+                lattice.grid_history.update(&lattice.cell_grid);
+            }
+        }
+
+        for (x, y, pos) in spiking_positions {
+            self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
+            self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+        }
+        
+        self.internal_clock += 1;
+
+        for lattice in self.lattices.values_mut() {
+            lattice.internal_clock = self.internal_clock;
+        }
+
+        self.spike_train_lattices.values_mut()
+            .for_each(|i|{
+                i.iterate();
+            });
+
+        Ok(())
+    }
+
     /// Iterates one simulation timestep lattice given a set of only electrical inputs
     pub fn iterate(
         &mut self,
@@ -1713,10 +1833,10 @@ where
         Ok(())
     }
 
-    /// Iterates the lattice based only on internal connections for a given amount of time using
+    /// Iterates the lattices based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs, set `do_receptor_kinetics` to `true` to update
     /// receptor kinetics
-    pub fn run_lattices_with_neurotransmission(
+    pub fn run_lattices_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -1729,7 +1849,22 @@ where
         Ok(())
     }
 
-    /// Iterates lattice based only on internal connections for a given amount of time using
+    /// Iterates the lattices based only on internal connections for a given amount of time using
+    /// neurotransmitter inputs alone, set `do_receptor_kinetics` to `true` to update receptor kinetics
+    pub fn run_lattices_chemical_only(
+        &mut self,
+        iterations: usize,
+    ) -> Result<(), GraphError> {
+        for _ in 0..iterations {
+            let neurotransmitter_inputs = self.get_all_neurotransmitter_inputs();
+    
+            self.iterate_chemical_synapses_only(&neurotransmitter_inputs)?;      
+        }
+
+        Ok(())
+    }
+
+    /// Iterates lattices based only on internal connections for a given amount of time using
     /// only electrical inputs
     pub fn run_lattices(
         &mut self,
