@@ -39,6 +39,7 @@
 //! ### Coupling neurons with current input
 //! 
 //! ```rust
+//! use std::collections::HashMap;
 //! use spiking_neural_networks::{
 //!     neuron::{
 //!         iterate_and_spike::{
@@ -53,63 +54,74 @@
 //! /// the current input and neurotransmitter input from the presynaptic neuron,
 //! /// returns whether each neuron is spiking
 //! /// 
-//! /// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+//! /// - `presynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 //! /// 
-//! /// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+//! /// - `postsynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 //! /// 
-//! /// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+//! /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
+//! /// 
+//! /// - `chemical_synapse` : use `true` to update receptor gating values of 
 //! /// the neurons based on neurotransmitter input during the simulation
 //! /// 
 //! /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 //! pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
-//!    presynaptic_neuron: &mut T, 
-//!    postsynaptic_neuron: &mut T,
-//!    input_current: f32,
-//!    do_receptor_kinetics: bool,
-//!    gaussian: bool,
-//!) -> (bool, bool) {
-//!    let (t_total, post_current, input_current) = if gaussian {
-//!        // gets normally distributed factor to add noise with by scaling
-//!        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
-//!        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
+//!     presynaptic_neuron: &mut T, 
+//!     postsynaptic_neuron: &mut T,
+//!     input_current: f32,
+//!     electrical_synapse: bool,
+//!     chemical_synapse: bool,
+//!     gaussian: bool,
+//! ) -> (bool, bool) {
+//!     let (t_total, post_current, input_current) = if gaussian {
+//!         // gets normally distributed factor to add noise with by scaling
+//!         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
+//!         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
 //!
-//!        // scaling to add noise
-//!        let input_current = input_current * pre_gaussian_factor;
+//!         // scaling to add noise
+//!         let input_current = input_current * pre_gaussian_factor;
 //!
-//!        // calculates input current to postsynaptic neuron
-//!        let post_current = signed_gap_junction(
-//!            &*presynaptic_neuron,
-//!            &*postsynaptic_neuron,
-//!        );
+//!         // calculates electrical input current to postsynaptic neuron
+//!         let post_current = if electrical_synapse {
+//!               signed_gap_junction(
+//!                  &*presynaptic_neuron,
+//!                  &*postsynaptic_neuron,
+//!             ) * post_gaussian_factor
+//!        } else {
+//!             0.
+//!        };
 //!
 //!        // calculates postsynaptic neurotransmitter input
-//!        let t_total = if do_receptor_kinetics {
+//!        let t_total = if chemical_synapse {
 //!            // weights neurotransmitter with random noise
 //!            let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
 //!            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
 //!
-//!            Some(t)
+//!            t
 //!        } else {
-//!            // returns None to indicate no update to receptor gating variables
-//!            None
+//!            // returns empty hashmap to indicate no chemical transmission
+//!            HashMap::new()
 //!        };
 //!
 //!        (t_total, post_current, input_current)
 //!    } else {
-//!        // calculates input current to postsynaptic neuron
-//!        let post_current = signed_gap_junction(
-//!            &*presynaptic_neuron,
-//!            &*postsynaptic_neuron,
-//!        );
+//!         // calculates input current to postsynaptic neuron
+//!        let post_current = if electrical_synapse {
+//!             signed_gap_junction(
+//!                 &*presynaptic_neuron,
+//!                 &*postsynaptic_neuron,
+//!             )
+//!        } else {
+//!             0.
+//!        };
 //!
 //!       // calculates postsynaptic neurotransmitter input
-//!       let t_total = if do_receptor_kinetics {
+//!       let t_total = if chemical_synapse {
 //!            let t = presynaptic_neuron.get_neurotransmitter_concentrations();
-//!            Some(t)
-//!        } else {
-//!            // returns None to indicate no update to receptor gating variables
-//!            None
-//!        };
+//!            t
+//!       } else {
+//!            // returns empty hashmap to indicate no chemical transmission
+//!            HashMap::new()
+//!       };
 //!
 //!        (t_total, post_current, input_current)
 //!    };
@@ -120,16 +132,17 @@
 //!    // updates postsynaptic neuron by one step
 //!    let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
 //!        post_current,
-//!        t_total.as_ref(),
+//!        &t_total,
 //!    );
 //!
 //!    (pre_spiking, post_spiking)
-//!}
+//! }
 //! ```
 //! 
 //! ### Coupling neurons with spike train input
 //! 
 //! ```rust
+//! use std::collections::HashMap;
 //! use spiking_neural_networks::{
 //!     neuron::{
 //!         iterate_and_spike::{
@@ -146,15 +159,17 @@
 //! /// also updates the last firing times of each neuron and spike train given the
 //! /// current timestep of the simulation, returns whether each neuron is spiking
 //! /// 
-//! /// - `spike_train` : a spike train that implements `Spiketrain`
+//! /// - `spike_train` : a spike train that implements [`SpikeTrain`]
 //! /// 
-//! /// - `presynaptic_neuron` : a neuron that implements `IterateAndSpike`
+//! /// - `presynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 //! /// 
-//! /// - `postsynaptic_neuron` : a neuron that implements `IterateAndSpike`
+//! /// - `postsynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 //! /// 
 //! /// - `timestep` : the current timestep of the simulation
 //! /// 
-//! /// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+//! /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
+//! /// 
+//! /// - `chemical_synapse` : use `true` to update receptor gating values of 
 //! /// the neurons based on neurotransmitter input during the simulation
 //! /// 
 //! /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
@@ -163,77 +178,101 @@
 //!     presynaptic_neuron: &mut U, 
 //!     postsynaptic_neuron: &mut U,
 //!     timestep: usize,
-//!     do_receptor_kinetics: bool,
+//!     electrical_synapse: bool,
+//!     chemical_synapse: bool,
 //!     gaussian: bool,
 //! ) -> (bool, bool, bool) {
-//!     // calculates input from spike train to presynaptic neuron given the current
-//!     // timestep of the simulation
-//!     let input_current = spike_train_gap_juncton(spike_train, presynaptic_neuron, timestep);
-//!     
-//!     let (pre_t_total, post_t_total, current) = if gaussian {
+//!     let (pre_t_total, post_t_total, pre_current, post_current) = if gaussian {
 //!         // gets normally distributed factor to add noise with by scaling
 //!         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
 //!         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
 //! 
 //!         // calculates presynaptic neurotransmitter input
-//!         let pre_t_total = if do_receptor_kinetics {
+//!         let pre_t_total = if chemical_synapse {
 //!             // weights neurotransmitter with random noise
 //!             let mut t = spike_train.get_neurotransmitter_concentrations();
 //!             weight_neurotransmitter_concentration(&mut t, pre_gaussian_factor);
-//!     
-//!             Some(t)
-//!         } else {
-//!             // returns None to indicate no update to receptor gating variables
-//!             None
-//!         };
-//!     
-//!         // calculates input current to postsynaptic neuron
-//!         let current = signed_gap_junction(
-//!             &*presynaptic_neuron,
-//!             &*postsynaptic_neuron,
-//!         );
 //! 
-//!         // calculates postsynaptic neurotransmitter input
-//!         let post_t_total = if do_receptor_kinetics {
-//!             // weights neurotransmitter with random noise
+//!             t
+//!         } else {
+//!             // returns empty hashmap to indicate no chemical transmission
+//!             HashMap::new()
+//!         };
+//! 
+//!         let (pre_current, post_current) = if electrical_synapse {
+//!             // calculates input from spike train to presynaptic neuron given the current
+//!             // timestep of the simulation
+//!             let pre_current = spike_train_gap_juncton(
+//!                 spike_train, 
+//!                 presynaptic_neuron, 
+//!                 timestep
+//!             ) * pre_gaussian_factor;
+//! 
+//!             // input from presynaptic neuron to postsynaptic
+//!             let post_current = signed_gap_junction(
+//!                 &*presynaptic_neuron,
+//!                 &*postsynaptic_neuron,
+//!             ) * post_gaussian_factor;
+//! 
+//!             (pre_current, post_current)
+//!         } else {
+//!             // returns 0 if no electrical synapse
+//!             (0., 0.)
+//!         };
+//! 
+//!         let post_t_total = if chemical_synapse {
 //!             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
 //!             weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
-//!     
-//!             Some(t)
+//! 
+//!             t
 //!         } else {
-//!             // returns None to indicate no update to receptor gating variables
-//!             None
+//!             // returns empty hashmap to indicate no chemical transmission
+//!             HashMap::new()
 //!         };
-//!     
-//!         (pre_t_total, post_t_total, current)
+//! 
+//!         (pre_t_total, post_t_total, pre_current, post_current)
 //!     } else {
-//!         // calculates presynaptic neurotransmitter input
-//!         let pre_t_total = if do_receptor_kinetics {
-//!             let t = spike_train.get_neurotransmitter_concentrations();
-//!             Some(t)
+//!         let pre_t_total = if chemical_synapse {
+//!             spike_train.get_neurotransmitter_concentrations()
 //!         } else {
-//!             // returns None to indicate no update to receptor gating variables
-//!             None
+//!             // returns empty hashmap to indicate no chemical transmission
+//!             HashMap::new()
 //!         };
-//!     
-//!         // calculates current to postsynaptic neuron
-//!         let current = signed_gap_junction(
-//!             &*presynaptic_neuron,
-//!             &*postsynaptic_neuron,
-//!         );
-//!     
-//!         let post_t_total = if do_receptor_kinetics {
-//!             let t = presynaptic_neuron.get_neurotransmitter_concentrations();
-//!             Some(t)
+//! 
+//!         // calculates currents from electrical gap junctions
+//!         let (pre_current, current) = if electrical_synapse {
+//!             // calculates input from spike train to presynaptic neuron given the current
+//!             // timestep of the simulation
+//!             let pre_current = spike_train_gap_juncton(
+//!                 spike_train, 
+//!                 presynaptic_neuron, 
+//!                 timestep
+//!             );
+//! 
+//!             // input from presynaptic neuron to postsynaptic
+//!             let current = signed_gap_junction(
+//!                 &*presynaptic_neuron,
+//!                 &*postsynaptic_neuron,
+//!             );
+//! 
+//!             (pre_current, current)
 //!         } else {
-//!             // returns None to indicate no update to receptor gating variables
-//!             None
+//!             // returns 0 if no electrical synapse
+//!             (0., 0.)
 //!         };
-//!     
-//!         (pre_t_total, post_t_total, current)
+//! 
+//!         // calculates neurotransmitter input
+//!         let post_t_total = if chemical_synapse {
+//!             presynaptic_neuron.get_neurotransmitter_concentrations()
+//!         } else {
+//!             // returns empty hashmap to indicate no chemical transmission
+//!             HashMap::new()
+//!         };
+//! 
+//!         (pre_t_total, post_t_total, pre_current, current)
 //!     };
-//!     
-//!     // iterates neuron and if firing sets the last firing time to keep
+//! 
+//!     // iterates neuron and if firing sets the last firing time to keep   
 //!     // track of activity in order to calculate input on the next iteration
 //!     let spike_train_spiking = spike_train.iterate();   
 //!     if spike_train_spiking {
@@ -242,22 +281,22 @@
 //!     
 //!     // iterates presynaptic neuron based on current and neurotransmitter input
 //!     let pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-//!         input_current,
-//!         pre_t_total.as_ref(),
+//!         pre_current,
+//!         &pre_t_total,
 //!     );
 //!     if pre_spiking {
 //!         presynaptic_neuron.set_last_firing_time(Some(timestep));
 //!     }
-//!     
+//! 
 //!     // iterates presynaptic neuron based on current and neurotransmitter input
 //!     let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-//!         current,
-//!         post_t_total.as_ref(),
+//!         post_current,
+//!         &post_t_total,
 //!     ); 
 //!     if post_spiking {
 //!         postsynaptic_neuron.set_last_firing_time(Some(timestep));
 //!     }
-//!     
+//! 
 //!     (spike_train_spiking, pre_spiking, post_spiking)
 //! }
 //! ```
@@ -332,7 +371,10 @@
 //! /// `weight_params` : parameters to use to randomly initialize the weights on the 
 //! /// input presynaptic neurons
 //! ///
-//! /// `do_receptor_kinetics` : whether to update receptor gating values based on neurotransmitter input
+//! /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
+//! /// 
+//! /// - `chemical_synapse` : use `true` to update receptor gating values of 
+//! /// the neurons based on neurotransmitter input during the simulation
 //! fn test_isolated_stdp<T: IterateAndSpike>(
 //!     presynaptic_neurons: &mut Vec<T>,
 //!     postsynaptic_neuron: &mut T,
@@ -340,7 +382,8 @@
 //!     input_current: f32,
 //!     input_current_deviation: f32,
 //!     weight_params: &GaussianParameters,
-//!     do_receptor_kinetics: bool,
+//!     electrical_synapse: bool,
+//!     chemical_synapse: bool,
 //! ) -> HashMap<String, Vec<f32>> {
 //!     let n = presynaptic_neurons.len();
 //! 
@@ -368,43 +411,47 @@
 //!     for timestep in 0..iterations {
 //!         // calculates weighted current inputs and averages them to ensure input does not get too high,
 //!         // otherwise neuronal dynamics becomes unstable
-//!         let calculated_current: f32 = (0..n)
-//!             .map(
-//!                 |i| {
-//!                     let output = weights[i] * signed_gap_junction(
-//!                         &presynaptic_neurons[i], 
-//!                         &*postsynaptic_neuron
-//!                     );
+//!         let calculated_current: f32 = if electrical_synapse { 
+//!             (0..n).map(
+//!                     |i| {
+//!                         let output = weights[i] * signed_gap_junction(
+//!                             &presynaptic_neurons[i], 
+//!                             &*postsynaptic_neuron
+//!                         );
 //! 
-//!                     output / (n as f32)
-//!                 }
-//!             ) 
-//!             .collect::<Vec<f32>>()
-//!             .iter()
-//!             .sum();
-//!         // calculates weighted neurotransmitter inputs
-//!         let presynaptic_neurotransmitters: Option<NeurotransmitterConcentrations> = match do_receptor_kinetics {
-//!             true => Some({
-//!                 let neurotransmitters_vec = (0..n) 
-//!                     .map(|i| {
-//!                         let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
-//!                         weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
-//! 
-//!                         presynaptic_neurotransmitter
+//!                         output / (n as f32)
 //!                     }
-//!                 ).collect::<Vec<NeurotransmitterConcentrations>>();
+//!                 ) 
+//!                 .collect::<Vec<f32>>()
+//!                 .iter()
+//!                 .sum()
+//!             } else {
+//!                 // returns 0 if no electrical synapses to represent to electrical transmission
+//!                 0.
+//!             };
 //! 
-//!                 let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
+//!         // calculates weighted neurotransmitter inputs
+//!         let presynaptic_neurotransmitters: NeurotransmitterConcentrations = if chemical_synapse {
+//!             let neurotransmitters_vec = (0..n) 
+//!                 .map(|i| {
+//!                     let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
+//!                     weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
 //! 
-//!                 weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
+//!                     presynaptic_neurotransmitter
+//!                 }
+//!             ).collect::<Vec<NeurotransmitterConcentrations>>();
 //! 
-//!                 neurotransmitters
-//!             }),
-//!             false => None
+//!             let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
+//! 
+//!             weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
+//! 
+//!             neurotransmitters
+//!         } else {
+//!             // returns empty hashmap to indicate no chemical transmission
+//!             HashMap::new()
 //!         };
 //!         
 //!         // adds noise to current inputs with normally distributed random noise
-//!         let noise_factor = postsynaptic_neuron.get_gaussian_factor();
 //!         let presynaptic_inputs: Vec<f32> = (0..n)
 //!             .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
 //!             .collect();
@@ -415,8 +462,8 @@
 //!             .collect();
 //!         // iterates postsynaptic neuron based on calculated inputs
 //!         let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-//!             noise_factor * calculated_current,
-//!             presynaptic_neurotransmitters.as_ref(),
+//!             calculated_current,
+//!             &presynaptic_neurotransmitters,
 //!         );
 //! 
 //!         update_isolated_presynaptic_neuron_weights(
@@ -680,12 +727,12 @@
 //! 
 //!     // updates voltage and adaptive values as well as the 
 //!     // neurotransmitters, receptor current is factored in and receptor gating
-//!     // is updated if `t_total` is not `None`, spiking is handled at the end
-//!     // of the method and returns whether it is currently spiking
+//!     // is updated spiking is handled at the end of the method and 
+//!     // returns whether it is currently spiking
 //!     fn iterate_with_neurotransmitter_and_spike(
 //!         &mut self, 
 //!         input_current: f32, 
-//!         t_total: Option<&NeurotransmitterConcentrations>,
+//!         t_total: &NeurotransmitterConcentrations,
 //!     ) -> bool {
 //!         self.ligand_gates.update_receptor_kinetics(t_total);
 //!         self.ligand_gates.set_receptor_currents(self.current_voltage);
