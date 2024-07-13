@@ -198,7 +198,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: Option<&NeurotransmitterConcentrations>,
+        t_total: &NeurotransmitterConcentrations,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
@@ -234,7 +234,7 @@ macro_rules! impl_iterate_and_spike {
             fn iterate_with_neurotransmitter_and_spike(
                 &mut self, 
                 input_current: f32, 
-                t_total: Option<&NeurotransmitterConcentrations>,
+                t_total: &NeurotransmitterConcentrations,
             ) -> bool {
                 self.ligand_gates.update_receptor_kinetics(t_total);
                 self.ligand_gates.set_receptor_currents(self.current_voltage);
@@ -352,7 +352,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: Option<&NeurotransmitterConcentrations>,
+        t_total: &NeurotransmitterConcentrations,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
