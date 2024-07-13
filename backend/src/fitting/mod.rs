@@ -244,7 +244,8 @@ pub fn get_hodgkin_huxley_summary<
     hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<T, U>, 
     input_spike_train: &PresetSpikeTrain<V, W>, 
     iterations: usize,
-    do_receptor_kinetics: bool,
+    electrical_synapse: bool,
+    chemical_synapse: bool,
     gaussian: bool, 
     spike_amplitude_default: f32,
     resting_potential: f32
@@ -266,7 +267,8 @@ pub fn get_hodgkin_huxley_summary<
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron, 
             timestep,
-            do_receptor_kinetics,
+            electrical_synapse,
+            chemical_synapse,
             gaussian, 
         );
 
@@ -323,9 +325,10 @@ pub struct FittingSettings<
     pub iterations: usize,
     /// Use `true` to add normally distributed random noise to inputs of simulation
     pub gaussian: bool,
-    /// Use `true` to update receptor gating values of Izhikevich neuron based on neurotransmitter input,
-    /// use `false` to keep gating values static throughout simulation
-    pub do_receptor_kinetics: bool,
+    /// Use `true` to neurons based on electrical gap junction input,
+    pub electrical_synapse: bool,
+    /// Use `true` to update receptor gating values of neurons based on neurotransmitter input,
+    pub chemical_synapse: bool,
 }
 
 /// Generates a summary of the Izhikevich neuron's action potentials over time
@@ -355,7 +358,8 @@ pub fn get_izhikevich_summary<
             presynaptic_neuron, 
             postsynaptic_neuron, 
             timestep,
-            settings.do_receptor_kinetics,
+            settings.electrical_synapse,
+            settings.chemical_synapse,
             settings.gaussian, 
         );
 
@@ -502,8 +506,10 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
     iterations: usize,
     input_spike_trains: &Vec<PresetSpikeTrain<V, X>>,
     genetic_algo_params: &GeneticAlgorithmParameters,
-    hodgkin_huxley_do_receptor_kinetics: bool,
-    izhikevich_do_receptor_kinetics: bool,
+    hodgkin_huxley_electrical_synapse: bool,
+    hodgkin_huxley_chemical_synapse: bool,
+    izhikevich_electrical_synapse: bool,
+    izhikevich_chemical_synapse: bool,
     resting_potential: f32,
     gaussian: bool,
     use_amplitude: bool,
@@ -528,7 +534,8 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
                     &hodgkin_huxley_neuron, 
                     &current_spike_train, 
                     iterations,
-                    hodgkin_huxley_do_receptor_kinetics,
+                    hodgkin_huxley_electrical_synapse,
+                    hodgkin_huxley_chemical_synapse,
                     gaussian, 
                     spike_amplitude_default,
                     resting_potential,
@@ -553,7 +560,8 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
                     &hodgkin_huxley_neuron, 
                     &current_spike_train, 
                     iterations,
-                    hodgkin_huxley_do_receptor_kinetics,
+                    hodgkin_huxley_electrical_synapse,
+                    hodgkin_huxley_chemical_synapse,
                     gaussian, 
                     spike_amplitude_default,
                     resting_potential,
@@ -575,7 +583,8 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
         spike_trains: input_spike_trains.clone(),
         iterations: iterations,
         gaussian: gaussian,
-        do_receptor_kinetics: izhikevich_do_receptor_kinetics,
+        electrical_synapse: izhikevich_electrical_synapse,
+        chemical_synapse: izhikevich_chemical_synapse,
     };
 
     let mut fitting_settings_map: HashMap<&str, FittingSettings<T, W, V, X>> = HashMap::new();
