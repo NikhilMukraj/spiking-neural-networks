@@ -726,20 +726,14 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
             .sum::<f32>() * (dt / c_m)
     }
 
-    /// Updates the receptor gating values based on the neurotransitter concentrations (mM),
-    /// if there is a `None` for the neurotransmitter input, receptor gating values are held constant
-    pub fn update_receptor_kinetics(&mut self, t_total: Option<&NeurotransmitterConcentrations>) {
-        match t_total {
-            Some(t_hashmap) => {
-                t_hashmap.iter()
-                    .for_each(|(key, value)| {
-                        if let Some(gate) = self.ligand_gates.get_mut(key) {
-                            gate.receptor.apply_r_change(*value);
-                        }
-                    })
-            },
-            None => {}
-        }
+    /// Updates the receptor gating values based on the neurotransitter concentrations (mM)
+    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations) {
+        t_total.iter()
+            .for_each(|(key, value)| {
+                if let Some(gate) = self.ligand_gates.get_mut(key) {
+                    gate.receptor.apply_r_change(*value);
+                }
+            })
     }
 }
 
@@ -1106,7 +1100,7 @@ pub trait STDP: LastFiringTime {
 ///     fn iterate_with_neurotransmitter_and_spike(
 ///         &mut self, 
 ///         input_current: f32, 
-///         t_total: Option<&NeurotransmitterConcentrations>,
+///         t_total: &NeurotransmitterConcentrations,
 ///     ) -> bool {
 ///         // accounts for receptor currents
 ///         self.ligand_gates.update_receptor_kinetics(t_total);
@@ -1140,12 +1134,12 @@ Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpik
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Takes in an input current and neurotransmitter input and returns whether the model
     /// is spiking after the membrane potential is updated, neurotransmitter input updates
-    /// receptor gating values if it is not `None`, the associated concentration will be applied
-    /// to the [`LigandGatedChannel`] of the same [`NeurotransmitterType`], the current from the 
-    /// receptors is also factored into the change in membrane potential
+    /// receptor gating values based on the associated neurotransmitter concentration which will be 
+    /// applied to the [`LigandGatedChannel`] of the same [`NeurotransmitterType`], 
+    /// the current from the receptors is also factored into the change in membrane potential
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: Option<&NeurotransmitterConcentrations>,
+        t_total: &NeurotransmitterConcentrations,
     ) -> bool;
 }
