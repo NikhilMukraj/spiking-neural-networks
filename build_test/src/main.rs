@@ -22,31 +22,31 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug)]
-pub enum Expr {
+pub enum AST {
     Number(f32),
     Name(String),
-    UnaryMinus(Box<Expr>),
+    UnaryMinus(Box<AST>),
     BinOp {
-        lhs: Box<Expr>,
+        lhs: Box<AST>,
         op: Op,
-        rhs: Box<Expr>,
+        rhs: Box<AST>,
     },
     EmptyFunction(String),
     Function {
         name: String,
-        args: Vec<Box<Expr>>
+        args: Vec<Box<AST>>
     },
 }
 
-// then try writing rust code from expr
-pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
+// then try writing rust code from ast
+pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::number => Expr::Number(primary.as_str().parse::<f32>().unwrap()),
-            Rule::name => Expr::Name(String::from(primary.as_str())),
-            Rule::expr => parse_expr(primary.into_inner()),
+            Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
+            Rule::name => AST::Name(String::from(primary.as_str())),
+            Rule::expr => parse_ast(primary.into_inner()),
             Rule::empty_function => {
-                Expr::EmptyFunction(
+                AST::EmptyFunction(
                     String::from(
                         primary.into_inner()
                             .next()
@@ -62,15 +62,15 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                     .expect("Could not get function name").as_str()
                 );
 
-                let args: Vec<Box<Expr>> = inner_rules.next()
+                let args: Vec<Box<AST>> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(parse_expr(i.into_inner())))
+                    .map(|i| Box::new(parse_ast(i.into_inner())))
                     .collect();
                 
-                Expr::Function { name: name, args: args }
+                AST::Function { name: name, args: args }
             },
-            rule => unreachable!("Expr::parse expected atom, found {:?}", rule),
+            rule => unreachable!("AST::parse expected atom, found {:?}", rule),
         })
         .map_infix(|lhs, op, rhs| {
             let op = match op.as_rule() {
@@ -79,16 +79,16 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> Expr {
                 Rule::multiply => Op::Multiply,
                 Rule::divide => Op::Divide,
                 Rule::power => Op::Power,
-                rule => unreachable!("Expr::parse expected infix operation, found {:?}", rule),
+                rule => unreachable!("AST::parse expected infix operation, found {:?}", rule),
             };
-            Expr::BinOp {
+            AST::BinOp {
                 lhs: Box::new(lhs),
                 op,
                 rhs: Box::new(rhs),
             }
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::unary_minus => Expr::UnaryMinus(Box::new(rhs)),
+            Rule::unary_minus => AST::UnaryMinus(Box::new(rhs)),
             _ => unreachable!(),
         })
         .parse(pairs)
@@ -103,13 +103,13 @@ pub enum Op {
     Power,
 }
 
-impl Expr {
+impl AST {
     pub fn to_string(&self) -> String {
         match self {
-            Expr::Number(n) => n.to_string(),
-            Expr::Name(name) => name.clone(),
-            Expr::UnaryMinus(expr) => format!("-{}", expr.to_string()),
-            Expr::BinOp { lhs, op, rhs } => {
+            AST::Number(n) => n.to_string(),
+            AST::Name(name) => name.clone(),
+            AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
+            AST::BinOp { lhs, op, rhs } => {
                 match op {
                     Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
                     Op::Subtract => format!("({} - {})", lhs.to_string(), rhs.to_string()),
@@ -118,8 +118,8 @@ impl Expr {
                     Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
                 }
             }
-            Expr::EmptyFunction(name) => format!("{}()", name.clone()),
-            Expr::Function { name, args } => {
+            AST::EmptyFunction(name) => format!("{}()", name.clone()),
+            AST::Function { name, args } => {
                 format!(
                     "{}({})",
                     name, 
@@ -152,11 +152,11 @@ fn main() -> io::Result<()> {
         // then generate appropriate rust code
         match CalculatorParser::parse(Rule::equation, &line) {
             Ok(mut pairs) => {
-                let current_expr = parse_expr(pairs.next().unwrap().into_inner());
+                let current_ast = parse_ast(pairs.next().unwrap().into_inner());
                 println!(
                     "Parsed: {:#?}\nString: {}",
-                    current_expr,
-                    current_expr.to_string(),
+                    current_ast,
+                    current_ast.to_string(),
                     // after string is generated, any unnecessary parantheses should be dropped
                     // number string should be suffixed with decimal if integer
                 );
