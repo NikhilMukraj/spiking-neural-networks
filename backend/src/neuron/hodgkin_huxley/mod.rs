@@ -226,7 +226,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     /// Updates receptor gating based on neurotransmitter input
     pub fn update_receptors(
         &mut self, 
-        t_total: Option<&NeurotransmitterConcentrations>
+        t_total: &NeurotransmitterConcentrations
     ) {
         self.ligand_gates.update_receptor_kinetics(t_total);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
@@ -253,7 +253,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     fn iterate_with_neurotransmitter(
         &mut self, 
         input: f32, 
-        t_total: Option<&NeurotransmitterConcentrations>
+        t_total: &NeurotransmitterConcentrations
     ) {
         self.update_receptors(t_total);
         self.iterate(input);
@@ -293,7 +293,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: Option<&NeurotransmitterConcentrations>,
+        t_total: &NeurotransmitterConcentrations,
     ) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate_with_neurotransmitter(input_current, t_total);
