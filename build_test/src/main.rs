@@ -110,16 +110,15 @@ impl Expr {
             Expr::Name(name) => name.clone(),
             Expr::UnaryMinus(expr) => format!("-{}", expr.to_string()),
             Expr::BinOp { lhs, op, rhs } => {
-                let op_str = match op {
-                    Op::Add => "+",
-                    Op::Subtract => "-",
-                    Op::Multiply => "*",
-                    Op::Divide => "/",
-                    Op::Power => "^",
-                };
-                format!("({} {} {})", lhs.to_string(), op_str, rhs.to_string())
+                match op {
+                    Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
+                    Op::Subtract => format!("({} - {})", lhs.to_string(), rhs.to_string()),
+                    Op::Multiply => format!("({} * {})", lhs.to_string(), rhs.to_string()),
+                    Op::Divide => format!("({} / {})", lhs.to_string(), rhs.to_string()),
+                    Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
+                }
             }
-            Expr::EmptyFunction(name) => name.clone(),
+            Expr::EmptyFunction(name) => format!("{}()", name.clone()),
             Expr::Function { name, args } => {
                 format!(
                     "{}({})",
@@ -152,9 +151,10 @@ fn main() -> io::Result<()> {
                 let current_expr = parse_expr(pairs.next().unwrap().into_inner());
                 println!(
                     "Parsed: {:#?}\nString: {}",
-                    // inner of expr
                     current_expr,
                     current_expr.to_string(),
+                    // after string is generated, any unnecessary parantheses should be dropped
+                    // number string should be suffixed with decimal if integer
                 );
             }
             Err(e) => {
