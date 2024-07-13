@@ -146,6 +146,10 @@ fn main() -> io::Result<()> {
             break;
         }
 
+        // handle function versus eq versus diff eq
+        // then move to neuron block versus ion channel 
+        // versus neurotransmitter versus receptor
+        // then generate appropriate rust code
         match CalculatorParser::parse(Rule::equation, &line) {
             Ok(mut pairs) => {
                 let current_expr = parse_expr(pairs.next().unwrap().into_inner());
