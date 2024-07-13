@@ -59,7 +59,8 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     input_current: f32,
     input_current_deviation: f32,
     weight_params: &GaussianParameters,
-    do_receptor_kinetics: bool,
+    electrical_synapse: bool,
+    chemical_synapse: bool,
 ) -> HashMap<String, Vec<f32>> {
     let n = presynaptic_neurons.len();
 
@@ -82,41 +83,43 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     }
 
     for timestep in 0..iterations {
-        let calculated_current: f32 = (0..n)
-            .map(
-                |i| {
-                    let output = weights[i] * signed_gap_junction(
-                        &presynaptic_neurons[i], 
-                        &*postsynaptic_neuron
-                    );
+        let calculated_current: f32 = if electrical_synapse { 
+            (0..n).map(
+                    |i| {
+                        let output = weights[i] * signed_gap_junction(
+                            &presynaptic_neurons[i], 
+                            &*postsynaptic_neuron
+                        );
 
-                    output / (n as f32)
-                }
-            ) 
-            .collect::<Vec<f32>>()
-            .iter()
-            .sum();
-        let presynaptic_neurotransmitters: Option<NeurotransmitterConcentrations> = match do_receptor_kinetics {
-            true => Some({
-                let neurotransmitters_vec = (0..n) 
-                    .map(|i| {
-                        let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
-                        weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
-
-                        presynaptic_neurotransmitter
+                        output / (n as f32)
                     }
-                ).collect::<Vec<NeurotransmitterConcentrations>>();
+                ) 
+                .collect::<Vec<f32>>()
+                .iter()
+                .sum()
+            } else {
+                0.
+            };
+            
+        let presynaptic_neurotransmitters: NeurotransmitterConcentrations = if chemical_synapse {
+            let neurotransmitters_vec = (0..n) 
+                .map(|i| {
+                    let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
+                    weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
 
-                let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
+                    presynaptic_neurotransmitter
+                }
+            ).collect::<Vec<NeurotransmitterConcentrations>>();
 
-                weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
+            let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 
-                neurotransmitters
-            }),
-            false => None
+            weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
+
+            neurotransmitters
+        } else {
+            HashMap::new()
         };
         
-        let noise_factor = postsynaptic_neuron.get_gaussian_factor();
         let presynaptic_inputs: Vec<f32> = (0..n)
             .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
             .collect();
@@ -126,8 +129,8 @@ fn test_isolated_stdp<T: IterateAndSpike>(
             })
             .collect();
         let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-            noise_factor * calculated_current,
-            presynaptic_neurotransmitters.as_ref(),
+            calculated_current,
+            &presynaptic_neurotransmitters,
         );
 
         update_isolated_presynaptic_neuron_weights(
@@ -195,6 +198,7 @@ fn main() {
         30., 
         0.1, 
         &weight_params, 
+        true,
         false,
     );
 

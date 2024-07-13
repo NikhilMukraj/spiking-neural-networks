@@ -27,7 +27,8 @@ fn main() {
 
     let iterations = 10000;
     let input_current = 50.;
-    let do_receptor_kinetics = true;
+    let electrical_synapse = true;
+    let chemical_synapse = true;
     let gaussian = false;
 
     let mut postsynaptic_voltages: Vec<f32> = Vec::new();
@@ -39,7 +40,8 @@ fn main() {
             &mut presynaptic_neuron, 
             &mut postsynaptic_neuron, 
             input_current, 
-            do_receptor_kinetics, 
+            electrical_synapse,
+            chemical_synapse, 
             gaussian
         );
 
