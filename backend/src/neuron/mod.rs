@@ -76,7 +76,9 @@ pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage +
 /// 
 /// - `postsynaptic_neuron` : a neuron that implements [`IterateAndSpike`]
 /// 
-/// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
+/// 
+/// - `chemical_synapse` : use `true` to update receptor gating values of 
 /// the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
@@ -84,7 +86,8 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
     input_current: f32,
-    do_receptor_kinetics: bool,
+    electrical_synapse: bool,
+    chemical_synapse: bool,
     gaussian: bool,
 ) -> (bool, bool) {
     let (t_total, post_current, input_current) = if gaussian {
@@ -93,32 +96,39 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 
         let input_current = input_current * pre_gaussian_factor;
 
-        let post_current = signed_gap_junction(
-            &*presynaptic_neuron,
-            &*postsynaptic_neuron,
-        );
+        let post_current = if electrical_synapse {
+            signed_gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
+            ) * post_gaussian_factor
+        } else {
+            0.
+        };
 
-        let t_total = if do_receptor_kinetics {
+        let t_total = if chemical_synapse {
             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
             weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
 
-            Some(t)
+            t
         } else {
-            None
+            HashMap::new()
         };
 
         (t_total, post_current, input_current)
     } else {
-        let post_current = signed_gap_junction(
-            &*presynaptic_neuron,
-            &*postsynaptic_neuron,
-        );
-
-        let t_total = if do_receptor_kinetics {
-            let t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            Some(t)
+        let post_current = if electrical_synapse {
+            signed_gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
+            )
         } else {
-            None
+            0.
+        };
+
+        let t_total = if chemical_synapse {
+            presynaptic_neuron.get_neurotransmitter_concentrations()
+        } else {
+            HashMap::new()
         };
 
         (t_total, post_current, input_current)
@@ -128,7 +138,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 
     let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
         post_current,
-        t_total.as_ref(),
+        &t_total,
     );
 
     (pre_spiking, post_spiking)
@@ -176,7 +186,9 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
 /// 
 /// - `timestep` : the current timestep of the simulation
 /// 
-/// - `do_receptor_kinetics` : use `true` to update receptor gating values of 
+/// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
+/// 
+/// - `chemical_synapse` : use `true` to update receptor gating values of 
 /// the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
@@ -185,60 +197,81 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     presynaptic_neuron: &mut U, 
     postsynaptic_neuron: &mut U,
     timestep: usize,
-    do_receptor_kinetics: bool,
+    electrical_synapse: bool,
+    chemical_synapse: bool,
     gaussian: bool,
 ) -> (bool, bool, bool) {
-    let input_current = spike_train_gap_juncton(spike_train, presynaptic_neuron, timestep);
-
-    let (pre_t_total, post_t_total, current) = if gaussian {
+    let (pre_t_total, post_t_total, pre_current, post_current) = if gaussian {
         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
 
-        let pre_t_total = if do_receptor_kinetics {
+        let pre_t_total = if chemical_synapse {
             let mut t = spike_train.get_neurotransmitter_concentrations();
             weight_neurotransmitter_concentration(&mut t, pre_gaussian_factor);
 
-            Some(t)
+            t
         } else {
-            None
+            HashMap::new()
         };
 
-        let current = signed_gap_junction(
-            &*presynaptic_neuron,
-            &*postsynaptic_neuron,
-        );
+        let (pre_current, post_current) = if electrical_synapse {
+            let pre_current = spike_train_gap_juncton(
+                spike_train, 
+                presynaptic_neuron, 
+                timestep
+            ) * pre_gaussian_factor;
 
-        let post_t_total = if do_receptor_kinetics {
+            let post_current = signed_gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
+            ) * post_gaussian_factor;
+
+            (pre_current, post_current)
+        } else {
+            (0., 0.)
+        };
+
+        let post_t_total = if chemical_synapse {
             let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
             weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
 
-            Some(t)
+            t
         } else {
-            None
+            HashMap::new()
         };
 
-        (pre_t_total, post_t_total, current)
+        (pre_t_total, post_t_total, pre_current, post_current)
     } else {
-        let pre_t_total = if do_receptor_kinetics {
-            let t = spike_train.get_neurotransmitter_concentrations();
-            Some(t)
+        let pre_t_total = if chemical_synapse {
+            spike_train.get_neurotransmitter_concentrations()
         } else {
-            None
+            HashMap::new()
         };
 
-        let current = signed_gap_junction(
-            &*presynaptic_neuron,
-            &*postsynaptic_neuron,
-        );
+        let (pre_current, current) = if electrical_synapse {
+            let pre_current = spike_train_gap_juncton(
+                spike_train, 
+                presynaptic_neuron, 
+                timestep
+            );
 
-        let post_t_total = if do_receptor_kinetics {
-            let t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            Some(t)
+            let current = signed_gap_junction(
+                &*presynaptic_neuron,
+                &*postsynaptic_neuron,
+            );
+
+            (pre_current, current)
         } else {
-            None
+            (0., 0.)
         };
 
-        (pre_t_total, post_t_total, current)
+        let post_t_total = if chemical_synapse {
+            presynaptic_neuron.get_neurotransmitter_concentrations()
+        } else {
+            HashMap::new()
+        };
+
+        (pre_t_total, post_t_total, pre_current, current)
     };
 
     let spike_train_spiking = spike_train.iterate();   
@@ -247,16 +280,16 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     }
     
     let pre_spiking = presynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-        input_current,
-        pre_t_total.as_ref(),
+        pre_current,
+        &pre_t_total,
     );
     if pre_spiking {
         presynaptic_neuron.set_last_firing_time(Some(timestep));
     }
 
     let post_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-        current,
-        post_t_total.as_ref(),
+        post_current,
+        &post_t_total,
     ); 
     if post_spiking {
         postsynaptic_neuron.set_last_firing_time(Some(timestep));
@@ -466,8 +499,6 @@ pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHis
     pub update_grid_history: bool,
     /// Whether to update weights with STDP when iterating
     pub do_stdp: bool,
-    /// Whether to update receptor gating values based on neurotransmitter
-    pub do_receptor_kinetics: bool,
     /// Whether to add normally distributed random noise
     pub gaussian: bool,
     /// Internal clock keeping track of what timestep the lattice is at
@@ -483,7 +514,6 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Default 
             update_graph_history: false,
             update_grid_history: false,
             do_stdp: false,
-            do_receptor_kinetics: false,
             gaussian: false,
             internal_clock: 0,
         }
@@ -604,33 +634,26 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
 
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_neurotransmitter_inputs(&self) -> 
-    Option<HashMap<(usize, usize), NeurotransmitterConcentrations>> {
-        match self.do_receptor_kinetics {
-            true => {
-                let neurotransmitters: HashMap<(usize, usize), NeurotransmitterConcentrations> = self.graph.get_every_node_as_ref()
-                    .iter()
-                    .map(|&pos| {
-                        let input_positions = self.graph.get_incoming_connections(&pos)
-                            .expect("Cannot find position");
+    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+        self.graph.get_every_node_as_ref()
+            .iter()
+            .map(|&pos| {
+                let input_positions = self.graph.get_incoming_connections(&pos)
+                    .expect("Cannot find position");
 
-                        let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
-                            &pos,
-                            &input_positions,
-                        );
+                let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
+                    &pos,
+                    &input_positions,
+                );
 
-                        (*pos, neurotransmitter_input)
-                    })
-                    .collect();
-                    
-                Some(neurotransmitters)
-            },
-            false => None,
-        }
+                (*pos, neurotransmitter_input)
+            })
+            .collect()
     }
 
     /// Gets all internal electrical and neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>) {
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
         let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
@@ -675,16 +698,13 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
-        neurotransmitter_inputs: &Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>,
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
             let input_value = *inputs.get(&pos).unwrap();
 
-            let input_neurotransmitter = match neurotransmitter_inputs {
-                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
-                None => None,
-            };
+            let input_neurotransmitter = neurotransmitter_inputs.get(&pos).unwrap();
 
             let is_spiking = self.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
                 input_value, input_neurotransmitter,
@@ -713,15 +733,12 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     /// Iterates one simulation timestep given only chemical inputs
     pub fn iterate_chemical_synapses_only(
         &mut self, 
-        inputs: &Option<HashMap<(usize, usize), NeurotransmitterConcentrations>>
+        inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
 
-            let input_neurotransmitter = match inputs {
-                Some(ref neurotransmitter_hashmap) => Some(neurotransmitter_hashmap.get(&pos).unwrap()),
-                None => None,
-            };
+            let input_neurotransmitter = inputs.get(&pos).unwrap();
 
             let is_spiking = self.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
                 0., input_neurotransmitter,
@@ -779,8 +796,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     }
 
     /// Iterates the lattice based only on internal connections for a given amount of time using
-    /// both electrical and neurotransmitter inputs, set `do_receptor_kinetics` to `true` to update
-    /// receptor kinetics
+    /// both electrical and neurotransmitter inputs
     pub fn run_lattice_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
@@ -795,7 +811,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
     }
 
     /// Iterates the lattice based only on internal connections for a given amount of time using
-    /// neurotransmitter inputs alone, set `do_receptor_kinetics` to `true` to update receptor kinetics
+    /// neurotransmitter inputs alone
     pub fn run_lattice_chemical_synapses_only(
         &mut self,
         iterations: usize,
@@ -1538,21 +1554,14 @@ where
     }
 
     fn get_all_neurotransmitter_inputs(&self) -> 
-    HashMap<GraphPosition, Option<NeurotransmitterConcentrations>> {
+    HashMap<GraphPosition, NeurotransmitterConcentrations> {
         self.get_every_node()
             .iter()
             .map(|pos| {
-                let input = match self.lattices.get(&pos.id).unwrap().do_receptor_kinetics {
-                    true => {
-                        Some(
-                            self.calculate_neurotransmitter_input_from_positions(
-                                &pos,
-                                &self.get_all_input_positions(*pos),
-                            )
-                        )
-                    },
-                    false => None,
-                };
+                let input = self.calculate_neurotransmitter_input_from_positions(
+                    &pos,
+                    &self.get_all_input_positions(*pos),
+                );
 
                 (*pos, input)
             })
@@ -1560,7 +1569,7 @@ where
     }
 
     fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations>) {
         let neurotransmitters_inputs = self.get_all_neurotransmitter_inputs();
 
         let inputs = self.get_all_electrical_inputs();
@@ -1669,7 +1678,7 @@ where
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<GraphPosition, f32>, 
-        neurotransmitter_inputs: &HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>,
+        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
     ) -> Result<(), GraphError> {
         let mut spiking_positions = Vec::new();
 
@@ -1683,7 +1692,7 @@ where
                 let input_neurotransmitter = neurotransmitter_inputs.get(&graph_pos).unwrap();
 
                 let is_spiking = lattice.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
-                    input_value, input_neurotransmitter.as_ref(),
+                    input_value, input_neurotransmitter,
                 );
     
                 if is_spiking {
@@ -1724,7 +1733,7 @@ where
     /// Iterates one simulation timestep lattice given a set of only chemical inputs
     pub fn iterate_chemical_synapses_only(
         &mut self,
-        inputs: &HashMap<GraphPosition, Option<NeurotransmitterConcentrations>>,
+        inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
     ) -> Result<(), GraphError> {
         let mut spiking_positions = Vec::new();
 
@@ -1736,7 +1745,7 @@ where
                 let input_neurotransmitter = inputs.get(&graph_pos).unwrap();
 
                 let is_spiking = lattice.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
-                    0., input_neurotransmitter.as_ref(),
+                    0., input_neurotransmitter,
                 );
     
                 if is_spiking {
@@ -1834,8 +1843,7 @@ where
     }
 
     /// Iterates the lattices based only on internal connections for a given amount of time using
-    /// both electrical and neurotransmitter inputs, set `do_receptor_kinetics` to `true` to update
-    /// receptor kinetics
+    /// both electrical and neurotransmitter inputs
     pub fn run_lattices_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
@@ -1850,7 +1858,7 @@ where
     }
 
     /// Iterates the lattices based only on internal connections for a given amount of time using
-    /// neurotransmitter inputs alone, set `do_receptor_kinetics` to `true` to update receptor kinetics
+    /// neurotransmitter inputs alone
     pub fn run_lattices_chemical_only(
         &mut self,
         iterations: usize,
