@@ -1,12 +1,11 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap}, hash::{Hash, Hasher}};
-use pyo3::{exceptions::{PyKeyError, PyValueError}, types::{PyList, PyDict}, prelude::*};
+use pyo3::{exceptions::PyKeyError, types::{PyList, PyDict}, prelude::*};
 use spiking_neural_networks::{graph::AdjacencyMatrix, neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-        PotentiationType
     }, GridVoltageHistory, Lattice
 }};
 
@@ -20,53 +19,6 @@ macro_rules! impl_repr {
             }
         }
     };
-}
-
-#[pyclass]
-#[pyo3(name = "PotentiationType")]
-#[derive(Clone, Copy)]
-pub struct PyPotentiationType {
-    potentiation: PotentiationType
-}
-
-impl_repr!(PyPotentiationType, potentiation);
-
-#[pymethods]
-impl PyPotentiationType {
-    #[new]
-    fn new(potentiation_type: String) -> PyResult<Self> {
-        match potentiation_type.to_ascii_lowercase().as_str() {
-            "excitatory" => Ok(PyPotentiationType { potentiation: PotentiationType::Excitatory }),
-            "inhibitory" => Ok(PyPotentiationType { potentiation: PotentiationType::Inhibitory }),
-            _ => Err(PyValueError::new_err("Potentation type must be inhibitory or excitatory"))
-        }
-    }
-
-    #[staticmethod]
-    fn from_bool(potentiation_type: bool) -> Self {
-        match potentiation_type {
-            true => PyPotentiationType { potentiation: PotentiationType::Excitatory },
-            false => PyPotentiationType { potentiation: PotentiationType::Inhibitory },
-        }
-    }
-
-    fn is_excitatory(&self) -> bool {
-        match self.potentiation {
-            PotentiationType::Excitatory => true,
-            PotentiationType::Inhibitory => false,
-        }
-    }
-
-    fn __bool__(&self) -> bool {
-        self.is_excitatory()
-    }
-
-    fn is_inhibitory(&self) -> bool {
-        match self.potentiation {
-            PotentiationType::Excitatory => false,
-            PotentiationType::Inhibitory => true,
-        }
-    }
 }
 
 #[pyclass]
@@ -456,11 +408,10 @@ impl PyIzhikevichNeuron {
     #[pyo3(signature = (
         a=0.02, b=0.2, c=-55., d=8., v_th=30., dt=0.1, current_voltage=-65., 
         v_init=-65., w_value=30., w_init=30., gap_conductance=10., tau_m=1., c_m=100.,
-        potentiation=PyPotentiationType { potentiation: PotentiationType::Excitatory }
     ))]
     fn new(
         a: f32, b: f32, c: f32, d: f32, v_th: f32, dt: f32, current_voltage: f32, v_init: f32, 
-        w_value: f32, w_init: f32, gap_conductance: f32, tau_m: f32, c_m: f32, potentiation: PyPotentiationType,
+        w_value: f32, w_init: f32, gap_conductance: f32, tau_m: f32, c_m: f32
     ) -> Self {
         PyIzhikevichNeuron {
             model: IzhikevichNeuron {
@@ -477,7 +428,6 @@ impl PyIzhikevichNeuron {
                 gap_conductance: gap_conductance,
                 tau_m: tau_m,
                 c_m: c_m,
-                potentiation_type: potentiation.potentiation,
                 ..IzhikevichNeuron::default()
             }
         }
@@ -601,7 +551,9 @@ impl PyIzhikevichLattice {
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PyPotentiationType>()?;
+    // REMEMBER TO UPDATE VERSION NUMBER WHEN POTENTIATION IS REMOVED FROM
+    // THE MAIN CRATE
+    // m.add_class::<PyPotentiationType>()?;
     m.add_class::<PyNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
     m.add_class::<PyApproximateNeurotransmitters>()?;
