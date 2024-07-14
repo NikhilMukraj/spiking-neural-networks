@@ -1,3 +1,4 @@
+use std::env;
 use self::AstNode::*;
 use pest::error::Error;
 use pest::Parser;
@@ -166,7 +167,19 @@ fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
 // add diff eq ident, get string between d and /dt by indexing 1:len-3
 // then move to neuron blocks
 fn main() {
-    let unparsed_file = std::fs::read_to_string("test.txt").expect("Cannot read file");
-    let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
-    println!("{:#?}", &astnode);
+    let mut filename = String::new();
+    for (key, value) in env::vars() {
+        if key == "build_file" {
+            println!("{}: {}", key, value);
+            filename = value.clone();
+        }
+    }
+
+    if filename == "" {
+        println!("No build file");
+    } else {
+        let unparsed_file = std::fs::read_to_string(&filename).expect("Cannot read file");
+        let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
+        println!("{:#?}", &astnode);
+    }
 }
