@@ -27,7 +27,6 @@ pub enum DyadicVerb {
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
-    Print(Box<AstNode>),
     Integer(i32),
     DoublePrecisionFloat(f64),
     MonadicOp {
@@ -164,6 +163,7 @@ fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
 // read file from env variables
 // add number and variable types
 // add functions
+// add .to_string method for clarity that just prints the tree as an expression again
 // add diff eq ident, get string between d and /dt by indexing 1:len-3
 // then move to neuron blocks
 fn main() {
