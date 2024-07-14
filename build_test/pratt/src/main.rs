@@ -35,11 +35,10 @@ pub enum AST {
         name: String,
         args: Vec<Box<AST>>
     },
-    DiffEqDeclaration(String),
-    // DiffEq {
-    //     variable: String,
-    //     rhs: Box<AST>,
-    // },
+    // Assignment {
+    //     name: String,
+    //     expr: Box<AST>,
+    // }
 }
 
 // then try writing rust code from ast
@@ -125,7 +124,7 @@ impl AST {
             // AST::DiffEq { variable, rhs } => {
             //     format!("d{}/dt = {}", variable, rhs.to_string())
             // },
-            AST::DiffEqDeclaration(expr) => expr.to_string(),
+            // AST::DiffEqDeclaration(expr) => expr.to_string(),
         }
     }
 }
