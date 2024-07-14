@@ -2,11 +2,7 @@
 //! as well as [`NeurotransmitterKinetics`] for neurotransmission and [`ReceptorKinetics`]
 //! for receptor dynamics over time.
 
-use rand::Rng;
-use std::{
-    io::{Error, ErrorKind, Result},
-    collections::{HashMap, hash_map::{Values, ValuesMut, Keys}},
-};
+use std::collections::{HashMap, hash_map::{Values, ValuesMut, Keys}};
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -856,36 +852,6 @@ pub fn aggregate_neurotransmitter_concentrations(
 // I AMPA (or GABAa) = G AMPA (or GABAa) * (Vm - E AMPA (or GABAa))
 // can also be modified with r
 
-/// Potentation type of a neuron
-#[derive(Clone, Copy, Debug)]
-pub enum PotentiationType {
-    /// Excitatory (activatory) potentiation
-    Excitatory,
-    /// Inhibitory potentiation
-    Inhibitory,
-}
-
-impl PotentiationType {
-    /// Generates [`PotentiationType`] from string
-    pub fn from_str(string: &str) -> Result<PotentiationType> {
-        match string.to_ascii_lowercase().as_str() {
-            "excitatory" => Ok(PotentiationType::Excitatory),
-            "inhibitory" => Ok(PotentiationType::Inhibitory),
-            _ => Err(Error::new(ErrorKind::InvalidInput, "Unknown potentiation type")),
-        }
-    }
-
-    /// Randomly generates a [`PotentiationType`] based on a given probability
-    pub fn weighted_random_type(prob: f32) -> PotentiationType {
-        if rand::thread_rng().gen_range(0.0..=1.0) <= prob {
-            PotentiationType::Excitatory
-        } else {
-            PotentiationType::Inhibitory
-        }
-    }
-}
-
-
 /// A set of parameters to use in generating gaussian noise
 #[derive(Debug, Clone)]
 pub struct GaussianParameters {
@@ -955,11 +921,6 @@ pub trait CurrentVoltage {
 /// Gets conductance of the synapse of a given neuron
 pub trait GapConductance {
     fn get_gap_conductance(&self) -> f32;
-}
-
-/// Gets a the potentiation of the neuron 
-pub trait Potentiation {
-    fn get_potentiation_type(&self) -> PotentiationType;
 }
 
 /// Gets the noise factor for the neuron
@@ -1118,7 +1079,7 @@ pub trait STDP: LastFiringTime {
 /// } 
 /// ```
 pub trait IterateAndSpike: 
-Clone + CurrentVoltage + GapConductance + Potentiation + GaussianFactor + IsSpiking + STDP + Send + Sync {
+Clone + CurrentVoltage + GapConductance + GaussianFactor + IsSpiking + STDP + Send + Sync {
     /// Type of neurotransmitter kinetics to use
     type T: NeurotransmitterKinetics;
     /// Type of receptor kinetics to use
