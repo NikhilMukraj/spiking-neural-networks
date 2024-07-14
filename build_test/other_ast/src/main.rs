@@ -219,6 +219,7 @@ fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
 // variable = ident
 // add .to_string method for clarity that just prints the tree as an expression again
 // assignment expression should not be nestable, could do check after ast is generated
+// if that processing takes too long then check string for more than one equals before checking nesting
 // add diff eq ident, get string between d and /dt by indexing 1:len-3
 // then move to neuron blocks
 fn main() {
