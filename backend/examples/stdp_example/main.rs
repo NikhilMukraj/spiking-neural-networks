@@ -11,7 +11,7 @@ use crate::spiking_neural_networks::{
             IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
         },
-        update_weight_stdp, signed_gap_junction,
+        update_weight_stdp, gap_junction,
     },
     distribution::limited_distr,
 };
@@ -86,7 +86,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         let calculated_current: f32 = if electrical_synapse { 
             (0..n).map(
                     |i| {
-                        let output = weights[i] * signed_gap_junction(
+                        let output = weights[i] * gap_junction(
                             &presynaptic_neurons[i], 
                             &*postsynaptic_neuron
                         );
