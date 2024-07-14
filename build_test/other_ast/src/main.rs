@@ -87,7 +87,7 @@ impl AstNode {
             ),
             AstNode::Terms(nodes) => {
                 nodes.iter()
-                    .map(|i| i.to_string())
+                    .map(|i| format!("({})", i.to_string()))
                     .collect::<Vec<String>>()
                     .join(" ")
             },
@@ -114,9 +114,12 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, Error<Rule>> {
     let pairs = ASTParser::parse(Rule::program, source)?;
     for pair in pairs {
         match pair.as_rule() {
-            Rule::expr => {
+            // Rule::expr => {
+            //     ast.push(AstNode::Statement(Box::new(build_ast_from_expr(pair))));
+            // }
+            Rule::assignment_expr => {
                 ast.push(AstNode::Statement(Box::new(build_ast_from_expr(pair))));
-            }
+            },
             _ => {}
         }
     }
