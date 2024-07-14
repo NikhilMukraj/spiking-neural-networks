@@ -1,10 +1,9 @@
 program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
-stmt = _{ expr }
+stmt = _{ assignment_expr }
 
-expr = {
-    assignment_expr
-  | monadic_expr
+expr = {  
+    monadic_expr
   | dyadic_expr
   | terms
 }
@@ -17,7 +16,7 @@ assignment_expr = { ident ~ "=" ~ expr }
 
 terms = { term+ }
 
-term = _{ function | number | ident | "(" ~ expr ~ ")" }
+term = _{ "(" ~ expr ~ ")" | function | number | ident }
 
 verb = {
     "*"
