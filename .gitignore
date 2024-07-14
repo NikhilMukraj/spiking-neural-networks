@@ -39,4 +39,5 @@
 /interface/target
 /interface/.venv/*
 /interface/generate_methods.py
-/build_test/target
+/build_test/pratt/target
+/build_test/other_ast/target
