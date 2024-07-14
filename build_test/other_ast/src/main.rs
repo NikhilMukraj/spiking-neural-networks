@@ -165,7 +165,7 @@ fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
 // add functions
 // add diff eq ident
 fn main() {
-    let unparsed_file = std::fs::read_to_string("test.txt").expect("cannot read ijs file");
-    let astnode = parse(&unparsed_file).expect("unsuccessful parse");
+    let unparsed_file = std::fs::read_to_string("test.txt").expect("Cannot read file");
+    let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
     println!("{:#?}", &astnode);
 }
