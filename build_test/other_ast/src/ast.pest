@@ -1,12 +1,12 @@
-program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+) * ~ stmt? ~ EOI }
+program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+)* ~ stmt? ~ EOI }
 
 stmt = _{ expr }
 
 expr = {
-      assignment_expr
-    | monadic_expr
-    | dyadic_expr
-    | terms
+    assignment_expr
+  | monadic_expr
+  | dyadic_expr
+  | terms
 }
 
 monadic_expr = { verb ~ expr }
@@ -17,21 +17,24 @@ assignment_expr = { ident ~ "=" ~ expr }
 
 terms = { term+ }
 
-// add functions
 term = _{ function | number | ident | "(" ~ expr ~ ")" }
 
 verb = {
-  	"*" | "/" | "+" | "-" | "^" 
+    "*"
+  | "/"
+  | "+"
+  | "-"
+  | "^"
 }
 
 integer = @{ ASCII_DIGIT+ }
 decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
-number = @{ integer | decimal }
+number  = @{ integer | decimal }
 
 ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
-args = { 
-	(expr | function | ident | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | ident | number))* ~ ","? 
+args = {
+    (expr | function | ident | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | ident | number))* ~ ","?
 }
 function = { ident ~ ("(" ~ args ~ ")") }
 
