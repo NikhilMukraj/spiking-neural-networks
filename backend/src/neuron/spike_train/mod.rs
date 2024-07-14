@@ -5,8 +5,7 @@ use std::collections::{HashMap, HashSet};
 use rand::Rng;
 use super::{
     iterate_and_spike::{ApproximateNeurotransmitter, NeurotransmitterKinetics}, 
-    CurrentVoltage, LastFiringTime, NeurotransmitterType, 
-    Neurotransmitters, Potentiation, PotentiationType,
+    CurrentVoltage, LastFiringTime, NeurotransmitterType, Neurotransmitters,
 };
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
@@ -80,7 +79,7 @@ fn exponential_decay_effect(k: f32, a: f32, time_difference: f32, v_resting: f32
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 /// Handles spike train dynamics
-pub trait SpikeTrain: CurrentVoltage + Potentiation + LastFiringTime + Clone {
+pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone {
     type T: NeurotransmitterKinetics;
     type U: NeuralRefractoriness;
     /// Updates spike train
@@ -106,17 +105,6 @@ macro_rules! impl_current_voltage_spike_train {
         }
     };
 }
-
-macro_rules! impl_potentiation_spike_train {
-    ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Potentiation for $struct<T, U> {
-            fn get_potentiation_type(&self) -> PotentiationType {
-                self.potentiation_type
-            }
-        }
-    };
-}
-
 
 macro_rules! impl_last_firing_time_spike_train {
     ($struct:ident) => {
@@ -145,8 +133,6 @@ pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// Neural refactoriness dynamics
     pub neural_refractoriness: U,
     /// Chance of neuron firing at a given timestep
@@ -183,7 +169,6 @@ macro_rules! impl_default_spike_train_methods {
 }
 
 impl_current_voltage_spike_train!(PoissonNeuron);
-impl_potentiation_spike_train!(PoissonNeuron);
 impl_last_firing_time_spike_train!(PoissonNeuron);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNeuron<T, U> {
@@ -194,7 +179,6 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNe
             v_resting: 0.,
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
-            potentiation_type: PotentiationType::Excitatory,
             neural_refractoriness: U::default(),
             chance_of_firing: 0.01,
             refractoriness_dt: 0.1,
@@ -263,8 +247,6 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// Neural refactoriness dynamics
     pub neural_refractoriness: U,
     /// Set of times to fire at
@@ -278,7 +260,6 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
 }
 
 impl_current_voltage_spike_train!(PresetSpikeTrain);
-impl_potentiation_spike_train!(PresetSpikeTrain);
 impl_last_firing_time_spike_train!(PresetSpikeTrain);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpikeTrain<T, U> {
@@ -289,7 +270,6 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             v_resting: 0.,
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
-            potentiation_type: PotentiationType::Excitatory,
             neural_refractoriness: U::default(),
             firing_times: HashSet::from([100, 300, 500]),
             internal_clock: 0,
