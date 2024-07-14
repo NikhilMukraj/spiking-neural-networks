@@ -1,6 +1,6 @@
-use std::{collections::{hash_map::DefaultHasher, HashMap}, hash::{Hash, Hasher}};
-use pyo3::{exceptions::PyKeyError, types::{PyList, PyDict}, prelude::*};
-use spiking_neural_networks::{graph::AdjacencyMatrix, neuron::{
+use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
+use pyo3::{exceptions::PyKeyError, types::{PyList, PyTuple, PyDict}, prelude::*};
+use spiking_neural_networks::{graph::{AdjacencyMatrix, Graph}, neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
@@ -342,13 +342,10 @@ impl PyApproximateLigandGatedChannels {
         );
     }
 
-    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: Option<&PyDict>) -> PyResult<()> {
-        let concs = match neurotransmitter_concs {
-            Some(ref value) => Some(pydict_to_neurotransmitters_concentration(value)?),
-            None => None,
-        };
+    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict) -> PyResult<()> {
+        let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
 
-        self.ligand_gates.update_receptor_kinetics(concs.as_ref());
+        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs);
 
         Ok(())
     }
@@ -437,14 +434,11 @@ impl PyIzhikevichNeuron {
         self.model.iterate_and_spike(i)
     }
 
-    #[pyo3(signature = (i, neurotransmitter_concs=None))]
-    fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: Option<&PyDict>) -> PyResult<bool> {
-        let concs = match neurotransmitter_concs {
-            Some(ref value) => Some(pydict_to_neurotransmitters_concentration(value)?),
-            None => None,
-        };
+    #[pyo3(signature = (i, neurotransmitter_concs))]
+    fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: &PyDict) -> PyResult<bool> {
+        let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
 
-        Ok(self.model.iterate_with_neurotransmitter_and_spike(i, concs.as_ref()))
+        Ok(self.model.iterate_with_neurotransmitter_and_spike(i, &neurotransmitter_concs))
     }
 
     fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
@@ -501,9 +495,43 @@ impl PyIzhikevichLattice {
         self.lattice.populate(&neuron.model, num_rows, num_cols);
     }
 
-    // fn connect(&mut self, connection_conditional: PyAny, weight_logc: PyAny) -> PyResult<()> {
+    #[pyo3(signature = (connection_conditional, weight_logic=None))]
+    fn connect(&mut self, py: Python, connection_conditional: &PyAny, weight_logic: Option<&PyAny>) {
+        let py_callable = connection_conditional.to_object(connection_conditional.py());
 
-    // }
+        let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+            let args = PyTuple::new(py, &[a, b]);
+            py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+        };
+
+        let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+            Some(value) => {
+                let py_callable = value.to_object(value.py()); 
+
+                let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                    let args = PyTuple::new(py, &[a, b]);
+                    py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                };
+
+                Some(Box::new(closure))
+            },
+            None => None,
+        };
+
+        self.lattice.connect(&connection_closure, weight_closure.as_deref());
+    }
+
+    fn get_every_node(&self) -> HashSet<(usize, usize)> {
+        self.lattice.graph.get_every_node()
+    }
+
+    fn get_id(&self) -> usize {
+        self.lattice.get_id()
+    }
+
+    fn set_id(&mut self, id: usize) {
+        self.lattice.set_id(id)
+    }
 
     fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyLatticeNeuron> {
         let neuron = match self.lattice.cell_grid.get(row) {
@@ -541,6 +569,30 @@ impl PyIzhikevichLattice {
             Err(PyKeyError::new_err(format!("Column at {} not found", col)))
         }
     }
+
+    fn get_weight(&self, presynaptic: (usize, usize), postsynaptic: (usize, usize)) -> PyResult<f32> {
+        match self.lattice.graph.lookup_weight(&presynaptic, &postsynaptic) {
+            Ok(value) => Ok(value.unwrap_or(0.)),
+            Err(_) => Err(PyKeyError::new_err(
+                format!("Weight at ({:#?}, {:#?}) not found", presynaptic, postsynaptic))
+            )
+        }
+    }
+
+    fn set_weight(&mut self, presynaptic: (usize, usize), postsynaptic: (usize, usize), weight: f32) -> PyResult<()> {
+        let weight = if weight == 0. {
+            None
+        } else {
+            Some(weight)
+        };
+        
+        match self.lattice.graph.edit_weight(&presynaptic, &postsynaptic, weight) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PyKeyError::new_err(
+                format!("Connection at ({:#?}, {:#?}) not found", presynaptic, postsynaptic))
+            ),
+        }
+    }
 }
 
 // #[pyclass]
@@ -551,9 +603,6 @@ impl PyIzhikevichLattice {
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
-    // REMEMBER TO UPDATE VERSION NUMBER WHEN POTENTIATION IS REMOVED FROM
-    // THE MAIN CRATE
-    // m.add_class::<PyPotentiationType>()?;
     m.add_class::<PyNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
     m.add_class::<PyApproximateNeurotransmitters>()?;
