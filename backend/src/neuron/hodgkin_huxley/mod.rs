@@ -8,8 +8,8 @@ use std::{
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage, IsSpiking,
-    GapConductance, STDPParameters, STDP, Potentiation, PotentiationType, 
-    LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
+    GapConductance, STDPParameters, STDP, LastFiringTime, 
+    LigandGatedChannels, NeurotransmitterConcentrations, 
     NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
     DestexheNeurotransmitter, DestexheReceptor,
 };
@@ -69,8 +69,6 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     pub was_increasing: bool,
     /// Whether the neuron is currently spiking
     pub is_spiking: bool,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// Additional ion gates
     pub additional_gates: Vec<Box<dyn IonChannel>>,
     /// Additional timestep indpendent ion channels
@@ -90,7 +88,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
         Self {
             current_voltage: self.current_voltage,
             gap_conductance: self.gap_conductance,
-            potentiation_type: self.potentiation_type.clone(),
             dt: self.dt,
             c_m: self.c_m,
             na_channel: self.na_channel.clone(),
@@ -119,7 +116,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
         HodgkinHuxleyNeuron { 
             current_voltage: 0.,
             gap_conductance: 7.,
-            potentiation_type: PotentiationType::Excitatory,
             dt: 0.01,
             c_m: 1., 
             na_channel: NaIonChannel::default(),
