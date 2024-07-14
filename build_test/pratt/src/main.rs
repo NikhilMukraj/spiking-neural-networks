@@ -31,7 +31,6 @@ pub enum AST {
         op: Op,
         rhs: Box<AST>,
     },
-    EmptyFunction(String),
     Function {
         name: String,
         args: Vec<Box<AST>>
@@ -50,16 +49,6 @@ pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
             Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => AST::Name(String::from(primary.as_str())),
             Rule::expr => parse_ast(primary.into_inner()),
-            Rule::empty_function => {
-                AST::EmptyFunction(
-                    String::from(
-                        primary.into_inner()
-                            .next()
-                            .expect("Cannot get empty function")
-                            .as_str()
-                    )
-                )
-            }
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
 
@@ -123,7 +112,6 @@ impl AST {
                     Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
                 }
             }
-            AST::EmptyFunction(name) => format!("{}()", name.clone()),
             AST::Function { name, args } => {
                 format!(
                     "{}({})",
