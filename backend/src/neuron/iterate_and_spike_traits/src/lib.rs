@@ -4,7 +4,7 @@ use syn::{parse_macro_input, DeriveInput};
 
 
 /// Derive macro to automatically implement many necessary traits for the `IterateAndSpike` trait,
-/// including `CurrentVoltage`, `GapConductance`, `Potentiation`, `GaussianFactor`, `LastFiringTime`,
+/// including `CurrentVoltage`, `GapConductance`, `GaussianFactor`, `LastFiringTime`,
 /// `IsSpiking`, and `STDP`
 #[proc_macro_derive(IterateAndSpikeBase)]
 pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
@@ -25,12 +25,6 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
         impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for #name<T, R> {
             fn get_gap_conductance(&self) -> f32 {
                 self.gap_conductance
-            }
-        }
-
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Potentiation for #name<T, R> {
-            fn get_potentiation_type(&self) -> PotentiationType {
-                self.potentiation_type
             }
         }
 
