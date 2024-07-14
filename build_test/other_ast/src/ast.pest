@@ -1,0 +1,43 @@
+program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+) * ~ stmt? ~ EOI }
+
+stmt = _{ expr }
+
+expr = {
+      assgmtExpr
+    | monadicExpr
+    | dyadicExpr
+    | terms
+}
+
+monadicExpr = { verb ~ expr }
+
+dyadicExpr = { (monadicExpr | terms) ~ verb ~ expr }
+
+assgmtExpr = { ident ~ "=" ~ expr }
+
+terms = { term+ }
+
+// add functions
+term = _{ decimal | integer | ident | "(" ~ expr ~ ")" }
+
+verb = {
+  "*" | "/" | "+" | "-" | "^" 
+}
+
+integer = @{ "_"? ~ ASCII_DIGIT+ }
+
+decimal = @{ "_"? ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+
+// integer = @{ ASCII_DIGIT+ }
+// decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+// number = @{ decimal | integer }
+
+ident = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+// args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
+// function = { name ~ ("(" ~ args ~ ")") }
+// empty_function = { name ~ "()" }
+
+WHITESPACE = _{ " " | "\t" }
+
+COMMENT = _{ "//" ~ (!"\n" ~ ANY)* }
