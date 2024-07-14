@@ -127,14 +127,14 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, Error<Rule>> {
 fn build_ast_from_expr(pair: pest::iterators::Pair<Rule>) -> AstNode {
     match pair.as_rule() {
         Rule::expr => build_ast_from_expr(pair.into_inner().next().unwrap()),
-        Rule::monadicExpr => {
+        Rule::monadic_expr => {
             let mut pair = pair.into_inner();
             let verb = pair.next().unwrap();
             let expr = pair.next().unwrap();
             let expr = build_ast_from_expr(expr);
             parse_monadic_verb(verb, expr)
         }
-        Rule::dyadicExpr => {
+        Rule::dyadic_expr => {
             let mut pair = pair.into_inner();
             let lhspair = pair.next().unwrap();
             let lhs = build_ast_from_expr(lhspair);
@@ -151,7 +151,7 @@ fn build_ast_from_expr(pair: pest::iterators::Pair<Rule>) -> AstNode {
                 _ => Terms(terms),
             }
         }
-        Rule::assgmtExpr => {
+        Rule::assignment_expr => {
             let mut pair = pair.into_inner();
             let ident = pair.next().unwrap();
             let expr = pair.next().unwrap();

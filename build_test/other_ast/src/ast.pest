@@ -3,17 +3,17 @@ program = _{ SOI ~ "\n"* ~ (stmt ~ "\n"+) * ~ stmt? ~ EOI }
 stmt = _{ expr }
 
 expr = {
-      assgmtExpr
-    | monadicExpr
-    | dyadicExpr
+      assignment_expr
+    | monadic_expr
+    | dyadic_expr
     | terms
 }
 
-monadicExpr = { verb ~ expr }
+monadic_expr = { verb ~ expr }
 
-dyadicExpr = { (monadicExpr | terms) ~ verb ~ expr }
+dyadic_expr = { (monadic_expr | terms) ~ verb ~ expr }
 
-assgmtExpr = { ident ~ "=" ~ expr }
+assignment_expr = { ident ~ "=" ~ expr }
 
 terms = { term+ }
 
