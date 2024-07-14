@@ -236,6 +236,10 @@ fn main() {
         let unparsed_file = std::fs::read_to_string(&filename).expect("Cannot read file");
         let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
         println!("{:#?}", &astnode);
-        println!("{}", astnode[0].to_string());
+        println!("{}", &astnode.iter()
+            .map(|i| i.to_string())
+            .collect::<Vec<String>>()
+            .join("\n")
+        );
     }
 }
