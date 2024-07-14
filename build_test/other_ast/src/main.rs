@@ -12,8 +12,16 @@ pub struct ASTParser;
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub enum MonadicVerb {
     Negate,
-    Ceiling,
-    Floor,
+    // Ceiling,
+    // Floor,
+}
+
+impl MonadicVerb {
+    pub fn to_string(&self) -> String {
+        match self {
+            MonadicVerb::Negate => String::from("-"),
+        }
+    }
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
@@ -25,10 +33,21 @@ pub enum DyadicVerb {
     Power,
 }
 
+impl DyadicVerb {
+    pub fn to_string(&self) -> String {
+        match self {
+            DyadicVerb::Plus => String::from("+"),
+            DyadicVerb::Multiply => String::from("*"),
+            DyadicVerb::Minus => String::from("-"),
+            DyadicVerb::Divide => String::from("/"),
+            DyadicVerb::Power => String::from("^"),
+        }
+    }
+}
+
 #[derive(PartialEq, Debug, Clone)]
 pub enum AstNode {
-    Integer(i32),
-    DoublePrecisionFloat(f64),
+    Number(f32),
     MonadicOp {
         verb: MonadicVerb,
         expr: Box<AstNode>,
@@ -44,6 +63,49 @@ pub enum AstNode {
         expr: Box<AstNode>,
     },
     Ident(String),
+    Function {
+        ident: String,
+        args: Vec<Box<AstNode>>,
+    },
+    Statement(Box<AstNode>),
+}
+
+impl AstNode {
+    fn to_string(&self) -> String {
+        match self {
+            AstNode::Number(value) => format!("{}", value),
+            AstNode::MonadicOp { verb, expr } => format!(
+                "{}{}", 
+                verb.to_string(), 
+                expr.to_string()
+            ),
+            AstNode::DyadicOp { verb, lhs, rhs } => format!(
+                "{} {} {}", 
+                lhs.to_string(), 
+                verb.to_string(), 
+                rhs.to_string()
+            ),
+            AstNode::Terms(nodes) => {
+                nodes.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join(" ")
+            },
+            AstNode::Variable { ident, expr } => format!("{} = {}", ident, expr.to_string()),
+            AstNode::Ident(ident) => ident.clone(),
+            AstNode::Function { ident, args } => {
+                format!(
+                    "{}({})",
+                    ident, 
+                    args.iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    )
+            },
+            Statement(nodes) => nodes.to_string(),
+        }
+    }
 }
 
 pub fn parse(source: &str) -> Result<Vec<AstNode>, Error<Rule>> {
@@ -53,7 +115,7 @@ pub fn parse(source: &str) -> Result<Vec<AstNode>, Error<Rule>> {
     for pair in pairs {
         match pair.as_rule() {
             Rule::expr => {
-                ast.push(Print(Box::new(build_ast_from_expr(pair))));
+                ast.push(AstNode::Statement(Box::new(build_ast_from_expr(pair))));
             }
             _ => {}
         }
@@ -122,8 +184,8 @@ fn parse_monadic_verb(pair: pest::iterators::Pair<Rule>, expr: AstNode) -> AstNo
     AstNode::MonadicOp {
         verb: match pair.as_str() {
             "-" => MonadicVerb::Negate,
-            ">." => MonadicVerb::Ceiling,
-            "<." => MonadicVerb::Floor,
+            // ">." => MonadicVerb::Ceiling,
+            // "<." => MonadicVerb::Floor,
             _ => panic!("Unsupported monadic verb: {}", pair.as_str()),
         },
         expr: Box::new(expr),
@@ -132,38 +194,31 @@ fn parse_monadic_verb(pair: pest::iterators::Pair<Rule>, expr: AstNode) -> AstNo
 
 fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
     match pair.as_rule() {
-        Rule::integer => {
-            let istr = pair.as_str();
-            let (sign, istr) = match &istr[..1] {
-                "_" => (-1, &istr[1..]),
-                _ => (1, &istr[..]),
-            };
-            let integer: i32 = istr.parse().unwrap();
-            AstNode::Integer(sign * integer)
-        }
-        Rule::decimal => {
-            let dstr = pair.as_str();
-            let (sign, dstr) = match &dstr[..1] {
-                "_" => (-1.0, &dstr[1..]),
-                _ => (1.0, &dstr[..]),
-            };
-            let mut flt: f64 = dstr.parse().unwrap();
-            if flt != 0.0 {
-                // Avoid negative zeroes; only multiply sign by nonzeroes.
-                flt *= sign;
-            }
-            AstNode::DoublePrecisionFloat(flt)
-        }
+        Rule::number => AstNode::Number(pair.as_str().parse::<f32>().unwrap()),
         Rule::expr => build_ast_from_expr(pair),
+        Rule::function => {
+            let mut inner_rules = pair.into_inner();
+
+            let name: String = String::from(inner_rules.next()
+                .expect("Could not get function name").as_str()
+            );
+
+            let args: Vec<Box<AstNode>> = inner_rules.next()
+                .expect("No arguments found")
+                .into_inner()
+                .map(|i| Box::new(build_ast_from_term(i)))
+                .collect();
+            
+            AstNode::Function { ident: name, args: args }
+        },
         Rule::ident => AstNode::Ident(String::from(pair.as_str())),
         unknown_term => panic!("Unexpected term: {:?}", unknown_term),
     }
 }
 
-// read file from env variables
-// add number and variable types
-// add functions
+// variable = ident
 // add .to_string method for clarity that just prints the tree as an expression again
+// assignment expression should not be nestable, could do check after ast is generated
 // add diff eq ident, get string between d and /dt by indexing 1:len-3
 // then move to neuron blocks
 fn main() {
@@ -181,5 +236,6 @@ fn main() {
         let unparsed_file = std::fs::read_to_string(&filename).expect("Cannot read file");
         let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
         println!("{:#?}", &astnode);
+        println!("{}", astnode[0].to_string());
     }
 }
