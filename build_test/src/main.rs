@@ -6,8 +6,8 @@ use std::io::{self, BufRead};
 
 
 #[derive(pest_derive::Parser)]
-#[grammar = "calculator.pest"]
-pub struct CalculatorParser;
+#[grammar = "ast.pest"]
+pub struct ASTParser;
 
 lazy_static::lazy_static! {
     static ref PRATT_PARSER: PrattParser<Rule> = {
@@ -36,6 +36,11 @@ pub enum AST {
         name: String,
         args: Vec<Box<AST>>
     },
+    DiffEqDeclaration(String),
+    // DiffEq {
+    //     variable: String,
+    //     rhs: Box<AST>,
+    // },
 }
 
 // then try writing rust code from ast
@@ -128,7 +133,11 @@ impl AST {
                         .collect::<Vec<String>>()
                         .join(", ")
                     )
-            }
+            },
+            // AST::DiffEq { variable, rhs } => {
+            //     format!("d{}/dt = {}", variable, rhs.to_string())
+            // },
+            AST::DiffEqDeclaration(expr) => expr.to_string(),
         }
     }
 }
@@ -150,7 +159,13 @@ fn main() -> io::Result<()> {
         // then move to neuron block versus ion channel 
         // versus neurotransmitter versus receptor
         // then generate appropriate rust code
-        match CalculatorParser::parse(Rule::equation, &line) {
+
+        // each block should have variables and constants
+        // if block uses variable or const that isnt in scope
+        // there should be an error
+        // if equation is only constants could be calculated once maybe
+
+        match ASTParser::parse(Rule::equation, &line) { // Rule::declaration?
             Ok(mut pairs) => {
                 let current_ast = parse_ast(pairs.next().unwrap().into_inner());
                 println!(
