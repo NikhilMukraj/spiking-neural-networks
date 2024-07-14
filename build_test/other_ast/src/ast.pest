@@ -16,7 +16,7 @@ assignment_expr = { ident ~ "=" ~ expr }
 
 terms = { term+ }
 
-term = _{ "(" ~ expr ~ ")" | function | number | ident }
+term = _{ function | number | ident | "(" ~ expr ~ ")" }
 
 verb = {
     "*"
