@@ -3,8 +3,8 @@
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     CurrentVoltage, GapConductance, GaussianFactor, LastFiringTime, STDP, IsSpiking,
-    Potentiation, IterateAndSpike, PotentiationType, GaussianParameters, STDPParameters,
-    LigandGatedChannels, Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics,
+    IterateAndSpike, GaussianParameters, STDPParameters, LigandGatedChannels, 
+    Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics,
     NeurotransmitterConcentrations, DestexheNeurotransmitter, DestexheReceptor,
 };
 use super::ion_channels::{
@@ -39,8 +39,6 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub was_increasing: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -66,7 +64,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             is_spiking: false,
             was_increasing: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
