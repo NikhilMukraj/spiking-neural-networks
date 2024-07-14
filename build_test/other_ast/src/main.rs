@@ -164,6 +164,7 @@ fn build_ast_from_term(pair: pest::iterators::Pair<Rule>) -> AstNode {
 // add number and variable types
 // add functions
 // add diff eq ident, get string between d and /dt by indexing 1:len-3
+// then move to neuron blocks
 fn main() {
     let unparsed_file = std::fs::read_to_string("test.txt").expect("Cannot read file");
     let astnode = parse(&unparsed_file).expect("Unsuccessful parse");
