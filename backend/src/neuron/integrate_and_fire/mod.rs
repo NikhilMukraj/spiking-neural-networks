@@ -4,8 +4,8 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
-    STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+    GaussianFactor, GaussianParameters, IsSpiking, STDPParameters,
+    STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -127,8 +127,6 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -160,7 +158,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
@@ -286,8 +283,6 @@ pub struct QuadraticIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: Recep
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -318,7 +313,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for QuadraticInte
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
@@ -411,8 +405,6 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -448,7 +440,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
@@ -558,8 +549,6 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -596,7 +585,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
@@ -661,8 +649,6 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -693,7 +679,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
@@ -787,8 +772,6 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -820,7 +803,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            potentiation_type: PotentiationType::Excitatory,
             stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
