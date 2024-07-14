@@ -42,29 +42,12 @@ use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 
 /// Calculates the current between two neurons based on the voltage and
 /// the gap conductance of the synapse
-fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
+pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
     presynaptic_neuron: &T, 
     postsynaptic_neuron: &U
 ) -> f32 {
     postsynaptic_neuron.get_gap_conductance() * 
     (presynaptic_neuron.get_current_voltage() - postsynaptic_neuron.get_current_voltage())
-}
-
-/// Calculates the current between two neurons based on the voltage,
-/// the gap conductance of the synapse, and the potentiation of the
-/// presynaptic neuron, both neurons should implement [`CurrentVoltage`],
-/// the presynaptic neuron should implement [`Potentiation`], and
-/// the postsynaptic neuron should implemenent [`GapConductance`]
-pub fn signed_gap_junction<T: CurrentVoltage + Potentiation, U: CurrentVoltage + GapConductance>(
-    presynaptic_neuron: &T, 
-    postsynaptic_neuron: &U
-) -> f32 {
-    let sign = match presynaptic_neuron.get_potentiation_type() {
-        PotentiationType::Excitatory => 1.,
-        PotentiationType::Inhibitory => -1.,
-    };
-
-    sign * gap_junction(presynaptic_neuron, postsynaptic_neuron)
 }
 
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
@@ -97,7 +80,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
         let input_current = input_current * pre_gaussian_factor;
 
         let post_current = if electrical_synapse {
-            signed_gap_junction(
+            gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             ) * post_gaussian_factor
@@ -117,7 +100,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
         (t_total, post_current, input_current)
     } else {
         let post_current = if electrical_synapse {
-            signed_gap_junction(
+            gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             )
@@ -221,7 +204,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
                 timestep
             ) * pre_gaussian_factor;
 
-            let post_current = signed_gap_junction(
+            let post_current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             ) * post_gaussian_factor;
@@ -255,7 +238,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
                 timestep
             );
 
-            let current = signed_gap_junction(
+            let current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             );
@@ -555,7 +538,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<
                 let (pos_x, pos_y) = input_position;
                 let input_cell = &self.cell_grid[*pos_x][*pos_y];
 
-                let final_input = signed_gap_junction(input_cell, postsynaptic_neuron);
+                let final_input = gap_junction(input_cell, postsynaptic_neuron);
                 
                 final_input * self.graph.lookup_weight(&input_position, position).unwrap().unwrap()
             })
@@ -1436,7 +1419,7 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    signed_gap_junction(input_cell, postsynaptic_neuron)
+                    gap_junction(input_cell, postsynaptic_neuron)
                 } else {
                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
