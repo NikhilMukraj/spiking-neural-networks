@@ -5,12 +5,13 @@ name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
 
 name = @{ name_characters ~ (name_characters | integer)* }
 
-args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
+args = {
+    (expr | function | name | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","?
+}
 function = { name ~ ("(" ~ args ~ ")") }
-empty_function = { name ~ "()" }
 
 unary_minus = { "-" }
-primary = _{ empty_function | function | number | name | "(" ~ expr ~ ")" }
+primary = _{ function | number | name | "(" ~ expr ~ ")" }
 
 atom = _{ unary_minus? ~ primary }
 
