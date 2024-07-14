@@ -41,7 +41,7 @@ use spiking_neural_networks::{
         iterate_and_spike::{
             IterateAndSpike, weight_neurotransmitter_concentration,
         },
-        signed_gap_junction,
+        gap_junction,
     }
 };
 
@@ -76,7 +76,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
             let input_current = input_current * pre_gaussian_factor;
             // calculates electrical input current to postsynaptic neuron
             let post_current = if electrical_synapse {
-                signed_gap_junction(
+                gap_junction(
                     &*presynaptic_neuron,
                     &*postsynaptic_neuron,
                 ) * post_gaussian_factor
@@ -99,7 +99,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     } else {
             // calculates input current to postsynaptic neuron
         let post_current = if electrical_synapse {
-                signed_gap_junction(
+                gap_junction(
                     &*presynaptic_neuron,
                     &*postsynaptic_neuron,
                 )
@@ -142,7 +142,7 @@ use spiking_neural_networks::{
             IterateAndSpike, weight_neurotransmitter_concentration,
         },
         spike_train::SpikeTrain,
-        spike_train_gap_juncton, signed_gap_junction,
+        spike_train_gap_juncton, gap_junction,
     }
 };
 
@@ -202,7 +202,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
             ) * pre_gaussian_factor;
 
             // input from presynaptic neuron to postsynaptic
-            let post_current = signed_gap_junction(
+            let post_current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             ) * post_gaussian_factor;
@@ -243,7 +243,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
             );
 
             // input from presynaptic neuron to postsynaptic
-            let current = signed_gap_junction(
+            let current = gap_junction(
                 &*presynaptic_neuron,
                 &*postsynaptic_neuron,
             );
@@ -306,7 +306,7 @@ use crate::spiking_neural_networks::{
             ApproximateNeurotransmitter, ApproximateReceptor,
             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
         },
-        update_weight_stdp, signed_gap_junction,
+        update_weight_stdp, gap_junction,
     },
     distribution::limited_distr,
 };
@@ -407,7 +407,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         let calculated_current: f32 = if electrical_synapse { 
             (0..n).map(
                     |i| {
-                        let output = weights[i] * signed_gap_junction(
+                        let output = weights[i] * gap_junction(
                             &presynaptic_neurons[i], 
                             &*postsynaptic_neuron
                         );
@@ -501,8 +501,8 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 ```rust
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
-    STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+    GaussianFactor, GaussianParameters, IsSpiking, STDPParameters, 
+    STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -646,8 +646,6 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub was_increasing: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Potentiation type of neuron
-    pub potentiation_type: PotentiationType,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
