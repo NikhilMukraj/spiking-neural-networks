@@ -1,0 +1,42 @@
+integer = @{ ASCII_DIGIT+ }
+decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
+number = @{ decimal | integer }
+name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
+
+name = @{ name_characters ~ (name_characters | integer)* }
+
+args = { ((expr | function | name | number)) ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","? }
+function = { name ~ ("(" ~ args ~ ")") }
+empty_function = { name ~ "()" }
+
+unary_minus = { "-" }
+primary = _{ empty_function | function | number | name | "(" ~ expr ~ ")" }
+
+atom = _{ unary_minus? ~ primary }
+
+bin_op = _{ add | subtract | multiply | divide | power }
+	add = { "+" }
+	subtract = { "-" }
+	multiply = { "*" }
+	divide = { "/" }
+	power = { "^" }
+
+expr = { atom ~ (bin_op ~ atom)* }
+
+equation = _{ SOI ~ expr ~ EOI }
+
+// statement types
+// diff_eq_declaration = { "d" ~ name ~ "/dt" ~ " "* ~ "=" ~ " "* }
+// diff_eq = { diff_eq_declaration ~ expr }
+//
+// eq_declaration = { name ~ " "* ~ "=" ~ " "* }
+// eq = _{ SOI ~ eq_declaration ~ expr ~ EOI }
+//
+// func_declaration = _{ name ~ "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" ~ " "* ~ "=" ~ " "* }
+// func = _{ SOI ~ func_declaration ~ expr ~ EOI }
+//
+// declaration = _{ ( diff_eq | eq | func ) }
+// program = _{ SOI ~ diff_eq_declaration ~ expr ~ EOI }
+
+WHITESPACE = _{ " " }
+
