@@ -953,8 +953,8 @@ pub trait STDP: LastFiringTime {
 /// ```rust
 /// use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 /// use spiking_neural_networks::neuron::iterate_and_spike::{
-///     GaussianFactor, GaussianParameters, Potentiation, PotentiationType, IsSpiking,
-///     STDPParameters, STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+///     GaussianFactor, GaussianParameters, IsSpiking, STDPParameters, 
+///     STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
 ///     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 ///     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -993,8 +993,6 @@ pub trait STDP: LastFiringTime {
 ///     pub is_spiking: bool,
 ///     /// Last timestep the neuron has spiked
 ///     pub last_firing_time: Option<usize>,
-///     /// Potentiation type of neuron
-///     pub potentiation_type: PotentiationType,
 ///     /// STDP parameters
 ///     pub stdp_params: STDPParameters,
 ///     /// Parameters used in generating noise
