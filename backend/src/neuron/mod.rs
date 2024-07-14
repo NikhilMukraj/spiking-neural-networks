@@ -28,9 +28,8 @@ use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime,
-    Potentiation, PotentiationType, STDP, NeurotransmitterConcentrations, 
-    NeurotransmitterType, Neurotransmitters, aggregate_neurotransmitter_concentrations, 
-    weight_neurotransmitter_concentration, 
+    STDP, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, 
+    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
 };
 /// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
@@ -130,7 +129,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 /// Calculates the input to the postsynaptic neuron given a spike train
 /// and the potenation of the spike train as well as the current timestep 
 /// of the simulation
-pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
+pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
     presynaptic_neuron: &T,
     postsynaptic_neuron: &U,
     timestep: usize,
@@ -141,18 +140,13 @@ pub fn spike_train_gap_juncton<T: SpikeTrain + Potentiation, U: GapConductance>(
         return v_resting;
     }
 
-    let sign = match presynaptic_neuron.get_potentiation_type() {
-        PotentiationType::Excitatory => 1.,
-        PotentiationType::Inhibitory => -1.,
-    };
-
     let last_firing_time = presynaptic_neuron.get_last_firing_time().unwrap();
     let refractoriness_function = presynaptic_neuron.get_refractoriness_function();
     let dt = presynaptic_neuron.get_refractoriness_timestep();
     let conductance = postsynaptic_neuron.get_gap_conductance();
     let effect = refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt);
 
-    sign * conductance * effect
+    conductance * effect
 }
 
 /// Calculates one iteration of two coupled neurons where the presynaptic neuron
