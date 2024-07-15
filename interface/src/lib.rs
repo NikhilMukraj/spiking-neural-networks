@@ -8,7 +8,7 @@ use spiking_neural_networks::{
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, GridVoltageHistory, Lattice
 }};
 
 
@@ -519,7 +519,7 @@ impl_repr!(PyPoissonNeuron, model);
 #[pymethods]
 impl PyPoissonNeuron {
     #[new]
-    #[pyo3(signature = (current_voltage, v_th, v_resting, chance_of_firing, refactoriness_dt))]
+    #[pyo3(signature = (current_voltage=0., v_th=30., v_resting=0., chance_of_firing=0.01, refactoriness_dt=0.1))]
     fn new(
         current_voltage: f32, v_th: f32, v_resting: f32, chance_of_firing: f32, refactoriness_dt: f32
     ) -> Self {
@@ -537,16 +537,20 @@ impl PyPoissonNeuron {
         }
     }
 
+    fn iterate(&mut self) -> bool {
+        self.model.iterate()
+    }
+
     fn get_refractoriness(&self) -> PyDeltaDiracRefractoriness {
-        self.model.neural_refractoriness
+        PyDeltaDiracRefractoriness { refractoriness: self.model.neural_refractoriness }
     }
 
     fn set_refractoriness(&mut self, refractoriness: PyDeltaDiracRefractoriness) {
-        self.model.neural_refractoriness = refractoriness;
+        self.model.neural_refractoriness = refractoriness.refractoriness;
     }
 
     fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
-        PyApproximateNeurotransmitters { neurotransmitters: self.model.get_neurotransmitters().clone() }
+        PyApproximateNeurotransmitters { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
     }
 
     fn set_neurotransmitters(&mut self, neurotransmitters: PyApproximateNeurotransmitters) {
