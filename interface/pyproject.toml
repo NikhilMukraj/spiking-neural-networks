@@ -3,7 +3,7 @@ requires = ["maturin>=1.6,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "oxidized_neural_networks"
+name = "lixirnet"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Rust",
