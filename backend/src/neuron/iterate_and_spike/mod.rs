@@ -1031,17 +1031,6 @@ pub trait STDP: LastFiringTime {
 /// }
 /// 
 /// impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for QuadraticIntegrateAndFireNeuron<T, R> {
-///     type T = T;
-///     type R = R;
-/// 
-///     fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
-///         &self.ligand_gates
-///     }
-/// 
-///     fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
-///         &self.synaptic_neurotransmitters
-///     }
-/// 
 ///     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
 ///         self.synaptic_neurotransmitters.get_concentrations()
 ///     }
@@ -1078,23 +1067,14 @@ pub trait STDP: LastFiringTime {
 /// ```
 pub trait IterateAndSpike: 
 Clone + CurrentVoltage + GapConductance + GaussianFactor + IsSpiking + STDP + Send + Sync {
-    /// Type of neurotransmitter kinetics to use
-    type T: NeurotransmitterKinetics;
-    /// Type of receptor kinetics to use
-    type R: ReceptorKinetics;
     /// Takes in an input current and returns whether the model is spiking
     /// after the membrane potential is updated
     fn iterate_and_spike(&mut self, input_current: f32) -> bool;
-    /// Returns the ligand gated channels of the neuron
-    fn get_ligand_gates(&self) -> &LigandGatedChannels<Self::R>;
-    /// Returns the neurotransmitters of the neuron
-    fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     /// Gets the neurotransmitter concentrations of the neuron (mM)
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Takes in an input current and neurotransmitter input and returns whether the model
     /// is spiking after the membrane potential is updated, neurotransmitter input updates
-    /// receptor gating values based on the associated neurotransmitter concentration which will be 
-    /// applied to the [`LigandGatedChannel`] of the same [`NeurotransmitterType`], 
+    /// receptor currents based on the associated neurotransmitter concentration,
     /// the current from the receptors is also factored into the change in membrane potential
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
