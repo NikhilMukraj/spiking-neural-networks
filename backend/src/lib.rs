@@ -694,17 +694,6 @@
 //! }
 //! 
 //! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
-//!     type T = T;
-//!     type R = R;
-//! 
-//!     fn get_ligand_gates(&self) -> &LigandGatedChannels<Self::R> {
-//!         &self.ligand_gates
-//!     }
-//! 
-//!     fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T> {
-//!         &self.synaptic_neurotransmitters
-//!     }
-//! 
 //!     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
 //!         self.synaptic_neurotransmitters.get_concentrations()
 //!     }
