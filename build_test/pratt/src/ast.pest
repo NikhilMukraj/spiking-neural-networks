@@ -24,7 +24,7 @@ bin_op = _{ add | subtract | multiply | divide | power }
 
 expr = { atom ~ (bin_op ~ atom)* }
 
-equation = _{ SOI ~ expr ~ EOI }
+equation = _{ SOI ~ name ~ " "* ~ "=" ~ " "* ~ expr ~ EOI }
 
 // statement types
 // diff_eq_declaration = { "d" ~ name ~ "/dt" ~ " "* ~ "=" ~ " "* }
