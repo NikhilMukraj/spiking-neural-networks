@@ -80,7 +80,6 @@ impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_
 
 /// Handles spike train dynamics
 pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone {
-    type T: NeurotransmitterKinetics;
     type U: NeuralRefractoriness;
     /// Updates spike train
     fn iterate(&mut self) -> bool;
@@ -88,8 +87,6 @@ pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone {
     fn get_height(&self) -> (f32, f32);
     /// Gets timestep or `dt` (ms)
     fn get_refractoriness_timestep(&self) -> f32;
-    /// Returns neurotransmitters
-    fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T>;
     /// Returns neurotransmitter concentrations
     fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32>;
     /// Returns refractoriness dynamics
@@ -143,7 +140,6 @@ pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
 
 macro_rules! impl_default_spike_train_methods {
     () => {
-        type T = T;
         type U = U;
 
         fn get_height(&self) -> (f32, f32) {
@@ -152,10 +148,6 @@ macro_rules! impl_default_spike_train_methods {
     
         fn get_refractoriness_timestep(&self) -> f32 {
             self.refractoriness_dt
-        }
-    
-        fn get_neurotransmitters(&self) -> &Neurotransmitters<Self::T> {
-            &self.synaptic_neurotransmitters
         }
     
         fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32> {
