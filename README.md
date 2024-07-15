@@ -169,6 +169,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 ### Classifier/Regression Model Notes
 
 - Potential refactor of STDP to a plasticity trait that, given the last time of firing for two neurons and the current timestep, calculates weight change
+  - Plasticity refactor should have boolean method that checks if to apply weight update instead of only doing it on whether neuron is spiking
   - Triplet STDP
   - External reward could just be multiplied by change in weight for reward modulated plasticity
   - Plasticity rule called at the end of each `iterate_and_spike`
