@@ -35,10 +35,10 @@ pub enum AST {
         name: String,
         args: Vec<Box<AST>>
     },
-    // Assignment {
-    //     name: String,
-    //     expr: Box<AST>,
-    // }
+    Assignment {
+        name: String,
+        expr: Box<AST>,
+    }
 }
 
 // then try writing rust code from ast
@@ -87,6 +87,34 @@ pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
         .parse(pairs)
 }
 
+// fn parse_declaration(pair: Pair<Rule>) -> AST {
+//     match pair.as_rule() {
+//         Rule::diff_eq_declaration => {
+//             AST::DiffEqAssignment {
+//                 name: String::from(pairs.next().unwrap().as_str()),
+//                 expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
+//             }
+//         },
+//         Rule::eq_declaration => {
+//             AST::EqAssignment {
+//                 name: String::from(pairs.next().unwrap().as_str()),
+//                 expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
+//             }
+//         },
+//         // Rule::func_declaration => {
+//         //     AST::FunctionAssignment {
+//         //         name: String::from(pairs.next().unwrap().as_str()),
+//         //         args: pairs.next()
+//         //             .expect("No arguments found")
+//         //             .into_inner()
+//         //             .map(|i| Box::new(parse_ast(i.into_inner())))
+//         //             .collect(),
+//         //         expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
+//         //     }
+//         // }
+//     }
+// }
+
 #[derive(Debug)]
 pub enum Op {
     Add,
@@ -121,6 +149,9 @@ impl AST {
                         .join(", ")
                     )
             },
+            AST::Assignment { name, expr } => {
+                format!("{} = {}", name, expr.to_string())
+            }
             // AST::DiffEq { variable, rhs } => {
             //     format!("d{}/dt = {}", variable, rhs.to_string())
             // },
@@ -154,7 +185,12 @@ fn main() -> io::Result<()> {
 
         match ASTParser::parse(Rule::equation, &line) { // Rule::declaration?
             Ok(mut pairs) => {
-                let current_ast = parse_ast(pairs.next().unwrap().into_inner());
+                // parse declaration from rule
+
+                let current_ast = AST::Assignment {
+                    name: String::from(pairs.next().unwrap().as_str()),
+                    expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
+                };
                 println!(
                     "Parsed: {:#?}\nString: {}",
                     current_ast,
