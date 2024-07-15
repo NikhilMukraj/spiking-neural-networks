@@ -1,12 +1,14 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::PyKeyError, types::{PyList, PyTuple, PyDict}, prelude::*};
-use spiking_neural_networks::{graph::{AdjacencyMatrix, Graph}, neuron::{
+use spiking_neural_networks::{
+    graph::{AdjacencyMatrix, Graph}, 
+    neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, GridVoltageHistory, Lattice
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice
 }};
 
 
@@ -468,6 +470,90 @@ impl PyIzhikevichNeuron {
     }
 }
 
+#[pyclass]
+#[pyo3(name = "DeltaDiracRefractoriness")]
+#[derive(Clone)]
+pub struct PyDeltaDiracRefractoriness {
+    refractoriness: DeltaDiracRefractoriness,
+}
+
+implement_basic_getter_and_setter!(
+    PyDeltaDiracRefractoriness, 
+    refractoriness,
+    k, get_k, set_k
+);
+
+#[pymethods]
+impl PyDeltaDiracRefractoriness {
+    #[new]
+    fn new(k: f32) -> Self {
+        PyDeltaDiracRefractoriness {
+            refractoriness: DeltaDiracRefractoriness { k: k }
+        }
+    }
+
+    fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {
+        self.refractoriness.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "PoissonNeuron")]
+#[derive(Clone)]
+pub struct PyPoissonNeuron {
+    model: PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+}
+
+implement_basic_getter_and_setter!(
+    PyPoissonNeuron, 
+    model,
+    current_voltage, get_current_voltage, set_current_voltage,
+    v_th, get_v_th, set_v_th,
+    v_resting, get_v_resting, set_v_resting,
+    chance_of_firing, get_chance_of_firing, set_chance_of_firing,
+    refractoriness_dt, get_refractoriness_dt, set_refractoriness_dt
+);
+
+impl_repr!(PyPoissonNeuron, model);
+
+#[pymethods]
+impl PyPoissonNeuron {
+    #[new]
+    #[pyo3(signature = (current_voltage, v_th, v_resting, chance_of_firing, refactoriness_dt))]
+    fn new(
+        current_voltage: f32, v_th: f32, v_resting: f32, chance_of_firing: f32, refactoriness_dt: f32
+    ) -> Self {
+        PyPoissonNeuron {
+            model: PoissonNeuron { 
+                current_voltage: current_voltage, 
+                v_th: v_th, 
+                v_resting: v_resting, 
+                last_firing_time: None, 
+                synaptic_neurotransmitters: Neurotransmitters::default(), 
+                neural_refractoriness: DeltaDiracRefractoriness::default(), 
+                chance_of_firing: chance_of_firing, 
+                refractoriness_dt: refactoriness_dt, 
+            }
+        }
+    }
+
+    fn get_refractoriness(&self) -> PyDeltaDiracRefractoriness {
+        self.model.neural_refractoriness
+    }
+
+    fn set_refractoriness(&mut self, refractoriness: PyDeltaDiracRefractoriness) {
+        self.model.neural_refractoriness = refractoriness;
+    }
+
+    fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
+        PyApproximateNeurotransmitters { neurotransmitters: self.model.get_neurotransmitters().clone() }
+    }
+
+    fn set_neurotransmitters(&mut self, neurotransmitters: PyApproximateNeurotransmitters) {
+        self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
+    }
+}
+
 // eventually use macro to generate lattices for each neuronal type
 // could have user precompile or dynamically dispatch neuron lattice type
 // depending on user input and wrap relevant functions
@@ -596,7 +682,15 @@ impl PyIzhikevichLattice {
 }
 
 // #[pyclass]
+// #[pyo3(name = "PoissonLattice")]
+// #[derive(Clone)]
+// pub struct PyPoissonLattice {
+//     lattice: SpikeTrainLattice<>
+// }
+
+// #[pyclass]
 // #[pyo3(name = "IzhikevichNetwork")]
+// #[derive(Clone)]
 // pub struct PyIzhikevichNetwork {
 //     network: LatticeNetwork<LatticeNeuron, >
 // }
@@ -610,6 +704,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyApproximateLigandGatedChannels>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
     m.add_class::<PyIzhikevichLattice>()?;
+    m.add_class::<PyDeltaDiracRefractoriness>()?;
+    m.add_class::<PyPoissonNeuron>()?;
+    // m.add_class::<PyPoissonLattice>()?;
     // m.add_class::<PyIzhikevichNetwork>()?;
 
     Ok(())
