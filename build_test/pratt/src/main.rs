@@ -39,6 +39,11 @@ pub enum AST {
         name: String,
         expr: Box<AST>,
     }
+    // FunctionAssignment {
+    //     name: String,
+    //     args: String,
+    //     expr: Box<AST>,
+    // }
 }
 
 // then try writing rust code from ast
