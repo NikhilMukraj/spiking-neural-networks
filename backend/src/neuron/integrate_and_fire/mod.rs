@@ -38,18 +38,7 @@ pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
 }
 
 macro_rules! impl_default_neurotransmitter_methods {
-    () => {
-        type T = T;
-        type R = R;
-
-        fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
-            &self.ligand_gates
-        }
-    
-        fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
-            &self.synaptic_neurotransmitters
-        }
-    
+    () => {    
         fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
             self.synaptic_neurotransmitters.get_concentrations()
         }
