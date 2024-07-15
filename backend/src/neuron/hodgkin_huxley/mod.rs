@@ -257,9 +257,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T, R> {
-    type T = T;
-    type R = R;
-
     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate(input_current);
@@ -272,14 +269,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
         self.was_increasing = increasing_right_now;
 
         is_spiking
-    }
-
-    fn get_ligand_gates(&self) -> &LigandGatedChannels<R> {
-        &self.ligand_gates
-    }
-
-    fn get_neurotransmitters(&self) -> &Neurotransmitters<T> {
-        &self.synaptic_neurotransmitters
     }
 
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
