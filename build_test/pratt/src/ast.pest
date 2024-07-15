@@ -28,13 +28,10 @@ equation = _{ SOI ~ name ~ " "* ~ "=" ~ " "* ~ expr ~ EOI }
 
 // statement types
 // diff_eq_declaration = { "d" ~ name ~ "/dt" ~ " "* ~ "=" ~ " "* }
-// diff_eq = { diff_eq_declaration ~ expr }
 //
 // eq_declaration = { name ~ " "* ~ "=" ~ " "* }
-// eq = _{ SOI ~ eq_declaration ~ expr ~ EOI }
 //
 // func_declaration = _{ name ~ "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" ~ " "* ~ "=" ~ " "* }
-// func = _{ SOI ~ func_declaration ~ expr ~ EOI }
 //
 // declaration = _{ ( diff_eq | eq | func ) }
 // program = _{ SOI ~ diff_eq_declaration ~ expr ~ EOI }
