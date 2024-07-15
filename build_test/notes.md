@@ -8,3 +8,8 @@
       - f(x) = ?
       - dv/dt = ?
   - for non expressions use regular rule matching as seen in j lang example
+  - neuron
+  - ion channel
+  - neurotransmitter kinetics
+  - receptor kinetics
+  - spike train
