@@ -713,5 +713,10 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_class::<PyPoissonLattice>()?;
     // m.add_class::<PyIzhikevichNetwork>()?;
 
+    // add reset timing methods
+    // and history methods
+    // view weights
+    // run lattice methods
+
     Ok(())
 }
