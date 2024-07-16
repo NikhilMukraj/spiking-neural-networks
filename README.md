@@ -170,6 +170,11 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - Potential refactor of STDP to a plasticity trait that, given the last time of firing for two neurons and the current timestep, calculates weight change
   - Plasticity refactor should have boolean method that checks if to apply weight update instead of only doing it on whether neuron is spiking
+    - Could have `.update_weight(&self, other_neuron: T) -> f32` instead of a seperate `update_weight` function
+    - Could have similar system instead of gap junction
+  - Plasticity could require ::update_weight as associated method, lattice takes in update_weight, args are iterateandspike type + spike train type in lattice field or just the plasticity type, in trait args are associated type N, default method uses that associated method, or could use .update_weight(presynaptic)
+  - Neuron model lang should have to option to make kinetics and plasticity a trait or a specific implementation
+  - For some connections being plastic and some others not being plastic, this could be checked in update weight function or update weight condition, same with some being reward modulated and others not being so
   - Triplet STDP
   - External reward could just be multiplied by change in weight for reward modulated plasticity
   - Plasticity rule called at the end of each `iterate_and_spike`
