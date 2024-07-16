@@ -31,7 +31,8 @@ equation = _{ SOI ~ name ~ " "* ~ "=" ~ " "* ~ expr ~ EOI }
 //
 // eq_declaration = { name ~ " "* ~ "=" ~ " "* }
 //
-// func_declaration = _{ name ~ "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" ~ " "* ~ "=" ~ " "* }
+// func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
+// func_declaration = _{ name ~ func_declaration_args ~ " "* ~ "=" ~ " "* }
 //
 // declaration = _{ ( diff_eq | eq | func ) }
 // program = _{ SOI ~ diff_eq_declaration ~ expr ~ EOI }
