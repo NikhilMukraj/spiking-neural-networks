@@ -1,5 +1,5 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
-use pyo3::{exceptions::PyKeyError, types::{PyList, PyTuple, PyDict}, prelude::*};
+use pyo3::{exceptions::PyKeyError, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
     graph::{AdjacencyMatrix, Graph}, 
     neuron::{
@@ -8,7 +8,7 @@ use spiking_neural_networks::{
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, GridVoltageHistory, Lattice
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, GridVoltageHistory, Lattice, SpikeTrainGridHistory, SpikeTrainLattice
 }};
 
 
@@ -615,10 +615,12 @@ impl PyIzhikevichLattice {
         self.lattice.graph.get_every_node()
     }
 
+    #[getter]
     fn get_id(&self) -> usize {
         self.lattice.get_id()
     }
 
+    #[setter]
     fn set_id(&mut self, id: usize) {
         self.lattice.set_id(id)
     }
@@ -683,14 +685,151 @@ impl PyIzhikevichLattice {
             ),
         }
     }
+
+    fn reset_timing(&mut self) {
+        self.lattice.reset_timing();
+    }
+
+    fn run_lattice(&mut self, iterations: usize) -> PyResult<()> {
+        match self.lattice.run_lattice(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
+    fn run_lattice_chemical_synapse_only(&mut self, iterations: usize) -> PyResult<()> {
+        match self.lattice.run_lattice_chemical_synapses_only(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
+    fn run_lattice_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
+        match self.lattice.run_lattice_with_electrical_and_chemical_synapses(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
+    #[getter]
+    fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
+        self.lattice.grid_history.history.clone()
+    }
+
+    #[getter]
+    fn get_update_grid_history(&self) -> bool {
+        self.lattice.update_grid_history
+    }
+
+    #[setter]
+    fn set_update_grid_history(&mut self, flag: bool) {
+        self.lattice.update_grid_history = flag;
+    }
+
+    #[getter]
+    fn get_weights(&self) -> Vec<Vec<f32>> {
+        self.lattice.graph.matrix.clone()
+            .into_iter()
+            .map(|inner_vec| {
+                inner_vec.into_iter()
+                    .map(|opt| opt.unwrap_or(0.))
+                    .collect()
+            })
+            .collect()
+    }
 }
 
-// #[pyclass]
-// #[pyo3(name = "PoissonLattice")]
-// #[derive(Clone)]
-// pub struct PyPoissonLattice {
-//     lattice: SpikeTrainLattice<>
-// }
+#[pyclass]
+#[pyo3(name = "PoissonLattice")]
+#[derive(Clone)]
+pub struct PyPoissonLattice {
+    lattice: SpikeTrainLattice<
+        PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+        SpikeTrainGridHistory
+    >
+}
+
+#[pymethods]
+impl PyPoissonLattice {
+    #[new]
+    fn new() -> Self {
+        PyPoissonLattice { lattice: SpikeTrainLattice::default() }
+    }
+
+    fn populate(&mut self, neuron: PyPoissonNeuron, num_rows: usize, num_cols: usize) {
+        self.lattice.populate(&neuron.model, num_rows, num_cols);
+    }
+
+    #[getter]
+    fn get_id(&self) -> usize {
+        self.lattice.get_id()
+    }
+
+    #[setter]
+    fn set_id(&mut self, id: usize) {
+        self.lattice.set_id(id)
+    }
+
+    fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyPoissonNeuron> {
+        let neuron = match self.lattice.cell_grid.get(row) {
+            Some(row_cells) => match row_cells.get(col) {
+                Some(neuron) => neuron.clone(),
+                None => {
+                    return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                }
+            },
+            None => {
+                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+            }
+        };
+
+        Ok(
+            PyPoissonNeuron { 
+                model: neuron
+            }
+        )
+    }
+
+    fn set_neuron(&mut self, row: usize, col: usize, neuron: PyPoissonNeuron) -> PyResult<()> {
+        let row_cells = match self.lattice.cell_grid.get_mut(row) {
+            Some(row_cells) => row_cells,
+            None => {
+                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+            }
+        };
+
+        if let Some(existing_neuron) = row_cells.get_mut(col) {
+            *existing_neuron = neuron.model.clone();
+
+            Ok(())
+        } else {
+            Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+        }
+    }
+
+    fn reset_timing(&mut self) {
+        self.lattice.reset_timing();
+    }
+
+    fn run_lattice(&mut self, iterations: usize) {
+        self.lattice.run_lattice(iterations);
+    }
+
+    #[getter]
+    fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
+        self.lattice.grid_history.history.clone()
+    }
+
+    #[getter]
+    fn get_update_grid_history(&self) -> bool {
+        self.lattice.update_grid_history
+    }
+
+    #[setter]
+    fn set_update_grid_history(&mut self, flag: bool) {
+        self.lattice.update_grid_history = flag;
+    }
+}
 
 // #[pyclass]
 // #[pyo3(name = "IzhikevichNetwork")]
@@ -710,13 +849,11 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyIzhikevichLattice>()?;
     m.add_class::<PyDeltaDiracRefractoriness>()?;
     m.add_class::<PyPoissonNeuron>()?;
-    // m.add_class::<PyPoissonLattice>()?;
+    m.add_class::<PyPoissonLattice>()?;
     // m.add_class::<PyIzhikevichNetwork>()?;
 
-    // add reset timing methods
-    // and history methods
-    // view weights
-    // run lattice methods
+    // view weights (as matrix probably)
+    // __repr__
 
     Ok(())
 }
