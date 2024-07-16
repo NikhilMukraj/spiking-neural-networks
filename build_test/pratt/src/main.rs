@@ -38,21 +38,25 @@ pub enum AST {
     Assignment {
         name: String,
         expr: Box<AST>,
+    },
+    DiffEqAssignment {
+        name: String,
+        expr: Box<AST>,
+    },
+    FunctionAssignment {
+        name: String,
+        args: Vec<Box<AST>>,
+        expr: Box<AST>,
     }
-    // FunctionAssignment {
-    //     name: String,
-    //     args: String,
-    //     expr: Box<AST>,
-    // }
 }
 
 // then try writing rust code from ast
-pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
+pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => AST::Name(String::from(primary.as_str())),
-            Rule::expr => parse_ast(primary.into_inner()),
+            Rule::expr => parse_expr(primary.into_inner()),
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
 
@@ -63,7 +67,7 @@ pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
                 let args: Vec<Box<AST>> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(parse_ast(i.into_inner())))
+                    .map(|i| Box::new(parse_expr(i.into_inner())))
                     .collect();
                 
                 AST::Function { name: name, args: args }
@@ -91,34 +95,6 @@ pub fn parse_ast(pairs: Pairs<Rule>) -> AST {
         })
         .parse(pairs)
 }
-
-// fn parse_declaration(pair: Pair<Rule>) -> AST {
-//     match pair.as_rule() {
-//         Rule::diff_eq_declaration => {
-//             AST::DiffEqAssignment {
-//                 name: String::from(pairs.next().unwrap().as_str()),
-//                 expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
-//             }
-//         },
-//         Rule::eq_declaration => {
-//             AST::EqAssignment {
-//                 name: String::from(pairs.next().unwrap().as_str()),
-//                 expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
-//             }
-//         },
-//         // Rule::func_declaration => {
-//         //     AST::FunctionAssignment {
-//         //         name: String::from(pairs.next().unwrap().as_str()),
-//         //         args: pairs.next()
-//         //             .expect("No arguments found")
-//         //             .into_inner()
-//         //             .map(|i| Box::new(parse_ast(i.into_inner())))
-//         //             .collect(),
-//         //         expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
-//         //     }
-//         // }
-//     }
-// }
 
 #[derive(Debug)]
 pub enum Op {
@@ -156,11 +132,21 @@ impl AST {
             },
             AST::Assignment { name, expr } => {
                 format!("{} = {}", name, expr.to_string())
-            }
-            // AST::DiffEq { variable, rhs } => {
-            //     format!("d{}/dt = {}", variable, rhs.to_string())
-            // },
-            // AST::DiffEqDeclaration(expr) => expr.to_string(),
+            },
+            AST::DiffEqAssignment { name, expr } => {
+                format!("d{}/dt = {}", name, expr.to_string())
+            },
+            AST::FunctionAssignment{ name, args, expr } =>{
+                format!(
+                    "{}({}) = {}",
+                    name, 
+                    args.iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    expr.to_string(),
+                )
+            },
         }
     }
 }
@@ -190,18 +176,32 @@ fn main() -> io::Result<()> {
 
         match ASTParser::parse(Rule::equation, &line) { // Rule::declaration?
             Ok(mut pairs) => {
-                // parse declaration from rule
+                let pair = pairs.next().unwrap();
 
-                let current_ast = AST::Assignment {
-                    name: String::from(pairs.next().unwrap().as_str()),
-                    expr: Box::new(parse_ast(pairs.next().unwrap().into_inner())),
+                let ast = match pair.as_rule() {
+                    Rule::diff_eq_declaration => {
+                        AST::DiffEqAssignment {
+                            name: String::from(pair.into_inner().as_str()),
+                            expr: Box::new(parse_expr(pairs.next().unwrap().into_inner())),
+                        }
+                    },
+                    Rule::eq_declaration => {
+                        AST::Assignment {
+                            name: String::from(pair.into_inner().as_str()),
+                            expr: Box::new(parse_expr(pairs.next().unwrap().into_inner())),
+                        }
+                    },
+                    // functions
+                    _ => unreachable!("Unexpected declaration"),
                 };
+
                 println!(
                     "Parsed: {:#?}\nString: {}",
-                    current_ast,
-                    current_ast.to_string(),
+                    ast,
+                    ast.to_string(),
                     // after string is generated, any unnecessary parantheses should be dropped
                     // number string should be suffixed with decimal if integer
+                    // checks for recursive definitions
                 );
             }
             Err(e) => {
