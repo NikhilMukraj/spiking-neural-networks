@@ -48,6 +48,8 @@ pub trait Graph: Default {
     fn get_outgoing_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>;
     /// Updates the history of the graph with the current state
     fn update_history(&mut self);
+    /// Resets graph history
+    fn reset_history(&mut self);
 }
 
 pub trait ToGraphPosition {
@@ -209,6 +211,10 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> G
 
     fn update_history(&mut self) {
         self.history.push(self.matrix.clone());
+    }
+
+    fn reset_history(&mut self) {
+        self.history = vec![];
     }
 }
 
@@ -374,6 +380,10 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> G
 
     fn update_history(&mut self) {
         self.history.push(self.incoming_connections.clone());
+    }
+
+    fn reset_history(&mut self) {
+        self.history = vec![];
     }
 }
 
