@@ -48,7 +48,7 @@ impl DiscreteNeuron {
 }
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
-pub struct DiscreteNeuronLattice<T: Graph<T=(usize, usize)>>{
+pub struct DiscreteNeuronLattice<T: Graph<T=(usize, usize), U=f32>>{
     /// 2 dimensional grid of discrete neurons
     pub cell_grid: Vec<Vec<DiscreteNeuron>>,
     /// Internal graph weights, position listed in graph must have a corresponding index
@@ -56,7 +56,7 @@ pub struct DiscreteNeuronLattice<T: Graph<T=(usize, usize)>>{
     pub graph: T,
 }
 
-impl<T: Graph<T=(usize, usize)>> Default for DiscreteNeuronLattice<T> {
+impl<T: Graph<T=(usize, usize), U=f32>> Default for DiscreteNeuronLattice<T> {
     fn default() -> Self {
         DiscreteNeuronLattice {
             cell_grid: vec![],
@@ -65,7 +65,7 @@ impl<T: Graph<T=(usize, usize)>> Default for DiscreteNeuronLattice<T> {
     }
 }
 
-impl<T: Graph<T=(usize, usize)>> DiscreteNeuronLattice<T> {
+impl<T: Graph<T=(usize, usize), U=f32>> DiscreteNeuronLattice<T> {
     /// Generates a lattice with default weights given a number of rows and columns to use
     pub fn generate_lattice_from_dimension(num_rows: usize, num_cols: usize) -> Self {
         let cell_grid: Vec<Vec<DiscreteNeuron>> = (0..num_rows)
@@ -155,7 +155,7 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// Generates weights for a Hopfield network based on a given set of patterns, and 
 /// an id to assign to the graph, assumes the patterns have the same dimensions throughout,
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
-pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
+pub fn generate_hopfield_network<T: Graph<T=(usize, usize), U=f32> + Default>(
     graph_id: usize,
     data: &Vec<Vec<Vec<isize>>>
 ) -> result::Result<T, SpikingNeuralNetworksError> {
@@ -224,7 +224,7 @@ pub fn generate_hopfield_network<T: Graph<T=(usize, usize)> + Default>(
 
                 let current_weight = match weights.lookup_weight(&coming, &going)? {
                     Some(w) => w,
-                    None => 0.
+                    None => 0.,
                 };
 
                 weights.edit_weight(&coming, &going, Some(current_weight + *value as f32))?;
