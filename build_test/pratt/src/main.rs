@@ -35,7 +35,7 @@ pub enum AST {
         name: String,
         args: Vec<Box<AST>>
     },
-    Assignment {
+    EqAssignment {
         name: String,
         expr: Box<AST>,
     },
@@ -45,7 +45,7 @@ pub enum AST {
     },
     FunctionAssignment {
         name: String,
-        args: Vec<Box<AST>>,
+        args: Vec<String>,
         expr: Box<AST>,
     }
 }
@@ -130,7 +130,7 @@ impl AST {
                         .join(", ")
                     )
             },
-            AST::Assignment { name, expr } => {
+            AST::EqAssignment { name, expr } => {
                 format!("{} = {}", name, expr.to_string())
             },
             AST::DiffEqAssignment { name, expr } => {
@@ -186,13 +186,29 @@ fn main() -> io::Result<()> {
                         }
                     },
                     Rule::eq_declaration => {
-                        AST::Assignment {
+                        AST::EqAssignment {
                             name: String::from(pair.into_inner().as_str()),
                             expr: Box::new(parse_expr(pairs.next().unwrap().into_inner())),
                         }
                     },
-                    // functions
-                    _ => unreachable!("Unexpected declaration"),
+                    Rule::func_declaration => {
+                        let mut inner_rules = pair.into_inner();
+                        let name = String::from(inner_rules.next().unwrap().as_str());
+
+                        let args = inner_rules.next().unwrap()
+                            .into_inner()
+                            .map(|arg| String::from(arg.as_str()))
+                            .collect::<Vec<String>>();
+
+                        let expr = Box::new(parse_expr(pairs.next().unwrap().into_inner()));
+
+                        AST::FunctionAssignment {
+                            name,
+                            args,
+                            expr,
+                        }
+                    }
+                    rule => unreachable!("Unexpected declaration, found {:#?}", rule),
                 };
 
                 println!(
