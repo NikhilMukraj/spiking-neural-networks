@@ -8,7 +8,9 @@ use spiking_neural_networks::{
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, GridVoltageHistory, Lattice, SpikeTrainGridHistory, SpikeTrainLattice
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, 
+    GridVoltageHistory, Lattice, LatticeHistory, SpikeTrainGridHistory, 
+    SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -727,6 +729,20 @@ impl PyIzhikevichLattice {
     }
 
     #[getter]
+    fn get_do_stdp(&self) -> bool {
+        self.lattice.update_grid_history
+    }
+
+    #[setter]
+    fn set_do_stdp(&mut self, flag: bool) {
+        self.lattice.do_stdp = flag;
+    }
+
+    fn reset_history(&mut self) {
+        self.lattice.grid_history.reset();
+    }
+
+    #[getter]
     fn get_weights(&self) -> Vec<Vec<f32>> {
         self.lattice.graph.matrix.clone()
             .into_iter()
@@ -736,6 +752,21 @@ impl PyIzhikevichLattice {
                     .collect()
             })
             .collect()
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let rows = self.lattice.cell_grid.len();
+        let cols = self.lattice.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+        Ok(
+            format!(
+                "IzhikevichLattice {{ ({}x{}), do_stdp: {}, update_grid_history: {} }}", 
+                rows,
+                cols,
+                self.lattice.do_stdp,
+                self.lattice.update_grid_history,
+            )
+        )
     }
 }
 
@@ -811,6 +842,10 @@ impl PyPoissonLattice {
         self.lattice.reset_timing();
     }
 
+    fn reset_history(&mut self) {
+        self.lattice.grid_history.reset();
+    }
+
     fn run_lattice(&mut self, iterations: usize) {
         self.lattice.run_lattice(iterations);
     }
@@ -828,6 +863,20 @@ impl PyPoissonLattice {
     #[setter]
     fn set_update_grid_history(&mut self, flag: bool) {
         self.lattice.update_grid_history = flag;
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let rows = self.lattice.cell_grid.len();
+        let cols = self.lattice.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+        Ok(
+            format!(
+                "PoissonLattice {{ ({}x{}), update_grid_history: {} }}", 
+                rows,
+                cols,
+                self.lattice.update_grid_history,
+            )
+        )
     }
 }
 
@@ -851,10 +900,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPoissonNeuron>()?;
     m.add_class::<PyPoissonLattice>()?;
     // m.add_class::<PyIzhikevichNetwork>()?;
-
-    // view weights (as matrix probably)
-    // do_stdp flag
+    
     // __repr__ for lattices and network
+    // eventually work with graph history
 
     Ok(())
 }
