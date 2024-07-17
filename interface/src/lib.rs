@@ -853,7 +853,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // m.add_class::<PyIzhikevichNetwork>()?;
 
     // view weights (as matrix probably)
-    // __repr__
+    // do_stdp flag
+    // __repr__ for lattices and network
 
     Ok(())
 }
