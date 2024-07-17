@@ -73,7 +73,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 - **Integrate and fire split**
   - Write code changes in obsidian
-  - Hindmarsh-Rose
 
 - **Cargo package**
   - **Receptor kinetics refactor** (do this first so its less work refactoring later)
@@ -102,7 +101,6 @@ EEG processing with fourier transforms, and power spectral density calculations
   - **Hodgkin Huxley model should refactor additional gates enum into a trait**
     - Could have an example with integrate and fire neuron that has an additional gate
   - Note that `IterateAndSpike` trait as it stands currently only accounts for point neurons, neurons with spatial dimensions would need gap junction to be modified in a manner that accounts for where the synapse accounts to know which voltage to use in the calculation
-  - **Hindmarsh-Rose model**
   - **Documentation revamp**
     - [how to write documentation](https://blog.guillaume-gomez.fr/articles/2020-03-12+Guide+on+how+to+write+documentation+for+a+Rust+crate)
     - Update obsidian code and equations accordingly
@@ -145,6 +143,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Reward calculation
   - Dopamine calculation
   - Reward function is passed to `run_lattice`/`run_lattices` method to calculate weight changes
+  - Reward modulated lattice and reward modulated network (two connecting graphs one reward modulated one not modulated by reward, should have option to add non reward modulated lattices)
 
 - Use Rayon to thread lattice calculations
   - Inputs should be calculated in parallel
