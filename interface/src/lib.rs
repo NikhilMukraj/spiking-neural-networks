@@ -1,16 +1,14 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::PyKeyError, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
-    graph::{AdjacencyMatrix, Graph}, 
+    graph::{AdjacencyMatrix, Graph, GraphPosition}, 
     neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, 
-    GridVoltageHistory, Lattice, LatticeHistory, SpikeTrainGridHistory, 
-    SpikeTrainLattice, SpikeTrainLatticeHistory
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -770,12 +768,14 @@ impl PyIzhikevichLattice {
     }
 }
 
+type LatticeSpikeTrain = PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
+
 #[pyclass]
 #[pyo3(name = "PoissonLattice")]
 #[derive(Clone)]
 pub struct PyPoissonLattice {
     lattice: SpikeTrainLattice<
-        PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+        LatticeSpikeTrain,
         SpikeTrainGridHistory
     >
 }
@@ -884,7 +884,14 @@ impl PyPoissonLattice {
 // #[pyo3(name = "IzhikevichNetwork")]
 // #[derive(Clone)]
 // pub struct PyIzhikevichNetwork {
-//     network: LatticeNetwork<LatticeNeuron, >
+//     network: LatticeNetwork<
+//         LatticeNeuron, 
+//         AdjacencyMatrix<(usize, usize)>, 
+//         GridVoltageHistory, 
+//         LatticeSpikeTrain,
+//         SpikeTrainGridHistory,
+//         AdjacencyMatrix<GraphPosition>
+//     >
 // }
 
 #[pymodule]
