@@ -24,6 +24,7 @@ pub struct GraphPosition {
 /// Implementation of a basic graph
 pub trait Graph: Default {
     type T: Debug + Hash + Eq + PartialEq + Clone + Copy;
+    type U: Debug + Clone + Copy;
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
@@ -37,10 +38,10 @@ pub trait Graph: Default {
     fn get_every_node_as_ref(&self) -> HashSet<&Self::T>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
-    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<f32>, GraphError>; 
+    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<Self::U>, GraphError>; 
     /// Edits the weight between two neurons, errors if the positions are not in the graph,
-    /// `None` represents no connection while `Some(f32)` represents some weight
-    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<f32>) -> Result<(), GraphError>;
+    /// `None` represents no connection while `Some(U)` represents some weight
+    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<Self::U>) -> Result<(), GraphError>;
     /// Returns all presynaptic connections if the position is in the graph
     fn get_incoming_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>; 
     /// Returns all postsynaptic connections if the position is in the graph
@@ -53,12 +54,12 @@ pub trait ToGraphPosition {
     type GraphPos: Graph<T = GraphPosition>;
 }
 
-impl ToGraphPosition for AdjacencyMatrix<Position> {
-    type GraphPos = AdjacencyMatrix<GraphPosition>;
+impl<U: Debug + Clone + Copy> ToGraphPosition for AdjacencyMatrix<Position, U> {
+    type GraphPos = AdjacencyMatrix<GraphPosition, U>;
 }
 
-impl ToGraphPosition for AdjacencyList<Position> {
-    type GraphPos = AdjacencyMatrix<GraphPosition>;
+impl<U: Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Position, U> {
+    type GraphPos = AdjacencyMatrix<GraphPosition, U>;
 }
 
 /// A graph implemented as an adjacency matrix where the positions of each node
@@ -70,7 +71,7 @@ impl ToGraphPosition for AdjacencyList<Position> {
 /// use spiking_neural_networks::graph::{Graph, AdjacencyMatrix};
 /// 
 /// 
-/// let mut adjacency_matrix = AdjacencyMatrix::<(usize, usize)>::default();
+/// let mut adjacency_matrix = AdjacencyMatrix::<(usize, usize), f32>::default();
 /// adjacency_matrix.add_node((0, 0));
 /// adjacency_matrix.add_node((0, 1));
 /// adjacency_matrix.add_node((1, 2));
@@ -91,27 +92,28 @@ impl ToGraphPosition for AdjacencyList<Position> {
 /// assert!(adjacency_matrix.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
 #[derive(Clone, Debug)]
-pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy> {
+pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> {
     /// Converts position to a index for the matrix
     pub position_to_index: HashMap<T, usize>,
     /// Converts the index back to a position
     pub index_to_position: HashMap<usize, T>,
     /// Matrix of weights
-    pub matrix: Vec<Vec<Option<f32>>>,
+    pub matrix: Vec<Vec<Option<U>>>,
     /// History of matrix weights
-    pub history: Vec<Vec<Vec<Option<f32>>>>,
+    pub history: Vec<Vec<Vec<Option<U>>>>,
     /// Identifier
     pub id: usize,
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> AdjacencyMatrix<T> {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> AdjacencyMatrix<T, U> {
     pub fn nodes_len(&self) -> usize {
         self.position_to_index.len()
     }
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<T> {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Graph for AdjacencyMatrix<T, U> {
     type T = T;
+    type U = U;
 
     fn set_id(&mut self, id: usize) {
         self.id = id;
@@ -149,7 +151,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
         self.position_to_index.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f32>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<U>, GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::PostsynapticNotFound(format!("{:#?}", postsynaptic)));
         }
@@ -160,7 +162,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
         Ok(self.matrix[self.position_to_index[presynaptic]][self.position_to_index[postsynaptic]])
     }
 
-    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f32>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<U>) -> Result<(), GraphError> {
         if !self.position_to_index.contains_key(postsynaptic) {
             return Err(GraphError::PostsynapticNotFound(format!("{:#?}", postsynaptic)));
         }
@@ -210,7 +212,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyMatrix<
     }
 }
 
-impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
+impl<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default for AdjacencyMatrix<T, U> {
     fn default() -> Self {
         AdjacencyMatrix { 
             position_to_index: HashMap::new(), 
@@ -230,7 +232,7 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
 /// use spiking_neural_networks::graph::{Graph, AdjacencyList};
 /// 
 /// 
-/// let mut adjacency_list = AdjacencyList::<(usize, usize)>::default();
+/// let mut adjacency_list = AdjacencyList::<(usize, usize), f32>::default();
 /// adjacency_list.add_node((0, 0));
 /// adjacency_list.add_node((0, 1));
 /// adjacency_list.add_node((1, 2));
@@ -251,19 +253,20 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyMatrix<T> {
 /// assert!(adjacency_list.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
 #[derive(Clone, Debug)]
-pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy> {
+pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> {
     /// All presynaptic connections
-    pub incoming_connections: HashMap<T, HashMap<T, f32>>,
+    pub incoming_connections: HashMap<T, HashMap<T, U>>,
     /// All postsynaptic connections
     pub outgoing_connections: HashMap<T, HashSet<T>>,
     /// History of presynaptic connection weights
-    pub history: Vec<HashMap<T, HashMap<T, f32>>>,
+    pub history: Vec<HashMap<T, HashMap<T, U>>>,
     /// Identifier
     pub id: usize,
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T> {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Graph for AdjacencyList<T, U> {
     type T = T;
+    type U = U;
 
     fn set_id(&mut self, id: usize) {
         self.id = id;
@@ -290,7 +293,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
         self.incoming_connections.keys().collect()
     }
 
-    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<f32>, GraphError> {
+    fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<U>, GraphError> {
         // println!("{:#?} {:#?}", presynaptic, postsynaptic);
 
         if !self.incoming_connections.contains_key(postsynaptic) {
@@ -303,7 +306,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
         Ok(self.incoming_connections[postsynaptic].get(presynaptic).copied())
     }
 
-    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<f32>) -> Result<(), GraphError> {
+    fn edit_weight(&mut self, presynaptic: &T, postsynaptic: &T, weight: Option<U>) -> Result<(), GraphError> {
         // self.incoming_connections[presynaptic][postsynaptic] = weight;
 
         if !self.incoming_connections.contains_key(postsynaptic) {
@@ -374,7 +377,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Graph for AdjacencyList<T>
     }
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy> Default for AdjacencyList<T> {
+impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default for AdjacencyList<T, U> {
     fn default() -> Self {
         AdjacencyList { 
             incoming_connections: HashMap::new(), 
