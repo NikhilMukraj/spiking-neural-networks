@@ -34,3 +34,17 @@ equation = _{ SOI ~ ( func_declaration | diff_eq_declaration | eq_declaration ) 
 
 WHITESPACE = _{ " " }
 
+// neuron block
+// functions block (has any functions that )
+// ion channel block
+// neurotransmitter kinetics block
+// receptor kinetics block
+
+// neuron should include type of neuron (name of neuron)
+// test code generation, and reading from file
+// neuron should include list of necessary variables
+// variables either all have defaults or none have defaults
+
+// variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
+// variables_with_default = _{ "vars:" ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ number ~ (" "* ~ "," ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ number)* ~ ","? }
+// neuron_block = _{ SOI ~ "[neuron]\n" ~ "type:" ~ name ~ "\n" ~ (equation ~ "\n"+) * ~ equation? ~ "[end]" ~ EOI } 
