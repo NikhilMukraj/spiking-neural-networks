@@ -463,7 +463,7 @@ macro_rules! impl_reset_timing  {
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> {
+pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -482,7 +482,7 @@ pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHis
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Default for Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> Default for Lattice<T, U, V> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -497,14 +497,14 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Default 
     }
 }
 
-impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize)>, GridVoltageHistory> {
+impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory> {
     // Generates a default lattice implementation given a neuron type
     pub fn default_impl() -> Self {
         Lattice::default()
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize)>, V: LatticeHistory> Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> Lattice<T, U, V> {
     impl_reset_timing!();
 
     /// Gets id of lattice [`Graph`]
@@ -1076,11 +1076,11 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 #[derive(Debug, Clone)]
 pub struct LatticeNetwork<
     T: IterateAndSpike, 
-    U: Graph<T=(usize, usize)>, 
+    U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition>,
+    Y: Graph<T=GraphPosition, U=f32>,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
     lattices: HashMap<usize, Lattice<T, U, V>>,
@@ -1095,11 +1095,11 @@ pub struct LatticeNetwork<
 impl<T, U, V, W, X, Y> Default for LatticeNetwork<T, U, V, W, X, Y>
 where
     T: IterateAndSpike,
-    U: Graph<T=(usize, usize)>,
+    U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition>,
+    Y: Graph<T=GraphPosition, U=f32>,
 {
     fn default() -> Self { 
         LatticeNetwork {
@@ -1114,11 +1114,11 @@ where
 impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
 where
     T: IterateAndSpike,
-    U: Graph<T = (usize, usize)> + ToGraphPosition<GraphPos = Y>,
+    U: Graph<T=(usize, usize), U=f32> + ToGraphPosition<GraphPos = Y>,
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T = GraphPosition>,
+    Y: Graph<T=GraphPosition, U=f32>,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
@@ -1143,11 +1143,11 @@ where
 impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
 where
     T: IterateAndSpike,
-    U: Graph<T=(usize, usize)>,
+    U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition>,
+    Y: Graph<T=GraphPosition, U=f32>,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
