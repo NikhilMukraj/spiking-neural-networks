@@ -10,14 +10,30 @@ use std::io::{self, BufRead};
 pub struct ASTParser;
 
 lazy_static::lazy_static! {
+    // static ref PRATT_PARSER: PrattParser<Rule> = {
+    //     use pest::pratt_parser::{Assoc::*, Op};
+    //     use Rule::*;
+
+    //     PrattParser::new()
+    //         .op(Op::infix(add, Left) | Op::infix(subtract, Left))
+    //         .op(Op::infix(multiply, Left) | Op::infix(divide, Left) | Op::infix(power, Left))
+    //         .op(Op::prefix(unary_minus))
+    // };
+
     static ref PRATT_PARSER: PrattParser<Rule> = {
         use pest::pratt_parser::{Assoc::*, Op};
         use Rule::*;
 
         PrattParser::new()
+            .op(
+                Op::infix(equal, Left) | Op::infix(not_equal, Left) | Op::infix(greater_than, Left) |
+                Op::infix(greater_than_or_equal, Left) | Op::infix(less_than, Left) | 
+                Op::infix(less_than_or_equal, Left) | Op::infix(and_operator, Left) | 
+                Op::infix(or_operator, Left)
+            )
             .op(Op::infix(add, Left) | Op::infix(subtract, Left))
             .op(Op::infix(multiply, Left) | Op::infix(divide, Left) | Op::infix(power, Left))
-            .op(Op::prefix(unary_minus))
+            .op(Op::prefix(unary_minus) | Op::prefix(not_operator))
     };
 }
 
@@ -26,6 +42,7 @@ pub enum AST {
     Number(f32),
     Name(String),
     UnaryMinus(Box<AST>),
+    NotOperator(Box<AST>),
     BinOp {
         lhs: Box<AST>,
         op: Op,
@@ -81,7 +98,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
                 Rule::multiply => Op::Multiply,
                 Rule::divide => Op::Divide,
                 Rule::power => Op::Power,
-                rule => unreachable!("AST::parse expected infix operation, found {:?}", rule),
+                rule => unreachable!("AST::parse expected (non boolean) infix operation, found {:?}", rule),
             };
             AST::BinOp {
                 lhs: Box::new(lhs),
@@ -96,6 +113,60 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
         .parse(pairs)
 }
 
+pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
+    PRATT_PARSER
+        .map_primary(|primary| match primary.as_rule() {
+            Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
+            Rule::name => AST::Name(String::from(primary.as_str())),
+            Rule::expr => parse_expr(primary.into_inner()),
+            Rule::function => {
+                let mut inner_rules = primary.into_inner();
+
+                let name: String = String::from(inner_rules.next()
+                    .expect("Could not get function name").as_str()
+                );
+
+                let args: Vec<Box<AST>> = inner_rules.next()
+                    .expect("No arguments found")
+                    .into_inner()
+                    .map(|i| Box::new(parse_expr(i.into_inner())))
+                    .collect();
+                
+                AST::Function { name: name, args: args }
+            },
+            rule => unreachable!("AST::parse expected atom, found {:?}", rule),
+        })
+        .map_infix(|lhs, op, rhs| {
+            let op = match op.as_rule() {
+                Rule::add => Op::Add,
+                Rule::subtract => Op::Subtract,
+                Rule::multiply => Op::Multiply,
+                Rule::divide => Op::Divide,
+                Rule::power => Op::Power,
+                Rule::equal => Op::Equal,
+                Rule::not_equal => Op::NotEqual,
+                Rule::greater_than => Op::GreaterThan,
+                Rule::greater_than_or_equal => Op::GreaterThanOrEqual,
+                Rule::less_than => Op::LessThan,
+                Rule::less_than_or_equal => Op::LessThanOrEqual,
+                Rule::and_operator => Op::And,
+                Rule::or_operator => Op::Or,
+                rule => unreachable!("AST::parse expected infix operation, found {:?}", rule),
+            };
+            AST::BinOp {
+                lhs: Box::new(lhs),
+                op,
+                rhs: Box::new(rhs),
+            }
+        })
+        .map_prefix(|op, rhs| match op.as_rule() {
+            Rule::unary_minus => AST::UnaryMinus(Box::new(rhs)),
+            Rule::not_operator => AST::NotOperator(Box::new(rhs)),
+            _ => unreachable!(),
+        })
+        .parse(pairs)
+}
+
 #[derive(Debug)]
 pub enum Op {
     Add,
@@ -103,6 +174,14 @@ pub enum Op {
     Multiply,
     Divide,
     Power,
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    And,
+    Or,
 }
 
 impl AST {
@@ -111,6 +190,7 @@ impl AST {
             AST::Number(n) => n.to_string(),
             AST::Name(name) => name.clone(),
             AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
+            AST::NotOperator(expr) => format!("!{}", expr.to_string()),
             AST::BinOp { lhs, op, rhs } => {
                 match op {
                     Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
@@ -118,6 +198,14 @@ impl AST {
                     Op::Multiply => format!("({} * {})", lhs.to_string(), rhs.to_string()),
                     Op::Divide => format!("({} / {})", lhs.to_string(), rhs.to_string()),
                     Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
+                    Op::Equal => format!("{} == {}", lhs.to_string(), rhs.to_string()),
+                    Op::NotEqual => format!("{} != {}", lhs.to_string(), rhs.to_string()),
+                    Op::GreaterThan => format!("{} > {}", lhs.to_string(), rhs.to_string()),
+                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.to_string(), rhs.to_string()),
+                    Op::LessThan => format!("{} < {}", lhs.to_string(), rhs.to_string()),
+                    Op::LessThanOrEqual => format!("{} <= {}", lhs.to_string(), rhs.to_string()),
+                    Op::And => format!("{} && {}", lhs.to_string(), rhs.to_string()),
+                    Op::Or => format!("{} || {}", lhs.to_string(), rhs.to_string()),
                 }
             }
             AST::Function { name, args } => {
