@@ -912,6 +912,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     
     // __repr__ for lattices and network
     // eventually work with graph history
+    // temp env variable for building pyo3 with custom models
+    // impl neuron macro for arbitrary neuron (separate one for neurons with ion channels)
 
     Ok(())
 }
