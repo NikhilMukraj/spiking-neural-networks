@@ -1252,6 +1252,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // view weights
     // eventually work with graph history
     // connecting graph history should be updated
+    
+    // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
+
     // temp env variable for building pyo3 with custom models
     // impl neuron macro for arbitrary neuron (separate one for neurons with ion channels)
 
