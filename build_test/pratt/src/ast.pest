@@ -78,7 +78,7 @@ WHITESPACE = _{ " " }
 
 // variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
 // variables_with_default = _{ "vars:" ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ number ~ (" "* ~ "," ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ number)* ~ ","? }
-// neuron_block = _{ SOI ~ "[neuron]\n" ~ "type:" ~ name ~ "\n" ~ (equation ~ "\n"+) * ~ equation? ~ "[end]" ~ EOI } 
+// neuron_block = _{ SOI ~ "[neuron]\n" ~ "type:" ~ name ~ NEWLINE ~ (equation ~ NEWLINE+) * ~ equation? ~ "[end]" ~ EOI } 
 
 // neuron block should have option to either be extendable (ligand gates and neurotransmitter default implementation)
 // or custom (custom ligand gates, ligand gates block)
@@ -95,15 +95,16 @@ WHITESPACE = _{ " " }
 // spike_detection: bool_expr
 // ligand_gates: default
 
-// eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ ("\n"* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ "\n"? }
+// eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ (NEWLINE* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ NEWLINE? }
 
-// type_def = { "type:" ~ " "* ~ name }
-// oon_spike_def = { "on_spike:" ~ " "* ~ "\n"+ ~ eq_assignments }
-// spike_detection_def = { "spike_detection:" ~ " "* ~ expr }
-// ligand_gates_def = { "ligand_gates:" ~ " "* ~ name }
+// type_def = { "type:" ~ " "* ~ name ~ NEWLINE }
+// on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE|"␊")+ ~ eq_assignments }
+// // on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE ~ assignments }
+// spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE }
+// ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE }
 
 // neuron_definition = {
-//     (type_def | on_spike_def | spike_detection_def | ligand_gates_def){3, 4}
+//     "[neuron]" ~ NEWLINE ~ (type_def | on_spike_def | spike_detection_def | ligand_gates_def){3,} ~ "[end]"
 // }
 
 // Parser::parse(Rule::neuron_definition, input)
