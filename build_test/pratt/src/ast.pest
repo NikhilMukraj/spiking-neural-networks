@@ -13,9 +13,30 @@ function = { name ~ ("(" ~ args ~ ")") }
 unary_minus = { "-" }
 primary = _{ function | number | name | "(" ~ expr ~ ")" }
 
-atom = _{ unary_minus? ~ primary }
+atom = _{ not_operator? ~ unary_minus? ~ primary }
 
-bin_op = _{ add | subtract | multiply | divide | power }
+// bin_op = _{ add | subtract | multiply | divide | power }
+// 	add = { "+" }
+// 	subtract = { "-" }
+// 	multiply = { "*" }
+// 	divide = { "/" }
+// 	power = { "^" }
+
+not_operator = { "!" }
+
+bin_op = _{ 
+	greater_than_or_equal | less_than_or_equal | equal | not_equal | 
+	greater_than | less_than | and_operator | or_operator |
+	add | subtract | multiply | divide | power 
+}
+	equal = { "==" }
+	not_equal = { "!=" }
+	greater_than = { ">" }
+	greater_than_or_equal = { ">=" }
+	less_than = { "<" }
+	less_than_or_equal = { "<=" }
+	and_operator = { "&&" }
+	or_operator = { "||" }
 	add = { "+" }
 	subtract = { "-" }
 	multiply = { "*" }
@@ -23,6 +44,7 @@ bin_op = _{ add | subtract | multiply | divide | power }
 	power = { "^" }
 
 expr = { atom ~ (bin_op ~ atom)* }
+// bool_expr = { atom ~ (bool_bin_op ~ atom)* }
 
 diff_eq_declaration = { "d" ~ name ~ "/dt" }
 eq_declaration = { name }
@@ -61,7 +83,27 @@ WHITESPACE = _{ " " }
 // neuron block should have option to either be extendable (ligand gates and neurotransmitter default implementation)
 // or custom (custom ligand gates, ligand gates block)
 
+// when checking for type and what ligand gates to use, 
+// just keep matching on each pair in neuron block and assign them to an associated ast enum 
+// (ligand gates declaration, type declaration, equations, on spike, etc), 
+// then loop through each of the ast enums and add them to the appropriate field on the 
+// neuron block ast enum, if a certain enum cannot be found the declaration is missing and an 
+// error is thrown
+
+// type: NeuronName
+// on_spike: assignment(s?)
+// spike_detection: bool_expr
+// ligand_gates: default
+
+// [ligand_gates]
+// type: name
+// neurotransmitter_type: g * r * (voltage - e)
+// …
+// for custom ligand gates, a ligand gate struct is generated for each associated neurotransmitter type, 
+// which are then put in a ligand gated channels struct
+
 // allow functions to have if statements
 // if () -> () else -> ()
 // if () -> () elif () -> () else -> ()
 // allow nextlines with if statements
+
