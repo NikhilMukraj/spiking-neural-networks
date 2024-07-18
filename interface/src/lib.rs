@@ -1,15 +1,14 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
-use pyo3::{exceptions::PyKeyError, prelude::*, types::{PyDict, PyList, PyTuple}};
+use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
-    graph::{AdjacencyMatrix, Graph}, 
-    neuron::{
+    error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain}, 
-    GridVoltageHistory, Lattice, LatticeHistory, SpikeTrainGridHistory, 
+    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain},
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory,
     SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
@@ -568,6 +567,7 @@ type PyLatticeNeuron = PyIzhikevichNeuron;
 
 #[pyclass]
 #[pyo3(name = "IzhikevichLattice")]
+#[derive(Clone)]
 pub struct PyIzhikevichLattice {
     lattice: Lattice<
         LatticeNeuron,
@@ -673,20 +673,20 @@ impl PyIzhikevichLattice {
         }
     }
 
-    fn set_weight(&mut self, presynaptic: (usize, usize), postsynaptic: (usize, usize), weight: f32) -> PyResult<()> {
-        let weight = if weight == 0. {
-            None
-        } else {
-            Some(weight)
-        };
+    // fn set_weight(&mut self, presynaptic: (usize, usize), postsynaptic: (usize, usize), weight: f32) -> PyResult<()> {
+    //     let weight = if weight == 0. {
+    //         None
+    //     } else {
+    //         Some(weight)
+    //     };
         
-        match self.lattice.graph.edit_weight(&presynaptic, &postsynaptic, weight) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(PyKeyError::new_err(
-                format!("Connection at ({:#?}, {:#?}) not found", presynaptic, postsynaptic))
-            ),
-        }
-    }
+    //     match self.lattice.graph.edit_weight(&presynaptic, &postsynaptic, weight) {
+    //         Ok(_) => Ok(()),
+    //         Err(_) => Err(PyKeyError::new_err(
+    //             format!("Connection at ({:#?}, {:#?}) not found", presynaptic, postsynaptic))
+    //         ),
+    //     }
+    // }
 
     fn reset_timing(&mut self) {
         self.lattice.reset_timing();
@@ -760,9 +760,10 @@ impl PyIzhikevichLattice {
 
         Ok(
             format!(
-                "IzhikevichLattice {{ ({}x{}), do_stdp: {}, update_grid_history: {} }}", 
+                "IzhikevichLattice {{ ({}x{}), id: {}, do_stdp: {}, update_grid_history: {} }}", 
                 rows,
                 cols,
+                self.lattice.get_id(),
                 self.lattice.do_stdp,
                 self.lattice.update_grid_history,
             )
@@ -873,28 +874,364 @@ impl PyPoissonLattice {
 
         Ok(
             format!(
-                "PoissonLattice {{ ({}x{}), update_grid_history: {} }}", 
+                "PoissonLattice {{ ({}x{}), id: {}, update_grid_history: {} }}", 
                 rows,
                 cols,
+                self.lattice.get_id(),
                 self.lattice.update_grid_history,
             )
         )
     }
 }
 
-// #[pyclass]
-// #[pyo3(name = "IzhikevichNetwork")]
-// #[derive(Clone)]
-// pub struct PyIzhikevichNetwork {
-//     network: LatticeNetwork<
-//         LatticeNeuron, 
-//         AdjacencyMatrix<(usize, usize)>, 
-//         GridVoltageHistory, 
-//         LatticeSpikeTrain,
-//         SpikeTrainGridHistory,
-//         AdjacencyMatrix<GraphPosition>
-//     >
-// }
+#[pyclass]
+#[pyo3(name = "GraphPosition")]
+#[derive(Clone)]
+pub struct PyGraphPosition {
+    graph_position: GraphPosition
+}
+
+#[pymethods]
+impl PyGraphPosition {
+    #[new]
+    fn new(id: usize, pos: (usize, usize)) -> PyGraphPosition {
+        PyGraphPosition { graph_position: GraphPosition { id: id, pos: pos } }
+    }
+
+    #[getter]
+    fn get_id(&self) -> usize {
+        self.graph_position.id
+    }
+
+    #[setter]
+    fn set_id(&mut self, id: usize) {
+        self.graph_position.id = id;
+    }
+
+    #[getter]
+    fn get_pos(&self) -> (usize, usize) {
+        self.graph_position.pos
+    }
+
+    #[setter]
+    fn set_pos(&mut self, pos: (usize, usize)) {
+        self.graph_position.pos = pos;
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "IzhikevichNetwork")]
+#[derive(Clone)]
+pub struct PyIzhikevichNetwork {
+    network: LatticeNetwork<
+        LatticeNeuron, 
+        AdjacencyMatrix<(usize, usize)>, 
+        GridVoltageHistory, 
+        LatticeSpikeTrain,
+        SpikeTrainGridHistory,
+        AdjacencyMatrix<GraphPosition>
+    >
+}
+
+#[pymethods]
+impl PyIzhikevichNetwork {
+    #[new]
+    fn new() -> Self {
+        PyIzhikevichNetwork { network: LatticeNetwork::default() }
+    }
+
+    fn add_lattice(&mut self, lattice: PyIzhikevichLattice) -> PyResult<()> {
+        match self.network.add_lattice(lattice.lattice) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PyValueError::new_err("Id already in network")),
+        }
+    }
+
+    fn add_spike_train_lattice(&mut self, spike_train_lattice: PyPoissonLattice) -> PyResult<()> {
+        match self.network.add_spike_train_lattice(spike_train_lattice.lattice) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PyValueError::new_err("Id already in network")),
+        }
+    }
+
+    #[pyo3(signature = (id, connection_conditional, weight_logic=None))]
+    fn connect_internally(
+        &mut self, py: Python, id: usize, connection_conditional: &PyAny, weight_logic: Option<&PyAny>,
+    ) -> PyResult<()> {
+        let py_callable = connection_conditional.to_object(connection_conditional.py());
+
+        let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+            let args = PyTuple::new(py, &[a, b]);
+            py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+        };
+
+        let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+            Some(value) => {
+                let py_callable = value.to_object(value.py()); 
+
+                let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                    let args = PyTuple::new(py, &[a, b]);
+                    py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                };
+
+                Some(Box::new(closure))
+            },
+            None => None,
+        };
+
+        match self.network.connect_innterally(id, &connection_closure, weight_closure.as_deref()) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PyValueError::new_err("Id not found in network")),
+        }
+    }
+
+    #[pyo3(signature = (presynaptic_id, postsynaptic_id, connection_conditional, weight_logic=None))]
+    fn connect(
+        &mut self, 
+        py: Python, 
+        presynaptic_id: usize,  
+        postsynaptic_id: usize, 
+        connection_conditional: &PyAny, 
+        weight_logic: Option<&PyAny>,
+    ) -> PyResult<()> {
+        let py_callable = connection_conditional.to_object(connection_conditional.py());
+
+        let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+            let args = PyTuple::new(py, &[a, b]);
+            py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+        };
+
+        let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+            Some(value) => {
+                let py_callable = value.to_object(value.py()); 
+
+                let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                    let args = PyTuple::new(py, &[a, b]);
+                    py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                };
+
+                Some(Box::new(closure))
+            },
+            None => None,
+        };
+
+        match self.network.connect(
+            presynaptic_id, 
+            postsynaptic_id, 
+            &connection_closure, 
+            weight_closure.as_deref()
+        ) {
+            Ok(_) => Ok(()),
+            Err(e) => match e {
+                LatticeNetworkError::PresynapticIDNotFound(id) => Err(PyValueError::new_err(
+                    format!("Presynaptic id ({}) not found", id)
+                )),
+                LatticeNetworkError::PostsynapticIDNotFound(id) => Err(PyValueError::new_err(
+                    format!("Postsynaptic id ({}) not found", id)
+                )),
+                LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => Err(PyValueError::new_err(
+                    format!("Postsynaptic lattice cannot be spike train")
+                )),
+                _ => unreachable!(),
+            },
+        }
+    }
+
+    // #[getter]
+    // fn get_connecting_weights(&self) -> Vec<Vec<f32>> {
+    //     self.network.get_connecting_graph().matrix
+    // }
+
+    fn get_weight(&self, presynaptic: PyGraphPosition, postsynaptic: PyGraphPosition) -> PyResult<f32> {
+        let presynaptic = presynaptic.graph_position;
+        let postsynaptic = postsynaptic.graph_position;
+
+        if presynaptic.id == postsynaptic.id {
+            let current_lattice = match self.network.get_lattice(&presynaptic.id) {
+                Some(lattice) => lattice,
+                None => { return Err(PyValueError::new_err("Id not found in lattice")); },
+            };
+                
+            match current_lattice.graph.lookup_weight(&presynaptic.pos, &postsynaptic.pos) {
+                Ok(Some(value)) => Ok(value),
+                Ok(None) => Ok(0.),
+                Err(e) => Err(
+                    PyValueError::new_err(format!("{}", e))
+                )
+            }
+        } else {
+            match self.network.get_connecting_graph().lookup_weight(&presynaptic, &postsynaptic) {
+                Ok(Some(value)) => Ok(value),
+                Ok(None) => Ok(0.),
+                Err(e) => Err(
+                    PyValueError::new_err(format!("{}", e))
+                )
+            }
+        }
+    }
+
+    // fn set_weight(&mut self, presynaptic: PyGraphPosition, postsynaptic: PyGraphPosition, weight: f32) -> PyResult<()> {
+    //     let presynaptic = presynaptic.graph_position;
+    //     let postsynaptic = postsynaptic.graph_position;
+
+    //     let weight = match weight {
+    //         0. => None,
+    //         value => Some(value)
+    //     };
+
+    //     if presynaptic.id == postsynaptic.id {
+    //         let current_lattice = match self.network.get_mut_lattice(&presynaptic.id) {
+    //             Some(lattice) => lattice,
+    //             None => { return Err(PyValueError::new_err("Id not found in lattice")); },
+    //         };
+                
+    //         match current_lattice.graph.edit_weight(&presynaptic.pos, &postsynaptic.pos, weight) {
+    //             Ok(_) => Ok(()),
+    //             Err(e) => Err(
+    //                 PyValueError::new_err(format!("{}", e))
+    //             )
+    //         }
+    //     } else {
+    //         match self.network.get_connecting_graph().edit_weight(&presynaptic, &postsynaptic, weight) {
+    //             Ok(_) => Ok(()),
+    //             Err(e) => Err(
+    //                 PyValueError::new_err(format!("{}", e))
+    //             )
+    //         }
+    //     }
+    // }
+
+    fn get_neuron(&self, id: usize, row: usize, col: usize) -> PyResult<PyIzhikevichNeuron> {
+        match self.network.get_lattice(&id) {
+            Some(lattice) => {
+                let neuron = match lattice.cell_grid.get(row) {
+                    Some(row_cells) => match row_cells.get(col) {
+                        Some(neuron) => neuron.clone(),
+                        None => {
+                            return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                        }
+                    },
+                    None => {
+                        return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                    }
+                };
+        
+                Ok(
+                    PyIzhikevichNeuron { 
+                        model: neuron
+                    }
+                )
+            },
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    }
+
+    fn set_neuron(&mut self, id: usize, row: usize, col: usize, neuron: PyLatticeNeuron) -> PyResult<()> {
+        match self.network.get_mut_lattice(&id) {
+            Some(lattice) => {
+                let row_cells = match lattice.cell_grid.get_mut(row) {
+                    Some(row_cells) => row_cells,
+                    None => {
+                        return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                    }
+                };
+        
+                if let Some(existing_neuron) = row_cells.get_mut(col) {
+                    *existing_neuron = neuron.model.clone();
+        
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+                }
+            },
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    }
+
+    fn get_spike_train(&self, id: usize, row: usize, col: usize) -> PyResult<PyPoissonNeuron> {
+        match self.network.get_spike_train_lattice(&id) {
+            Some(lattice) => {
+                let neuron = match lattice.cell_grid.get(row) {
+                    Some(row_cells) => match row_cells.get(col) {
+                        Some(neuron) => neuron.clone(),
+                        None => {
+                            return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                        }
+                    },
+                    None => {
+                        return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                    }
+                };
+        
+                Ok(
+                    PyPoissonNeuron { 
+                        model: neuron
+                    }
+                )
+            },
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    }
+
+    fn set_spike_train(&mut self, id: usize, row: usize, col: usize, neuron: PyPoissonNeuron) -> PyResult<()> {
+        match self.network.get_mut_spike_train_lattice(&id) {
+            Some(lattice) => {
+                let row_cells = match lattice.cell_grid.get_mut(row) {
+                    Some(row_cells) => row_cells,
+                    None => {
+                        return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                    }
+                };
+        
+                if let Some(existing_neuron) = row_cells.get_mut(col) {
+                    *existing_neuron = neuron.model.clone();
+        
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+                }
+            },
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        let lattice_strings = self.network.lattices_values()
+            .map(|i| {
+                let rows = i.cell_grid.len();
+                let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+                format!(
+                    "IzhikevichLattice {{ ({}x{}), id: {}, do_stdp: {}, update_grid_history: {} }}", 
+                    rows,
+                    cols,
+                    i.get_id(),
+                    i.do_stdp,
+                    i.update_grid_history,
+                )
+            })
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let spike_train_strings = self.network.spike_trains_values()
+            .map(|i| {
+                let rows = i.cell_grid.len();
+                let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+                format!(
+                    "PoissonLattice {{ ({}x{}), id: {}, update_grid_history: {} }}", 
+                    rows,
+                    cols,
+                    i.get_id(),
+                    i.update_grid_history,
+                )
+            })
+            .collect::<Vec<String>>()
+            .join(",\n");
+
+        Ok(format!("IzhikevichNetwork {{ \n[{}],\n[{}], }}", lattice_strings, spike_train_strings))
+    }
+}
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -908,10 +1245,13 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyDeltaDiracRefractoriness>()?;
     m.add_class::<PyPoissonNeuron>()?;
     m.add_class::<PyPoissonLattice>()?;
-    // m.add_class::<PyIzhikevichNetwork>()?;
+    m.add_class::<PyIzhikevichNetwork>()?;
+
+    // RUN LATTICE METHODS
     
-    // __repr__ for lattices and network
+    // view weights
     // eventually work with graph history
+    // connecting graph history should be updated
     // temp env variable for building pyo3 with custom models
     // impl neuron macro for arbitrary neuron (separate one for neurons with ion channels)
 
