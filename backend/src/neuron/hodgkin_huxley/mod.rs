@@ -72,7 +72,7 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Additional ion gates
     pub additional_gates: Vec<Box<dyn IonChannel>>,
     /// Additional timestep indpendent ion channels
-    pub additional_channels: Vec<Box<dyn TimestepIndependentIonChannel>>,
+    pub additional_independent_gates: Vec<Box<dyn TimestepIndependentIonChannel>>,
     /// STDP parameters
     pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
@@ -100,7 +100,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
             additional_gates: self.additional_gates.iter()
                 .map(|gate| gate.clone_box())
                 .collect(),
-            additional_channels: self.additional_channels.iter()
+            additional_independent_gates: self.additional_independent_gates.iter()
                 .map(|channel| channel.clone_box())
                 .collect(),
             synaptic_neurotransmitters: self.synaptic_neurotransmitters.clone(),
@@ -128,7 +128,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
             additional_gates: vec![],
-            additional_channels: vec![],
+            additional_independent_gates: vec![],
             gaussian_params: GaussianParameters::default(),
             stdp_params: STDPParameters::default(),
         }
@@ -203,7 +203,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
                 i.get_current()
             ) 
             .sum::<f32>();
-        let i_additional_channels = self.additional_channels
+        let i_additional_channels = self.additional_independent_gates
             .iter()
             .map(|i| 
                 i.get_current()
@@ -237,6 +237,10 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         self.additional_gates.iter_mut()
             .for_each(|i| {
                 i.update_current(self.current_voltage, self.dt);
+        });
+        self.additional_independent_gates.iter_mut()
+            .for_each(|i| {
+                i.update_current(self.current_voltage);
         });
     }
 
