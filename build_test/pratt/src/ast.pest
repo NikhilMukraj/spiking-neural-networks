@@ -98,7 +98,7 @@ WHITESPACE = _{ " " }
 // eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ (NEWLINE* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ NEWLINE? }
 
 // type_def = { "type:" ~ " "* ~ name ~ NEWLINE }
-// on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE|"␊")+ ~ eq_assignments }
+// on_spike_def = { "on_spike:" ~ " "* ~ NEWLINE ~ eq_assignments }
 // // on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE ~ assignments }
 // spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE }
 // ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE }
