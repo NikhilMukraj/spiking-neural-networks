@@ -23,6 +23,7 @@
 /backend/src/neuron/iterate_and_spike_traits/target
 /backend/examples/hopfield_example/*_hopfield.txt
 /backend/examples/stdp_example/*.csv
+/backend/examples/rstdp_example/*.csv
 /backend/examples/fitzhugh_nagumo_example/*.csv
 /backend/examples/morris_lecar_example/*.csv
 /backend/examples/hodgkin_huxley_example/*.csv
