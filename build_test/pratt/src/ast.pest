@@ -95,6 +95,57 @@ WHITESPACE = _{ " " }
 // spike_detection: bool_expr
 // ligand_gates: default
 
+// eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ ("\n"* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ "\n"? }
+
+// type_def = { "type:" ~ " "* ~ name }
+// oon_spike_def = { "on_spike:" ~ " "* ~ "\n"+ ~ eq_assignments }
+// spike_detection_def = { "spike_detection:" ~ " "* ~ expr }
+// ligand_gates_def = { "ligand_gates:" ~ " "* ~ name }
+
+// neuron_definition = {
+//     (type_def | on_spike_def | spike_detection_def | ligand_gates_def){3, 4}
+// }
+
+// Parser::parse(Rule::neuron_definition, input)
+// fn check_neuron_definition(pairs: Pairs<Rule>) -> Result<(), String> {
+//     let mut keys_found = HashSet::new();
+//     let required_keys = ["type", "on_spike", "spike_detection", "ligand_gates"];
+
+//     for pair in pairs {
+//         match pair.as_rule() {
+//             Rule::type_def => {
+//                 if !keys_found.insert("type") {
+//                     return Err("Duplicate 'type' definition found.".into());
+//                 }
+//             },
+//             Rule::on_spike_def => {
+//                 if !keys_found.insert("on_spike") {
+//                     return Err("Duplicate 'on_spike' definition found.".into());
+//                 }
+//             },
+//             Rule::spike_detection_def => {
+//                 if !keys_found.insert("spike_detection") {
+//                     return Err("Duplicate 'spike_detection' definition found.".into());
+//                 }
+//             },
+//             Rule::ligand_gates_def => {
+//                 if !keys_found.insert("ligand_gates") {
+//                     return Err("Duplicate 'ligand_gates' definition found.".into());
+//                 }
+//             },
+//             _ => {}
+//         }
+//     }
+
+//     for key in &required_keys {
+//         if !keys_found.contains(key) {
+//             return Err(format!("Missing '{}' definition.", key));
+//         }
+//     }
+
+//     Ok(())
+// }
+
 // [ligand_gates]
 // type: name
 // neurotransmitter_type: g * r * (voltage - e)
