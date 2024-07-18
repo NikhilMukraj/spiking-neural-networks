@@ -91,7 +91,7 @@ WHITESPACE = _{ " " }
 // error is thrown
 
 // type: NeuronName
-// on_spike: assignment(s?)
+// on_spike: assignments
 // spike_detection: bool_expr
 // ligand_gates: default
 
