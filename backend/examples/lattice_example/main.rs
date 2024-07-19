@@ -42,13 +42,10 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     lattice.connect(&connection_conditional, None);
 
-    let mut rng = rand::thread_rng();
-
-    for row in lattice.cell_grid.iter_mut() {
-        for neuron in row {
-            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
-        }
-    }
+    lattice.apply(|neuron: &mut _| {
+        let mut rng = rand::thread_rng();
+        neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+    });
 
     lattice.update_grid_history = true;
 
