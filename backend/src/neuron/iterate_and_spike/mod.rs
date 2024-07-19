@@ -889,30 +889,6 @@ impl GaussianParameters {
     }
 }
 
-/// Parameters to use when calculating spike time dependent plasticity
-#[derive(Clone, Debug)]
-pub struct STDPParameters {
-    /// Postitive STDP modifier 
-    pub a_plus: f32,
-    /// Negative STDP modifier  
-    pub a_minus: f32,
-    /// Postitive STDP decay modifier  
-    pub tau_plus: f32, 
-    /// Negative STDP decay modifier 
-    pub tau_minus: f32, 
-}
-
-impl Default for STDPParameters {
-    fn default() -> Self {
-        STDPParameters { 
-            a_plus: 2., 
-            a_minus: 2., 
-            tau_plus: 45., 
-            tau_minus: 45., 
-        }
-    }
-}
-
 /// Gets current voltage (mV) of model
 pub trait CurrentVoltage {
     fn get_current_voltage(&self) -> f32;
@@ -941,11 +917,6 @@ pub trait LastFiringTime {
     fn set_last_firing_time(&mut self, timestep: Option<usize>);
 }
 
-/// Gets the STDP parameters of the given model
-pub trait STDP: LastFiringTime {
-    fn get_stdp_params(&self) -> &STDPParameters;
-}
-
 /// Handles dynamics neurons that can take in an input to update membrane potential
 /// 
 /// Example implementation:
@@ -953,8 +924,8 @@ pub trait STDP: LastFiringTime {
 /// ```rust
 /// use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 /// use spiking_neural_networks::neuron::iterate_and_spike::{
-///     GaussianFactor, GaussianParameters, IsSpiking, STDPParameters, 
-///     STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+///     GaussianFactor, GaussianParameters, IsSpiking, 
+///     CurrentVoltage, GapConductance, IterateAndSpike, 
 ///     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 ///     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -993,8 +964,6 @@ pub trait STDP: LastFiringTime {
 ///     pub is_spiking: bool,
 ///     /// Last timestep the neuron has spiked
 ///     pub last_firing_time: Option<usize>,
-///     /// STDP parameters
-///     pub stdp_params: STDPParameters,
 ///     /// Parameters used in generating noise
 ///     pub gaussian_params: GaussianParameters,
 ///     /// Postsynaptic neurotransmitters in cleft
