@@ -96,6 +96,11 @@ WHITESPACE = _{ " " }
 // ligand_gates: default
 
 // eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ (NEWLINE* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ NEWLINE? }
+// assignments = {
+// 	(( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr) ~ 
+// 	(NEWLINE* ~ (( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr))* ~ 
+// 	NEWLINE?
+// }
 
 // type_def = { "type:" ~ " "* ~ name ~ NEWLINE }
 // on_spike_def = { "on_spike:" ~ " "* ~ NEWLINE ~ eq_assignments }
