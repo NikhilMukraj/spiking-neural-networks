@@ -5,8 +5,8 @@
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     GaussianFactor, GaussianParameters, IsSpiking, STDPParameters,
-    STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
-    LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
+    NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
     ApproximateNeurotransmitter, ApproximateReceptor,
 };
@@ -116,8 +116,6 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// STDP parameters
-    pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
@@ -147,7 +145,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            stdp_params: STDPParameters::default(),
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             ligand_gates: LigandGatedChannels::default(),

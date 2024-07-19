@@ -8,8 +8,7 @@ use std::{
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage, IsSpiking,
-    GapConductance, STDPParameters, STDP, LastFiringTime, 
-    LigandGatedChannels, NeurotransmitterConcentrations, 
+    GapConductance, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
     NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
     DestexheNeurotransmitter, DestexheReceptor,
 };
@@ -73,8 +72,6 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     pub additional_gates: Vec<Box<dyn IonChannel>>,
     /// Additional timestep indpendent ion channels
     pub additional_independent_gates: Vec<Box<dyn TimestepIndependentIonChannel>>,
-    /// STDP parameters
-    pub stdp_params: STDPParameters,
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
@@ -106,7 +103,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNe
             synaptic_neurotransmitters: self.synaptic_neurotransmitters.clone(),
             ligand_gates: self.ligand_gates.clone(),
             gaussian_params: self.gaussian_params.clone(),
-            stdp_params: self.stdp_params.clone(),
         }
     }
 }
@@ -130,7 +126,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             additional_gates: vec![],
             additional_independent_gates: vec![],
             gaussian_params: GaussianParameters::default(),
-            stdp_params: STDPParameters::default(),
         }
     }
 }
