@@ -1,0 +1,10 @@
+[neuron]
+    type: Izhikevich
+    vars: e=0, v_th=-55
+    ligand_gates: default
+    on_spike: 
+        v = v_reset
+    spike_detection: v >= v_th
+    on_iteration:
+        dv/dt = (v - e) + i
+[end]
