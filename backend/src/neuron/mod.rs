@@ -29,10 +29,10 @@ pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
     CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
-    NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, STDP 
+    NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, 
 };
 pub mod plasticity;
-use plasticity::{Plasticity, STDPlasticity};
+use plasticity::{Plasticity, STDP};
 /// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
@@ -277,33 +277,6 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     (spike_train_spiking, pre_spiking, post_spiking)
 }
 
-/// Calculates and returns the change in weight based off of STDP (spike time dependent plasticity)
-/// given one presynaptic neuron that implements [`LastFiringTime`] to get the last time it fired
-/// as well as a postsynaptic neuron that implements [`STDP`]
-pub fn update_weight_stdp<T: LastFiringTime, U: STDP>(
-    presynaptic_neuron: &T, 
-    postsynaptic_neuron: &U
-) -> f32 {
-    let mut delta_w: f32 = 0.;
-
-    match (presynaptic_neuron.get_last_firing_time(), postsynaptic_neuron.get_last_firing_time()) {
-        (Some(t_pre), Some(t_post)) => {
-            let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
-
-            if t_pre < t_post {
-                delta_w = postsynaptic_neuron.get_stdp_params().a_plus * 
-                    (-1. * (t_pre - t_post).abs() / postsynaptic_neuron.get_stdp_params().tau_plus).exp();
-            } else if t_pre > t_post {
-                delta_w = -1. * postsynaptic_neuron.get_stdp_params().a_minus * 
-                    (-1. * (t_post - t_pre).abs() / postsynaptic_neuron.get_stdp_params().tau_minus).exp();
-            }
-        },
-        _ => {}
-    };
-
-    return delta_w;
-}
-
 /// Handles history of a lattice
 pub trait LatticeHistory: Default {
     /// Stores the current state of the lattice given the cell grid
@@ -507,7 +480,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     }
 }
 
-impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDPlasticity> {
+impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDP> {
     // Generates a default lattice implementation given a neuron type
     pub fn default_impl() -> Self {
         Lattice::default()
