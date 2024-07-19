@@ -1066,7 +1066,7 @@ pub trait STDP: LastFiringTime {
 /// } 
 /// ```
 pub trait IterateAndSpike: 
-Clone + CurrentVoltage + GapConductance + GaussianFactor + IsSpiking + STDP + Send + Sync {
+Clone + CurrentVoltage + GapConductance + GaussianFactor + IsSpiking + LastFiringTime + Send + Sync {
     /// Takes in an input current and returns whether the model is spiking
     /// after the membrane potential is updated
     fn iterate_and_spike(&mut self, input_current: f32) -> bool;
