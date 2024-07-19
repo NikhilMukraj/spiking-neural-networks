@@ -7,8 +7,12 @@ use spiking_neural_networks::{
         GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
         LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
         NeurotransmitterType, Neurotransmitters, 
-    }, spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain},
-    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory,
+    }, 
+    spike_train::{
+        DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
+    }, 
+    plasticity::STDP, 
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, 
     SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
@@ -390,16 +394,6 @@ implement_nested_getter_and_setter!(
     max, gaussian_max, get_gaussian_max, set_gaussian_max
 );
 
-implement_nested_getter_and_setter!(
-    PyIzhikevichNeuron,
-    model,
-    stdp_params,
-    a_plus, a_plus, get_a_plis, set_a_plis,
-    a_minus, a_minus, get_a_minus, set_a_minus,
-    tau_minus, tau_minus, get_tau_minus, set_tau_minus,
-    tau_plus, tau_plus, get_tau_plus, set_tau_plus
-);
-
 impl_repr!(PyIzhikevichNeuron, model);
 
 #[pymethods]
@@ -445,7 +439,7 @@ impl PyIzhikevichNeuron {
     }
 
     fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
-        PyApproximateNeurotransmitters { neurotransmitters: self.model.get_neurotransmitters().clone() }
+        PyApproximateNeurotransmitters { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
     }
 
     fn set_neurotransmitters(&mut self, neurotransmitters: PyApproximateNeurotransmitters) {
@@ -453,7 +447,7 @@ impl PyIzhikevichNeuron {
     }
 
     fn get_ligand_gates(&self) -> PyApproximateLigandGatedChannels {
-        PyApproximateLigandGatedChannels { ligand_gates: self.model.get_ligand_gates().clone() }
+        PyApproximateLigandGatedChannels { ligand_gates: self.model.ligand_gates.clone() }
     }
 
     fn set_ligand_gates(&mut self, ligand_gates: PyApproximateLigandGatedChannels) {
@@ -571,8 +565,9 @@ type PyLatticeNeuron = PyIzhikevichNeuron;
 pub struct PyIzhikevichLattice {
     lattice: Lattice<
         LatticeNeuron,
-        AdjacencyMatrix<(usize, usize)>,
+        AdjacencyMatrix<(usize, usize), f32>,
         GridVoltageHistory,
+        STDP,
     >
 }
 
@@ -688,6 +683,21 @@ impl PyIzhikevichLattice {
     //     }
     // }
 
+    fn apply_function(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        self.lattice.apply(|neuron| {
+            let py_neuron = PyIzhikevichNeuron {
+                model: neuron.clone(),
+            };
+            let result = py_callable.call1(py, (py_neuron,)).unwrap();
+            let updated_py_neuron: PyIzhikevichNeuron = result.extract(py).unwrap();
+            *neuron = updated_py_neuron.model;
+        });
+
+        Ok(())
+    }
+
     fn reset_timing(&mut self) {
         self.lattice.reset_timing();
     }
@@ -729,13 +739,13 @@ impl PyIzhikevichLattice {
     }
 
     #[getter]
-    fn get_do_stdp(&self) -> bool {
+    fn get_do_plasticity(&self) -> bool {
         self.lattice.update_grid_history
     }
 
     #[setter]
-    fn set_do_stdp(&mut self, flag: bool) {
-        self.lattice.do_stdp = flag;
+    fn set_do_plasticity(&mut self, flag: bool) {
+        self.lattice.do_plasticity = flag;
     }
 
     fn reset_history(&mut self) {
@@ -760,11 +770,11 @@ impl PyIzhikevichLattice {
 
         Ok(
             format!(
-                "IzhikevichLattice {{ ({}x{}), id: {}, do_stdp: {}, update_grid_history: {} }}", 
+                "IzhikevichLattice {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {} }}", 
                 rows,
                 cols,
                 self.lattice.get_id(),
-                self.lattice.do_stdp,
+                self.lattice.do_plasticity,
                 self.lattice.update_grid_history,
             )
         )
@@ -839,6 +849,21 @@ impl PyPoissonLattice {
         } else {
             Err(PyKeyError::new_err(format!("Column at {} not found", col)))
         }
+    }
+    
+    fn apply_function(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        self.lattice.apply(|neuron| {
+            let py_neuron = PyPoissonNeuron {
+                model: neuron.clone(),
+            };
+            let result = py_callable.call1(py, (py_neuron,)).unwrap();
+            let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
+            *neuron = updated_py_neuron.model;
+        });
+
+        Ok(())
     }
 
     fn reset_timing(&mut self) {
@@ -925,11 +950,12 @@ impl PyGraphPosition {
 pub struct PyIzhikevichNetwork {
     network: LatticeNetwork<
         LatticeNeuron, 
-        AdjacencyMatrix<(usize, usize)>, 
+        AdjacencyMatrix<(usize, usize), f32>, 
         GridVoltageHistory, 
         LatticeSpikeTrain,
         SpikeTrainGridHistory,
-        AdjacencyMatrix<GraphPosition>
+        AdjacencyMatrix<GraphPosition, f32>,
+        STDP,
     >
 }
 
@@ -1202,11 +1228,11 @@ impl PyIzhikevichNetwork {
                 let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
 
                 format!(
-                    "IzhikevichLattice {{ ({}x{}), id: {}, do_stdp: {}, update_grid_history: {} }}", 
+                    "IzhikevichLattice {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {} }}", 
                     rows,
                     cols,
                     i.get_id(),
-                    i.do_stdp,
+                    i.do_plasticity,
                     i.update_grid_history,
                 )
             })
@@ -1247,7 +1273,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPoissonLattice>()?;
     m.add_class::<PyIzhikevichNetwork>()?;
 
-    // RUN LATTICE METHODS
+    // RUN LATTICE METHODS (for network)
+    // SET AND GET LATTICE (for network)
     
     // view weights
     // eventually work with graph history
