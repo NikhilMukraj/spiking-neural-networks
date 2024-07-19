@@ -27,10 +27,12 @@ pub mod spike_train;
 use spike_train::{SpikeTrain, NeuralRefractoriness};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime,
-    STDP, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, 
     aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
+    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
+    NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, STDP 
 };
+pub mod plasticity;
+use plasticity::{Plasticity, STDPlasticity};
 /// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
@@ -463,7 +465,12 @@ macro_rules! impl_reset_timing  {
 /// }
 /// ```
 #[derive(Debug, Clone)]
-pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> {
+pub struct Lattice<
+    T: IterateAndSpike, 
+    U: Graph<T=(usize, usize), U=f32>, 
+    V: LatticeHistory, 
+    W: Plasticity<T, T, T>,
+> {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -474,15 +481,17 @@ pub struct Lattice<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: Lat
     pub update_graph_history: bool,
     /// Whether to update grid's history
     pub update_grid_history: bool,
-    /// Whether to update weights with STDP when iterating
-    pub do_stdp: bool,
+    // Plasticity rule
+    pub plasticity: W,
+    /// Whether to update weights with based on plasticity when iterating
+    pub do_plasticity: bool,
     /// Whether to add normally distributed random noise
     pub gaussian: bool,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> Default for Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T>> Default for Lattice<T, U, V, W> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -490,21 +499,22 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> D
             grid_history: V::default(),
             update_graph_history: false,
             update_grid_history: false,
-            do_stdp: false,
+            do_plasticity: false,
+            plasticity: W::default(),
             gaussian: false,
             internal_clock: 0,
         }
     }
 }
 
-impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory> {
+impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDPlasticity> {
     // Generates a default lattice implementation given a neuron type
     pub fn default_impl() -> Self {
         Lattice::default()
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> Lattice<T, U, V> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T>> Lattice<T, U, V, W> {
     impl_reset_timing!();
 
     /// Gets id of lattice [`Graph`]
@@ -651,7 +661,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> L
             self.graph.edit_weight(
                 &i, 
                 &pos, 
-                Some(current_weight + update_weight_stdp(&self.cell_grid[x_in][y_in], given_neuron))
+                Some(current_weight + self.plasticity.update_weight(&self.cell_grid[x_in][y_in], given_neuron))
             )?;
         }
 
@@ -664,7 +674,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> L
             self.graph.edit_weight(
                 &pos, 
                 &i, 
-                Some(current_weight + update_weight_stdp(given_neuron, &self.cell_grid[x_out][y_out]))
+                Some(current_weight + self.plasticity.update_weight(given_neuron, &self.cell_grid[x_out][y_out]))
             )?; 
         }
 
@@ -691,7 +701,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> L
                 self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
             }
 
-            if self.do_stdp && is_spiking {
+            if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
                 self.update_weights_from_spiking_neuron(x, y, &pos)?;
             } 
         }
@@ -725,7 +735,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> L
                 self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
             }
 
-            if self.do_stdp && is_spiking {
+            if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
                 self.update_weights_from_spiking_neuron(x, y, &pos)?;
             } 
         }
@@ -756,7 +766,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory> L
                 self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
             }
 
-            if self.do_stdp && is_spiking {
+            if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
                 self.update_weights_from_spiking_neuron(x, y, &pos)?;
             } 
         }
@@ -1081,9 +1091,10 @@ pub struct LatticeNetwork<
     W: SpikeTrain, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
+    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
-    lattices: HashMap<usize, Lattice<T, U, V>>,
+    lattices: HashMap<usize, Lattice<T, U, V, Z>>,
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
     /// An array of graphs connecting different lattices together
@@ -1092,7 +1103,7 @@ pub struct LatticeNetwork<
     pub internal_clock: usize,
 }
 
-impl<T, U, V, W, X, Y> Default for LatticeNetwork<T, U, V, W, X, Y>
+impl<T, U, V, W, X, Y, Z> Default for LatticeNetwork<T, U, V, W, X, Y, Z>
 where
     T: IterateAndSpike,
     U: Graph<T=(usize, usize), U=f32>,
@@ -1100,6 +1111,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
+    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
 {
     fn default() -> Self { 
         LatticeNetwork {
@@ -1111,7 +1123,7 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
+impl<T, U, V, W, X, Y, Z> LatticeNetwork<T, U, V, W, X, Y, Z>
 where
     T: IterateAndSpike,
     U: Graph<T=(usize, usize), U=f32> + ToGraphPosition<GraphPos = Y>,
@@ -1119,11 +1131,12 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
+    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
     pub fn generate_network(
-        lattices: Vec<Lattice<T, U, V>>, 
+        lattices: Vec<Lattice<T, U, V, Z>>, 
         spike_train_lattices: Vec<SpikeTrainLattice<W, X>>
     ) -> Result<Self, LatticeNetworkError> {
         let mut network = LatticeNetwork::default();
@@ -1140,7 +1153,7 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y> LatticeNetwork<T, U, V, W, X, Y>
+impl<T, U, V, W, X, Y, Z> LatticeNetwork<T, U, V, W, X, Y, Z>
 where
     T: IterateAndSpike,
     U: Graph<T=(usize, usize), U=f32>,
@@ -1148,11 +1161,12 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
+    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
         &mut self, 
-        lattice: Lattice<T, U, V>
+        lattice: Lattice<T, U, V, Z>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
@@ -1188,27 +1202,27 @@ where
     }
 
     /// Returns an immutable reference to all the lattice hashmaps
-    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
+    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
         (&self.lattices, &self.spike_train_lattices)
     }
 
     /// Returns the set of [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V>> {
+    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z>> {
         self.lattices.values()
     }
 
     /// Returns a mutable set [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V>> {
+    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Z>> {
         self.lattices.values_mut()
     }
 
     /// Returns a reference to [`Lattice`] given the identifier
-    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V>> {
+    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z>> {
         self.lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`Lattice`] given the identifier
-    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V>> {
+    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z>> {
         self.lattices.get_mut(id)
     }
 
@@ -1555,7 +1569,8 @@ where
     }
 
     fn update_weights_from_spiking_neuron_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
-        let given_neuron = &self.lattices.get(&pos.id).unwrap().cell_grid[x][y];
+        let current_lattice = &self.lattices.get(&pos.id).unwrap();
+        let given_neuron = &current_lattice.cell_grid[x][y];
 
         for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
             let (x_in, y_in) = input_pos.pos;
@@ -1565,7 +1580,7 @@ where
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = update_weight_stdp(
+            let dw = current_lattice.plasticity.update_weight(
                 &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
                 given_neuron,
             );
@@ -1580,15 +1595,16 @@ where
 
         for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
             let (x_out, y_out) = output_pos.pos;
+            let output_lattice = self.lattices.get(&output_pos.id).unwrap();
 
             let current_weight: f32 = self.connecting_graph
                 .lookup_weight(&pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = update_weight_stdp(
+            let dw = output_lattice.plasticity.update_weight(
                 given_neuron,
-                &self.lattices.get(&output_pos.id).unwrap().cell_grid[x_out][y_out], 
+                &output_lattice.cell_grid[x_out][y_out], 
             );
                                         
             self.connecting_graph
@@ -1614,7 +1630,7 @@ where
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = update_weight_stdp(
+            let dw = current_lattice.plasticity.update_weight(
                 &current_lattice.cell_grid[x_in][y_in], 
                 given_neuron,
             );
@@ -1635,7 +1651,7 @@ where
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = update_weight_stdp(
+            let dw = current_lattice.plasticity.update_weight(
                 given_neuron,
                 &current_lattice.cell_grid[x_out][y_out], 
             );
@@ -1671,10 +1687,13 @@ where
                 let is_spiking = lattice.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
                     input_value, input_neurotransmitter,
                 );
-    
-                if is_spiking {
+
+                if is_spiking { 
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
-                    if lattice.do_stdp {
+                }
+    
+                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                    if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
                 }
@@ -1725,13 +1744,12 @@ where
                     0., input_neurotransmitter,
                 );
     
-                if is_spiking {
+                if is_spiking { 
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if is_spiking {
-                    lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
-                    if lattice.do_stdp {
+                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                    if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
                 }
@@ -1780,13 +1798,12 @@ where
 
                 let is_spiking = lattice.cell_grid[x][y].iterate_and_spike(input_value);
     
-                if is_spiking {
+                if is_spiking { 
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if is_spiking {
-                    lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
-                    if lattice.do_stdp {
+                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                    if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
                 }
