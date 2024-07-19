@@ -1274,6 +1274,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyIzhikevichNetwork>()?;
 
     // RUN LATTICE METHODS (for network)
+    // APPLY GIVEN POSITION (for regular and spike train lattice)
     // SET AND GET LATTICE (for network)
     
     // view weights
