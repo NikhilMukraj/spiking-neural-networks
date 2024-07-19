@@ -21,6 +21,8 @@ pub struct STDP {
     pub tau_plus: f32, 
     /// Negative STDP decay modifier 
     pub tau_minus: f32, 
+    /// Timestep
+    pub dt: f32,
 }
 
 impl Default for STDP {
@@ -28,8 +30,9 @@ impl Default for STDP {
         STDP { 
             a_plus: 2., 
             a_minus: 2., 
-            tau_plus: 45., 
-            tau_minus: 45., 
+            tau_plus: 4.5, 
+            tau_minus: 4.5, 
+            dt: 0.1,
         }
     }
 }
@@ -48,9 +51,9 @@ where
                 let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
 
                 if t_pre < t_post {
-                    delta_w = self.a_plus * (-1. * (t_pre - t_post).abs() / self.tau_plus).exp();
+                    delta_w = self.a_plus * (-1. * ((t_pre - t_post) * self.dt).abs() / self.tau_plus).exp();
                 } else if t_pre > t_post {
-                    delta_w = -1. * self.a_minus * (-1. * (t_post - t_pre).abs() / self.tau_minus).exp();
+                    delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
                 }
             },
             _ => {}
