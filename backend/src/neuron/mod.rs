@@ -1101,6 +1101,8 @@ pub struct LatticeNetwork<
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
     /// An array of graphs connecting different lattices together
     connecting_graph: Y,
+    /// Whether to update connecting graph history
+    pub update_connecting_graph_history: bool,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
 }
@@ -1120,6 +1122,7 @@ where
             lattices: HashMap::new(),
             spike_train_lattices: HashMap::new(),
             connecting_graph: Y::default(),
+            update_connecting_graph_history: false,
             internal_clock: 0,
         }
     }
@@ -1714,6 +1717,10 @@ where
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
         }
 
+        if self.update_connecting_graph_history {
+            self.connecting_graph.update_history();
+        }
+
         self.internal_clock += 1;
 
         for lattice in self.lattices.values_mut() {
@@ -1769,6 +1776,10 @@ where
             self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
         }
+
+        if self.update_connecting_graph_history {
+            self.connecting_graph.update_history();
+        }
         
         self.internal_clock += 1;
 
@@ -1822,6 +1833,10 @@ where
         for (x, y, pos) in spiking_positions {
             self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+        }
+
+        if self.update_connecting_graph_history {
+            self.connecting_graph.update_history();
         }
         
         self.internal_clock += 1;
