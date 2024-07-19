@@ -313,7 +313,8 @@
 //!             ApproximateNeurotransmitter, ApproximateReceptor,
 //!             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
 //!         },
-//!         update_weight_stdp, gap_junction,
+//!         plasticity::{Plasticity, STDP},
+//!         gap_junction,
 //!     },
 //!     distribution::limited_distr,
 //! };
@@ -334,32 +335,13 @@
 //!     keys_vector
 //! }
 //! 
-//! /// Updates each presynaptic neuron's weights given the timestep
-//! /// and whether the neuron is spiking along with the state of the
-//! /// postsynaptic neuron
-//! fn update_isolated_presynaptic_neuron_weights<T: IterateAndSpike>(
-//!     neurons: &mut Vec<T>,
-//!     neuron: &T,
-//!     weights: &mut Vec<f32>,
-//!     delta_ws: &mut Vec<f32>,
-//!     timestep: usize,
-//!     is_spikings: Vec<bool>,
-//! ) {
-//!     for (n, i) in is_spikings.iter().enumerate() {
-//!         if *i {
-//!             // update firing times if spiking
-//!             neurons[n].set_last_firing_time(Some(timestep));
-//!             delta_ws[n] = update_weight_stdp(&neurons[n], &*neuron);
-//!             weights[n] += delta_ws[n];
-//!         }
-//!     }
-//! }
-//! 
 //! /// Tests spike time dependent plasticity on a set of given neurons
 //! /// 
 //! /// `presynaptic_neurons` : a set of input neurons
 //! ///
 //! /// `postsynaptic_neuron` : a single output neuron
+//! ///
+//! /// `stdp_params` : parameters for the plasticity rule
 //! ///
 //! /// `iterations` : number of timesteps to simulate neurons for
 //! ///
@@ -378,6 +360,7 @@
 //! fn test_isolated_stdp<T: IterateAndSpike>(
 //!     presynaptic_neurons: &mut Vec<T>,
 //!     postsynaptic_neuron: &mut T,
+//!     stdp_params: &STDP,
 //!     iterations: usize,
 //!     input_current: f32,
 //!     input_current_deviation: f32,
@@ -466,21 +449,26 @@
 //!             &presynaptic_neurotransmitters,
 //!         );
 //! 
-//!         update_isolated_presynaptic_neuron_weights(
-//!             presynaptic_neurons, 
-//!             &postsynaptic_neuron,
-//!             &mut weights, 
-//!             &mut delta_ws, 
-//!             timestep, 
-//!             is_spikings,
-//!         );
-//! 
-//!         // if postsynaptic neuron fires then update the firing time
-//!         // and update the weight accordingly
+//!         for (n, i) in is_spikings.iter().enumerate() {
+//!             if *i {
+//!                 presynaptic_neurons[n].set_last_firing_time(Some(timestep));
+//!                 delta_ws[n] = <STDP as Plasticity<T, T, T>>::update_weight(
+//!                     stdp_params, 
+//!                     &presynaptic_neurons[n], 
+//!                     postsynaptic_neuron
+//!                 );
+//!                 weights[n] += delta_ws[n];
+//!             }
+//!         }
+//!         
 //!         if is_spiking {
 //!             postsynaptic_neuron.set_last_firing_time(Some(timestep));
 //!             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-//!                 delta_ws[n_neuron] = update_weight_stdp(i, postsynaptic_neuron);
+//!                 delta_ws[n_neuron] = <STDP as Plasticity<T, T, T>>::update_weight(
+//!                     stdp_params, 
+//!                     i, 
+//!                     postsynaptic_neuron
+//!                 );
 //!                 weights[n_neuron] += delta_ws[n_neuron];
 //!             }
 //!         }
@@ -508,8 +496,8 @@
 //! ```rust
 //! use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 //! use spiking_neural_networks::neuron::iterate_and_spike::{
-//!     GaussianFactor, GaussianParameters, IsSpiking, STDPParameters, 
-//!     STDP, CurrentVoltage, GapConductance, IterateAndSpike, 
+//!     GaussianFactor, GaussianParameters, IsSpiking, 
+//!     CurrentVoltage, GapConductance, IterateAndSpike, 
 //!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -653,8 +641,6 @@
 //!     pub was_increasing: bool,
 //!     /// Last timestep the neuron has spiked
 //!     pub last_firing_time: Option<usize>,
-//!     /// STDP parameters
-//!     pub stdp_params: STDPParameters,
 //!     /// Parameters used in generating noise
 //!     pub gaussian_params: GaussianParameters,
 //!     /// Postsynaptic neurotransmitters in cleft
