@@ -49,12 +49,6 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
                 self.last_firing_time
             }
         }
-
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> STDP for #name<T, R> {        
-            fn get_stdp_params(&self) -> &STDPParameters {
-                &self.stdp_params
-            }
-        }
     };
 
     TokenStream::from(expanded)
