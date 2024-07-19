@@ -11,7 +11,8 @@ use crate::spiking_neural_networks::{
             IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
         },
-        update_weight_stdp, gap_junction,
+        plasticity::{Plasticity, STDPlasticity},
+        gap_junction,
     },
     distribution::limited_distr,
 };
@@ -33,7 +34,7 @@ impl Default for Trace {
 
 impl Trace {
     pub fn update_trace(&mut self, weight_change: f32) {
-        // self.c += ((-self.c / self.tau_c) + weight_change) * self.dt;
+        // self.c = (self.c + weight_change) * (-self.dt / self.tau_c).exp();
         self.c = self.c * (-self.dt / self.tau_c).exp() + weight_change;
     }
 }
@@ -53,7 +54,7 @@ impl Default for RewardParameters {
 
 impl RewardParameters {
     pub fn update_dopamine(&mut self, reward: f32) {
-        // self.dopamine += ((-self.dopamine / self.tau_d) + reward) * self.dt; 
+        // self.dopamine = (self.dopamine + reward) * (-self.dt / self.tau_d).exp();
         self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + reward;
     }
 }
@@ -80,6 +81,7 @@ fn generate_keys(n: usize) -> Vec<String> {
 fn test_isolated_r_stdp<T: IterateAndSpike>(
     presynaptic_neurons: &mut Vec<T>,
     postsynaptic_neuron: &mut T,
+    stdp_params: &STDPlasticity,
     iterations: usize,
     input_current: f32,
     input_current_deviation: f32,
@@ -176,21 +178,24 @@ fn test_isolated_r_stdp<T: IterateAndSpike>(
         for (n, i) in is_spikings.iter().enumerate() {
             if *i {
                 presynaptic_neurons[n].set_last_firing_time(Some(timestep));
-                delta_ws[n] = update_weight_stdp(&presynaptic_neurons[n], &*postsynaptic_neuron);
+                delta_ws[n] = <STDPlasticity as Plasticity<T, T, T>>::update_weight(
+                    stdp_params, &presynaptic_neurons[n], &*postsynaptic_neuron
+                );
             }
         }
 
         if is_spiking {
             postsynaptic_neuron.set_last_firing_time(Some(timestep));
             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-                delta_ws[n_neuron] = update_weight_stdp(i, &*postsynaptic_neuron);
+                delta_ws[n_neuron] = <STDPlasticity as Plasticity<T, T, T>>::update_weight(
+                    stdp_params, i, &*postsynaptic_neuron
+                );
             }
         }
 
         for (index, trace) in traces.iter_mut().enumerate() {
             trace.update_trace(delta_ws[index]);
             weights[index] += trace.c * reward_params.dopamine;
-            // weights[index] += delta_ws[index];
         }
 
         for (index, i) in presynaptic_neurons.iter().enumerate() {
@@ -240,9 +245,12 @@ fn main() {
     let reward_times: &[usize] = &[4000, 8000];
     let reward = 0.001;
 
+    let stdp_params = STDPlasticity::default();
+
     let output_hashmap = test_isolated_r_stdp(
         &mut presynaptic_neurons, 
         &mut izhikevich_neuron,
+        &stdp_params,
         iterations, 
         30., 
         0.1, 
