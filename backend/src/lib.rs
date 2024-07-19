@@ -449,6 +449,9 @@
 //!             &presynaptic_neurotransmitters,
 //!         );
 //! 
+//!         // updates each presynaptic neuron's weights given the timestep
+//!         // and whether the neuron is spiking along with the state of the
+//!         // postsynaptic neuron
 //!         for (n, i) in is_spikings.iter().enumerate() {
 //!             if *i {
 //!                 presynaptic_neurons[n].set_last_firing_time(Some(timestep));
@@ -461,6 +464,8 @@
 //!             }
 //!         }
 //!         
+//!         // if postsynaptic neuron fires then update the firing time
+//!         // and update the weight accordingly
 //!         if is_spiking {
 //!             postsynaptic_neuron.set_last_firing_time(Some(timestep));
 //!             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
