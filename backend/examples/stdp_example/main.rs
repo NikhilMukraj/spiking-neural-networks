@@ -11,7 +11,7 @@ use crate::spiking_neural_networks::{
             IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
             weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
         },
-        plasticity::{Plasticity, STDPlasticity},
+        plasticity::{Plasticity, STDP},
         gap_junction,
     },
     distribution::limited_distr,
@@ -36,7 +36,7 @@ fn generate_keys(n: usize) -> Vec<String> {
 fn test_isolated_stdp<T: IterateAndSpike>(
     presynaptic_neurons: &mut Vec<T>,
     postsynaptic_neuron: &mut T,
-    stdp_params: &STDPlasticity,
+    stdp_params: &STDP,
     iterations: usize,
     input_current: f32,
     input_current_deviation: f32,
@@ -118,7 +118,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         for (n, i) in is_spikings.iter().enumerate() {
             if *i {
                 presynaptic_neurons[n].set_last_firing_time(Some(timestep));
-                delta_ws[n] = <STDPlasticity as Plasticity<T, T, T>>::update_weight(
+                delta_ws[n] = <STDP as Plasticity<T, T, T>>::update_weight(
                     stdp_params, 
                     &presynaptic_neurons[n], 
                     postsynaptic_neuron
@@ -130,7 +130,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
         if is_spiking {
             postsynaptic_neuron.set_last_firing_time(Some(timestep));
             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-                delta_ws[n_neuron] = <STDPlasticity as Plasticity<T, T, T>>::update_weight(
+                delta_ws[n_neuron] = <STDP as Plasticity<T, T, T>>::update_weight(
                     stdp_params, 
                     i, 
                     postsynaptic_neuron
@@ -180,7 +180,7 @@ fn main() {
         max: 2.,
     };
 
-    let stdp_params = STDPlasticity::default();
+    let stdp_params = STDP::default();
 
     let output_hashmap = test_isolated_stdp(
         &mut presynaptic_neurons, 
