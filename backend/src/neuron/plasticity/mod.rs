@@ -10,9 +10,9 @@ pub trait Plasticity<T, U, V>: Default + Send + Sync {
     fn do_update(&self, neuron: &V) -> bool;
 }
 
-/// Spike time dependent plasticity
+/// Spike time dependent plasticity rule
 #[derive(Debug, Clone, Copy)]
-pub struct STDPlasticity {
+pub struct STDP {
     /// Postitive STDP modifier 
     pub a_plus: f32,
     /// Negative STDP modifier  
@@ -23,9 +23,9 @@ pub struct STDPlasticity {
     pub tau_minus: f32, 
 }
 
-impl Default for STDPlasticity {
+impl Default for STDP {
     fn default() -> Self {
-        STDPlasticity { 
+        STDP { 
             a_plus: 2., 
             a_minus: 2., 
             tau_plus: 45., 
@@ -34,7 +34,7 @@ impl Default for STDPlasticity {
     }
 }
 
-impl<T, U, V> Plasticity<T, U, V> for STDPlasticity
+impl<T, U, V> Plasticity<T, U, V> for STDP
 where
     T: LastFiringTime,
     U: LastFiringTime,
