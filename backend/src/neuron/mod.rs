@@ -380,6 +380,35 @@ macro_rules! impl_reset_timing  {
     };
 }
 
+macro_rules! impl_apply {
+    () => {
+        /// Applies a function across the entire cell grid to each neuron
+        pub fn apply<F>(&mut self, f: F)
+        where
+            F: Fn(&mut T),
+        {
+            for row in self.cell_grid.iter_mut() {
+                for neuron in row {
+                    f(neuron);
+                }
+            }
+        }
+
+        /// Applies a function across the entire cell grid to each neuron
+        /// given the position of the neuron and the neuron itself
+        pub fn apply_given_position<F>(&mut self, f: F)
+        where
+            F: Fn((usize, usize), &mut T),
+        {
+            for (i, row) in self.cell_grid.iter_mut().enumerate() {
+                for (j, neuron) in row.iter_mut().enumerate() {
+                    f((i, j), neuron);
+                }
+            }
+        }
+    };
+}
+
 /// Lattice of [`IterateAndSpike`] neurons, each lattice has a corresponding [`Graph`] that
 /// details the internal connections of the lattice, a grid of neurons stored as a 2
 /// dimensional array, as well as a field to track the history of the lattice over time, 
@@ -427,12 +456,10 @@ macro_rules! impl_reset_timing  {
 ///     lattice.run_lattice(500)?;
 /// 
 ///     // randomly initialize starting values of neurons
-///     let mut rng = rand::thread_rng();
-///     for row in lattice.cell_grid.iter_mut() {
-///         for neuron in row {
-///             neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
-///         }
-///     }
+///     lattice.apply(|neuron: &mut _| {
+///         let mut rng = rand::thread_rng();
+///         neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+///     });
 /// 
 ///     Ok(())
 /// }
@@ -489,6 +516,7 @@ impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVo
 
 impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T>> Lattice<T, U, V, W> {
     impl_reset_timing!();
+    impl_apply!();
 
     /// Gets id of lattice [`Graph`]
     pub fn get_id(&self) -> usize {
@@ -928,6 +956,7 @@ impl<T: SpikeTrain> SpikeTrainLattice<T, SpikeTrainGridHistory> {
 
 impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     impl_reset_timing!();
+    impl_apply!();
 
     /// Returns the identifier of the lattice
     pub fn get_id(&self) -> usize {
