@@ -51,14 +51,9 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     network.run_lattices(iterations)?;
 
-    network.get_mut_spike_train_lattice(&0).unwrap().cell_grid
-        .iter_mut()
-        .for_each(|i| {
-            i.iter_mut()
-                .for_each(|j| {
-                    j.chance_of_firing = 0.01
-            })
-        });
+    network.get_mut_spike_train_lattice(&0).unwrap().apply(|neuron| {
+        neuron.chance_of_firing = 0.01;
+    });
     
     network.run_lattices(iterations)?;
 
