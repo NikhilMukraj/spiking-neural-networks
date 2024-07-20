@@ -79,7 +79,7 @@ fn exponential_decay_effect(k: f32, a: f32, time_difference: f32, v_resting: f32
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 /// Handles spike train dynamics
-pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone {
+pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone + Send + Sync {
     type U: NeuralRefractoriness;
     /// Updates spike train
     fn iterate(&mut self) -> bool;
@@ -263,9 +263,9 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
-            firing_times: HashSet::from([100, 300, 500]),
+            firing_times: HashSet::default(),
             internal_clock: 0,
-            max_clock_value: 600,
+            max_clock_value: 500,
             refractoriness_dt: 0.1,
         }
     }
