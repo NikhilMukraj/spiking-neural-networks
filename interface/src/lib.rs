@@ -1363,7 +1363,11 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyIzhikevichNetwork>()?;
 
     // windows compile
+    // pyo3 raster plot (find peaks, if peak above certain threshold say it is a spike)
+    // (could just take all values above a certain threshold and say its spiking)
     // hodgkin huxley (ion channels too)
+
+    // modify plasticity params on lattice
     
     // view weights
     // eventually work with graph history
