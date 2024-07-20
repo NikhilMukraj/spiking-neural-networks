@@ -463,6 +463,11 @@ impl PyIzhikevichNeuron {
     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
         self.model.set_last_firing_time(timestep);
     }
+
+    #[getter]
+    fn is_spiking(&self) -> bool {
+        self.model.is_spiking
+    }
 }
 
 #[pyclass]
