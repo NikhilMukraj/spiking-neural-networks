@@ -1954,7 +1954,7 @@ where
 //     T: IterateAndSpike, 
 //     U: Graph<T=(usize, usize), U=Trace>, 
 //     V: LatticeHistory, 
-//     W: Plasticity<T, T, T>, // stdp with trace trait for this
+//     W: Plasticity<T, T, T>, // stdp with trace trait for this (TraceSTDP) (instead of calculating dw, it could modify weight directly)
 // > {
 //     /// Grid of neurons
 //     pub cell_grid: Vec<Vec<T>>,
