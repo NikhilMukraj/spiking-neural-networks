@@ -1898,3 +1898,82 @@ where
         Ok(())
     }
 }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct Trace {
+//     weight: f32,
+//     c: f32,
+//     tau_c: f32,
+//     dt: f32,
+// }
+
+// impl Default for Trace {
+//     fn default() -> Self {
+//         Trace { weight: 0., c: 0., tau_c: 1000., dt: 0.1 }
+//     }
+// }
+
+// impl Trace {
+//     pub fn update_trace(&mut self, weight_change: f32) {
+//         // self.c = (self.c + weight_change) * (-self.dt / self.tau_c).exp();
+//         self.c = self.c * (-self.dt / self.tau_c).exp() + weight_change;
+//     }
+// }
+
+// pub trait RewardModulator<T> {
+//     fn update(&mut self, reward: f32);
+//     fn update_weight(&self, weight: &mut T);
+// }
+
+// #[derive(Debug, Clone, Copy)]
+// pub struct DopamineRewardModulator {
+//     tau_d: f32,
+//     dopamine: f32,
+//     dt: f32,
+// }
+
+// impl Default for DopamineRewardModulator {
+//     fn default() -> Self {
+//         DopamineRewardModulator { tau_d: 200., dopamine: 0., dt: 0.1 }
+//     }
+// }
+
+// impl RewardModulator<Trace> for DopamineRewardModulator {
+//     fn update(&mut self, reward: f32) {
+//         // self.dopamine = (self.dopamine + reward) * (-self.dt / self.tau_d).exp();
+//         self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + reward;
+//     }
+
+//     fn update_weight(&self, weight: &mut Trace) {
+//         weight.weight = weight.c * self.dopamine;
+//     }
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct RewardModulatedLattice<
+//     T: IterateAndSpike, 
+//     U: Graph<T=(usize, usize), U=Trace>, 
+//     V: LatticeHistory, 
+//     W: Plasticity<T, T, T>, // stdp with trace trait for this
+// > {
+//     /// Grid of neurons
+//     pub cell_grid: Vec<Vec<T>>,
+//     /// Graph connecting internal neurons and storing weights between neurons
+//     pub graph: U,
+//     /// History of grid
+//     pub grid_history: V,
+//     /// Whether to update graph's history of weights
+//     pub update_graph_history: bool,
+//     /// Whether to update grid's history
+//     pub update_grid_history: bool,
+//     // Plasticity rule
+//     pub plasticity: W,
+//     /// Whether to update weights with based on plasticity when iterating
+//     pub do_plasticity: bool,
+//     /// Reward parameters for updating plasticity
+//     pub reward_params: DopamineRewardModulator,
+//     /// Whether to add normally distributed random noise
+//     pub gaussian: bool,
+//     /// Internal clock keeping track of what timestep the lattice is at
+//     pub internal_clock: usize,
+// }
