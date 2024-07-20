@@ -269,8 +269,9 @@ pub struct FittingSettings<
     pub electrical_synapse: bool,
     /// Use `true` to update receptor gating values of neurons based on neurotransmitter input,
     pub chemical_synapse: bool,
-    // Function that decodes the bitstring into a neuron
-    pub decoder: fn(&Vec<f32>) -> T,
+    /// Function that takes the decoded bitstring and generates the 
+    /// neuron to fit based on those parameters
+    pub converter: fn(&Vec<f32>) -> T,
 }
 
 /// Generates a summary of the neuron's action potentials over time
@@ -344,7 +345,7 @@ fn fitting_objective<
         Err(e) => return Err(e),
     };
 
-    let test_cell = (settings.decoder)(&decoded);
+    let test_cell = (settings.converter)(&decoded);
 
     let summaries_results = (0..settings.spike_trains.len())
         .map(|i| {
@@ -379,7 +380,7 @@ fn fitting_objective<
     Ok(score)
 }
 
-/// Fits a given neuron to another given neuron by modulating a given set of parameters in a decoder
+/// Fits a given neuron to another given neuron by modulating a given set of parameters in a converter
 /// function, returns an action potential summary for the reference model in second item of tuple,
 /// returns an action potential summary for the neuron to fit in third item of tuple,
 /// and returns scaling factors used during simulations in fourth item of tuple
@@ -388,7 +389,7 @@ fn fitting_objective<
 /// 
 /// - `reference_neuron` : neuron to reference as a target to meet
 /// 
-/// - `decoder` : function to use to take decoded values and translate them to a neuron
+/// - `converter` : function to use to take decoded values and translate them to a neuron
 /// 
 /// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
 /// use `None` to not scale summaries during fitting
@@ -423,7 +424,7 @@ pub fn fit_neuron_to_neuron<
 >(
     neuron_to_fit: &T,
     reference_neuron: &U,
-    decoder: fn(&Vec<f32>) -> T,
+    converter: fn(&Vec<f32>) -> T,
     scaling_defaults: Option<SummaryScalingDefaults>,
     iterations: usize,
     input_spike_trains: &Vec<V>,
@@ -498,7 +499,7 @@ pub fn fit_neuron_to_neuron<
         gaussian: gaussian,
         electrical_synapse: neuron_to_fit_electrical_synapse,
         chemical_synapse: neuron_to_fit_chemical_synapse,
-        decoder: decoder,
+        converter: converter,
     };
 
     let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V>> = HashMap::new();
@@ -522,7 +523,7 @@ pub fn fit_neuron_to_neuron<
         Err(e) => return Err(e),
     };
 
-    let test_cell = decoder(&decoded);
+    let test_cell = converter(&decoded);
 
     let summaries_results = (0..fitting_settings.spike_trains.len())
         .map(|i| {
