@@ -1,5 +1,5 @@
 [neuron]
-    type: Izhikevich
+    type: Simple
     vars: e=0, v_th=-55
     ligand_gates: default
     on_spike: 
