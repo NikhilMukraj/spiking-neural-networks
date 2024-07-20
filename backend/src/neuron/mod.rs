@@ -1870,7 +1870,7 @@ where
 
     /// Iterates the lattices based only on internal connections for a given amount of time using
     /// neurotransmitter inputs alone
-    pub fn run_lattices_chemical_only(
+    pub fn run_lattices_chemical_synapses_only(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
