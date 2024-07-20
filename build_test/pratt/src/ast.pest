@@ -46,11 +46,11 @@ bin_op = _{
 expr = { atom ~ (bin_op ~ atom)* }
 // bool_expr = { atom ~ (bool_bin_op ~ atom)* }
 
-diff_eq_declaration = { "d" ~ name ~ "/dt" }
-eq_declaration = { name }
+diff_eq_declaration = { "d" ~ name ~ "/dt" ~ " "* ~ "=" ~ " "* ~ expr }
+eq_declaration = { name ~ " "* ~ "=" ~ " "* ~ expr }
 
 func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
-func_declaration = { name ~ func_declaration_args }
+func_declaration = { name ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
 
 equation = _{ SOI ~ ( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr ~ EOI }
 
@@ -99,11 +99,8 @@ WHITESPACE = _{ " " }
 // }
 
 // eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ (NEWLINE* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ NEWLINE? }
-// assignments = {
-// 	(( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr) ~ 
-// 	(NEWLINE* ~ (( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr))* ~ 
-// 	NEWLINE?
-// }
+assignment = _{ func_declaration | diff_eq_declaration | eq_declaration }
+assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
 // type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
 // vars_def  = { (variables_with_default ~ NEWLINE+) | (variables_block ~ NEWLINE+) }
