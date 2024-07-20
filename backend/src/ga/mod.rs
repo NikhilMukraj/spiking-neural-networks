@@ -11,7 +11,7 @@ use crate::error::GeneticAlgorithmError;
 
 
 /// Bit string to use as a chromosome
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct BitString {
     pub string: String
 }
