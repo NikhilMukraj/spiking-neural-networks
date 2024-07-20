@@ -159,8 +159,10 @@ pub fn generate_hopfield_network<T: Graph<T=(usize, usize), U=f32> + Default>(
     graph_id: usize,
     data: &Vec<Vec<Vec<isize>>>
 ) -> result::Result<T, SpikingNeuralNetworksError> {
-    let num_rows = data[0].len();
-    let num_cols = data[0][0].len();
+    let num_rows = data.get(0).unwrap_or(&vec![]).len();
+    let num_cols = data.get(0).unwrap_or(&vec![])
+        .get(0).unwrap_or(&vec![])
+        .len();
 
     for pattern in data {
         for row in pattern {
