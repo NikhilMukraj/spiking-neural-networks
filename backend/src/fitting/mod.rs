@@ -1,4 +1,4 @@
-//! A set of tools to fit a given Izhikevich neuron to a Hodgkin Huxley neuron.
+//! A set of tools to fit a given neuron to another neuron
 
 use std::{
     collections::HashMap,
@@ -8,10 +8,8 @@ use std::{
 };
 use crate::error::GeneticAlgorithmError;
 use crate::neuron::{   
-    hodgkin_huxley::HodgkinHuxleyNeuron, 
-    integrate_and_fire::IzhikevichNeuron, 
-    iterate_and_spike::{NeurotransmitterKinetics, ReceptorKinetics}, 
-    spike_train::{PresetSpikeTrain, NeuralRefractoriness},
+    iterate_and_spike::IterateAndSpike, 
+    spike_train::SpikeTrain,
     iterate_coupled_spiking_neurons_and_spike_train,
 };
 use crate::ga::{BitString, decode, genetic_algo, GeneticAlgorithmParameters};
@@ -22,24 +20,10 @@ fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
         .collect()
 }
 
-fn get_average_spike(peaks: &Vec<usize>, voltages: &Vec<f32>, default: f32) -> f32 {
-    if peaks.len() == 0 {
-        return default;
-    }
-
-    peaks.iter()
-        .map(|n| voltages[*n])
-        .sum::<f32>() / (peaks.len() as f32)
-}
-
 /// Summarizes various characteristics of two voltage time series,
 /// one from a presynaptic neuron and one from a postsynaptic neuron
 #[derive(Debug)]
 pub struct ActionPotentialSummary {
-    /// Average height of the presynaptic spikes (mV)
-    pub average_pre_spike_amplitude: f32,
-    /// Average height of the postynaptic spikes (mV)
-    pub average_post_spike_amplitude: f32,
     /// Average difference in timing between spikes from the presynaptic neuron
     pub average_pre_spike_time_difference: f32,
     /// Average difference in timing between spikes from the postsynaptic neuron
@@ -58,7 +42,6 @@ pub fn get_summary(
     post_voltages: &Vec<f32>, 
     pre_peaks: &Vec<usize>,
     post_peaks: &Vec<usize>,
-    spike_amplitude_default: f32,
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
         return Err(
@@ -67,9 +50,6 @@ pub fn get_summary(
             )
         );
     }
-
-    let average_pre_spike: f32 = get_average_spike(&pre_peaks, pre_voltages, spike_amplitude_default);
-    let average_post_spike: f32 = get_average_spike(&post_peaks, post_voltages, spike_amplitude_default);
 
     let average_pre_spike_difference: f32 = if pre_peaks.len() != 0 {
         diff(&pre_peaks).iter()
@@ -87,8 +67,6 @@ pub fn get_summary(
 
     Ok(
         ActionPotentialSummary {
-            average_pre_spike_amplitude: average_pre_spike,
-            average_post_spike_amplitude: average_post_spike,
             average_pre_spike_time_difference: average_pre_spike_difference,
             average_post_spike_time_difference: average_post_spike_difference,
             num_pre_spikes: pre_peaks.len() as f32,
@@ -98,7 +76,7 @@ pub fn get_summary(
 }
 
 /// A set of defaults to use for scaling if no spikes are
-/// found within inputs for [`fit_izhikevich_to_hodgkin_huxley`]
+/// found within inputs for [`fit_neuron_to_neuron`]
 pub struct SummaryScalingDefaults {
     /// Default scaling for height of spikes
     pub default_amplitude_scale: f32,
@@ -118,11 +96,9 @@ impl Default for SummaryScalingDefaults {
     }
 }
 
-/// Scaling factors for action potential summaries used in [`fit_izhikevich_to_hodgkin_huxley`]
+/// Scaling factors for action potential summaries used in [`fit_neuron_to_neuron`]
 #[derive(Clone, Copy)]
 pub struct SummaryScalingFactors {
-    /// Scaling for height of spikes
-    pub amplitude_scale: f32,
     /// Scaling for times between spikes
     pub time_difference_scale: f32,
     /// Scaling for number of spikes
@@ -149,9 +125,6 @@ pub fn get_reference_scale(
     reference_summary: &ActionPotentialSummary, 
     scaling_defaults: &SummaryScalingDefaults,
 ) -> (ActionPotentialSummary, SummaryScalingFactors) {
-    let amplitudes = vec![
-        reference_summary.average_pre_spike_amplitude, reference_summary.average_post_spike_amplitude
-    ];
     let time_differences = vec![
         reference_summary.average_pre_spike_time_difference, reference_summary.average_post_spike_time_difference
     ];
@@ -159,9 +132,6 @@ pub fn get_reference_scale(
         reference_summary.num_pre_spikes, reference_summary.num_post_spikes,
     ];
 
-    let amplitude_scale = replace_with_default(
-        *get_f32_max(&amplitudes).unwrap(), scaling_defaults.default_amplitude_scale
-    );
     let time_difference_scale = replace_with_default(
         *get_f32_max(&time_differences).unwrap(), scaling_defaults.default_time_difference_scale
     );
@@ -170,8 +140,6 @@ pub fn get_reference_scale(
     );
 
     let scaled_reference = ActionPotentialSummary {
-        average_post_spike_amplitude: reference_summary.average_pre_spike_amplitude / amplitude_scale,
-        average_pre_spike_amplitude: reference_summary.average_post_spike_amplitude / amplitude_scale,
         average_pre_spike_time_difference: reference_summary.average_pre_spike_time_difference / time_difference_scale,
         average_post_spike_time_difference: reference_summary.average_post_spike_time_difference / time_difference_scale,
         num_pre_spikes: reference_summary.num_pre_spikes / num_peaks_scale,
@@ -179,7 +147,6 @@ pub fn get_reference_scale(
     };
 
     let scaling_factors = SummaryScalingFactors {
-        amplitude_scale: amplitude_scale, 
         time_difference_scale: time_difference_scale,
         num_peaks_scale: num_peaks_scale,
     };
@@ -193,8 +160,6 @@ pub fn scale_summary(
     scaling_factors: &SummaryScalingFactors
 ) -> ActionPotentialSummary {
     ActionPotentialSummary {
-        average_post_spike_amplitude: summary.average_pre_spike_amplitude / scaling_factors.amplitude_scale,
-        average_pre_spike_amplitude: summary.average_post_spike_amplitude / scaling_factors.amplitude_scale,
         average_pre_spike_time_difference: summary.average_pre_spike_time_difference / scaling_factors.time_difference_scale,
         average_post_spike_time_difference: summary.average_post_spike_time_difference / scaling_factors.time_difference_scale,
         num_pre_spikes: summary.num_pre_spikes / scaling_factors.num_peaks_scale,
@@ -205,15 +170,8 @@ pub fn scale_summary(
 /// Compares the spike amplitudes, spike time differences, and number of spikes between action potentials
 /// by summing the square of the difference between each field across summaries, if any value is not a number
 /// `f32::INFINITY` is returned
-pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary, use_amplitudes: bool) -> f32 {
+pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPotentialSummary) -> f32 {
     let mut score = 0.;
-
-    if use_amplitudes {
-        let pre_spike_amplitude = (summary1.average_pre_spike_amplitude - summary2.average_pre_spike_amplitude).powf(2.);
-        let post_spike_amplitude = (summary1.average_post_spike_amplitude - summary2.average_post_spike_amplitude).powf(2.);
-
-        score += pre_spike_amplitude + post_spike_amplitude;
-    }
 
     let pre_spike_difference = (summary1.average_pre_spike_time_difference - summary2.average_pre_spike_time_difference).powf(2.);
     let post_spike_difference = (summary1.average_post_spike_time_difference - summary2.average_post_spike_time_difference).powf(2.);
@@ -230,33 +188,29 @@ pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPoten
     }
 }
 
-/// Generates an action potential summary from coupled Hodgkin Huxley neurons where the presynaptic neuron
-/// is coupled to a preset spike train, set `do_receptor_kinetics` to `true` to update receptor kinetics based
-/// on neurotransmitter input or to `false` to keep it state, use `gaussian` to add normally distributed 
-/// random noise, use `spike_amplitude_default` to set a default spike height if no spikes are generated,
-/// use `resting_potential` to set the resting potential of both Hodgkin Huxley neurons (mV)
-pub fn get_hodgkin_huxley_summary<
-    T: NeurotransmitterKinetics, 
-    U: ReceptorKinetics, 
-    V: NeurotransmitterKinetics,
-    W: NeuralRefractoriness,
+/// Generates an action potential summary from coupled neurons where the presynaptic neuron
+/// is coupled to a preset spike train, set `electrical_synapse` to `true` to update neurons based on
+/// electrical gap junctions, set `chemical_synapse` to `true` to update receptor kinetics based
+/// on neurotransmitter input or to `false` to not account for chemical neurotransmission, 
+/// use `gaussian` to add normally distributed random noise
+pub fn get_reference_summary<
+    T: IterateAndSpike,
+    U: SpikeTrain,
 >(
-    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<T, U>, 
-    input_spike_train: &PresetSpikeTrain<V, W>, 
+    neuron: &T, 
+    input_spike_train: &U, 
     iterations: usize,
     electrical_synapse: bool,
     chemical_synapse: bool,
     gaussian: bool, 
-    spike_amplitude_default: f32,
-    resting_potential: f32
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = input_spike_train.clone();
 
-    let mut presynaptic_neuron = hodgkin_huxley_neuron.clone();
-    let mut postsynaptic_neuron = hodgkin_huxley_neuron.clone();
+    let mut presynaptic_neuron = neuron.clone();
+    let mut postsynaptic_neuron = neuron.clone();
 
-    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.current_voltage];
-    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.current_voltage];
+    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.get_current_voltage()];
+    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.get_current_voltage()];
 
     let mut pre_peaks: Vec<usize> = vec![];
     let mut post_peaks: Vec<usize> = vec![];
@@ -280,47 +234,33 @@ pub fn get_hodgkin_huxley_summary<
             post_peaks.push(timestep);
         };
 
-        pre_voltages.push(presynaptic_neuron.current_voltage);
-        post_voltages.push(postsynaptic_neuron.current_voltage);
+        pre_voltages.push(presynaptic_neuron.get_current_voltage());
+        post_voltages.push(postsynaptic_neuron.get_current_voltage());
     }
-
-    let pre_voltages = pre_voltages.iter()
-        .map(|i| i + resting_potential)
-        .collect();
-    let post_voltages = post_voltages.iter()
-        .map(|i| i + resting_potential)
-        .collect();
 
     Ok(
         get_summary(
-            &pre_voltages, &post_voltages, &pre_peaks, &post_peaks, spike_amplitude_default
+            &pre_voltages, &post_voltages, &pre_peaks, &post_peaks,
         )?
     )
 }
 
-/// Settings used to scale action potential summary during [`fit_izhikevich_to_hodgkin_huxley`]
-/// as well as settings used to run Izhikevich neuron during fitting process
+/// Settings used to scale action potential summary during [`fit_neuron_to_neuron`]
+/// as well as settings used to run neuron to fit during fitting process
 #[derive(Clone)]
 pub struct FittingSettings<
-    'a, 
-    T: NeurotransmitterKinetics, 
-    U: ReceptorKinetics, 
-    V: NeurotransmitterKinetics,
-    W: NeuralRefractoriness,
+    'a,  
+    T: IterateAndSpike,
+    U: SpikeTrain,
 >{
-    /// Izhikevich neuron to reference for parameters during fitting
-    pub izhikevich_neuron: IzhikevichNeuron<T, U>,
-    /// Spike trains to use when simulating Izhikevich neurons
-    pub spike_trains: Vec<PresetSpikeTrain<V, W>>,
-    /// Reference summaries to compare Izhikevich neuron against
+    /// Neuron to fit to reference neuron
+    pub neuron_to_fit: T,
+    /// Spike trains to as input to the first neuron
+    pub spike_trains: Vec<U>,
+    /// Reference summaries to compare neuron to fit against
     pub action_potential_summary: &'a [ActionPotentialSummary],
     /// Scalars to use when comparing summaries
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
-    /// Whether or not to include the average amplitudes as a parameter when
-    /// calculating similarity of action potential summaries
-    pub use_amplitude: bool,
-    /// Default value to use if no spikes are found
-    pub spike_amplitude_default: f32,
     /// Number of iterations to run simulation for
     pub iterations: usize,
     /// Use `true` to add normally distributed random noise to inputs of simulation
@@ -329,25 +269,25 @@ pub struct FittingSettings<
     pub electrical_synapse: bool,
     /// Use `true` to update receptor gating values of neurons based on neurotransmitter input,
     pub chemical_synapse: bool,
+    // Function that decodes the bitstring into a neuron
+    pub decoder: fn(&Vec<f32>) -> T,
 }
 
-/// Generates a summary of the Izhikevich neuron's action potentials over time
+/// Generates a summary of the neuron's action potentials over time
 /// given a presynaptic and postsynaptic neuron
-pub fn get_izhikevich_summary<
-    T: NeurotransmitterKinetics, 
-    U: ReceptorKinetics, 
-    V: NeurotransmitterKinetics, 
-    W: NeuralRefractoriness
+fn get_summary_given_settings<
+    T: IterateAndSpike,
+    U: SpikeTrain,
 >(
-    presynaptic_neuron: &mut IzhikevichNeuron<T, U>, 
-    postsynaptic_neuron: &mut IzhikevichNeuron<T, U>,
-    settings: &FittingSettings<T, U, V, W>,
+    presynaptic_neuron: &mut T, 
+    postsynaptic_neuron: &mut T,
+    settings: &FittingSettings<T, U>,
     index: usize,
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = settings.spike_trains[index].clone();
 
-    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.current_voltage];
-    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.current_voltage];
+    let mut pre_voltages: Vec<f32> = vec![presynaptic_neuron.get_current_voltage()];
+    let mut post_voltages: Vec<f32> = vec![postsynaptic_neuron.get_current_voltage()];
 
     let mut pre_peaks: Vec<usize> = vec![];
     let mut post_peaks: Vec<usize> = vec![];
@@ -371,12 +311,12 @@ pub fn get_izhikevich_summary<
             post_peaks.push(timestep);
         };
 
-        pre_voltages.push(presynaptic_neuron.current_voltage);
-        post_voltages.push(postsynaptic_neuron.current_voltage);
+        pre_voltages.push(presynaptic_neuron.get_current_voltage());
+        post_voltages.push(postsynaptic_neuron.get_current_voltage());
     }
 
     let summary = get_summary(
-        &pre_voltages, &post_voltages, &pre_peaks, &post_peaks, settings.spike_amplitude_default
+        &pre_voltages, &post_voltages, &pre_peaks, &post_peaks
     )?;
 
     match settings.scaling_factors[index] {
@@ -389,41 +329,26 @@ pub fn get_izhikevich_summary<
 // if fitting does not generalize, optimize other coefs in equation
 // or can try optimizing tau_m and c_m
 fn fitting_objective<
-    T: NeurotransmitterKinetics, 
-    U: ReceptorKinetics,
-    W: NeurotransmitterKinetics,
-    V: NeuralRefractoriness,
+    T: IterateAndSpike,
+    U: SpikeTrain,
 >(
     bitstring: &BitString, 
     bounds: &Vec<(f32, f32)>, 
     n_bits: usize, 
-    settings: &HashMap<&str, FittingSettings<T, U, W, V>>
+    settings: &HashMap<&str, FittingSettings<T, U>>
 ) -> result::Result<f32, GeneticAlgorithmError> {
+    let settings = settings.get("settings").unwrap();
+
     let decoded = match decode(bitstring, bounds, n_bits) {
         Ok(decoded_value) => decoded_value,
         Err(e) => return Err(e),
     };
 
-    let a: f32 = decoded[0];
-    let b: f32 = decoded[1];
-    let c: f32 = decoded[2];
-    let d: f32 = decoded[3];
-    let v_th: f32 = decoded[4];
-    let gap_conductance: f32 = decoded[5];
-
-    let settings = settings.get("settings").unwrap();
-
-    let mut test_cell = settings.izhikevich_neuron.clone();
-    test_cell.v_th = v_th;
-    test_cell.gap_conductance = gap_conductance;
-    test_cell.a = a;
-    test_cell.b = b;
-    test_cell.c = c;
-    test_cell.d = d;
+    let test_cell = (settings.decoder)(&decoded);
 
     let summaries_results = (0..settings.spike_trains.len())
         .map(|i| {
-            get_izhikevich_summary(
+            get_summary_given_settings(
                 &mut test_cell.clone(), 
                 &mut test_cell.clone(), 
                 settings,
@@ -447,28 +372,28 @@ fn fitting_objective<
 
     let score = (0..settings.spike_trains.len())
         .map(|i| {
-            compare_summary(&settings.action_potential_summary[i], &summaries[i], settings.use_amplitude)
+            compare_summary(&settings.action_potential_summary[i], &summaries[i])
         })
         .sum::<f32>();
 
     Ok(score)
 }
 
-/// Fits a given Izhikevich neuron to a given Hodgkin Huxley by modulating the
-/// `a`, `b`, `c`, `d`, `v_th`, and `gap_conductance` parameters, 
-/// returns `a`, `b`, `c`, `d`, `v_th`, and `gap_conductance` in first item of tuple,
-/// returns an action potential summary for the reference Hodgkin Huxley model in second item of tuple,
-/// returns an action potential summary for the fit Izhikevich neuron in third item of tuple,
+/// Fits a given neuron to another given neuron by modulating a given set of parameters in a decoder
+/// function, returns an action potential summary for the reference model in second item of tuple,
+/// returns an action potential summary for the neuron to fit in third item of tuple,
 /// and returns scaling factors used during simulations in fourth item of tuple
 /// 
-/// - `izhikevich_neuron` : Izhikevich neuron to simulate for fitting
+/// - `neuron_to_fit` : neuron to simulate for fitting
 /// 
-/// - `hodgkin_huxley_neuron` : Hodgkin Huxley neuron to reference
+/// - `reference_neuron` : neuron to reference as a target to meet
+/// 
+/// - `decoder` : function to use to take decoded values and translate them to a neuron
 /// 
 /// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
 /// use `None` to not scale summaries during fitting
 /// 
-/// - `iterations` : number of iterations to run each Hodgkin Huxley and Izhikevich simulation for
+/// - `iterations` : number of iterations to run each simulation for
 /// 
 /// - `input_spike_trains` : a set of preset spike trains to use when simulating each neuron, essentially
 /// a set of conditions to observe the neurons over in order to ensure the models are fit
@@ -476,130 +401,119 @@ fn fitting_objective<
 /// - `genetic_algo_parameters` : a set of hyperparameters for the genetic algorithm that fits
 /// the neurons to use
 /// 
-/// - `hodgkin_huxley_do_receptor_kinetics` : use `true` to update receptor gating values of 
-/// Hodgkin Huxley neuron based on neurotransmitter input during the simulation
+/// - `reference_electrical_synapse` : use `true` to update neurons based on electrical gap junctions for
+/// the reference neuron
 /// 
-/// - `izhikevich_do_receptor_kinetics` : use `true` to update receptor gating values of 
-/// Izhikevich neuron based on neurotransmitter input during the simulation
+/// - `reference_chemical_synapse` : use `true` to update receptor gating values of 
+/// the neurons based on neurotransmitter input during the simulation for the reference neuron
 /// 
-/// - `resting_potential` : resting potential of the Hodgkin Huxley neuron
+/// - `neuron_to_fit_electrical_synapse` : use `true` to update neurons based on electrical gap junctions for
+/// the neuron to fit
+/// 
+/// - `neuron_to_fit_chemical_synapse` : use `true` to update receptor gating values of 
+/// the neurons based on neurotransmitter input during the simulation for the neuron to fit
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 /// 
-/// - `use_amplitude` : use `true` to compare the average spike amplitudes of the simulations
-/// in the fitting function
-/// 
-/// - `spike_amplitude_default` : default height for a spike if no spikes are found in a given simulation
-/// 
 /// - `verbose` : use `true` to print extra information
-pub fn fit_izhikevich_to_hodgkin_huxley<
-    T: NeurotransmitterKinetics, 
-    U: NeurotransmitterKinetics, 
-    V: NeurotransmitterKinetics, 
-    W: ReceptorKinetics,
-    Y: ReceptorKinetics,
-    X: NeuralRefractoriness,
+pub fn fit_neuron_to_neuron<
+    T: IterateAndSpike,
+    U: IterateAndSpike,
+    V: SpikeTrain,
 >(
-    izhikevich_neuron: &IzhikevichNeuron<T, W>,
-    hodgkin_huxley_neuron: &HodgkinHuxleyNeuron<U, Y>,
+    neuron_to_fit: &T,
+    reference_neuron: &U,
+    decoder: fn(&Vec<f32>) -> T,
     scaling_defaults: Option<SummaryScalingDefaults>,
     iterations: usize,
-    input_spike_trains: &Vec<PresetSpikeTrain<V, X>>,
+    input_spike_trains: &Vec<V>,
     genetic_algo_params: &GeneticAlgorithmParameters,
-    hodgkin_huxley_electrical_synapse: bool,
-    hodgkin_huxley_chemical_synapse: bool,
-    izhikevich_electrical_synapse: bool,
-    izhikevich_chemical_synapse: bool,
-    resting_potential: f32,
+    reference_electrical_synapse: bool,
+    reference_chemical_synapse: bool,
+    neuron_to_fit_electrical_synapse: bool,
+    neuron_to_fit_chemical_synapse: bool,
     gaussian: bool,
-    use_amplitude: bool,
-    spike_amplitude_default: f32,
-    debug: bool,
+    verbose: bool,
 ) -> result::Result<
     (
-        (f32, f32, f32, f32, f32, f32), 
+        Vec<f32>, 
         Vec<ActionPotentialSummary>, 
         Vec<ActionPotentialSummary>,
         Vec<Option<SummaryScalingFactors>>,
     ),
     GeneticAlgorithmError
 > {
-    let (hodgkin_huxley_summaries, scaling_factors) = match scaling_defaults {
+    let (reference_summaries, scaling_factors) = match scaling_defaults {
         Some(scaling_defaults_values) => {
-            let mut hodgkin_huxley_summaries: Vec<ActionPotentialSummary> = vec![];
+            let mut reference_summaries: Vec<ActionPotentialSummary> = vec![];
             let mut scaling_factors_vector: Vec<Option<SummaryScalingFactors>> = vec![];
 
             for current_spike_train in input_spike_trains.iter() {
-                let hodgkin_huxley_summary = get_hodgkin_huxley_summary(
-                    &hodgkin_huxley_neuron, 
-                    &current_spike_train, 
+                let reference_summary = get_reference_summary(
+                    reference_neuron, 
+                    current_spike_train, 
                     iterations,
-                    hodgkin_huxley_electrical_synapse,
-                    hodgkin_huxley_chemical_synapse,
+                    reference_electrical_synapse,
+                    reference_chemical_synapse,
                     gaussian, 
-                    spike_amplitude_default,
-                    resting_potential,
                 )?;
 
-                let (hodgkin_huxley_summary, scaling_factors) = get_reference_scale(
-                    &hodgkin_huxley_summary, &scaling_defaults_values
+                let (reference_summary, scaling_factors) = get_reference_scale(
+                    &reference_summary, &scaling_defaults_values
                 );
 
-                hodgkin_huxley_summaries.push(hodgkin_huxley_summary);
+                reference_summaries.push(reference_summary);
                 scaling_factors_vector.push(Some(scaling_factors));
             }
 
-            (hodgkin_huxley_summaries, scaling_factors_vector)
+            (reference_summaries, scaling_factors_vector)
         },
         None => {
-            let mut hodgkin_huxley_summaries: Vec<ActionPotentialSummary> = vec![];
+            let mut reference_summaries: Vec<ActionPotentialSummary> = vec![];
             let scaling_factors_vector: Vec<Option<SummaryScalingFactors>> = vec![None; input_spike_trains.len()];
 
             for current_spike_train in input_spike_trains.iter() {
-                let hodgkin_huxley_summary = get_hodgkin_huxley_summary(
-                    &hodgkin_huxley_neuron, 
-                    &current_spike_train, 
+                let reference_summary = get_reference_summary(
+                    reference_neuron, 
+                    current_spike_train, 
                     iterations,
-                    hodgkin_huxley_electrical_synapse,
-                    hodgkin_huxley_chemical_synapse,
+                    reference_electrical_synapse,
+                    reference_chemical_synapse,
                     gaussian, 
-                    spike_amplitude_default,
-                    resting_potential,
                 )?;
 
-                hodgkin_huxley_summaries.push(hodgkin_huxley_summary);
+                reference_summaries.push(reference_summary);
             }
 
-            (hodgkin_huxley_summaries, scaling_factors_vector)
+            (reference_summaries, scaling_factors_vector)
         }
     };
 
     let fitting_settings = FittingSettings {
-        izhikevich_neuron: izhikevich_neuron.clone(),
-        action_potential_summary: &hodgkin_huxley_summaries.as_slice(),
+        neuron_to_fit: neuron_to_fit.clone(),
+        action_potential_summary: &reference_summaries.as_slice(),
         scaling_factors: &scaling_factors.as_slice(),
-        use_amplitude: use_amplitude,
-        spike_amplitude_default: spike_amplitude_default,
         spike_trains: input_spike_trains.clone(),
         iterations: iterations,
         gaussian: gaussian,
-        electrical_synapse: izhikevich_electrical_synapse,
-        chemical_synapse: izhikevich_chemical_synapse,
+        electrical_synapse: neuron_to_fit_electrical_synapse,
+        chemical_synapse: neuron_to_fit_chemical_synapse,
+        decoder: decoder,
     };
 
-    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, W, V, X>> = HashMap::new();
+    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V>> = HashMap::new();
     fitting_settings_map.insert("settings", fitting_settings.clone());
 
-    if debug {
+    if verbose {
         println!("Starting genetic algorithm...");
     }
     let (best_bitstring, _best_score, _scores) = genetic_algo(
         fitting_objective, 
         genetic_algo_params,
         &fitting_settings_map,
-        debug,
+        verbose,
     )?;
-    if debug {
+    if verbose {
         println!("Finished genetic algorithm...");
     }
 
@@ -608,86 +522,59 @@ pub fn fit_izhikevich_to_hodgkin_huxley<
         Err(e) => return Err(e),
     };
 
-    let a: f32 = decoded[0];
-    let b: f32 = decoded[1];
-    let c: f32 = decoded[2];
-    let d: f32 = decoded[3];
-    let v_th: f32 = decoded[4];
-    let gap_conductance: f32 = decoded[5];
+    let test_cell = decoder(&decoded);
 
-    let mut test_cell = izhikevich_neuron.clone();
+    let summaries_results = (0..fitting_settings.spike_trains.len())
+        .map(|i| {
+            get_summary_given_settings(
+                &mut test_cell.clone(), 
+                &mut test_cell.clone(), 
+                &fitting_settings,
+                i
+            )
+        })
+        .collect::<Vec<result::Result<ActionPotentialSummary, GeneticAlgorithmError>>>();
 
-    test_cell.a = a;
-    test_cell.b = b;
-    test_cell.c = c;
-    test_cell.d = d;
-    test_cell.v_th = v_th;
-    test_cell.gap_conductance = gap_conductance;
-
-        let summaries_results = (0..fitting_settings.spike_trains.len())
-            .map(|i| {
-                get_izhikevich_summary(
-                    &mut test_cell.clone(), 
-                    &mut test_cell.clone(), 
-                    &fitting_settings,
-                    i
-                )
-            })
-            .collect::<Vec<result::Result<ActionPotentialSummary, GeneticAlgorithmError>>>();
-
-        for result in summaries_results.iter() {
-            if let Err(e) = result {
-                return Err(e.clone());
-            }
+    for result in summaries_results.iter() {
+        if let Err(e) = result {
+            return Err(e.clone());
         }
+    }
 
-        let generated_summaries = summaries_results.into_iter().map(|res| res.unwrap())
-            .collect::<Vec<ActionPotentialSummary>>();
+    let generated_summaries = summaries_results.into_iter().map(|res| res.unwrap())
+        .collect::<Vec<ActionPotentialSummary>>();
 
-
-    Ok(((a, b, c, d, v_th, gap_conductance), hodgkin_huxley_summaries, generated_summaries, scaling_factors))
+    Ok((decoded, reference_summaries, generated_summaries, scaling_factors))
 }
 
 /// Prints out the given action potential summaries and scales them appropriately
 /// based on the given set of scaling factors, length of action potential summaries
-/// and the length of scaling factors must be the same set `use_amplitude` to `false` to
-/// not print out amplitude related statistics
+/// and the length of scaling factors must be the same
 pub fn print_action_potential_summaries(
     summaries: &[ActionPotentialSummary], 
     scaling_factors: &[Option<SummaryScalingFactors>],
-    use_amplitude: bool,
 ) -> Result<()> {
     if summaries.len() != scaling_factors.len() {
         return Err(Error::new(ErrorKind::InvalidInput, "summaries and scaling_factors length must be the same"));
     }
 
-    let mut pre_spike_amplitudes: Vec<f32> = Vec::new();
-    let mut post_spike_amplitudes: Vec<f32> = Vec::new();
     let mut pre_spike_time_differences: Vec<f32> = Vec::new();
     let mut post_spike_time_differences: Vec<f32> = Vec::new();
     let mut num_pre_spikes: Vec<f32> = Vec::new();
     let mut num_post_spikes: Vec<f32> = Vec::new();
 
     for (summary, scaling) in summaries.iter().zip(scaling_factors) {
-        let (amplitude_scaling, time_scaling, peaks_scaling) = match scaling {
-            Some(value) => (value.amplitude_scale, value.time_difference_scale, value.num_peaks_scale),
-            None => (1., 1., 1.)
+        let (time_scaling, peaks_scaling) = match scaling {
+            Some(value) => (value.time_difference_scale, value.num_peaks_scale),
+            None => (1., 1.)
         };
 
-        if use_amplitude {
-            pre_spike_amplitudes.push(summary.average_pre_spike_amplitude * amplitude_scaling);
-            post_spike_amplitudes.push(summary.average_post_spike_amplitude * amplitude_scaling);
-        }
         pre_spike_time_differences.push(summary.average_pre_spike_time_difference * time_scaling);
         post_spike_time_differences.push(summary.average_post_spike_time_difference * time_scaling);
         num_pre_spikes.push(summary.num_pre_spikes * peaks_scaling);
         num_post_spikes.push(summary.num_post_spikes * peaks_scaling);
     }
 
-    if use_amplitude {
-        println!("Presynaptic spike amplitudes: {:?}", pre_spike_amplitudes);
-        println!("Postsynaptic spike amplitudes: {:?}", post_spike_amplitudes);
-    }
     println!("Presynaptic spike time Differences: {:?}", pre_spike_time_differences);
     println!("Postsynaptic spike time Differences: {:?}", post_spike_time_differences);
     println!("# of presynaptic spikes: {:?}", num_pre_spikes);
