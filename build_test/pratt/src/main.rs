@@ -1,8 +1,7 @@
-use std::env;
-use pest::iterators::Pairs;
+use std::{io::Result, env, fs};
+use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
-use std::io::{self, BufRead};
 
 
 #[derive(pest_derive::Parser)]
@@ -167,6 +166,63 @@ pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
         .parse(pairs)
 }
 
+pub fn parse_declaration(pair: Pair<Rule>) -> AST {
+    match pair.as_rule() {
+        Rule::diff_eq_declaration => {
+            let mut inner_rules = pair.into_inner();
+
+            let name: String = String::from(inner_rules.next()
+                .expect("Could not get function name").as_str()
+            );
+
+            let expr: Box<AST> = Box::new(
+                parse_expr(
+                    inner_rules.next()
+                        .expect("No arguments found")
+                        .into_inner()
+                )
+            );
+
+            AST::DiffEqAssignment { name: name, expr: expr }
+        },
+        Rule::eq_declaration => {
+            let mut inner_rules = pair.into_inner();
+
+            let name: String = String::from(inner_rules.next()
+                .expect("Could not get function name").as_str()
+            );
+
+            let expr: Box<AST> = Box::new(
+                parse_expr(
+                    inner_rules.next()
+                        .expect("No arguments found")
+                        .into_inner()
+                )
+            );
+
+            AST::EqAssignment { name: name, expr: expr }
+        },
+        Rule::func_declaration => {
+            let mut inner_rules = pair.into_inner();
+            let name = String::from(inner_rules.next().unwrap().as_str());
+
+            let args = inner_rules.next().unwrap()
+                .into_inner()
+                .map(|arg| String::from(arg.as_str()))
+                .collect::<Vec<String>>();
+
+            let expr = Box::new(parse_expr(inner_rules.next().unwrap().into_inner()));
+
+            AST::FunctionAssignment {
+                name,
+                args,
+                expr,
+            }
+        }
+        rule => unreachable!("Unexpected declaration, found {:#?}", rule),
+    }
+}
+
 #[derive(Debug)]
 pub enum Op {
     Add,
@@ -239,65 +295,35 @@ impl AST {
     }
 }
 
-fn main() -> io::Result<()> {
+fn main() -> Result<()> {
+    let mut filename = String::from("");
+
     for (key, value) in env::vars() {
-        if key == "FOO" {
-            println!("{}: {}", key, value);
+        if key == "filename" {
+            filename = value;
         }
     }
 
-    for line in io::stdin().lock().lines() {
-        let line = line?;
-        if line.trim() == "q" {
-            break;
-        }
+    if filename == "" {
+        return Ok(())
+    }
 
-        // handle function versus eq versus diff eq
-        // then move to neuron block versus ion channel 
-        // versus neurotransmitter versus receptor
-        // then generate appropriate rust code
+    let contents = fs::read_to_string(filename)?;
 
-        // each block should have variables and constants
-        // if block uses variable or const that isnt in scope
-        // there should be an error
-        // if equation is only constants could be calculated once maybe
+    // handle function versus eq versus diff eq
+    // then move to neuron block versus ion channel 
+    // versus neurotransmitter versus receptor
+    // then generate appropriate rust code
 
-        match ASTParser::parse(Rule::equation, &line) { // Rule::declaration?
-            Ok(mut pairs) => {
-                let pair = pairs.next().unwrap();
+    // each block should have variables and constants
+    // if block uses variable or const that isnt in scope
+    // there should be an error
+    // if equation is only constants could be calculated once maybe
 
-                let ast = match pair.as_rule() {
-                    Rule::diff_eq_declaration => {
-                        AST::DiffEqAssignment {
-                            name: String::from(pair.into_inner().as_str()),
-                            expr: Box::new(parse_expr(pairs.next().unwrap().into_inner())),
-                        }
-                    },
-                    Rule::eq_declaration => {
-                        AST::EqAssignment {
-                            name: String::from(pair.into_inner().as_str()),
-                            expr: Box::new(parse_expr(pairs.next().unwrap().into_inner())),
-                        }
-                    },
-                    Rule::func_declaration => {
-                        let mut inner_rules = pair.into_inner();
-                        let name = String::from(inner_rules.next().unwrap().as_str());
-
-                        let args = inner_rules.next().unwrap()
-                            .into_inner()
-                            .map(|arg| String::from(arg.as_str()))
-                            .collect::<Vec<String>>();
-
-                        let expr = Box::new(parse_expr(pairs.next().unwrap().into_inner()));
-
-                        AST::FunctionAssignment {
-                            name,
-                            args,
-                            expr,
-                        }
-                    }
-                    rule => unreachable!("Unexpected declaration, found {:#?}", rule),
-                };
+    match ASTParser::parse(Rule::assignments, &contents) { // Rule::declaration?
+        Ok(pairs) => {
+            for pair in pairs {
+                let ast = parse_declaration(pair);
 
                 println!(
                     "Parsed: {:#?}\nString: {}",
@@ -308,9 +334,9 @@ fn main() -> io::Result<()> {
                     // checks for recursive definitions
                 );
             }
-            Err(e) => {
-                eprintln!("Parse failed: {:?}", e);
-            }
+        }
+        Err(e) => {
+            eprintln!("Parse failed: {:?}", e);
         }
     }
 
