@@ -688,7 +688,7 @@ impl PyIzhikevichLattice {
     //     }
     // }
 
-    fn apply_function(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+    fn apply(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
         let py_callable = function.to_object(py);
 
         self.lattice.apply(|neuron| {
@@ -696,6 +696,21 @@ impl PyIzhikevichLattice {
                 model: neuron.clone(),
             };
             let result = py_callable.call1(py, (py_neuron,)).unwrap();
+            let updated_py_neuron: PyIzhikevichNeuron = result.extract(py).unwrap();
+            *neuron = updated_py_neuron.model;
+        });
+
+        Ok(())
+    }
+
+    fn apply_function_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        self.lattice.apply_given_position(|(i, j), neuron| {
+            let py_neuron = PyIzhikevichNeuron {
+                model: neuron.clone(),
+            };
+            let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
             let updated_py_neuron: PyIzhikevichNeuron = result.extract(py).unwrap();
             *neuron = updated_py_neuron.model;
         });
@@ -714,7 +729,7 @@ impl PyIzhikevichLattice {
         }
     }
 
-    fn run_lattice_chemical_synapse_only(&mut self, iterations: usize) -> PyResult<()> {
+    fn run_lattice_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
         match self.lattice.run_lattice_chemical_synapses_only(iterations) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
@@ -757,7 +772,6 @@ impl PyIzhikevichLattice {
         self.lattice.grid_history.reset();
     }
 
-    #[getter]
     fn get_weights(&self) -> Vec<Vec<f32>> {
         self.lattice.graph.matrix.clone()
             .into_iter()
@@ -864,6 +878,21 @@ impl PyPoissonLattice {
                 model: neuron.clone(),
             };
             let result = py_callable.call1(py, (py_neuron,)).unwrap();
+            let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
+            *neuron = updated_py_neuron.model;
+        });
+
+        Ok(())
+    }
+
+    fn apply_function_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        self.lattice.apply_given_position(|(i, j), neuron| {
+            let py_neuron = PyPoissonNeuron {
+                model: neuron.clone(),
+            };
+            let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
             let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
             *neuron = updated_py_neuron.model;
         });
@@ -1226,6 +1255,61 @@ impl PyIzhikevichNetwork {
         }
     }
 
+    fn get_lattice(&self, id: usize) -> PyResult<PyIzhikevichLattice> {
+        match self.network.get_lattice(&id) {
+            Some(value) => Ok(PyIzhikevichLattice { lattice: value.clone() }),
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    } 
+
+    fn get_spike_train_lattice(&self, id: usize) -> PyResult<PyPoissonLattice> {
+        match self.network.get_spike_train_lattice(&id) {
+            Some(value) => Ok(PyPoissonLattice { lattice: value.clone() }),
+            None => Err(PyValueError::new_err("Id not found")),
+        }
+    } 
+
+    fn set_lattice(&mut self, id: usize, lattice: PyIzhikevichLattice) -> PyResult<()> {
+        if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+            *current_lattice = lattice.lattice.clone();
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+    
+    fn set_spike_train_lattice(&mut self, id: usize, lattice: PyPoissonLattice) -> PyResult<()> {
+        if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+            *current_lattice = lattice.lattice.clone();
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+
+    fn run_lattices(&mut self, iterations: usize) -> PyResult<()> {
+        match self.network.run_lattices(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
+    fn run_lattices_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
+        match self.network.run_lattices_chemical_only(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
+    fn run_lattices_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
+        match self.network.run_lattices_with_electrical_and_chemical_synapses(iterations) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+        }
+    }
+
     fn __repr__(&self) -> PyResult<String> {
         let lattice_strings = self.network.lattices_values()
             .map(|i| {
@@ -1278,9 +1362,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPoissonLattice>()?;
     m.add_class::<PyIzhikevichNetwork>()?;
 
-    // RUN LATTICE METHODS (for network)
-    // APPLY GIVEN POSITION (for regular and spike train lattice)
-    // SET AND GET LATTICE (for network)
+    // windows compile
+    // hodgkin huxley (ion channels too)
     
     // view weights
     // eventually work with graph history
