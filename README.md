@@ -144,7 +144,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Dopamine calculation
   - Reward function is passed to `run_lattice`/`run_lattices` method to calculate weight changes
   - Reward modulated lattice and reward modulated network (connecting graph has weights that are an enum, one is reward modulated and has a trace while the other is not), should have option to add non reward modulated lattices
-  - Reward optimizer structure, takes in a reward modulated network and a reward function and a state structure and optimizes reward given the state structure, state structure encapsulates state of network (firing rate of readout for example), also needs a setup function that given parameters sets the state of network (for instance doing rate encoding on poisson lattice)
+  - Reward optimizer structure, takes in a reward modulated network and a reward function and a state structure and optimizes reward given the state structure, state structure encapsulates state of network (firing rate of readout for example) as well as a state representing something the network is interacting with, also needs a setup function that given parameters sets the state of network (for instance doing rate encoding on poisson lattice)
 
 - Use Rayon to thread lattice calculations
   - Inputs should be calculated in parallel
