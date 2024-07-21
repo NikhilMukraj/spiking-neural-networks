@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::io::{Error, ErrorKind};
 use std::{io::Result, env, fs};
 use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
@@ -63,7 +65,12 @@ pub enum AST {
         name: String,
         args: Vec<String>,
         expr: Box<AST>,
-    }
+    },
+    TypeDefinition(String),
+    OnSpike(Vec<Box<AST>>),
+    OnIteration(Vec<Box<AST>>),
+    SpikeDetection(Box<AST>),
+    Variables(Vec<Box<AST>>),
 }
 
 // then try writing rust code from ast
@@ -117,7 +124,7 @@ pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
         .map_primary(|primary| match primary.as_rule() {
             Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => AST::Name(String::from(primary.as_str())),
-            Rule::expr => parse_expr(primary.into_inner()),
+            Rule::expr => bool_parse_expr(primary.into_inner()),
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
 
@@ -128,7 +135,7 @@ pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
                 let args: Vec<Box<AST>> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(parse_expr(i.into_inner())))
+                    .map(|i| Box::new(bool_parse_expr(i.into_inner())))
                     .collect();
                 
                 AST::Function { name: name, args: args }
@@ -291,6 +298,34 @@ impl AST {
                     expr.to_string(),
                 )
             },
+            AST::TypeDefinition(string) => format!("type: {}", string),
+            AST::OnSpike(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                format!("on_spike:\n{}", assignments_string)
+            },
+            AST::OnIteration(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                format!("on_iteration:\n{}", assignments_string)
+            },
+            AST::SpikeDetection(expr) => {
+                format!("spike_detection: {}", expr.to_string())
+            },
+            AST::Variables(assignments) => {
+                let assignments_string = assignments.iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<String>>()
+                .join("\n");
+
+                format!("vars:\n{}", assignments_string)
+            }
         }
     }
 }
@@ -310,29 +345,83 @@ fn main() -> Result<()> {
 
     let contents = fs::read_to_string(filename)?;
 
-    // handle function versus eq versus diff eq
-    // then move to neuron block versus ion channel 
-    // versus neurotransmitter versus receptor
-    // then generate appropriate rust code
+    // handle variables
+    // handle continous detection
+    // try code generation (assume default ligands)
+    // runge kutta
 
-    // each block should have variables and constants
-    // if block uses variable or const that isnt in scope
-    // there should be an error
-    // if equation is only constants could be calculated once maybe
+    // handle ion channels
+    // handle ligand gates
+    // neurotransmitter and approximate kinetics
 
-    match ASTParser::parse(Rule::assignments, &contents) { // Rule::declaration?
+    match ASTParser::parse(Rule::neuron_definition, &contents) {
         Ok(pairs) => {
-            for pair in pairs {
-                let ast = parse_declaration(pair);
+            let mut definitions: HashMap<String, AST> = HashMap::new();
 
-                println!(
-                    "Parsed: {:#?}\nString: {}",
-                    ast,
-                    ast.to_string(),
-                    // after string is generated, any unnecessary parantheses should be dropped
-                    // number string should be suffixed with decimal if integer
-                    // checks for recursive definitions
-                );
+            for pair in pairs {
+                let (key, current_ast) = match pair.as_rule() {
+                    Rule::type_def => {
+                        (
+                            String::from("type"), 
+                            AST::TypeDefinition(
+                                String::from(pair.into_inner().next().unwrap().as_str())
+                            )
+                        )
+                    },
+                    Rule::on_iteration_def => {
+                        let inner_rules = pair.into_inner();
+
+                        (
+                            String::from("on_iteration"),
+                            AST::OnIteration(
+                                inner_rules
+                                .map(|i| Box::new(parse_declaration(i)))
+                                .collect::<Vec<Box<AST>>>()
+                            )
+                        )
+                    },
+                    Rule::on_spike_def => {
+                        let inner_rules = pair.into_inner();
+
+                        (
+                            String::from("on_spike"),
+                            AST::OnIteration(
+                                inner_rules
+                                .map(|i| Box::new(parse_declaration(i)))
+                                .collect::<Vec<Box<AST>>>()
+                            )
+                        )
+                    },
+                    Rule::spike_detection_def => {
+                        (
+                            String::from("spike_detection"),
+                            AST::SpikeDetection(Box::new(bool_parse_expr(pair.into_inner())))
+                        )
+                    }
+                    // Rule::vars_def => {
+                        // if no defaults then just assume assingment is 0.
+                        // in order to prevent duplicate, key should be "vars"
+                    // }
+                    // Rule::vars_with_default_def => {
+                        // assignment should be just a number
+                        // in order to prevent duplicate, key should be "vars"
+                    // }
+                    definition => unreachable!("Unexpected definiton: {:#?}", definition)
+                };
+
+                if definitions.contains_key(&key) {
+                    return Err(
+                        Error::new(
+                            ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                        )
+                    )
+                }
+
+                definitions.insert(key, current_ast);
+            }
+
+            for value in definitions.values() {
+                println!("{}", value.to_string());
             }
         }
         Err(e) => {
