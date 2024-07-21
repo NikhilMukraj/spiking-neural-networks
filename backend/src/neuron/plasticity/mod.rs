@@ -4,7 +4,7 @@ use super::iterate_and_spike::{LastFiringTime, IterateAndSpike};
 /// Handles plasticity rules given the two neurons and whether to 
 /// update weights based on the given neuron
 pub trait Plasticity<T, U, V, W>: Default + Send + Sync {
-    /// Calculates the change in weight given two neurons
+    /// Modifies the weight between given two neurons
     fn update_weight(&self, weight: &mut W, presynaptic: &T, postsynaptic: &U);
     // Determines whether to update weights given the neuron
     fn do_update(&self, neuron: &V) -> bool;
