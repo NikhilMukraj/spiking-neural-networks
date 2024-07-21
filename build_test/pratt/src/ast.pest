@@ -91,29 +91,37 @@ WHITESPACE = _{ " " }
 // spike_detection: bool_expr
 // ligand_gates: default
 
-// variables_block = { "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
-// variables_with_default = { 
-// 	"vars:" ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~ number ~ 
-//     (" "* ~ "," ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~number)* ~ 
-//     ","? 
-// }
+variables_block = { "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
+variables_with_default = { 
+	"vars:" ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~ number ~ 
+    (" "* ~ "," ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~number)* ~ 
+    ","? 
+}
 
 // eq_assignments = { (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr) ~ (NEWLINE* ~ (eq_declaration ~ " "* ~ "=" ~ " "* ~ expr))* ~ NEWLINE? }
+eq_assignments = _{ eq_declaration ~ (NEWLINE* ~ eq_declaration)* ~ NEWLINE? }
 assignment = _{ func_declaration | diff_eq_declaration | eq_declaration }
 assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
-// type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
-// vars_def  = { (variables_with_default ~ NEWLINE+) | (variables_block ~ NEWLINE+) }
-// on_spike_def = { "on_spike:" ~ " "* ~ NEWLINE+ ~ eq_assignments }
-// on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE+ ~ assignments }
-// spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
-// ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
+type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
+vars_def  = { variables_block ~ NEWLINE+ }
+vars_with_default_def  = { variables_with_default ~ NEWLINE+ }
+on_spike_def = { "on_spike:" ~ " "* ~ NEWLINE+ ~ eq_assignments }
+on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE+ ~ assignments }
+spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
+ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
 
-// neuron_definition = {
+// neuron_definition = _{
 //     "[neuron]" ~ NEWLINE ~ 
 // 	(on_iteration_def | type_def | vars_def | on_spike_def | spike_detection_def | ligand_gates_def){3,} ~ 
 // 	"[end]"
 // }
+
+neuron_definition = _{
+    "[neuron]" ~ NEWLINE ~ 
+	(on_iteration_def | type_def | on_spike_def | spike_detection_def){3,} ~ 
+	"[end]"
+}
 
 // Parser::parse(Rule::neuron_definition, input)
 // fn check_neuron_definition(pairs: Pairs<Rule>) -> Result<(), String> {
@@ -166,4 +174,3 @@ assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 // if () -> () else -> ()
 // if () -> () elif () -> () else -> ()
 // allow nextlines with if statements
-
