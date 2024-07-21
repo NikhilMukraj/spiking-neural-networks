@@ -39,6 +39,9 @@
 /archive_interface/generate_methods.py
 /interface/target
 /interface/.venv/*
+/interface/windows_venv/*
+/interface/notebooks/*.ipynb
+/interface/notebooks/.ipynb_checkpoints
 /interface/generate_methods.py
 /build_test/pratt/target
 /build_test/other_ast/target
