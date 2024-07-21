@@ -3,17 +3,15 @@ use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, P
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
     integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, GABAaDefault, 
-        GABAbDefault, IterateAndSpike, LastFiringTime, LigandGatedChannel, 
-        LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, 
-        NeurotransmitterType, Neurotransmitters, 
-    }, 
-    spike_train::{
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
+        DestexheNeurotransmitter, DestexheReceptor, GABAaDefault, GABAbDefault, 
+        IterateAndSpike, LastFiringTime, LigandGatedChannel, LigandGatedChannels, 
+        NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
+        NeurotransmitterType, Neurotransmitters, ReceptorKinetics 
+    }, plasticity::STDP, spike_train::{
         DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
-    }, 
-    plasticity::STDP, 
-    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, 
-    SpikeTrainLattice, SpikeTrainLatticeHistory
+    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, 
+    SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -130,6 +128,10 @@ impl PyApproximateNeurotransmitter {
             }
         }
     }
+
+    fn apply_t_change(&mut self, voltage: f32) {
+        self.neurotransmitter.apply_t_change(voltage);
+    }
 }
 
 impl_repr!(PyApproximateNeurotransmitter, neurotransmitter);
@@ -200,31 +202,35 @@ impl PyApproximateNeurotransmitters {
     }
 }
 
-// #[pyclass]
-// #[pyo3(name = "ApproximateReceptor")]
-// #[derive(Clone)]
-// pub struct PyApproximateReceptor {
-//     receptor: ApproximateReceptor
-// }
+#[pyclass]
+#[pyo3(name = "ApproximateReceptor")]
+#[derive(Clone)]
+pub struct PyApproximateReceptor {
+    receptor: ApproximateReceptor
+}
 
-// implement_basic_getter_and_setter!(
-//     PyApproximateReceptor, 
-//     receptor,
-//     r, get_r, set_r 
-// );
+implement_basic_getter_and_setter!(
+    PyApproximateReceptor, 
+    receptor,
+    r, get_r, set_r 
+);
 
-// #[pymethods]
-// impl PyApproximateReceptor {
-//     #[new]
-//     #[pyo3(signature = (r=0.))]
-//     fn new(r: f32) -> Self {
-//         PyApproximateReceptor {
-//             receptor: ApproximateReceptor {
-//                 r: r
-//             }
-//         }
-//     }
-// }
+#[pymethods]
+impl PyApproximateReceptor {
+    #[new]
+    #[pyo3(signature = (r=0.))]
+    fn new(r: f32) -> Self {
+        PyApproximateReceptor {
+            receptor: ApproximateReceptor {
+                r: r
+            }
+        }
+    }
+
+    fn apply_r_change(&mut self, neurotransmitter_conc: f32) {
+        self.receptor.apply_r_change(neurotransmitter_conc);
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "ApproximateLigandGatedChannel")]
@@ -261,14 +267,12 @@ impl PyApproximateLigandGatedChannel {
         }
     }
 
-    #[getter]
-    fn get_r(&self) -> f32 {
-        self.ligand_gate.receptor.r
+    fn get_receptor(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor { receptor: self.ligand_gate.receptor }
     }
 
-    #[setter]
-    fn set_r(&mut self, new_r: f32) {
-        self.ligand_gate.receptor.r = new_r;
+    fn set_receptor(&mut self, receptor: PyApproximateReceptor) {
+        self.ligand_gate.receptor = receptor.receptor;
     }
 }
 
@@ -1348,13 +1352,278 @@ impl PyIzhikevichNetwork {
     }
 }
 
+#[pyclass]
+#[pyo3(name = "DestexheNeurotransmitter")]
+#[derive(Clone)]
+pub struct PyDestexheNeurotransmitter {
+    neurotransmitter: DestexheNeurotransmitter
+}
+
+implement_basic_getter_and_setter!(
+    PyDestexheNeurotransmitter,
+    neurotransmitter,
+    t_max, get_t_max, set_t_max,
+    t, get_t, set_t,
+    v_p, get_v_p, set_v_p,
+    k_p, get_k_p, set_k_p
+);
+
+#[pymethods]
+impl PyDestexheNeurotransmitter {
+    #[new]
+    #[pyo3(signature = (t_max=1., t=0., v_p=5.0, k_p=2.0))]
+    fn new(t_max: f32, t: f32, v_p: f32, k_p: f32) -> Self {
+        PyDestexheNeurotransmitter {
+            neurotransmitter: DestexheNeurotransmitter {
+                t_max: t_max,
+                t: t,
+                v_p: v_p,
+                k_p: k_p,
+            }
+        }
+    }
+
+    fn apply_t_change(&mut self, voltage: f32) {
+        self.neurotransmitter.apply_t_change(voltage);
+    }
+}
+
+impl_repr!(PyDestexheNeurotransmitter, neurotransmitter);
+
+#[pyclass]
+#[pyo3(name = "DestexheNeurotransmitters")]
+#[derive(Clone)]
+pub struct PyDestexheNeurotransmitters {
+    neurotransmitters: Neurotransmitters<DestexheNeurotransmitter>
+}
+
+impl_repr!(PyDestexheNeurotransmitters, neurotransmitters);
+
+#[pymethods]
+impl PyDestexheNeurotransmitters {
+    #[new]
+    #[pyo3(signature = (neurotransmitter_types=None))]
+    fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
+        let mut neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
+
+        match neurotransmitter_types {
+            Some(values) => {
+                for i in values.iter() {
+                    let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                    let neurotransmitter = match current_type {
+                        NeurotransmitterType::Basic => DestexheNeurotransmitter::default(),
+                        NeurotransmitterType::AMPA => DestexheNeurotransmitter::ampa_default(),
+                        NeurotransmitterType::GABAa => DestexheNeurotransmitter::gabaa_default(),
+                        NeurotransmitterType::GABAb => DestexheNeurotransmitter::gabab_default(),
+                        NeurotransmitterType::NMDA => DestexheNeurotransmitter::nmda_default(),
+                    };
+        
+                    neurotransmitters.insert(current_type, neurotransmitter);
+                }
+            },
+            None => {}
+        };
+
+        Ok(
+            PyDestexheNeurotransmitters {
+                neurotransmitters: Neurotransmitters { neurotransmitters: neurotransmitters }
+            }
+        )
+    }
+
+    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyDestexheNeurotransmitter> {
+        if let Some(value) = self.neurotransmitters.get(&neurotransmitter_type.convert_type()) {
+            Ok(
+                PyDestexheNeurotransmitter { 
+                    neurotransmitter: *value 
+                }
+            )
+        } else {
+            Err(PyKeyError::new_err(format!("{:#?} not found", neurotransmitter_type)))
+        }
+    }
+
+    fn set_neurotransmitter(
+        &mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyDestexheNeurotransmitter
+    ) {
+        self.neurotransmitters.neurotransmitters.insert(
+            neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
+        );
+    }
+
+    fn apply_t_changes(&mut self, voltage: f32) {
+        self.neurotransmitters.apply_t_changes(voltage);
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "DestexheReceptor")]
+#[derive(Clone)]
+pub struct PyDestexheReceptor {
+    receptor: DestexheReceptor
+}
+
+implement_basic_getter_and_setter!(
+    PyDestexheReceptor,
+    receptor,
+    r, get_r, set_r,
+    alpha, get_alpha, set_alpha,
+    beta, get_beta, set_beta,
+    dt, get_dt, set_dt
+);
+
+#[pymethods]
+impl PyDestexheReceptor {
+    #[new]
+    #[pyo3(signature = (r=1., alpha=1., beta=1.0, dt=0.1))]
+    fn new(r: f32, alpha: f32, beta: f32, dt: f32) -> Self {
+        PyDestexheReceptor { 
+            receptor: DestexheReceptor {
+                r: r,
+                alpha: alpha,
+                beta: beta,
+                dt: dt,
+            } 
+        }
+    }
+
+    fn apply_r_change(&mut self, neurotransmitter_conc: f32) {
+        self.receptor.apply_r_change(neurotransmitter_conc);
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "DestexheLigandGatedChannel")]
+#[derive(Clone)]
+pub struct PyDestexheLigandGatedChannel {
+    ligand_gate: LigandGatedChannel<DestexheReceptor>
+}
+
+implement_basic_getter_and_setter!(
+    PyDestexheLigandGatedChannel, 
+    ligand_gate,
+    g, get_g, set_g,
+    reversal, get_reversal, set_reversal,
+    current, get_current, set_current
+);
+
+impl_repr!(PyDestexheLigandGatedChannel, ligand_gate);
+
+#[pyclass]
+#[pyo3(name = "DestexheLigandGatedChannels")]
+#[derive(Clone)]
+pub struct PyDestexheLigandGatedChannels {
+    ligand_gates: LigandGatedChannels<DestexheReceptor>
+}
+
+#[pymethods]
+impl PyDestexheLigandGatedChannels {
+    #[new]
+    #[pyo3(signature = (neurotransmitter_types=None))]
+    fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
+        let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<DestexheReceptor>> = HashMap::new();
+
+        match neurotransmitter_types {
+            Some(values) => {
+                for i in values.iter() {
+                    let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                    let neurotransmitter = match current_type {
+                        NeurotransmitterType::Basic => LigandGatedChannel::default(),
+                        NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+                        NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+                        NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+                        NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    };
+        
+                    ligand_gates.insert(current_type, neurotransmitter);
+                }
+            },
+            None => {}
+        };
+
+        Ok(
+            PyDestexheLigandGatedChannels {
+                ligand_gates: LigandGatedChannels { ligand_gates: ligand_gates }
+            }
+        )
+    }
+
+    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyDestexheLigandGatedChannel> {
+        if let Some(value) = self.ligand_gates.get(&neurotransmitter_type.convert_type()) {
+            Ok(
+                PyDestexheLigandGatedChannel { 
+                    ligand_gate: value.clone() 
+                }
+            )
+        } else {
+            Err(PyKeyError::new_err(format!("{:#?} not found", neurotransmitter_type)))
+        }
+    }
+
+    fn set_ligand_gate(
+        &mut self, neurotransmitter_type: PyNeurotransmitterType, ligand_gate: PyDestexheLigandGatedChannel
+    ) {
+        self.ligand_gates.ligand_gates.insert(
+            neurotransmitter_type.convert_type(), ligand_gate.ligand_gate
+        );
+    }
+
+    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict) -> PyResult<()> {
+        let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
+
+        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs);
+
+        Ok(())
+    }
+}
+
+#[pymethods]
+impl PyDestexheLigandGatedChannel {
+    #[new]
+    #[pyo3(signature = (receptor_type=PyNeurotransmitterType::Basic))]
+    fn new(receptor_type: PyNeurotransmitterType) -> Self {
+        let ligand_gate = match receptor_type.convert_type() {
+            NeurotransmitterType::Basic => LigandGatedChannel::default(),
+            NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+            NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+            NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+            NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+        };
+
+        PyDestexheLigandGatedChannel {
+            ligand_gate: ligand_gate
+        }
+    }
+
+    fn get_receptor(&self) -> PyDestexheReceptor {
+        PyDestexheReceptor { receptor: self.ligand_gate.receptor }
+    }
+
+    fn set_receptor(&mut self, receptor: PyDestexheReceptor) {
+        self.ligand_gate.receptor = receptor.receptor;
+    }
+}
+
+// #[pyclass]
+// #[pyo3(name = "HodgkinHuxleyNeuron")]
+// #[derive(Clone)]
+// pub struct PyHodgkinHuxleyNeuron {
+//     model: HodgkinHuxleyNeuron<DestexheNeurotransmitter, DestexheReceptor>,
+// }
+
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
     m.add_class::<PyApproximateNeurotransmitters>()?;
+    m.add_class::<PyDestexheNeurotransmitter>()?;
+    m.add_class::<PyDestexheNeurotransmitters>()?;
+    m.add_class::<PyApproximateReceptor>()?;
     m.add_class::<PyApproximateLigandGatedChannel>()?;
     m.add_class::<PyApproximateLigandGatedChannels>()?;
+    m.add_class::<PyDestexheReceptor>()?;
+    m.add_class::<PyDestexheLigandGatedChannel>()?;
+    m.add_class::<PyDestexheLigandGatedChannels>()?;
     m.add_class::<PyIzhikevichNeuron>()?;
     m.add_class::<PyIzhikevichLattice>()?;
     m.add_class::<PyDeltaDiracRefractoriness>()?;
@@ -1365,7 +1634,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // windows compile
     // pyo3 raster plot (find peaks, if peak above certain threshold say it is a spike)
     // (could just take all values above a certain threshold and say its spiking)
+    // --relase build with maturin
     // hodgkin huxley (ion channels too)
+    // macros for building receptors, ligand gates, neurotransmitters, and neurons
 
     // modify plasticity params on lattice
     
@@ -1375,6 +1646,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
+    // python wrapper should do f = lambda x: bool(x) to try and autoconvert before
+    // passing to rust
 
     // temp env variable for building pyo3 with custom models
     // impl neuron macro for arbitrary neuron (separate one for neurons with ion channels)
