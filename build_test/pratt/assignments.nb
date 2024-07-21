@@ -1,2 +1,0 @@
-du/dt = a * (u * v - b)
-dv/dt = (v - e) + i
