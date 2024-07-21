@@ -380,10 +380,6 @@
 //!     let mut weights: Vec<f32> = (0..n).map(|_| weight_params.get_random_number())
 //!         .collect();
 //! 
-//!     let mut delta_ws: Vec<f32> = (0..n)
-//!         .map(|_| 0.0)
-//!         .collect();
-//! 
 //!     // generate hashmap to save history of simulation
 //!     let mut output_hashmap: HashMap<String, Vec<f32>> = HashMap::new();
 //!     let keys_vector = generate_keys(n);
@@ -455,12 +451,12 @@
 //!         for (n, i) in is_spikings.iter().enumerate() {
 //!             if *i {
 //!                 presynaptic_neurons[n].set_last_firing_time(Some(timestep));
-//!                 delta_ws[n] = <STDP as Plasticity<T, T, T>>::update_weight(
+//!                 <STDP as Plasticity<T, T, T, f32>>::update_weight(
 //!                     stdp_params, 
+//!                     &mut weights[n],
 //!                     &presynaptic_neurons[n], 
 //!                     postsynaptic_neuron
 //!                 );
-//!                 weights[n] += delta_ws[n];
 //!             }
 //!         }
 //!         
@@ -469,12 +465,12 @@
 //!         if is_spiking {
 //!             postsynaptic_neuron.set_last_firing_time(Some(timestep));
 //!             for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-//!                 delta_ws[n_neuron] = <STDP as Plasticity<T, T, T>>::update_weight(
+//!                 <STDP as Plasticity<T, T, T, f32>>::update_weight(
 //!                     stdp_params, 
+//!                     &mut weights[n_neuron],
 //!                     i, 
 //!                     postsynaptic_neuron
 //!                 );
-//!                 weights[n_neuron] += delta_ws[n_neuron];
 //!             }
 //!         }
 //! 
