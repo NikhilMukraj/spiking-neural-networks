@@ -1963,12 +1963,16 @@ where
 // weight = reward_modulator(trace)
 // do_update is always considered to be true
 
+// reward modulated lattice network has connecting graph with enum for weights
+// enum { Weight(f32), Trace(Trace) }
+// connecting function could generate different enums
+
 // #[derive(Debug, Clone)]
 // pub struct RewardModulatedLattice<
 //     T: IterateAndSpike, 
 //     U: Graph<T=(usize, usize), U=Trace>, 
 //     V: LatticeHistory, 
-//     W: Plasticity<T, T, T>, 
+//     W: Plasticity<T, T, T, Trace>, 
 // > {
 //     /// Grid of neurons
 //     pub cell_grid: Vec<Vec<T>>,
