@@ -469,7 +469,7 @@ pub struct Lattice<
     T: IterateAndSpike, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: Plasticity<T, T, T>,
+    W: Plasticity<T, T, T, f32>,
 > {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
@@ -491,7 +491,7 @@ pub struct Lattice<
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T>> Default for Lattice<T, U, V, W> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T, f32>> Default for Lattice<T, U, V, W> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -514,7 +514,7 @@ impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVo
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T>> Lattice<T, U, V, W> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T, f32>> Lattice<T, U, V, W> {
     impl_reset_timing!();
     impl_apply!();
 
@@ -657,12 +657,13 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
         for i in input_positions {
             let (x_in, y_in) = i;
-            let current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
+            self.plasticity.update_weight(&mut current_weight, &self.cell_grid[x_in][y_in], given_neuron);
                                         
             self.graph.edit_weight(
                 &i, 
                 &pos, 
-                Some(current_weight + self.plasticity.update_weight(&self.cell_grid[x_in][y_in], given_neuron))
+                Some(current_weight)
             )?;
         }
 
@@ -670,12 +671,13 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
         for i in out_going_connections {
             let (x_out, y_out) = i;
-            let current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
+            self.plasticity.update_weight(&mut current_weight, given_neuron, &self.cell_grid[x_out][y_out]);
 
             self.graph.edit_weight(
                 &pos, 
                 &i, 
-                Some(current_weight + self.plasticity.update_weight(given_neuron, &self.cell_grid[x_out][y_out]))
+                Some(current_weight)
             )?; 
         }
 
@@ -1093,7 +1095,7 @@ pub struct LatticeNetwork<
     W: SpikeTrain, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
+    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
     lattices: HashMap<usize, Lattice<T, U, V, Z>>,
@@ -1115,7 +1117,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
+    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
 {
     fn default() -> Self { 
         LatticeNetwork {
@@ -1136,7 +1138,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
+    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
@@ -1166,7 +1168,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T> + Plasticity<W, T, T>,
+    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
@@ -1580,12 +1582,13 @@ where
         for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
             let (x_in, y_in) = input_pos.pos;
 
-            let current_weight: f32 = self.connecting_graph
+            let mut current_weight: f32 = self.connecting_graph
                 .lookup_weight(&input_pos, &pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = current_lattice.plasticity.update_weight(
+            current_lattice.plasticity.update_weight(
+                &mut current_weight,
                 &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
                 given_neuron,
             );
@@ -1594,7 +1597,7 @@ where
                 .edit_weight(
                     &input_pos, 
                     &pos, 
-                    Some(current_weight + dw)
+                    Some(current_weight)
                 )?;
         }
 
@@ -1602,12 +1605,13 @@ where
             let (x_out, y_out) = output_pos.pos;
             let output_lattice = self.lattices.get(&output_pos.id).unwrap();
 
-            let current_weight: f32 = self.connecting_graph
+            let mut current_weight: f32 = self.connecting_graph
                 .lookup_weight(&pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = output_lattice.plasticity.update_weight(
+            output_lattice.plasticity.update_weight(
+                &mut current_weight,
                 given_neuron,
                 &output_lattice.cell_grid[x_out][y_out], 
             );
@@ -1616,7 +1620,7 @@ where
                 .edit_weight(
                     &pos, 
                     &output_pos, 
-                    Some(current_weight + dw)
+                    Some(current_weight)
                 )?;
         }
 
@@ -1630,12 +1634,13 @@ where
         for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
             let (x_in, y_in) = input_pos;
 
-            let current_weight: f32 = current_lattice.graph
+            let mut current_weight: f32 = current_lattice.graph
                 .lookup_weight(&input_pos, &pos.pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = current_lattice.plasticity.update_weight(
+            current_lattice.plasticity.update_weight(
+                &mut current_weight,
                 &current_lattice.cell_grid[x_in][y_in], 
                 given_neuron,
             );
@@ -1644,19 +1649,20 @@ where
                 .edit_weight(
                     &input_pos, 
                     &pos.pos, 
-                    Some(current_weight + dw)
+                    Some(current_weight)
                 )?;
         }
 
         for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
             let (x_out, y_out) = output_pos;
 
-            let current_weight: f32 = current_lattice.graph
+            let mut current_weight: f32 = current_lattice.graph
                 .lookup_weight(&pos.pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            let dw = current_lattice.plasticity.update_weight(
+            current_lattice.plasticity.update_weight(
+                &mut current_weight,
                 given_neuron,
                 &current_lattice.cell_grid[x_out][y_out], 
             );
@@ -1665,7 +1671,7 @@ where
                 .edit_weight(
                     &pos.pos, 
                     &output_pos, 
-                    Some(current_weight + dw)
+                    Some(current_weight)
                 )?;
         }
 
@@ -1697,7 +1703,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1757,7 +1763,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1815,7 +1821,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1916,7 +1922,7 @@ where
 // impl Trace {
 //     pub fn update_trace(&mut self, weight_change: f32) {
 //         // self.c = (self.c + weight_change) * (-self.dt / self.tau_c).exp();
-//         self.c = self.c * (-self.dt / self.tau_c).exp() + weight_change;
+//         self.c = self.c * (-self.dt / self.tau_c).exp() + self.tau_c * weight_change;
 //     }
 // }
 
@@ -1941,7 +1947,7 @@ where
 // impl RewardModulator<Trace> for DopamineRewardModulator {
 //     fn update(&mut self, reward: f32) {
 //         // self.dopamine = (self.dopamine + reward) * (-self.dt / self.tau_d).exp();
-//         self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + reward;
+//         self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + self.tau_d * reward;
 //     }
 
 //     fn update_weight(&self, weight: &mut Trace) {
@@ -1949,12 +1955,20 @@ where
 //     }
 // }
 
+// test r-stdp with new equations
+
+// stdp with trace trait for this (TraceSTDP) (instead of calculating dw, it could modify weight directly)
+// since state is updated each iteration, half of trace decay is calculated + current dw
+// and second time half of trace decay is calculated + current dw
+// weight = reward_modulator(trace)
+// do_update is always considered to be true
+
 // #[derive(Debug, Clone)]
 // pub struct RewardModulatedLattice<
 //     T: IterateAndSpike, 
 //     U: Graph<T=(usize, usize), U=Trace>, 
 //     V: LatticeHistory, 
-//     W: Plasticity<T, T, T>, // stdp with trace trait for this (TraceSTDP) (instead of calculating dw, it could modify weight directly)
+//     W: Plasticity<T, T, T>, 
 // > {
 //     /// Grid of neurons
 //     pub cell_grid: Vec<Vec<T>>,
@@ -1970,8 +1984,8 @@ where
 //     pub plasticity: W,
 //     /// Whether to update weights with based on plasticity when iterating
 //     pub do_plasticity: bool,
-//     /// Reward parameters for updating plasticity
-//     pub reward_params: DopamineRewardModulator,
+//     /// Reward modulator for plasticity
+//     pub reward_modulator: DopamineRewardModulator,
 //     /// Whether to add normally distributed random noise
 //     pub gaussian: bool,
 //     /// Internal clock keeping track of what timestep the lattice is at
