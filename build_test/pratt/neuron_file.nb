@@ -1,7 +1,5 @@
 [neuron]
-    type: Simple
-    vars: e=0, v_th=-55
-    ligand_gates: default
+    type: BasicIntegrateAndFire
     on_spike: 
         v = v_reset
     spike_detection: v >= v_th
