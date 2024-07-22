@@ -1,5 +1,6 @@
 [neuron]
     type: BasicIntegrateAndFire
+    vars: e = 0, v_reset = -75, v_th = -55
     on_spike: 
         v = v_reset
     spike_detection: v >= v_th
