@@ -2,7 +2,9 @@ use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash,
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
-    integrate_and_fire::IzhikevichNeuron, iterate_and_spike::{
+    integrate_and_fire::IzhikevichNeuron, ion_channels::{BasicGatingVariable, IonChannel, 
+        KIonChannel, KLeakChannel, NaIonChannel, TimestepIndependentIonChannel}, 
+    iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
         DestexheNeurotransmitter, DestexheReceptor, GABAaDefault, GABAbDefault, 
         IterateAndSpike, LastFiringTime, LigandGatedChannel, LigandGatedChannels, 
@@ -10,8 +12,8 @@ use spiking_neural_networks::{
         NeurotransmitterType, Neurotransmitters, ReceptorKinetics 
     }, plasticity::STDP, spike_train::{
         DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
-    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, 
-    SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
+    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, 
+    SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -1293,6 +1295,82 @@ impl PyIzhikevichNetwork {
         }
     }
 
+    fn apply_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+            current_lattice.apply(|neuron| {
+                let py_neuron = PyIzhikevichNeuron {
+                    model: neuron.clone(),
+                };
+                let result = py_callable.call1(py, (py_neuron,)).unwrap();
+                let updated_py_neuron: PyIzhikevichNeuron = result.extract(py).unwrap();
+                *neuron = updated_py_neuron.model;
+            });
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+
+    fn apply_spike_train_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+            current_lattice.apply(|neuron| {
+                let py_neuron = PyPoissonNeuron {
+                    model: neuron.clone(),
+                };
+                let result = py_callable.call1(py, (py_neuron,)).unwrap();
+                let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
+                *neuron = updated_py_neuron.model;
+            });
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+
+    fn apply_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+            current_lattice.apply_given_position(|(i, j), neuron| {
+                let py_neuron = PyIzhikevichNeuron {
+                    model: neuron.clone(),
+                };
+                let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
+                let updated_py_neuron: PyIzhikevichNeuron = result.extract(py).unwrap();
+                *neuron = updated_py_neuron.model;
+            });
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+
+    fn apply_spike_train_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+        let py_callable = function.to_object(py);
+
+        if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+            current_lattice.apply_given_position(|(i, j), neuron| {
+                let py_neuron = PyPoissonNeuron {
+                    model: neuron.clone(),
+                };
+                let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
+                let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
+                *neuron = updated_py_neuron.model;
+            });
+
+            Ok(())
+        } else {
+            Err(PyValueError::new_err("Id not found"))
+        }
+    }
+
     fn run_lattices(&mut self, iterations: usize) -> PyResult<()> {
         match self.network.run_lattices(iterations) {
             Ok(_) => Ok(()),
@@ -1604,6 +1682,198 @@ impl PyDestexheLigandGatedChannel {
     }
 }
 
+#[pyclass]
+#[pyo3(name = "BasicGatingVariable")]
+#[derive(Clone)]
+pub struct PyBasicGatingVariable {
+    gating_variable: BasicGatingVariable
+}
+
+implement_basic_getter_and_setter!(
+    PyBasicGatingVariable,
+    gating_variable,
+    alpha, get_alpha, set_alpha,
+    beta, get_beta, set_beta,
+    state, get_state, set_state
+);
+
+impl_repr!(PyBasicGatingVariable, gating_variable);
+
+#[pymethods]
+impl PyBasicGatingVariable {
+    #[new]
+    #[pyo3(signature = (alpha=0., beta=0., state=0.))]
+    fn new(alpha: f32, beta: f32, state: f32) -> Self {
+        PyBasicGatingVariable { 
+            gating_variable: BasicGatingVariable { 
+                alpha: alpha, 
+                beta: beta, 
+                state: state, 
+            } 
+        }
+    }
+
+    fn init_state(&mut self) {
+        self.gating_variable.init_state();
+    }
+
+    fn update(&mut self, dt: f32) {
+        self.gating_variable.update(dt);
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "NaIonChannel")]
+#[derive(Clone)]
+pub struct PyNaIonChannel {
+    ion_channel: NaIonChannel
+}
+
+implement_basic_getter_and_setter!(
+    PyNaIonChannel,
+    ion_channel,
+    g_na, get_g_na, set_g_na,
+    e_na, get_e_na, set_e_na,
+    current, get_current, set_current
+);
+
+impl_repr!(PyNaIonChannel, ion_channel);
+
+#[pymethods]
+impl PyNaIonChannel {
+    #[new]
+    #[pyo3(signature = (
+        g_na=120., 
+        e_na=115., 
+        m=PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() }, 
+        h=PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() }, 
+        current=0.
+    ))]
+    fn new(g_na: f32, e_na: f32, m: PyBasicGatingVariable, h: PyBasicGatingVariable, current: f32) -> Self {
+        PyNaIonChannel {
+            ion_channel: NaIonChannel { 
+                g_na: g_na, 
+                e_na: e_na, 
+                m: m.gating_variable, 
+                h: h.gating_variable, 
+                current: current,
+            }
+        }
+    }
+
+    fn update_current(&mut self, voltage: f32, dt: f32) {
+        self.ion_channel.update_current(voltage, dt);
+    }
+
+    #[getter]
+    fn get_m(&self) -> PyBasicGatingVariable {
+        PyBasicGatingVariable { gating_variable: self.ion_channel.m }
+    }
+
+    #[setter]
+    fn set_m(&mut self, m: PyBasicGatingVariable) {
+        self.ion_channel.m = m.gating_variable;
+    }
+
+    #[getter]
+    fn get_h(&self) -> PyBasicGatingVariable {
+        PyBasicGatingVariable { gating_variable: self.ion_channel.h }
+    }
+
+    #[setter]
+    fn set_h(&mut self, h: PyBasicGatingVariable) {
+        self.ion_channel.h = h.gating_variable;
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "KIonChannel")]
+#[derive(Clone)]
+pub struct PyKIonChannel {
+    ion_channel: KIonChannel
+}
+
+implement_basic_getter_and_setter!(
+    PyKIonChannel,
+    ion_channel,
+    g_k, get_g_k, set_g_k,
+    e_k, get_e_k, set_e_k,
+    current, get_current, set_current
+);
+
+impl_repr!(PyKIonChannel, ion_channel);
+
+#[pymethods]
+impl PyKIonChannel {
+    #[new]
+    #[pyo3(signature = (
+        g_k=36., 
+        e_k=-12., 
+        n=PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() }, 
+        current=0.
+    ))]
+    fn new(g_k: f32, e_k: f32, n: PyBasicGatingVariable, current: f32) -> Self {
+        PyKIonChannel {
+            ion_channel: KIonChannel { 
+                g_k: g_k, 
+                e_k: e_k, 
+                n: n.gating_variable, 
+                current: current 
+            }
+        }
+    }
+
+    fn update_current(&mut self, voltage: f32, dt: f32) {
+        self.ion_channel.update_current(voltage, dt);
+    }
+
+    #[getter]
+    fn get_n(&self) -> PyBasicGatingVariable {
+        PyBasicGatingVariable { gating_variable: self.ion_channel.n }
+    }
+
+    #[setter]
+    fn set_n(&mut self, n: PyBasicGatingVariable) {
+        self.ion_channel.n = n.gating_variable;
+    }
+}
+
+#[pyclass]
+#[pyo3(name = "KLeakChannel")]
+#[derive(Clone)]
+pub struct PyKLeakChannel {
+    ion_channel: KLeakChannel
+}
+
+implement_basic_getter_and_setter!(
+    PyKLeakChannel,
+    ion_channel,
+    g_k_leak, get_g_k_leak, set_g_k_leak,
+    e_k_leak, get_e_k_leak, set_e_k_leak,
+    current, get_current, set_current
+);
+
+impl_repr!(PyKLeakChannel, ion_channel);
+
+#[pymethods]
+impl PyKLeakChannel {
+    #[new]
+    #[pyo3(signature = (g_k_leak=0.3, e_k_leak=10.6, current=0.))]
+    fn new(g_k_leak: f32, e_k_leak: f32, current: f32) -> Self {
+        PyKLeakChannel {
+            ion_channel: KLeakChannel { 
+                g_k_leak: g_k_leak, 
+                e_k_leak: e_k_leak, 
+                current: current 
+            }
+        }
+    }
+
+    fn update_current(&mut self, voltage: f32) {
+        self.ion_channel.update_current(voltage);
+    }
+}
+
 // #[pyclass]
 // #[pyo3(name = "HodgkinHuxleyNeuron")]
 // #[derive(Clone)]
@@ -1630,6 +1900,10 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyPoissonNeuron>()?;
     m.add_class::<PyPoissonLattice>()?;
     m.add_class::<PyIzhikevichNetwork>()?;
+    m.add_class::<PyBasicGatingVariable>()?;
+    m.add_class::<PyNaIonChannel>()?;
+    m.add_class::<PyKIonChannel>()?;
+    m.add_class::<PyKLeakChannel>()?;
 
     // windows compile
     // pyo3 raster plot (find peaks, if peak above certain threshold say it is a spike)
@@ -1637,6 +1911,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // --relase build with maturin
     // hodgkin huxley (ion channels too)
     // macros for building receptors, ligand gates, neurotransmitters, and neurons
+
+    // verbose option that prints progress in running simulation
+    // should be printed from rust
 
     // modify plasticity params on lattice
     
