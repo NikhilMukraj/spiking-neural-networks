@@ -389,7 +389,8 @@ fn fitting_objective<
 /// 
 /// - `reference_neuron` : neuron to reference as a target to meet
 /// 
-/// - `converter` : function to use to take decoded values and translate them to a neuron
+/// - `converter` : function to use to take decoded values and translate them to a neuron, number of values
+/// passed the converter within the vector is equal to the length of `bounds` in `genetic_algo_parameters`
 /// 
 /// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
 /// use `None` to not scale summaries during fitting
