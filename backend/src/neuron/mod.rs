@@ -434,7 +434,8 @@ macro_rules! impl_apply {
 /// // otherwise false
 /// fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
 ///     (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.))).sqrt() <= 2. && 
-///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8
+///     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8 &&
+///     x != y
 /// }
 /// 
 /// fn main() -> Result<(), SpikingNeuralNetworksError> {
@@ -469,7 +470,7 @@ pub struct Lattice<
     T: IterateAndSpike, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: Plasticity<T, T, T, f32>,
+    W: Plasticity<T, T, f32>,
 > {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
@@ -491,7 +492,7 @@ pub struct Lattice<
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T, f32>> Default for Lattice<T, U, V, W> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -514,7 +515,7 @@ impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVo
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, T, f32>> Lattice<T, U, V, W> {
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Lattice<T, U, V, W> {
     impl_reset_timing!();
     impl_apply!();
 
@@ -1095,7 +1096,7 @@ pub struct LatticeNetwork<
     W: SpikeTrain, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
     lattices: HashMap<usize, Lattice<T, U, V, Z>>,
@@ -1117,7 +1118,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
 {
     fn default() -> Self { 
         LatticeNetwork {
@@ -1138,7 +1139,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
@@ -1168,7 +1169,7 @@ where
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
-    Z: Plasticity<T, T, T, f32> + Plasticity<W, T, T, f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
@@ -1703,7 +1704,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1763,7 +1764,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1821,7 +1822,7 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
                         spiking_positions.push((x, y, graph_pos));
                     }
@@ -1905,55 +1906,111 @@ where
     }
 }
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct Trace {
-//     weight: f32,
-//     c: f32,
-//     tau_c: f32,
-//     dt: f32,
-// }
+// Weight trace for RSTDP
+#[derive(Debug, Clone, Copy)]
+pub struct TraceRSTDP {
+    counter: usize,
+    dw: f32,
+    weight: f32,
+    c: f32,
+    tau_c: f32,
+    dt: f32,
+}
 
-// impl Default for Trace {
-//     fn default() -> Self {
-//         Trace { weight: 0., c: 0., tau_c: 1000., dt: 0.1 }
-//     }
-// }
+impl Default for TraceRSTDP {
+    fn default() -> Self {
+        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 1000., dt: 0.1 }
+    }
+}
 
-// impl Trace {
-//     pub fn update_trace(&mut self, weight_change: f32) {
-//         // self.c = (self.c + weight_change) * (-self.dt / self.tau_c).exp();
-//         self.c = self.c * (-self.dt / self.tau_c).exp() + self.tau_c * weight_change;
-//     }
-// }
+impl TraceRSTDP {
+    /// Updates trace based on weight change and current state
+    pub fn update_trace(&mut self) {
+        self.c = self.c * (-self.dt / self.tau_c).exp() + self.tau_c * self.dw;
+    }
+}
 
-// pub trait RewardModulator<T> {
-//     fn update(&mut self, reward: f32);
-//     fn update_weight(&self, weight: &mut T);
-// }
+pub trait RewardModulator<T, U, V>: Clone + Send + Sync {
+    /// Update parameters based on reward
+    fn update(&mut self, reward: f32);
+    /// Update weight given two neurons and the weight itself
+    fn update_weight(&self, weight: &mut V, presynaptic_neuron: &T, postsynaptic_neuron: &U);
+    /// Whether to update the given neuron
+    fn do_update(&self, neuron: &U) -> bool;
+}
 
-// #[derive(Debug, Clone, Copy)]
-// pub struct DopamineRewardModulator {
-//     tau_d: f32,
-//     dopamine: f32,
-//     dt: f32,
-// }
+#[derive(Debug, Clone, Copy)]
+pub struct RewardModulatedSTDP {
+    // Dopamine concentration
+    dopamine: f32,
+    // Dopamine decay factor
+    tau_d: f32,
+    /// Postitive STDP modifier 
+    pub a_plus: f32,
+    /// Negative STDP modifier  
+    pub a_minus: f32,
+    /// Postitive STDP decay modifier  
+    pub tau_plus: f32, 
+    /// Negative STDP decay modifier 
+    pub tau_minus: f32, 
+    dt: f32,
+}
 
-// impl Default for DopamineRewardModulator {
-//     fn default() -> Self {
-//         DopamineRewardModulator { tau_d: 200., dopamine: 0., dt: 0.1 }
-//     }
-// }
+impl Default for RewardModulatedSTDP {
+    fn default() -> Self {
+        RewardModulatedSTDP { 
+            tau_d: 200., 
+            dopamine: 0., 
+            a_plus: 2., 
+            a_minus: 2., 
+            tau_plus: 4.5, 
+            tau_minus: 4.5, 
+            dt: 0.1 
+        }
+    }
+}
 
-// impl RewardModulator<Trace> for DopamineRewardModulator {
-//     fn update(&mut self, reward: f32) {
-//         // self.dopamine = (self.dopamine + reward) * (-self.dt / self.tau_d).exp();
-//         self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + self.tau_d * reward;
-//     }
+impl<T, U> RewardModulator<T, U, TraceRSTDP> for RewardModulatedSTDP 
+where 
+    T: LastFiringTime,
+    U: IterateAndSpike,
+{
+    fn update(&mut self, reward: f32) {
+        self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + self.tau_d * reward;
+    }
 
-//     fn update_weight(&self, weight: &mut Trace) {
-//         weight.weight = weight.c * self.dopamine;
-//     }
-// }
+    fn update_weight(&self, weight: &mut TraceRSTDP, presynaptic: &T, postsynaptic: &U) {
+        let mut delta_w: f32 = 0.;
+
+            match (presynaptic.get_last_firing_time(), postsynaptic.get_last_firing_time()) {
+                (Some(t_pre), Some(t_post)) => {
+                    let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
+
+                    if t_pre < t_post {
+                        delta_w = self.a_plus * (-1. * ((t_pre - t_post) * self.dt).abs() / self.tau_plus).exp();
+                    } else if t_pre > t_post {
+                        delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
+                    }
+                },
+                _ => {}
+            };
+
+        weight.dw += delta_w;
+
+        if weight.counter == 0 {
+            weight.counter = 1;
+        } else {
+            weight.update_trace();
+            weight.counter = 0;
+        }
+
+        weight.weight = weight.c * self.dopamine;
+    }
+
+    fn do_update(&self, _: &U) -> bool {
+        true
+    }
+}
 
 // test r-stdp with new equations
 
@@ -1963,35 +2020,205 @@ where
 // weight = reward_modulator(trace)
 // do_update is always considered to be true
 
+// rolling synaptic updates will always trigger twice if update is always on, 
+// add dw to field in trace and increment counter counter, if counter is 1, 
+// sum dw and then calculate decay and reset counter and apply change to 
+// weight accounting for trace, if that doesnt work try trace calculation times 0.5 on each update 
+
+// for performance sake, update could be turned off if dopamine is 0
+// plasticity trait could return whether to loop over presynaptic weights or 
+// postsynaptic weights or both when calculating weights
+
 // reward modulated lattice network has connecting graph with enum for weights
 // enum { Weight(f32), Trace(Trace) }
 // connecting function could generate different enums
 
-// #[derive(Debug, Clone)]
-// pub struct RewardModulatedLattice<
-//     T: IterateAndSpike, 
-//     U: Graph<T=(usize, usize), U=Trace>, 
-//     V: LatticeHistory, 
-//     W: Plasticity<T, T, T, Trace>, 
-// > {
-//     /// Grid of neurons
-//     pub cell_grid: Vec<Vec<T>>,
-//     /// Graph connecting internal neurons and storing weights between neurons
-//     pub graph: U,
-//     /// History of grid
-//     pub grid_history: V,
-//     /// Whether to update graph's history of weights
-//     pub update_graph_history: bool,
-//     /// Whether to update grid's history
-//     pub update_grid_history: bool,
-//     // Plasticity rule
-//     pub plasticity: W,
-//     /// Whether to update weights with based on plasticity when iterating
-//     pub do_plasticity: bool,
-//     /// Reward modulator for plasticity
-//     pub reward_modulator: DopamineRewardModulator,
-//     /// Whether to add normally distributed random noise
-//     pub gaussian: bool,
-//     /// Internal clock keeping track of what timestep the lattice is at
-//     pub internal_clock: usize,
-// }
+#[derive(Debug, Clone)]
+pub struct RewardModulatedLattice<
+    T: IterateAndSpike, 
+    U: Graph<T=(usize, usize), U=TraceRSTDP>, 
+    V: LatticeHistory, 
+    W: RewardModulator<T, T, TraceRSTDP>, 
+> {
+    /// Grid of neurons
+    pub cell_grid: Vec<Vec<T>>,
+    /// Graph connecting internal neurons and storing weights between neurons
+    pub graph: U,
+    /// History of grid
+    pub grid_history: V,
+    /// Whether to update graph's history of weights
+    pub update_graph_history: bool,
+    /// Whether to update grid's history
+    pub update_grid_history: bool,
+    // Whether to modulate lattice based on reward
+    pub do_modulation: bool,
+    /// Reward modulator for plasticity rule
+    pub reward_modulator: W,
+    /// Whether to add normally distributed random noise
+    pub gaussian: bool,
+    /// Internal clock keeping track of what timestep the lattice is at
+    pub internal_clock: usize,
+}
+
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHistory, W: RewardModulator<T, T, TraceRSTDP>> RewardModulatedLattice<T, U, V, W> {
+    pub fn get_id(&self) -> usize {
+        self.graph.get_id()
+    }
+
+    pub fn set_id(&mut self, id: usize) {
+        self.graph.set_id(id);
+    }
+    
+    /// Updates internal weights based on STDP
+    fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
+        let given_neuron = &self.cell_grid[x][y];
+        
+        let input_positions = self.graph.get_incoming_connections(&pos)?;
+
+        for i in input_positions {
+            let (x_in, y_in) = i;
+            let mut current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
+            self.reward_modulator.update_weight(&mut current_weight, &self.cell_grid[x_in][y_in], given_neuron);
+                                        
+            self.graph.edit_weight(
+                &i, 
+                &pos, 
+                Some(current_weight)
+            )?;
+        }
+
+        let out_going_connections = self.graph.get_outgoing_connections(&pos)?;
+
+        for i in out_going_connections {
+            let (x_out, y_out) = i;
+            let mut current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
+            self.reward_modulator.update_weight(&mut current_weight, given_neuron, &self.cell_grid[x_out][y_out]);
+
+            self.graph.edit_weight(
+                &pos, 
+                &i, 
+                Some(current_weight)
+            )?; 
+        }
+
+        Ok(())
+    }
+
+    /// Iterates lattice one simulation timestep given a set of electrical and neurotransmitter inputs
+    pub fn iterate_with_neurotransmission(
+        &mut self, 
+        inputs: &HashMap<(usize, usize), f32>, 
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
+        reward: f32,
+    ) -> Result<(), GraphError> {
+        self.reward_modulator.update(reward);
+
+        for pos in self.graph.get_every_node() {
+            let (x, y) = pos;
+            let input_value = *inputs.get(&pos).unwrap();
+
+            let input_neurotransmitter = neurotransmitter_inputs.get(&pos).unwrap();
+
+            let is_spiking = self.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+                input_value, input_neurotransmitter,
+            );
+
+            if is_spiking {
+                self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+            }
+
+            if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
+                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+            } 
+        }
+
+        if self.update_graph_history {
+            self.graph.update_history();
+        }
+        if self.update_grid_history {
+            self.grid_history.update(&self.cell_grid);
+        }
+        self.internal_clock += 1;
+
+        Ok(())
+    }
+
+    fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
+        (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        base_neuron.clone()
+                    })
+                    .collect::<Vec<T>>()
+            })
+            .collect()
+    }
+
+    /// Populates a lattice given the dimensions and a base neuron to copy the parameters
+    /// of without generating any connections within the graph, (overwrites any pre-existing
+    /// neurons or connections)
+    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+        let id = self.get_id();
+
+        self.graph = U::default();
+        self.graph.set_id(id);
+        self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
+
+        for i in 0..num_rows {
+            for j in 0..num_cols {
+                self.graph.add_node((i, j))
+            }
+        }
+    }
+
+    /// Connects the neurons in a lattice together given a function to determine
+    /// if the neurons should be connected given their position (usize, usize), and
+    /// a function to determine what the weight between the neurons should be
+    /// assumes lattice is already populated using the `populate` method
+    pub fn connect(
+        &mut self, 
+        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
+        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> TraceRSTDP,
+    ) {
+        self.graph.get_every_node()
+            .iter()
+            .for_each(|i| {
+                for j in self.graph.get_every_node().iter() {
+                    if (connecting_conditional)(*i, *j) {
+                        self.graph.edit_weight(i, j, Some((weight_logic)(*i, *j))).unwrap();
+                    } else {
+                        self.graph.edit_weight(i, j, None).unwrap();
+                    }
+                }
+            });
+    }
+} 
+
+pub trait Agent {
+    fn update_and_apply_reward(&mut self, reward: f32);
+}
+
+pub trait State {
+    type A: Agent;
+    fn update_state(&mut self, agent: &Self::A);
+}
+
+pub struct Optimizer<T: Agent, U: State<A=T>> {
+    pub agent: T,
+    pub state: U,
+    pub reward_function: fn(&U, &T) -> f32,
+}
+
+impl<T: Agent, U: State<A=T>> Optimizer<T, U> {
+    pub fn run(&mut self, iterations: usize) {
+        for _ in 0..iterations {
+            // get reward
+            let reward = (self.reward_function)(&self.state, &self.agent);
+            // update agent (taking action) and apply reward for the action
+            self.agent.update_and_apply_reward(reward);
+            // update state based on agent
+            self.state.update_state(&self.agent);
+        }
+    }
+}
