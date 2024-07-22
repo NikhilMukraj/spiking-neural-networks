@@ -3,11 +3,11 @@ use super::iterate_and_spike::{LastFiringTime, IterateAndSpike};
 
 /// Handles plasticity rules given the two neurons and whether to 
 /// update weights based on the given neuron
-pub trait Plasticity<T, U, V, W>: Default + Send + Sync {
+pub trait Plasticity<T, U, V>: Default + Send + Sync {
     /// Modifies the weight between given two neurons
-    fn update_weight(&self, weight: &mut W, presynaptic: &T, postsynaptic: &U);
+    fn update_weight(&self, weight: &mut V, presynaptic: &T, postsynaptic: &U);
     // Determines whether to update weights given the neuron
-    fn do_update(&self, neuron: &V) -> bool;
+    fn do_update(&self, neuron: &U) -> bool;
 }
 
 /// Spike time dependent plasticity rule
@@ -37,11 +37,10 @@ impl Default for STDP {
     }
 }
 
-impl<T, U, V> Plasticity<T, U, V, f32> for STDP
+impl<T, U> Plasticity<T, U, f32> for STDP
 where
     T: LastFiringTime,
-    U: LastFiringTime,
-    V: IterateAndSpike,
+    U: IterateAndSpike,
 {
     fn update_weight(&self, weight: &mut f32, presynaptic: &T, postsynaptic: &U) {
         let mut delta_w: f32 = 0.;
@@ -62,7 +61,7 @@ where
         *weight += delta_w;
     }
 
-    fn do_update(&self, neuron: &V) -> bool {
+    fn do_update(&self, neuron: &U) -> bool {
         neuron.is_spiking()
     }
 }
