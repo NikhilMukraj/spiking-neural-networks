@@ -1640,16 +1640,22 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // modify plasticity params on lattice
     
-    // view weights
+    // view weights, pos to index too
     // eventually work with graph history
     // connecting graph history should be also updated
     
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
-    // python wrapper should do f = lambda x: bool(x) to try and autoconvert before
-    // passing to rust
+    // python wrapper should do f = lambda x: bool(x) to try and autoconvert before passing to rust
+    // universal lattice and latticenetwork type that dynamically dispatch to a certain neuron type
+    // depending on initialization
 
     // temp env variable for building pyo3 with custom models
+    // builtin models can be listed in a separate file associated with this crate
+    // if env variable does not work when installing package, use a seperate build script
+    // to generate new models that is associated with this package but accessible from the command line
+    // or maybe wheel is built separately with a setup py and config is done through there
+    // (could use setuptools rust for that)
     // impl neuron macro for arbitrary neuron (separate one for neurons with ion channels)
 
     Ok(())
