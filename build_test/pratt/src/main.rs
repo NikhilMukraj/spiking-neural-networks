@@ -70,7 +70,147 @@ pub enum AST {
     OnSpike(Vec<Box<AST>>),
     OnIteration(Vec<Box<AST>>),
     SpikeDetection(Box<AST>),
-    Variables(Vec<Box<AST>>),
+    VariableAssignment {
+        name: String,
+        value: Option<f32>,
+    },
+    VariablesAssignments(Vec<Box<AST>>),
+}
+
+
+#[derive(Debug)]
+pub enum Op {
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Power,
+    Equal,
+    NotEqual,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    And,
+    Or,
+}
+
+impl AST {
+    pub fn to_string(&self) -> String {
+        match self {
+            AST::Number(n) => n.to_string(),
+            AST::Name(name) => name.clone(),
+            AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
+            AST::NotOperator(expr) => format!("!{}", expr.to_string()),
+            AST::BinOp { lhs, op, rhs } => {
+                match op {
+                    Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
+                    Op::Subtract => format!("({} - {})", lhs.to_string(), rhs.to_string()),
+                    Op::Multiply => format!("({} * {})", lhs.to_string(), rhs.to_string()),
+                    Op::Divide => format!("({} / {})", lhs.to_string(), rhs.to_string()),
+                    Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
+                    Op::Equal => format!("{} == {}", lhs.to_string(), rhs.to_string()),
+                    Op::NotEqual => format!("{} != {}", lhs.to_string(), rhs.to_string()),
+                    Op::GreaterThan => format!("{} > {}", lhs.to_string(), rhs.to_string()),
+                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.to_string(), rhs.to_string()),
+                    Op::LessThan => format!("{} < {}", lhs.to_string(), rhs.to_string()),
+                    Op::LessThanOrEqual => format!("{} <= {}", lhs.to_string(), rhs.to_string()),
+                    Op::And => format!("{} && {}", lhs.to_string(), rhs.to_string()),
+                    Op::Or => format!("{} || {}", lhs.to_string(), rhs.to_string()),
+                }
+            }
+            AST::Function { name, args } => {
+                format!(
+                    "{}({})",
+                    name, 
+                    args.iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    )
+            },
+            AST::EqAssignment { name, expr } => {
+                format!("{} = {}", name, expr.to_string())
+            },
+            AST::DiffEqAssignment { name, expr } => {
+                format!("d{}/dt = {}", name, expr.to_string())
+            },
+            AST::FunctionAssignment{ name, args, expr } =>{
+                format!(
+                    "{}({}) = {}",
+                    name, 
+                    args.iter()
+                        .map(|i| i.to_string())
+                        .collect::<Vec<String>>()
+                        .join(", "),
+                    expr.to_string(),
+                )
+            },
+            AST::TypeDefinition(string) => format!("type: {}", string),
+            AST::OnSpike(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                format!("on_spike:\n\t{}", assignments_string)
+            },
+            AST::OnIteration(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n\t");
+
+                format!("on_iteration:\n\t{}", assignments_string)
+            },
+            AST::SpikeDetection(expr) => {
+                format!("spike_detection: {}", expr.to_string())
+            },
+            AST::VariableAssignment { name, value } => {
+                let value = match value {
+                    Some(x) => x.to_string(),
+                    None => String::from("None"),
+                };
+
+                format!("{} = {}", name, value)
+            },
+            AST::VariablesAssignments(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n\t");
+
+                format!("vars:\n\t{}", assignments_string)
+            }
+        }
+    }
+}
+
+pub struct NeuronDefinition {
+    type_name: AST,
+    vars: AST,
+    on_spike: AST,
+    on_iteration: AST,
+    spike_detection: AST,
+}
+
+impl NeuronDefinition {
+    // temporary
+    // write out structure definition with #[derive(Debug, Clone, IterateAndSpikeBase)]
+    // eventually adapt for documentation to be integrated
+    // on spike and spike detection combined into handle spiking function
+    // handle spiking is called after membrane potential is updated
+    // for now use default ligand gates and neurotransmitter implementation
+    fn to_code(&self) -> String {
+        format!(
+            "{}\n{}\n{}\n{}\n{}", 
+            self.type_name.to_string(), 
+            self.vars.to_string(),
+            self.on_spike.to_string(),
+            self.on_iteration.to_string(),
+            self.spike_detection.to_string()
+        )
+    }
 }
 
 // then try writing rust code from ast
@@ -230,106 +370,6 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
     }
 }
 
-#[derive(Debug)]
-pub enum Op {
-    Add,
-    Subtract,
-    Multiply,
-    Divide,
-    Power,
-    Equal,
-    NotEqual,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    And,
-    Or,
-}
-
-impl AST {
-    pub fn to_string(&self) -> String {
-        match self {
-            AST::Number(n) => n.to_string(),
-            AST::Name(name) => name.clone(),
-            AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
-            AST::NotOperator(expr) => format!("!{}", expr.to_string()),
-            AST::BinOp { lhs, op, rhs } => {
-                match op {
-                    Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
-                    Op::Subtract => format!("({} - {})", lhs.to_string(), rhs.to_string()),
-                    Op::Multiply => format!("({} * {})", lhs.to_string(), rhs.to_string()),
-                    Op::Divide => format!("({} / {})", lhs.to_string(), rhs.to_string()),
-                    Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
-                    Op::Equal => format!("{} == {}", lhs.to_string(), rhs.to_string()),
-                    Op::NotEqual => format!("{} != {}", lhs.to_string(), rhs.to_string()),
-                    Op::GreaterThan => format!("{} > {}", lhs.to_string(), rhs.to_string()),
-                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.to_string(), rhs.to_string()),
-                    Op::LessThan => format!("{} < {}", lhs.to_string(), rhs.to_string()),
-                    Op::LessThanOrEqual => format!("{} <= {}", lhs.to_string(), rhs.to_string()),
-                    Op::And => format!("{} && {}", lhs.to_string(), rhs.to_string()),
-                    Op::Or => format!("{} || {}", lhs.to_string(), rhs.to_string()),
-                }
-            }
-            AST::Function { name, args } => {
-                format!(
-                    "{}({})",
-                    name, 
-                    args.iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                    )
-            },
-            AST::EqAssignment { name, expr } => {
-                format!("{} = {}", name, expr.to_string())
-            },
-            AST::DiffEqAssignment { name, expr } => {
-                format!("d{}/dt = {}", name, expr.to_string())
-            },
-            AST::FunctionAssignment{ name, args, expr } =>{
-                format!(
-                    "{}({}) = {}",
-                    name, 
-                    args.iter()
-                        .map(|i| i.to_string())
-                        .collect::<Vec<String>>()
-                        .join(", "),
-                    expr.to_string(),
-                )
-            },
-            AST::TypeDefinition(string) => format!("type: {}", string),
-            AST::OnSpike(assignments) => {
-                let assignments_string = assignments.iter()
-                    .map(|i| i.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n");
-
-                format!("on_spike:\n{}", assignments_string)
-            },
-            AST::OnIteration(assignments) => {
-                let assignments_string = assignments.iter()
-                    .map(|i| i.to_string())
-                    .collect::<Vec<String>>()
-                    .join("\n");
-
-                format!("on_iteration:\n{}", assignments_string)
-            },
-            AST::SpikeDetection(expr) => {
-                format!("spike_detection: {}", expr.to_string())
-            },
-            AST::Variables(assignments) => {
-                let assignments_string = assignments.iter()
-                .map(|i| i.to_string())
-                .collect::<Vec<String>>()
-                .join("\n");
-
-                format!("vars:\n{}", assignments_string)
-            }
-        }
-    }
-}
-
 fn main() -> Result<()> {
     let mut filename = String::from("");
 
@@ -386,7 +426,7 @@ fn main() -> Result<()> {
 
                         (
                             String::from("on_spike"),
-                            AST::OnIteration(
+                            AST::OnSpike(
                                 inner_rules
                                 .map(|i| Box::new(parse_declaration(i)))
                                 .collect::<Vec<Box<AST>>>()
@@ -399,14 +439,53 @@ fn main() -> Result<()> {
                             AST::SpikeDetection(Box::new(bool_parse_expr(pair.into_inner())))
                         )
                     }
-                    // Rule::vars_def => {
+                    Rule::vars_def => {
                         // if no defaults then just assume assingment is None
                         // in order to prevent duplicate, key should be "vars"
-                    // }
-                    // Rule::vars_with_default_def => {
+                        let inner_rules = pair.into_inner();
+
+                        let assignments: Vec<Box<AST>> = inner_rules
+                            .map(|i| Box::new(AST::VariableAssignment { 
+                                name: String::from(i.as_str()), 
+                                value: None,
+                            }))
+                            .collect();
+
+                        println!("{:#?}", assignments);
+
+                        (
+                            String::from("vars"),
+                            AST::VariablesAssignments(assignments)
+                        )
+                    },
+                    Rule::vars_with_default_def => {
                         // assignment should be just a number
                         // in order to prevent duplicate, key should be "vars"
-                    // }
+
+                        let inner_rules = pair.into_inner();
+
+                        let assignments: Vec<Box<AST>> = inner_rules 
+                            .map(|i| {
+                                let mut nested_rule = i.into_inner();
+
+                                Box::new(AST::VariableAssignment { 
+                                    name: String::from(nested_rule.next().unwrap().as_str()), 
+                                    value: Some(
+                                        nested_rule.next()
+                                            .unwrap()
+                                            .as_str()
+                                            .parse::<f32>()
+                                            .unwrap()
+                                        ), 
+                                })
+                            })
+                            .collect(); 
+
+                        (
+                            String::from("vars"),
+                            AST::VariablesAssignments(assignments)
+                        )
+                    },
                     definition => unreachable!("Unexpected definiton: {:#?}", definition)
                 };
 
@@ -421,13 +500,17 @@ fn main() -> Result<()> {
                 definitions.insert(key, current_ast);
             }
 
-            // neuron definition as part of ast enum
-            // anything that has a default can be represented as an option
-            // if none use default version of field
+            // neuron definition as part of ast enum?
 
-            for value in definitions.values() {
-                println!("{}", value.to_string());
-            }
+            let neuron = NeuronDefinition {
+                type_name: definitions.remove("type").unwrap(),
+                vars: definitions.remove("vars").unwrap(),
+                spike_detection: definitions.remove("spike_detection").unwrap(),
+                on_iteration: definitions.remove("on_iteration").unwrap(),
+                on_spike: definitions.remove("on_spike").unwrap()
+            };
+
+            println!("{}", neuron.to_code());
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
