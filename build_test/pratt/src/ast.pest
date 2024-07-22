@@ -91,10 +91,12 @@ WHITESPACE = _{ " " }
 // spike_detection: bool_expr
 // ligand_gates: default
 
-variables_block = { "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
-variables_with_default = { 
-	"vars:" ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~ number ~ 
-    (" "* ~ "," ~ " "* ~ name ~ " "* ~ "=" ~ " "* ~ unary_minus? ~number)* ~ 
+signed_number = @{ unary_minus? ~ number }
+variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
+variables_assignment = { name ~ " "* ~ "=" ~ " "* ~ signed_number }
+variables_with_default = _{ 
+	"vars:" ~ " "* ~ variables_assignment ~ 
+    (" "* ~ "," ~ " "* ~ variables_assignment)* ~ 
     ","? 
 }
 
@@ -119,7 +121,7 @@ ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
 
 neuron_definition = _{
     "[neuron]" ~ NEWLINE ~ 
-	(on_iteration_def | type_def | on_spike_def | spike_detection_def){3,} ~ 
+	(on_iteration_def | type_def | on_spike_def | spike_detection_def | vars_def | vars_with_default_def){3,} ~ 
 	"[end]"
 }
 
