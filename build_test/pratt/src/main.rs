@@ -353,6 +353,7 @@ fn main() -> Result<()> {
     // handle ion channels
     // handle ligand gates
     // neurotransmitter and approximate kinetics
+    // handling function if statements and boolean vars
 
     match ASTParser::parse(Rule::neuron_definition, &contents) {
         Ok(pairs) => {
@@ -399,7 +400,7 @@ fn main() -> Result<()> {
                         )
                     }
                     // Rule::vars_def => {
-                        // if no defaults then just assume assingment is 0.
+                        // if no defaults then just assume assingment is None
                         // in order to prevent duplicate, key should be "vars"
                     // }
                     // Rule::vars_with_default_def => {
@@ -419,6 +420,10 @@ fn main() -> Result<()> {
 
                 definitions.insert(key, current_ast);
             }
+
+            // neuron definition as part of ast enum
+            // anything that has a default can be represented as an option
+            // if none use default version of field
 
             for value in definitions.values() {
                 println!("{}", value.to_string());
