@@ -1300,6 +1300,11 @@ where
             return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
         }
 
+        if presynaptic_id == postsynaptic_id {
+            self.connect_interally(presynaptic_id, connecting_conditional, weight_logic)?;
+            return Ok(());
+        }
+
         if self.lattices.contains_key(&presynaptic_id) {
             let postsynaptic_graph = &self.lattices.get(&postsynaptic_id)
                 .unwrap()
@@ -1369,7 +1374,7 @@ where
     /// if the `weight_logic` function is `None`, the weights are set as `1.`
     /// if a connect should occur according to `connecting_conditional`,
     /// assumes lattice is already populated using the `populate` method
-    pub fn connect_innterally(
+    pub fn connect_interally(
         &mut self, 
         id: usize, 
         connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
