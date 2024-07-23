@@ -44,7 +44,7 @@ use super::ion_channels::{
     // pub synaptic_neurotransmitters: Neurotransmitters<T>
 // }
 
-#[derive(IterateAndSpikeBase)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f32,
@@ -68,43 +68,12 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     pub was_increasing: bool,
     /// Whether the neuron is currently spiking
     pub is_spiking: bool,
-    /// Additional ion gates
-    pub additional_gates: Vec<Box<dyn IonChannel>>,
-    /// Additional timestep indpendent ion channels
-    pub additional_independent_gates: Vec<Box<dyn TimestepIndependentIonChannel>>,
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<T>,
     /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
-}
-
-impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Clone for HodgkinHuxleyNeuron<T, R> {
-    fn clone(&self) -> Self {
-        Self {
-            current_voltage: self.current_voltage,
-            gap_conductance: self.gap_conductance,
-            dt: self.dt,
-            c_m: self.c_m,
-            na_channel: self.na_channel.clone(),
-            k_channel: self.k_channel.clone(),
-            k_leak_channel: self.k_leak_channel.clone(),
-            v_th: self.v_th,
-            last_firing_time: self.last_firing_time.clone(),
-            was_increasing: self.was_increasing,
-            is_spiking: self.is_spiking,
-            additional_gates: self.additional_gates.iter()
-                .map(|gate| gate.clone_box())
-                .collect(),
-            additional_independent_gates: self.additional_independent_gates.iter()
-                .map(|channel| channel.clone_box())
-                .collect(),
-            synaptic_neurotransmitters: self.synaptic_neurotransmitters.clone(),
-            ligand_gates: self.ligand_gates.clone(),
-            gaussian_params: self.gaussian_params.clone(),
-        }
-    }
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
@@ -123,8 +92,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             was_increasing: false,
             synaptic_neurotransmitters: Neurotransmitters::default(), 
             ligand_gates: LigandGatedChannels::default(),
-            additional_gates: vec![],
-            additional_independent_gates: vec![],
             gaussian_params: GaussianParameters::default(),
         }
     }
@@ -192,20 +159,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 
         let i_ligand_gates = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
-        let i_additional_gates = self.additional_gates
-            .iter()
-            .map(|i| 
-                i.get_current()
-            ) 
-            .sum::<f32>();
-        let i_additional_channels = self.additional_independent_gates
-            .iter()
-            .map(|i| 
-                i.get_current()
-            ) 
-            .sum::<f32>();
-
-        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates - i_additional_gates - i_additional_channels;
+        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates;
         self.current_voltage += self.dt * i_sum / self.c_m;
     }
 
@@ -228,15 +182,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         self.na_channel.update_current(self.current_voltage, self.dt);
         self.k_channel.update_current(self.current_voltage, self.dt);
         self.k_leak_channel.update_current(self.current_voltage);
-
-        self.additional_gates.iter_mut()
-            .for_each(|i| {
-                i.update_current(self.current_voltage, self.dt);
-        });
-        self.additional_independent_gates.iter_mut()
-            .for_each(|i| {
-                i.update_current(self.current_voltage);
-        });
     }
 
     fn iterate(&mut self, input: f32) {
