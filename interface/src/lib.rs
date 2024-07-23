@@ -447,7 +447,6 @@ implement_nested_getter_and_setter!(
     min, gaussian_min, get_gaussian_min, set_gaussian_min,
     max, gaussian_max, get_gaussian_max, set_gaussian_max
 );
-
 impl_repr!(PyIzhikevichNeuron, model);
 impl_default_neuron_methods!(
     PyIzhikevichNeuron, 
@@ -1065,7 +1064,7 @@ impl PyIzhikevichNetwork {
             None => None,
         };
 
-        match self.network.connect_innterally(id, &connection_closure, weight_closure.as_deref()) {
+        match self.network.connect_interally(id, &connection_closure, weight_closure.as_deref()) {
             Ok(_) => Ok(()),
             Err(_) => Err(PyValueError::new_err("Id not found in network")),
         }
@@ -1399,7 +1398,7 @@ impl PyIzhikevichNetwork {
     }
 
     fn run_lattices_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
-        match self.network.run_lattices_chemical_only(iterations) {
+        match self.network.run_lattices_chemical_synapses_only(iterations) {
             Ok(_) => Ok(()),
             Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
         }
@@ -1904,6 +1903,7 @@ implement_basic_getter_and_setter!(
     c_m, get_c_m, set_c_m,
     v_th, get_v_th, set_v_th
 );
+impl_repr!(PyHodgkinHuxleyNeuron, model);
 impl_default_neuron_methods!(
     PyHodgkinHuxleyNeuron,
     PyDestexheNeurotransmitters,
@@ -1979,10 +1979,6 @@ impl PyHodgkinHuxleyNeuron {
     #[setter]
     fn set_was_increasing(&mut self, was_increasing: bool) {
         self.model.was_increasing = was_increasing;
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        Ok(String::from("todo"))
     }
 }
 
