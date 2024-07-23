@@ -1,5 +1,6 @@
 use std::collections::HashMap;
-use std::io::{Error, ErrorKind};
+use std::fs::File;
+use std::io::{Error, ErrorKind, Write};
 use std::{io::Result, env, fs};
 use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
@@ -99,7 +100,15 @@ impl AST {
     pub fn to_string(&self) -> String {
         match self {
             AST::Number(n) => n.to_string(),
-            AST::Name(name) => name.clone(),
+            AST::Name(name) => {
+                if name == "v" {
+                    String::from("self.current_voltage")
+                } else if name == "i" {
+                    String::from("input_current")
+                } else {
+                    format!("self.{}", name)
+                }
+            },
             AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
             AST::NotOperator(expr) => format!("!{}", expr.to_string()),
             AST::BinOp { lhs, op, rhs } => {
@@ -130,10 +139,16 @@ impl AST {
                     )
             },
             AST::EqAssignment { name, expr } => {
-                format!("{} = {}", name, expr.to_string())
+                let name = if name == "v" {
+                    String::from("self.current_voltage")
+                } else {
+                    format!("self.{}", name)
+                };
+
+                format!("{} = {};", name, expr.to_string())
             },
             AST::DiffEqAssignment { name, expr } => {
-                format!("d{}/dt = {}", name, expr.to_string())
+                format!("let d{} = ({}) * dt;", name, expr.to_string())
             },
             AST::FunctionAssignment{ name, args, expr } =>{
                 format!(
@@ -146,26 +161,20 @@ impl AST {
                     expr.to_string(),
                 )
             },
-            AST::TypeDefinition(string) => format!("type: {}", string),
+            AST::TypeDefinition(string) => string.clone(),
             AST::OnSpike(assignments) => {
-                let assignments_string = assignments.iter()
+                assignments.iter()
                     .map(|i| i.to_string())
                     .collect::<Vec<String>>()
-                    .join("\n");
-
-                format!("on_spike:\n\t{}", assignments_string)
+                    .join("\n")
             },
             AST::OnIteration(assignments) => {
-                let assignments_string = assignments.iter()
+                assignments.iter()
                     .map(|i| i.to_string())
                     .collect::<Vec<String>>()
-                    .join("\n\t");
-
-                format!("on_iteration:\n\t{}", assignments_string)
+                    .join("\n\t\t")
             },
-            AST::SpikeDetection(expr) => {
-                format!("spike_detection: {}", expr.to_string())
-            },
+            AST::SpikeDetection(expr) => { expr.to_string() },
             AST::VariableAssignment { name, value } => {
                 let value = match value {
                     Some(x) => x.to_string(),
@@ -186,6 +195,13 @@ impl AST {
     }
 }
 
+fn add_indents(input: &str, indent: &str) -> String {
+    input.lines()
+        .map(|line| format!("{}{}", indent, line))
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
 pub struct NeuronDefinition {
     type_name: AST,
     vars: AST,
@@ -202,13 +218,196 @@ impl NeuronDefinition {
     // handle spiking is called after membrane potential is updated
     // for now use default ligand gates and neurotransmitter implementation
     fn to_code(&self) -> String {
+        let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
+        let necessary_imports = vec![
+            "CurrentVoltage", "GapConductance", "GaussianFactor", "LastFiringTime", "IsSpiking",
+            "IterateAndSpike", "GaussianParameters", "LigandGatedChannels", 
+            "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
+            "NeurotransmitterConcentrations",
+        ];
+        let necessary_imports = format!(
+            "use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};",
+            necessary_imports.join(", ")
+        );
+
+        let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
+        let receptor_kinetics = "ApproximateReceptor";
+
+        let kinetics_import = format!(
+            "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
+            neurotransmitter_kinetics,
+            receptor_kinetics,
+        );
+
+        let import_statement = format!(
+            "{}\n{}\n{}\n\n\n",
+            iterate_and_spike_base,
+            necessary_imports,
+            kinetics_import,
+        );
+
+        let macros = "#[derive(Debug, Clone, IterateAndSpikeBase)]";
+        let header = format!(
+            "pub struct {}<T: {}, R: {}> {{", 
+            self.type_name.to_string(),
+            neurotransmitter_kinetics,
+            receptor_kinetics,
+        );
+        let mut fields = match &self.vars {
+            AST::VariablesAssignments(variables) => {
+                variables
+                    .iter()
+                    .map(|i| {
+                        let var_name = match i.as_ref() {
+                            AST::VariableAssignment { name, .. } => name,
+                            _ => unreachable!(),
+                        };
+
+                        format!("{}: f32", var_name)
+                    })
+                    .collect::<Vec<String>>()
+            },
+            _ => unreachable!()
+        };
+        let current_voltage_field = String::from("current_voltage: f32");
+        let gap_conductance_field = String::from("gap_conductance: f32");
+        let is_spiking_field = String::from("is_spiking: bool");
+        let gaussian_field = String::from("gaussian_params: GaussianParameters");
+        let neurotransmitter_field = String::from("synaptic_neurotransmitters: Neurotransmitters<T>");
+        let ligand_gates_field = String::from("ligand_gates: LigandGatedChannels<R>");
+
+        fields.insert(0, current_voltage_field);
+        fields.push(gap_conductance_field);
+        fields.push(is_spiking_field);
+        fields.push(gaussian_field);
+        fields.push(neurotransmitter_field);
+        fields.push(ligand_gates_field);
+
+        let fields = format!("\t{},", fields.join(",\n\t"));
+
+        let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
+        let handle_spiking_check = format!("\tif {} {{", self.spike_detection.to_string());
+        let handle_spiking_function = format!("\t\t{}", self.on_spike.to_string());
+
+        let handle_spiking = format!(
+            "{}\n{}\n{}\n\t}}\n}}", 
+            handle_spiking_header, 
+            handle_spiking_check, 
+            handle_spiking_function
+        );
+
+        let on_iteration_assignments = self.on_iteration.to_string();
+
+        let changes = match &self.on_iteration {
+            AST::OnIteration(assignments) => {
+                let mut assignments_strings = vec![];
+
+                for i in assignments {
+                    match i.as_ref() {
+                        AST::DiffEqAssignment { name, .. } => {
+                            let change_string = if name == "v" {
+                                format!("self.current_voltage += dv;")
+                            } else {
+                                format!("self.{} += d{}", name, name)
+                            };
+
+                            assignments_strings.push(change_string);
+                        }
+                        _ => {}
+                    }
+                }
+
+                assignments_strings.join("\t\n")
+            },
+            _ => unreachable!()
+        };
+
+        let get_concentrations_header = "fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {";
+        let get_concentrations_body = "self.synaptic_neurotransmitters.get_concentrations()";
+        let get_concentrations_function = format!("{}\n\t{}\n}}", get_concentrations_header, get_concentrations_body);
+
+        let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);";
+        let handle_spiking_call = "self.handle_spiking()";
+        let iteration_header = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
+        let iteration_body = format!(
+            "\n\t{}\n\t{}\n\t{}\n\t{}", 
+            on_iteration_assignments, 
+            changes, 
+            handle_neurotransmitter_conc,
+            handle_spiking_call,
+        );
+        let iteration_function = format!("{}{}\n}}", iteration_header, iteration_body);
+
+        let iteration_with_neurotransmission_start = "fn iterate_with_neurotransmitter_and_spike(";
+        let iteration_with_neurotransmission_args = vec![
+            "&mut self", 
+            "input_current: f32",
+            "t_total: &NeurotransmitterConcentrations",
+        ];
+        let iteration_with_neurotransmitter_header = format!(
+            "{}\n\t{},\n) -> bool {{", 
+            iteration_with_neurotransmission_start, 
+            iteration_with_neurotransmission_args.join(",\n\t"),
+        );
+
+        let ligand_gates_update = "self.ligand_gates.update_receptor_kinetics(t_total);";
+        let ligand_gates_set_current = "self.ligand_gates.set_receptor_currents(self.current_voltage);";
+
+        let update_with_receptor_current = "self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);";
+
+        let iteration_with_neurotransmission_body = format!(
+            "{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
+            ligand_gates_update,
+            ligand_gates_set_current,
+            on_iteration_assignments,
+            changes,
+            update_with_receptor_current,
+            handle_neurotransmitter_conc,
+            handle_spiking_call,
+        );
+
+        let iteration_with_neurotransmission_function = format!(
+            "{}\n{}\n}}", 
+            iteration_with_neurotransmitter_header,
+            iteration_with_neurotransmission_body,
+        );
+
+        let impl_header = format!(
+            "impl<T: {}, R: {}> {}<T, R> {{", 
+            neurotransmitter_kinetics, 
+            receptor_kinetics,
+            self.type_name.to_string()
+        );
+        let impl_body = add_indents(&handle_spiking, "\t");
+        let impl_functions = format!("{}\n{}\n}}", impl_header, impl_body);
+
+        let impl_header_iterate_and_spike = format!(
+            "impl<T: {}, R: {}> IterateAndSpike for {}<T, R> {{", 
+            neurotransmitter_kinetics, 
+            receptor_kinetics,
+            self.type_name.to_string()
+        );
+        let impl_iterate_and_spike_body = format!(
+            "{}\n\n{}\n\n{}\n",
+            get_concentrations_function,
+            iteration_function,
+            iteration_with_neurotransmission_function,
+        );
+        let impl_iterate_and_spike_body = add_indents(&impl_iterate_and_spike_body, "\t");
+        let impl_iterate_and_spike = format!(
+            "{}\n{}\n}}", 
+            impl_header_iterate_and_spike, 
+            impl_iterate_and_spike_body,
+        );
+
         format!(
-            "{}\n{}\n{}\n{}\n{}", 
-            self.type_name.to_string(), 
-            self.vars.to_string(),
-            self.on_spike.to_string(),
-            self.on_iteration.to_string(),
-            self.spike_detection.to_string()
+            "{}\n{}\n{}\n{}\n}}\n\n{}\n\n{}", 
+            import_statement,
+            macros, 
+            header, 
+            fields, 
+            impl_functions, 
+            impl_iterate_and_spike,
         )
     }
 }
@@ -388,9 +587,11 @@ fn main() -> Result<()> {
     // handle variables
     // handle continous detection
     // try code generation (assume default ligands)
+    // default functions
     // runge kutta
 
-    // handle ion channels
+    // handle ion channels (handle builtin ion channels) 
+    // (could import with name prefixed as DefaultChannel or something)
     // handle ligand gates
     // neurotransmitter and approximate kinetics
     // handling function if statements and boolean vars
@@ -510,7 +711,8 @@ fn main() -> Result<()> {
                 on_spike: definitions.remove("on_spike").unwrap()
             };
 
-            println!("{}", neuron.to_code());
+            let mut file = File::create("neuron_file.rs")?;
+            file.write_all(neuron.to_code().as_bytes())?;
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
