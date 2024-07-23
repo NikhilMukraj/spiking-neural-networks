@@ -2066,12 +2066,138 @@ pub struct RewardModulatedLattice<
 }
 
 impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHistory, W: RewardModulator<T, T, TraceRSTDP>> RewardModulatedLattice<T, U, V, W> {
+    impl_reset_timing!();
+    impl_apply!();
+
+    /// Gets id of lattice [`Graph`]
     pub fn get_id(&self) -> usize {
         self.graph.get_id()
     }
 
+    /// Sets id of lattice [`Graph`] given an id
     pub fn set_id(&mut self, id: usize) {
         self.graph.set_id(id);
+    }
+
+    /// Calculates electrical input value from positions
+    fn calculate_internal_input_from_positions(
+        &self,
+        position: &(usize, usize),
+        input_positions: &HashSet<(usize, usize)>, 
+    ) -> f32 {
+        let (x, y) = position;
+        let postsynaptic_neuron = &self.cell_grid[*x][*y];
+
+        let mut input_val = input_positions
+            .iter()
+            .map(|input_position| {
+                let (pos_x, pos_y) = input_position;
+                let input_cell = &self.cell_grid[*pos_x][*pos_y];
+
+                let final_input = gap_junction(input_cell, postsynaptic_neuron);
+                
+                final_input * self.graph.lookup_weight(&input_position, position).unwrap().unwrap().weight
+            })
+            .sum();
+
+        if self.gaussian {
+            input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
+        }
+
+        input_val /= input_positions.len() as f32;
+
+        return input_val;
+    }
+
+    /// Calculates neurotransmitter input value from positions
+    fn calculate_internal_neurotransmitter_input_from_positions(
+        &self,
+        position: &(usize, usize),
+        input_positions: &HashSet<(usize, usize)>, 
+    ) -> NeurotransmitterConcentrations {
+        let input_vals = input_positions
+            .iter()
+            .map(|input_position| {
+                let (pos_x, pos_y) = input_position;
+                let input_cell = &self.cell_grid[*pos_x][*pos_y];
+
+                let mut final_input = input_cell.get_neurotransmitter_concentrations();
+                let trace = self.graph.lookup_weight(&input_position, position).unwrap().unwrap();
+                
+                weight_neurotransmitter_concentration(&mut final_input, trace.weight);
+
+                final_input
+            })
+            .collect::<Vec<NeurotransmitterConcentrations>>();
+
+        let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+
+        if self.gaussian {
+            let (x, y) = position;
+            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
+        }
+
+        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
+
+        return input_val;
+    }
+
+    /// Gets all internal electrical inputs 
+    fn get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
+        // eventually convert to this, same with neurotransmitter input
+        // convert on lattice network too
+        // let inputs: HashMap<Position, f32> = graph
+        //     .get_every_node()
+        //     .par_iter()
+        //     .map(|&pos| {
+        //     // .. calculating input
+        //     (pos, change)
+        //     });
+        //     .collect();
+
+        self.graph.get_every_node_as_ref()
+            .iter()
+            .map(|pos| {
+                let input_positions = self.graph.get_incoming_connections(&pos)
+                    .expect("Cannot find position");
+
+                let input = self.calculate_internal_input_from_positions(
+                    &pos,
+                    &input_positions,
+                );
+
+                (**pos, input)
+            })
+            .collect()
+    }
+
+    /// Gets all internal neurotransmitter inputs 
+    fn get_internal_neurotransmitter_inputs(&self) -> 
+    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+        self.graph.get_every_node_as_ref()
+            .iter()
+            .map(|&pos| {
+                let input_positions = self.graph.get_incoming_connections(&pos)
+                    .expect("Cannot find position");
+
+                let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
+                    &pos,
+                    &input_positions,
+                );
+
+                (*pos, neurotransmitter_input)
+            })
+            .collect()
+    }
+
+    /// Gets all internal electrical and neurotransmitter inputs 
+    fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
+        let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
+
+        let inputs = self.get_internal_electrical_inputs();
+
+        (inputs, neurotransmitter_inputs)
     }
     
     /// Updates internal weights based on STDP
@@ -2144,6 +2270,108 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
             self.grid_history.update(&self.cell_grid);
         }
         self.internal_clock += 1;
+
+        Ok(())
+    }
+
+    /// Iterates lattice one simulation timestep given a set of neurotransmitter inputs
+    pub fn iterate_with_chemical_synapses_only(
+        &mut self, 
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
+        reward: f32,
+    ) -> Result<(), GraphError> {
+        self.reward_modulator.update(reward);
+
+        for pos in self.graph.get_every_node() {
+            let (x, y) = pos;
+
+            let input_neurotransmitter = neurotransmitter_inputs.get(&pos).unwrap();
+
+            let is_spiking = self.cell_grid[x][y].iterate_with_neurotransmitter_and_spike(
+                0., input_neurotransmitter,
+            );
+
+            if is_spiking {
+                self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+            }
+
+            if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
+                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+            } 
+        }
+
+        if self.update_graph_history {
+            self.graph.update_history();
+        }
+        if self.update_grid_history {
+            self.grid_history.update(&self.cell_grid);
+        }
+        self.internal_clock += 1;
+
+        Ok(())
+    }
+
+    /// Iterates lattice one simulation timestep given a set of electrical inputs
+    pub fn iterate(
+        &mut self, 
+        inputs: &HashMap<(usize, usize), f32>, 
+        reward: f32,
+    ) -> Result<(), GraphError> {
+        self.reward_modulator.update(reward);
+
+        for pos in self.graph.get_every_node() {
+            let (x, y) = pos;
+
+            let input_value = *inputs.get(&pos).unwrap();
+
+            let is_spiking = self.cell_grid[x][y].iterate_and_spike(input_value);
+
+            if is_spiking {
+                self.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+            }
+
+            if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
+                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+            } 
+        }
+
+        if self.update_graph_history {
+            self.graph.update_history();
+        }
+        if self.update_grid_history {
+            self.grid_history.update(&self.cell_grid);
+        }
+        self.internal_clock += 1;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical synapses only
+    pub fn run_lattice(&mut self, reward: f32) -> Result<(), GraphError> {
+        let inputs = self.get_internal_electrical_inputs();
+
+        self.iterate(&inputs, reward)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// chemical synapses only
+    pub fn run_lattice_chemical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
+        let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
+
+        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs, reward)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical and chemical synapses
+    pub fn run_lattice_with_electrical_and_chemical_synapses(&mut self, reward: f32) -> Result<(), GraphError> {
+        let (inputs, neurotransmitter_inputs) = self.get_internal_electrical_and_neurotransmitter_inputs();
+
+        self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs, reward)?;
 
         Ok(())
     }
