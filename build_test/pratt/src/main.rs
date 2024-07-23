@@ -217,6 +217,7 @@ impl NeuronDefinition {
     // on spike and spike detection combined into handle spiking function
     // handle spiking is called after membrane potential is updated
     // for now use default ligand gates and neurotransmitter implementation
+    // if defaults come with vars assignment then add default trait
     fn to_code(&self) -> String {
         let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
         let necessary_imports = vec![
@@ -411,6 +412,12 @@ impl NeuronDefinition {
         )
     }
 }
+
+// pub struct IonChannelDefinition {
+//     type_name: AST,
+//     vars: AST,
+//     on_iteration: AST,
+// }
 
 // then try writing rust code from ast
 pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
