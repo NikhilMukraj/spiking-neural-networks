@@ -42,7 +42,7 @@ impl<T: ApproximateNeurotransmitter, R: ApproximateReceptor> IterateAndSpike for
 		input_current: f32,
 		t_total: &NeurotransmitterConcentrations,
 	) -> bool {
-	self.ligand_gates.update_receptor_kinetics(t_total);
+		self.ligand_gates.update_receptor_kinetics(t_total);
 		self.ligand_gates.set_receptor_currents(self.current_voltage);
 		let dv = (((self.current_voltage - self.e) + input_current)) * dt;
 		self.current_voltage += dv;
