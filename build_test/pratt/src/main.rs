@@ -357,7 +357,7 @@ impl NeuronDefinition {
         let update_with_receptor_current = "self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);";
 
         let iteration_with_neurotransmission_body = format!(
-            "{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
+            "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
             ligand_gates_update,
             ligand_gates_set_current,
             on_iteration_assignments,
