@@ -2,18 +2,17 @@ use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash,
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
-    integrate_and_fire::IzhikevichNeuron, ion_channels::{BasicGatingVariable, IonChannel, 
-        KIonChannel, KLeakChannel, NaIonChannel, TimestepIndependentIonChannel}, 
-    iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
-        DestexheNeurotransmitter, DestexheReceptor, GABAaDefault, GABAbDefault, 
-        IterateAndSpike, LastFiringTime, LigandGatedChannel, LigandGatedChannels, 
+    hodgkin_huxley::HodgkinHuxleyNeuron, integrate_and_fire::IzhikevichNeuron, ion_channels::{BasicGatingVariable, IonChannel, 
+        KIonChannel, KLeakChannel, NaIonChannel, TimestepIndependentIonChannel
+    }, iterate_and_spike::{
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, DestexheNeurotransmitter, 
+        DestexheReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LastFiringTime, 
+        LigandGatedChannel, LigandGatedChannels, 
         NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
         NeurotransmitterType, Neurotransmitters, ReceptorKinetics 
     }, plasticity::STDP, spike_train::{
         DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
-    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, 
-    SpikeTrainLattice, SpikeTrainLatticeHistory
+    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -364,6 +363,55 @@ impl PyApproximateLigandGatedChannels {
     }
 }
 
+macro_rules! impl_default_neuron_methods {
+    ($neuron_kind:ident, $neurotransmitter_kind:ident, $ligand_gates_kind:ident) => {
+        #[pymethods]
+        impl $neuron_kind {
+            fn iterate_and_spike(&mut self, i: f32) -> bool {
+                self.model.iterate_and_spike(i)
+            }
+        
+            #[pyo3(signature = (i, neurotransmitter_concs))]
+            fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: &PyDict) -> PyResult<bool> {
+                let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
+        
+                Ok(self.model.iterate_with_neurotransmitter_and_spike(i, &neurotransmitter_concs))
+            }
+        
+            fn get_neurotransmitters(&self) -> $neurotransmitter_kind {
+                $neurotransmitter_kind { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
+            }
+        
+            fn set_neurotransmitters(&mut self, neurotransmitters: $neurotransmitter_kind) {
+                self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
+            }
+        
+            fn get_ligand_gates(&self) -> $ligand_gates_kind {
+                $ligand_gates_kind { ligand_gates: self.model.ligand_gates.clone() }
+            }
+        
+            fn set_ligand_gates(&mut self, ligand_gates: $ligand_gates_kind) {
+                self.model.ligand_gates = ligand_gates.ligand_gates;
+            }
+        
+            #[getter(last_firing_time)]
+            fn get_last_firing_time(&self) -> Option<usize> {
+                self.model.get_last_firing_time()
+            }
+        
+            #[setter(last_firing_time)]
+            fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+                self.model.set_last_firing_time(timestep);
+            }
+        
+            #[getter]
+            fn is_spiking(&self) -> bool {
+                self.model.is_spiking
+            }
+        }
+    };
+}
+
 #[pyclass]
 #[pyo3(name = "IzhikevichNeuron")]
 #[derive(Clone)]
@@ -401,6 +449,11 @@ implement_nested_getter_and_setter!(
 );
 
 impl_repr!(PyIzhikevichNeuron, model);
+impl_default_neuron_methods!(
+    PyIzhikevichNeuron, 
+    PyApproximateNeurotransmitters, 
+    PyApproximateLigandGatedChannels
+);
 
 #[pymethods]
 impl PyIzhikevichNeuron {
@@ -408,10 +461,17 @@ impl PyIzhikevichNeuron {
     #[pyo3(signature = (
         a=0.02, b=0.2, c=-55., d=8., v_th=30., dt=0.1, current_voltage=-65., 
         v_init=-65., w_value=30., w_init=30., gap_conductance=10., tau_m=1., c_m=100.,
+        synaptic_neurotransmitters=PyApproximateNeurotransmitters { 
+            neurotransmitters: Neurotransmitters::<ApproximateNeurotransmitter>::default() 
+        },
+        ligand_gates=PyApproximateLigandGatedChannels {
+            ligand_gates: LigandGatedChannels::<ApproximateReceptor>::default()
+        }
     ))]
     fn new(
         a: f32, b: f32, c: f32, d: f32, v_th: f32, dt: f32, current_voltage: f32, v_init: f32, 
-        w_value: f32, w_init: f32, gap_conductance: f32, tau_m: f32, c_m: f32
+        w_value: f32, w_init: f32, gap_conductance: f32, tau_m: f32, c_m: f32,
+        synaptic_neurotransmitters: PyApproximateNeurotransmitters, ligand_gates: PyApproximateLigandGatedChannels,
     ) -> Self {
         PyIzhikevichNeuron {
             model: IzhikevichNeuron {
@@ -428,51 +488,11 @@ impl PyIzhikevichNeuron {
                 gap_conductance: gap_conductance,
                 tau_m: tau_m,
                 c_m: c_m,
+                synaptic_neurotransmitters: synaptic_neurotransmitters.neurotransmitters,
+                ligand_gates: ligand_gates.ligand_gates,
                 ..IzhikevichNeuron::default()
             }
         }
-    }
-
-    fn iterate_and_spike(&mut self, i: f32) -> bool {
-        self.model.iterate_and_spike(i)
-    }
-
-    #[pyo3(signature = (i, neurotransmitter_concs))]
-    fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: &PyDict) -> PyResult<bool> {
-        let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
-
-        Ok(self.model.iterate_with_neurotransmitter_and_spike(i, &neurotransmitter_concs))
-    }
-
-    fn get_neurotransmitters(&self) -> PyApproximateNeurotransmitters {
-        PyApproximateNeurotransmitters { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
-    }
-
-    fn set_neurotransmitters(&mut self, neurotransmitters: PyApproximateNeurotransmitters) {
-        self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
-    }
-
-    fn get_ligand_gates(&self) -> PyApproximateLigandGatedChannels {
-        PyApproximateLigandGatedChannels { ligand_gates: self.model.ligand_gates.clone() }
-    }
-
-    fn set_ligand_gates(&mut self, ligand_gates: PyApproximateLigandGatedChannels) {
-        self.model.ligand_gates = ligand_gates.ligand_gates;
-    }
-
-    #[getter(last_firing_time)]
-    fn get_last_firing_time(&self) -> Option<usize> {
-        self.model.get_last_firing_time()
-    }
-
-    #[setter(last_firing_time)]
-    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-        self.model.set_last_firing_time(timestep);
-    }
-
-    #[getter]
-    fn is_spiking(&self) -> bool {
-        self.model.is_spiking
     }
 }
 
@@ -1765,22 +1785,18 @@ impl PyNaIonChannel {
         self.ion_channel.update_current(voltage, dt);
     }
 
-    #[getter]
     fn get_m(&self) -> PyBasicGatingVariable {
         PyBasicGatingVariable { gating_variable: self.ion_channel.m }
     }
 
-    #[setter]
     fn set_m(&mut self, m: PyBasicGatingVariable) {
         self.ion_channel.m = m.gating_variable;
     }
 
-    #[getter]
     fn get_h(&self) -> PyBasicGatingVariable {
         PyBasicGatingVariable { gating_variable: self.ion_channel.h }
     }
 
-    #[setter]
     fn set_h(&mut self, h: PyBasicGatingVariable) {
         self.ion_channel.h = h.gating_variable;
     }
@@ -1827,12 +1843,10 @@ impl PyKIonChannel {
         self.ion_channel.update_current(voltage, dt);
     }
 
-    #[getter]
     fn get_n(&self) -> PyBasicGatingVariable {
         PyBasicGatingVariable { gating_variable: self.ion_channel.n }
     }
 
-    #[setter]
     fn set_n(&mut self, n: PyBasicGatingVariable) {
         self.ion_channel.n = n.gating_variable;
     }
@@ -1874,12 +1888,103 @@ impl PyKLeakChannel {
     }
 }
 
-// #[pyclass]
-// #[pyo3(name = "HodgkinHuxleyNeuron")]
-// #[derive(Clone)]
-// pub struct PyHodgkinHuxleyNeuron {
-//     model: HodgkinHuxleyNeuron<DestexheNeurotransmitter, DestexheReceptor>,
-// }
+#[pyclass]
+#[pyo3(name = "HodgkinHuxleyNeuron")]
+#[derive(Clone)]
+pub struct PyHodgkinHuxleyNeuron {
+    model: HodgkinHuxleyNeuron<DestexheNeurotransmitter, DestexheReceptor>,
+}
+
+implement_basic_getter_and_setter!(
+    PyHodgkinHuxleyNeuron,
+    model,
+    current_voltage, get_current_voltage, set_current_voltage,
+    gap_conductance, get_gap_conductance, set_gap_conductance,
+    dt, get_dt, set_dt,
+    c_m, get_c_m, set_c_m,
+    v_th, get_v_th, set_v_th
+);
+impl_default_neuron_methods!(
+    PyHodgkinHuxleyNeuron,
+    PyDestexheNeurotransmitters,
+    PyDestexheLigandGatedChannels
+);
+
+#[pymethods]
+impl PyHodgkinHuxleyNeuron {
+    #[new]
+    #[pyo3(signature = (
+        current_voltage=0., gap_conductance=10., dt=0.01, c_m=1.0, v_th=60.,
+        na_channel=PyNaIonChannel { ion_channel: NaIonChannel::default() },
+        k_channel=PyKIonChannel { ion_channel: KIonChannel::default() },
+        k_leak_channel=PyKLeakChannel { ion_channel: KLeakChannel::default() },
+        synaptic_neurotransmitters=PyDestexheNeurotransmitters { 
+            neurotransmitters: Neurotransmitters::<DestexheNeurotransmitter>::default() 
+        },
+        ligand_gates=PyDestexheLigandGatedChannels {
+            ligand_gates: LigandGatedChannels::<DestexheReceptor>::default()
+        }
+    ))]
+    fn new(
+        current_voltage: f32, gap_conductance: f32, dt: f32, c_m: f32, v_th: f32,
+        na_channel: PyNaIonChannel, k_channel: PyKIonChannel, k_leak_channel: PyKLeakChannel, 
+        synaptic_neurotransmitters: PyDestexheNeurotransmitters, ligand_gates: PyDestexheLigandGatedChannels
+    ) -> Self {
+        PyHodgkinHuxleyNeuron { 
+            model: HodgkinHuxleyNeuron { 
+                current_voltage: current_voltage, 
+                gap_conductance: gap_conductance, 
+                dt: dt, 
+                c_m: c_m, 
+                na_channel: na_channel.ion_channel, 
+                k_channel: k_channel.ion_channel,
+                k_leak_channel: k_leak_channel.ion_channel, 
+                v_th: v_th, 
+                synaptic_neurotransmitters: synaptic_neurotransmitters.neurotransmitters,
+                ligand_gates: ligand_gates.ligand_gates,
+                ..HodgkinHuxleyNeuron::default()
+            } 
+        }
+    }
+
+    fn get_na_channel(&self) -> PyNaIonChannel {
+        PyNaIonChannel { ion_channel: self.model.na_channel }
+    }
+
+    fn set_na_channel(&mut self, na_channel: PyNaIonChannel) {
+        self.model.na_channel = na_channel.ion_channel;
+    }
+
+    fn get_k_channel(&self) -> PyKIonChannel {
+        PyKIonChannel { ion_channel: self.model.k_channel }
+    }
+
+    fn set_k_channel(&mut self, k_channel: PyKIonChannel) {
+        self.model.k_channel = k_channel.ion_channel;
+    }
+
+    fn get_k_leak_channel(&self) -> PyKLeakChannel {
+        PyKLeakChannel { ion_channel: self.model.k_leak_channel }
+    }
+
+    fn set_k_leak_channel(&mut self, na_channel: PyKLeakChannel) {
+        self.model.k_leak_channel = na_channel.ion_channel;
+    }
+
+    #[getter]
+    fn get_was_increasing(&self) -> bool {
+        self.model.was_increasing
+    }
+
+    #[setter]
+    fn set_was_increasing(&mut self, was_increasing: bool) {
+        self.model.was_increasing = was_increasing;
+    }
+
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(String::from("todo"))
+    }
+}
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -1904,13 +2009,12 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyNaIonChannel>()?;
     m.add_class::<PyKIonChannel>()?;
     m.add_class::<PyKLeakChannel>()?;
+    m.add_class::<PyHodgkinHuxleyNeuron>()?;
 
-    // windows compile
-    // pyo3 raster plot (find peaks, if peak above certain threshold say it is a spike)
-    // (could just take all values above a certain threshold and say its spiking)
     // --relase build with maturin
     // hodgkin huxley (ion channels too)
     // macros for building receptors, ligand gates, neurotransmitters, and neurons
+    // macros for building lattices and lattice networks
 
     // reset timing and history on a given lattice in a network
     // reset_history(id) 
