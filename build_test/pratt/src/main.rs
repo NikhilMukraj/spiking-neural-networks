@@ -402,7 +402,7 @@ impl NeuronDefinition {
         );
 
         format!(
-            "{}\n{}\n{}\n{}\n}}\n\n{}\n\n{}", 
+            "{}\n{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
             import_statement,
             macros, 
             header, 
