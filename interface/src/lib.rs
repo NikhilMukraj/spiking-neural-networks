@@ -1912,6 +1912,12 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // hodgkin huxley (ion channels too)
     // macros for building receptors, ligand gates, neurotransmitters, and neurons
 
+    // reset timing and history on a given lattice in a network
+    // reset_history(id) 
+    // reset methods should try the id on both the spike train lattices and the regular lattices
+    // set or get plasticity or update history on a given lattice (spike train or otherwise) in a network
+    // set_do_plasticity(id, bool)
+
     // verbose option that prints progress in running simulation
     // should be printed from rust
 
