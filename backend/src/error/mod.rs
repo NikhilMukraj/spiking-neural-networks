@@ -161,6 +161,21 @@ impl Display for TimeSeriesProcessingError {
 
 impl_debug_default!(TimeSeriesProcessingError);
 
+#[derive(Clone, PartialEq, Eq)]
+pub enum AgentError {
+    AgentIterationFailure(String)
+}
+
+impl Display for AgentError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let err_msg = match self {
+            AgentError::AgentIterationFailure(string) => string
+        };
+
+        write!(f, "{}", err_msg)
+    }
+}
+
 /// A set of errors that may occur when using the library
 #[derive(Clone, PartialEq, Eq)]
 pub enum SpikingNeuralNetworksError {
@@ -174,6 +189,8 @@ pub enum SpikingNeuralNetworksError {
     LatticeNetworkRelatedError(LatticeNetworkError),
     /// Errors related to patterns
     PatternRelatedError(PatternError),
+    /// Errors related to agent
+    AgentRelatedError(AgentError),
 }
 
 impl Display for SpikingNeuralNetworksError {
@@ -184,6 +201,7 @@ impl Display for SpikingNeuralNetworksError {
             SpikingNeuralNetworksError::GraphRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::PatternRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksError::AgentRelatedError(err) => write!(f, "{}", err)
         }
     }
 }
@@ -205,3 +223,4 @@ impl_from_error_default!(GeneticAlgorithmError, GeneticAlgorithmRelatedErrors);
 impl_from_error_default!(GraphError, GraphRelatedError);
 impl_from_error_default!(LatticeNetworkError, LatticeNetworkRelatedError);
 impl_from_error_default!(PatternError, PatternRelatedError);
+impl_from_error_default!(AgentError, AgentRelatedError);
