@@ -148,7 +148,7 @@ impl AST {
                 format!("{} = {};", name, expr.to_string())
             },
             AST::DiffEqAssignment { name, expr } => {
-                format!("let d{} = ({}) * dt;", name, expr.to_string())
+                format!("let d{} = ({}) * self.dt;", name, expr.to_string())
             },
             AST::FunctionAssignment{ name, args, expr } =>{
                 format!(
@@ -211,13 +211,11 @@ pub struct NeuronDefinition {
 }
 
 impl NeuronDefinition {
-    // temporary
-    // write out structure definition with #[derive(Debug, Clone, IterateAndSpikeBase)]
     // eventually adapt for documentation to be integrated
-    // on spike and spike detection combined into handle spiking function
-    // handle spiking is called after membrane potential is updated
     // for now use default ligand gates and neurotransmitter implementation
     // if defaults come with vars assignment then add default trait
+    // if neurotransmitter kinetics and receptor kinetics specified then
+    // create default_impl() function
     fn to_code(&self) -> String {
         let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
         let necessary_imports = vec![
@@ -241,7 +239,7 @@ impl NeuronDefinition {
         );
 
         let import_statement = format!(
-            "{}\n{}\n{}\n\n\n",
+            "{}\n{}\n{}\n\n",
             iterate_and_spike_base,
             necessary_imports,
             kinetics_import,
@@ -249,10 +247,8 @@ impl NeuronDefinition {
 
         let macros = "#[derive(Debug, Clone, IterateAndSpikeBase)]";
         let header = format!(
-            "pub struct {}<T: {}, R: {}> {{", 
+            "pub struct {}<T: NeurotransmitterKinetics, R: ReceptorKinetics> {{", 
             self.type_name.to_string(),
-            neurotransmitter_kinetics,
-            receptor_kinetics,
         );
         let mut fields = match &self.vars {
             AST::VariablesAssignments(variables) => {
@@ -271,15 +267,21 @@ impl NeuronDefinition {
             _ => unreachable!()
         };
         let current_voltage_field = String::from("current_voltage: f32");
+        let dt_field = String::from("dt: f32");
+        let c_m_field = String::from("c_m: f32");
         let gap_conductance_field = String::from("gap_conductance: f32");
         let is_spiking_field = String::from("is_spiking: bool");
+        let last_firing_time_field = String::from("last_firing_time: Option<usize>");
         let gaussian_field = String::from("gaussian_params: GaussianParameters");
         let neurotransmitter_field = String::from("synaptic_neurotransmitters: Neurotransmitters<T>");
         let ligand_gates_field = String::from("ligand_gates: LigandGatedChannels<R>");
 
         fields.insert(0, current_voltage_field);
         fields.push(gap_conductance_field);
+        fields.push(dt_field);
+        fields.push(c_m_field);
         fields.push(is_spiking_field);
+        fields.push(last_firing_time_field);
         fields.push(gaussian_field);
         fields.push(neurotransmitter_field);
         fields.push(ligand_gates_field);
@@ -287,12 +289,14 @@ impl NeuronDefinition {
         let fields = format!("\t{},", fields.join(",\n\t"));
 
         let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
-        let handle_spiking_check = format!("\tif {} {{", self.spike_detection.to_string());
+        let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.to_string());
+        let handle_spiking_check = "\tif self.is_spiking {";
         let handle_spiking_function = format!("\t\t{}", self.on_spike.to_string());
 
         let handle_spiking = format!(
-            "{}\n{}\n{}\n\t}}\n}}", 
+            "{}\n{}\n{}\n{}\n\t}}\n\n\tself.is_spiking\n}}", 
             handle_spiking_header, 
+            handle_is_spiking_calc,
             handle_spiking_check, 
             handle_spiking_function
         );
@@ -374,18 +378,14 @@ impl NeuronDefinition {
         );
 
         let impl_header = format!(
-            "impl<T: {}, R: {}> {}<T, R> {{", 
-            neurotransmitter_kinetics, 
-            receptor_kinetics,
+            "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> {}<T, R> {{", 
             self.type_name.to_string()
         );
         let impl_body = add_indents(&handle_spiking, "\t");
         let impl_functions = format!("{}\n{}\n}}", impl_header, impl_body);
 
         let impl_header_iterate_and_spike = format!(
-            "impl<T: {}, R: {}> IterateAndSpike for {}<T, R> {{", 
-            neurotransmitter_kinetics, 
-            receptor_kinetics,
+            "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for {}<T, R> {{", 
             self.type_name.to_string()
         );
         let impl_iterate_and_spike_body = format!(
