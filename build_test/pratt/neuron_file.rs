@@ -3,35 +3,40 @@ use spiking_neural_networks::neuron::iterate_and_spike::{CurrentVoltage, GapCond
 use spiking_neural_networks::neuron::iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor};
 
 
-
 #[derive(Debug, Clone, IterateAndSpikeBase)]
-pub struct BasicIntegrateAndFire<T: ApproximateNeurotransmitter, R: ApproximateReceptor> {
+pub struct BasicIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 	current_voltage: f32,
 	e: f32,
 	v_reset: f32,
 	v_th: f32,
 	gap_conductance: f32,
+	dt: f32,
+	c_m: f32,
 	is_spiking: bool,
+	last_firing_time: Option<usize>,
 	gaussian_params: GaussianParameters,
 	synaptic_neurotransmitters: Neurotransmitters<T>,
 	ligand_gates: LigandGatedChannels<R>,
 }
 
-impl<T: ApproximateNeurotransmitter, R: ApproximateReceptor> BasicIntegrateAndFire<T, R> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BasicIntegrateAndFire<T, R> {
 	fn handle_spiking(&mut self) -> bool {
-		if self.current_voltage >= self.v_th {
+		self.is_spiking = self.current_voltage >= self.v_th;
+		if self.is_spiking {
 			self.current_voltage = self.v_reset;
 		}
+	
+		self.is_spiking
 	}
 }
 
-impl<T: ApproximateNeurotransmitter, R: ApproximateReceptor> IterateAndSpike for BasicIntegrateAndFire<T, R> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BasicIntegrateAndFire<T, R> {
 	fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
 		self.synaptic_neurotransmitters.get_concentrations()
 	}
 	
 	fn iterate_and_spike(&mut self, input_current: f32) -> bool {
-		let dv = (((self.current_voltage - self.e) + input_current)) * dt;
+		let dv = (((self.current_voltage - self.e) + input_current)) * self.dt;
 		self.current_voltage += dv;
 		self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 		self.handle_spiking()
@@ -44,7 +49,7 @@ impl<T: ApproximateNeurotransmitter, R: ApproximateReceptor> IterateAndSpike for
 	) -> bool {
 		self.ligand_gates.update_receptor_kinetics(t_total);
 		self.ligand_gates.set_receptor_currents(self.current_voltage);
-		let dv = (((self.current_voltage - self.e) + input_current)) * dt;
+		let dv = (((self.current_voltage - self.e) + input_current)) * self.dt;
 		self.current_voltage += dv;
 		self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 		self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
