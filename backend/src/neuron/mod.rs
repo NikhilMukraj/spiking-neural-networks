@@ -37,7 +37,7 @@ use plasticity::{Plasticity, STDP};
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
 }
-use crate::error::{GraphError, LatticeNetworkError};
+use crate::error::{AgentError, GraphError, LatticeNetworkError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 
 
@@ -1911,15 +1911,19 @@ where
     }
 }
 
-// Weight trace for RSTDP
+pub trait RewardModulatedWeight {
+    fn get_weight(&self) -> f32;
+}
+
+/// Weight trace for RSTDP
 #[derive(Debug, Clone, Copy)]
 pub struct TraceRSTDP {
-    counter: usize,
-    dw: f32,
-    weight: f32,
-    c: f32,
-    tau_c: f32,
-    dt: f32,
+    pub counter: usize,
+    pub dw: f32,
+    pub weight: f32,
+    pub c: f32,
+    pub tau_c: f32,
+    pub dt: f32,
 }
 
 impl Default for TraceRSTDP {
@@ -1935,7 +1939,13 @@ impl TraceRSTDP {
     }
 }
 
-pub trait RewardModulator<T, U, V>: Clone + Send + Sync {
+impl RewardModulatedWeight for TraceRSTDP {
+    fn get_weight(&self) -> f32 {
+        self.weight
+    }
+}
+
+pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
     /// Update parameters based on reward
     fn update(&mut self, reward: f32);
     /// Update weight given two neurons and the weight itself
@@ -1947,9 +1957,9 @@ pub trait RewardModulator<T, U, V>: Clone + Send + Sync {
 #[derive(Debug, Clone, Copy)]
 pub struct RewardModulatedSTDP {
     // Dopamine concentration
-    dopamine: f32,
+    pub dopamine: f32,
     // Dopamine decay factor
-    tau_d: f32,
+    pub tau_d: f32,
     /// Postitive STDP modifier 
     pub a_plus: f32,
     /// Negative STDP modifier  
@@ -2035,15 +2045,16 @@ where
 // postsynaptic weights or both when calculating weights
 
 // reward modulated lattice network has connecting graph with enum for weights
-// enum { Weight(f32), Trace(Trace) }
+// enum { Weight(f32), RewardModulatedWeight(S) }
 // connecting function could generate different enums
 
 #[derive(Debug, Clone)]
 pub struct RewardModulatedLattice<
+    S: RewardModulatedWeight,
     T: IterateAndSpike, 
-    U: Graph<T=(usize, usize), U=TraceRSTDP>, 
+    U: Graph<T=(usize, usize), U=S>, 
     V: LatticeHistory, 
-    W: RewardModulator<T, T, TraceRSTDP>, 
+    W: RewardModulator<T, T, S>, 
 > {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
@@ -2055,7 +2066,11 @@ pub struct RewardModulatedLattice<
     pub update_graph_history: bool,
     /// Whether to update grid's history
     pub update_grid_history: bool,
-    // Whether to modulate lattice based on reward
+    /// Whether to use electrical synapses in optimizer
+    pub electrical_synapse: bool,
+    /// Whether to use chemical synapses in optimizer
+    pub chemical_synapse: bool,
+    /// Whether to modulate lattice based on reward
     pub do_modulation: bool,
     /// Reward modulator for plasticity rule
     pub reward_modulator: W,
@@ -2065,7 +2080,45 @@ pub struct RewardModulatedLattice<
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHistory, W: RewardModulator<T, T, TraceRSTDP>> RewardModulatedLattice<T, U, V, W> {
+impl<S, T, U, V, W> Default for RewardModulatedLattice<S, T, U, V, W>
+where
+    S: RewardModulatedWeight,
+    T: IterateAndSpike,
+    U: Graph<T = (usize, usize), U = S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>,
+{
+    fn default() -> Self {
+        RewardModulatedLattice { 
+            cell_grid: vec![], 
+            graph: U::default(), 
+            grid_history: V::default(), 
+            update_graph_history: false, 
+            update_grid_history: false,
+            electrical_synapse: true,
+            chemical_synapse: false, 
+            do_modulation: false, 
+            reward_modulator: W::default(), 
+            gaussian: false, 
+            internal_clock: 0,
+        }
+    }
+}
+
+impl<T: IterateAndSpike> RewardModulatedLattice<TraceRSTDP, T, AdjacencyMatrix<(usize, usize), TraceRSTDP>, GridVoltageHistory, RewardModulatedSTDP> {
+    pub fn default_impl() -> Self {
+        RewardModulatedLattice::default()
+    }
+}
+
+impl<S, T, U, V, W> RewardModulatedLattice<S, T, U, V, W>
+where
+    S: RewardModulatedWeight,
+    T: IterateAndSpike,
+    U: Graph<T=(usize, usize), U=S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>,
+{
     impl_reset_timing!();
     impl_apply!();
 
@@ -2096,7 +2149,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
 
                 let final_input = gap_junction(input_cell, postsynaptic_neuron);
                 
-                final_input * self.graph.lookup_weight(&input_position, position).unwrap().unwrap().weight
+                final_input * self.graph.lookup_weight(&input_position, position)
+                    .unwrap().unwrap().get_weight()
             })
             .sum();
 
@@ -2124,7 +2178,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
                 let mut final_input = input_cell.get_neurotransmitter_concentrations();
                 let trace = self.graph.lookup_weight(&input_position, position).unwrap().unwrap();
                 
-                weight_neurotransmitter_concentration(&mut final_input, trace.weight);
+                weight_neurotransmitter_concentration(&mut final_input, trace.get_weight());
 
                 final_input
             })
@@ -2348,7 +2402,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical synapses only
-    pub fn run_lattice(&mut self, reward: f32) -> Result<(), GraphError> {
+    pub fn run_lattice_electrical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
         let inputs = self.get_internal_electrical_inputs();
 
         self.iterate(&inputs, reward)?;
@@ -2374,6 +2428,15 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
         self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs, reward)?;
 
         Ok(())
+    }
+
+    pub fn run_lattice(&mut self, reward: f32) -> Result<(), GraphError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(reward),
+            (true, false) => self.run_lattice_electrical_synapses_only(reward),
+            (false, true) => self.run_lattice_chemical_synapses_only(reward),
+            (false, false) => Ok(()),
+        }
     }
 
     fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
@@ -2412,7 +2475,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
     pub fn connect(
         &mut self, 
         connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> TraceRSTDP,
+        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> S,
     ) {
         self.graph.get_every_node()
             .iter()
@@ -2428,8 +2491,24 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=TraceRSTDP>, V: LatticeHis
     }
 } 
 
+impl<S, T, U, V, W> Agent for RewardModulatedLattice<S, T, U, V, W> 
+where 
+    S: RewardModulatedWeight,
+    T: IterateAndSpike,
+    U: Graph<T=(usize, usize), U=S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>
+{
+    fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
+        match self.run_lattice(reward) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
+        }
+    }
+}
+
 pub trait Agent {
-    fn update_and_apply_reward(&mut self, reward: f32);
+    fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError>;
 }
 
 pub trait State {
@@ -2437,21 +2516,23 @@ pub trait State {
     fn update_state(&mut self, agent: &Self::A);
 }
 
-pub struct Optimizer<T: Agent, U: State<A=T>> {
+pub struct Optimizer<'a, T: Agent, U: State<A=T>> {
     pub agent: T,
     pub state: U,
-    pub reward_function: fn(&U, &T) -> f32,
+    pub reward_function: &'a dyn Fn(&U, &T) -> f32,
 }
 
-impl<T: Agent, U: State<A=T>> Optimizer<T, U> {
-    pub fn run(&mut self, iterations: usize) {
+impl<'a, T: Agent, U: State<A=T>> Optimizer<'a, T, U> {
+    pub fn run(&mut self, iterations: usize) -> Result<(), AgentError> {
         for _ in 0..iterations {
             // get reward
             let reward = (self.reward_function)(&self.state, &self.agent);
             // update agent (taking action) and apply reward for the action
-            self.agent.update_and_apply_reward(reward);
+            self.agent.update_and_apply_reward(reward)?;
             // update state based on agent
             self.state.update_state(&self.agent);
         }
+
+        Ok(())
     }
 }
