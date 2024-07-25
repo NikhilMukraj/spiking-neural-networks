@@ -217,7 +217,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - Attractor based classifier
 
 - R-STDP
-  - If reward modifer is 0, do not continue with STDP weight calculation
+  - Dopamine may need longer decay to ensure that weights change afterwards (need to attune $\tau_c$ as well)
   - Lattices implementation
   - Classifier
   - Regression
