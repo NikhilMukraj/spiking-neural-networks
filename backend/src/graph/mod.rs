@@ -224,7 +224,7 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default f
             position_to_index: HashMap::new(), 
             index_to_position: HashMap::new(), 
             matrix: vec![vec![]],
-            history: vec![vec![vec![]]],
+            history: vec![],
             id: 0,
         }
     }
