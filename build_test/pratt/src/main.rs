@@ -250,6 +250,7 @@ impl NeuronDefinition {
             "pub struct {}<T: NeurotransmitterKinetics, R: ReceptorKinetics> {{", 
             self.type_name.to_string(),
         );
+
         let mut fields = match &self.vars {
             AST::VariablesAssignments(variables) => {
                 variables
@@ -266,6 +267,7 @@ impl NeuronDefinition {
             },
             _ => unreachable!()
         };
+
         let current_voltage_field = String::from("current_voltage: f32");
         let dt_field = String::from("dt: f32");
         let c_m_field = String::from("c_m: f32");
@@ -413,11 +415,263 @@ impl NeuronDefinition {
     }
 }
 
-// pub struct IonChannelDefinition {
-//     type_name: AST,
-//     vars: AST,
-//     on_iteration: AST,
-// }
+pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
+    let mut definitions: HashMap<String, AST> = HashMap::new();
+
+    for pair in pairs {
+        let (key, current_ast) = match pair.as_rule() {
+            Rule::type_def => {
+                (
+                    String::from("type"), 
+                    AST::TypeDefinition(
+                        String::from(pair.into_inner().next().unwrap().as_str())
+                    )
+                )
+            },
+            Rule::on_iteration_def => {
+                let inner_rules = pair.into_inner();
+
+                (
+                    String::from("on_iteration"),
+                    AST::OnIteration(
+                        inner_rules
+                        .map(|i| Box::new(parse_declaration(i)))
+                        .collect::<Vec<Box<AST>>>()
+                    )
+                )
+            },
+            Rule::on_spike_def => {
+                let inner_rules = pair.into_inner();
+
+                (
+                    String::from("on_spike"),
+                    AST::OnSpike(
+                        inner_rules
+                        .map(|i| Box::new(parse_declaration(i)))
+                        .collect::<Vec<Box<AST>>>()
+                    )
+                )
+            },
+            Rule::spike_detection_def => {
+                (
+                    String::from("spike_detection"),
+                    AST::SpikeDetection(Box::new(bool_parse_expr(pair.into_inner())))
+                )
+            }
+            Rule::vars_def => {
+                // if no defaults then just assume assingment is None
+                // in order to prevent duplicate, key should be "vars"
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<Box<AST>> = inner_rules
+                    .map(|i| Box::new(AST::VariableAssignment { 
+                        name: String::from(i.as_str()), 
+                        value: None,
+                    }))
+                    .collect();
+
+                println!("{:#?}", assignments);
+
+                (
+                    String::from("vars"),
+                    AST::VariablesAssignments(assignments)
+                )
+            },
+            Rule::vars_with_default_def => {
+                // assignment should be just a number
+                // in order to prevent duplicate, key should be "vars"
+
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<Box<AST>> = inner_rules 
+                    .map(|i| {
+                        let mut nested_rule = i.into_inner();
+
+                        Box::new(AST::VariableAssignment { 
+                            name: String::from(nested_rule.next().unwrap().as_str()), 
+                            value: Some(
+                                nested_rule.next()
+                                    .unwrap()
+                                    .as_str()
+                                    .parse::<f32>()
+                                    .unwrap()
+                                ), 
+                        })
+                    })
+                    .collect(); 
+
+                (
+                    String::from("vars"),
+                    AST::VariablesAssignments(assignments)
+                )
+            },
+            definition => unreachable!("Unexpected definiton: {:#?}", definition)
+        };
+
+        if definitions.contains_key(&key) {
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                )
+            )
+        }
+
+        definitions.insert(key, current_ast);
+    }
+
+    // neuron definition as part of ast enum?
+
+    let neuron = NeuronDefinition {
+        type_name: definitions.remove("type").unwrap(),
+        vars: definitions.remove("vars").unwrap(),
+        spike_detection: definitions.remove("spike_detection").unwrap(),
+        on_iteration: definitions.remove("on_iteration").unwrap(),
+        on_spike: definitions.remove("on_spike").unwrap()
+    };
+
+    Ok(neuron)
+}
+
+pub struct IonChannelDefinition {
+    type_name: AST,
+    vars: AST,
+    on_iteration: AST,
+}
+
+impl IonChannelDefinition {
+    // check on iteration to see if diffeqs are used
+    // if diff eqs are used generate ion channel that is time dependent
+    // otherwise generate time independent
+    fn to_code(&self) -> String {
+        let header = format!(
+            "pub struct {} {{", 
+            self.type_name.to_string(),
+        );
+        
+        let mut fields = match &self.vars {
+            AST::VariablesAssignments(variables) => {
+                variables
+                    .iter()
+                    .map(|i| {
+                        let var_name = match i.as_ref() {
+                            AST::VariableAssignment { name, .. } => name,
+                            _ => unreachable!(),
+                        };
+
+                        format!("{}: f32", var_name)
+                    })
+                    .collect::<Vec<String>>()
+            },
+            _ => unreachable!()
+        };
+
+        let current_field = String::from("current: f32");
+        fields.push(current_field);
+
+        let fields = format!("\t{},", fields.join(",\n\t"));
+
+        let update_current_header = "fn update_current(&mut self, voltage: f32) {";
+        let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
+        let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
+
+        format!("{}\n{}\n}}\n{}", header, fields, update_current)
+    }
+}
+
+pub fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
+    let mut definitions: HashMap<String, AST> = HashMap::new();
+
+    for pair in pairs {
+        let (key, current_ast) = match pair.as_rule() {
+            Rule::type_def => {
+                (
+                    String::from("type"), 
+                    AST::TypeDefinition(
+                        String::from(pair.into_inner().next().unwrap().as_str())
+                    )
+                )
+            },
+            Rule::on_iteration_def => {
+                let inner_rules = pair.into_inner();
+
+                (
+                    String::from("on_iteration"),
+                    AST::OnIteration(
+                        inner_rules
+                        .map(|i| Box::new(parse_declaration(i)))
+                        .collect::<Vec<Box<AST>>>()
+                    )
+                )
+            },
+            Rule::vars_def => {
+                // if no defaults then just assume assingment is None
+                // in order to prevent duplicate, key should be "vars"
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<Box<AST>> = inner_rules
+                    .map(|i| Box::new(AST::VariableAssignment { 
+                        name: String::from(i.as_str()), 
+                        value: None,
+                    }))
+                    .collect();
+
+                println!("{:#?}", assignments);
+
+                (
+                    String::from("vars"),
+                    AST::VariablesAssignments(assignments)
+                )
+            },
+            Rule::vars_with_default_def => {
+                // assignment should be just a number
+                // in order to prevent duplicate, key should be "vars"
+
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<Box<AST>> = inner_rules 
+                    .map(|i| {
+                        let mut nested_rule = i.into_inner();
+
+                        Box::new(AST::VariableAssignment { 
+                            name: String::from(nested_rule.next().unwrap().as_str()), 
+                            value: Some(
+                                nested_rule.next()
+                                    .unwrap()
+                                    .as_str()
+                                    .parse::<f32>()
+                                    .unwrap()
+                                ), 
+                        })
+                    })
+                    .collect(); 
+
+                (
+                    String::from("vars"),
+                    AST::VariablesAssignments(assignments)
+                )
+            },
+            definition => unreachable!("Unexpected definiton: {:#?}", definition)
+        };
+
+        if definitions.contains_key(&key) {
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                )
+            )
+        }
+
+        definitions.insert(key, current_ast);
+    }
+
+    let ion_channel = IonChannelDefinition {
+        type_name: definitions.remove("type").unwrap(),
+        vars: definitions.remove("vars").unwrap(),
+        on_iteration: definitions.remove("on_iteration").unwrap(),
+    };
+
+    Ok(ion_channel)
+}
 
 // then try writing rust code from ast
 pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
@@ -589,7 +843,7 @@ fn main() -> Result<()> {
         return Ok(())
     }
 
-    let contents = fs::read_to_string(filename)?;
+    let contents = fs::read_to_string(&filename)?;
 
     // handle variables
     // handle continous detection
@@ -605,123 +859,41 @@ fn main() -> Result<()> {
     // neurotransmitter and approximate kinetics
     // handling function if statements and boolean vars
 
-    match ASTParser::parse(Rule::neuron_definition, &contents) {
+    let output_file_name = format!(
+        "{}.rs", filename.as_str().split(".").collect::<Vec<&str>>()[0]
+    );
+
+    // collect import statements at the top
+    // also collect code generated
+    // stitch imports and code together and then write to file
+    // imports will likely be a seperate struct that contains 
+    // a field for neuron import and a field for ion channel imports
+    // maybe add get_imports() method
+
+    // let mut imports = vec![];
+    let mut code = vec![];
+
+    match ASTParser::parse(Rule::full, &contents) {
         Ok(pairs) => {
-            let mut definitions: HashMap<String, AST> = HashMap::new();
-
             for pair in pairs {
-                let (key, current_ast) = match pair.as_rule() {
-                    Rule::type_def => {
-                        (
-                            String::from("type"), 
-                            AST::TypeDefinition(
-                                String::from(pair.into_inner().next().unwrap().as_str())
-                            )
-                        )
+                match pair.as_rule()  {
+                    Rule::neuron_definition => {
+                        let neuron_code = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
+                            .to_code();
+
+                        code.push(neuron_code);
                     },
-                    Rule::on_iteration_def => {
-                        let inner_rules = pair.into_inner();
+                    Rule::ion_channel_definition => {
+                        let ion_channel = generate_ion_channel(pair.into_inner()).expect("Could not generate neuron");
 
-                        (
-                            String::from("on_iteration"),
-                            AST::OnIteration(
-                                inner_rules
-                                .map(|i| Box::new(parse_declaration(i)))
-                                .collect::<Vec<Box<AST>>>()
-                            )
-                        )
+                        println!("{}", ion_channel.to_code())
                     },
-                    Rule::on_spike_def => {
-                        let inner_rules = pair.into_inner();
-
-                        (
-                            String::from("on_spike"),
-                            AST::OnSpike(
-                                inner_rules
-                                .map(|i| Box::new(parse_declaration(i)))
-                                .collect::<Vec<Box<AST>>>()
-                            )
-                        )
-                    },
-                    Rule::spike_detection_def => {
-                        (
-                            String::from("spike_detection"),
-                            AST::SpikeDetection(Box::new(bool_parse_expr(pair.into_inner())))
-                        )
-                    }
-                    Rule::vars_def => {
-                        // if no defaults then just assume assingment is None
-                        // in order to prevent duplicate, key should be "vars"
-                        let inner_rules = pair.into_inner();
-
-                        let assignments: Vec<Box<AST>> = inner_rules
-                            .map(|i| Box::new(AST::VariableAssignment { 
-                                name: String::from(i.as_str()), 
-                                value: None,
-                            }))
-                            .collect();
-
-                        println!("{:#?}", assignments);
-
-                        (
-                            String::from("vars"),
-                            AST::VariablesAssignments(assignments)
-                        )
-                    },
-                    Rule::vars_with_default_def => {
-                        // assignment should be just a number
-                        // in order to prevent duplicate, key should be "vars"
-
-                        let inner_rules = pair.into_inner();
-
-                        let assignments: Vec<Box<AST>> = inner_rules 
-                            .map(|i| {
-                                let mut nested_rule = i.into_inner();
-
-                                Box::new(AST::VariableAssignment { 
-                                    name: String::from(nested_rule.next().unwrap().as_str()), 
-                                    value: Some(
-                                        nested_rule.next()
-                                            .unwrap()
-                                            .as_str()
-                                            .parse::<f32>()
-                                            .unwrap()
-                                        ), 
-                                })
-                            })
-                            .collect(); 
-
-                        (
-                            String::from("vars"),
-                            AST::VariablesAssignments(assignments)
-                        )
-                    },
-                    definition => unreachable!("Unexpected definiton: {:#?}", definition)
-                };
-
-                if definitions.contains_key(&key) {
-                    return Err(
-                        Error::new(
-                            ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
-                        )
-                    )
+                    _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
                 }
-
-                definitions.insert(key, current_ast);
             }
 
-            // neuron definition as part of ast enum?
-
-            let neuron = NeuronDefinition {
-                type_name: definitions.remove("type").unwrap(),
-                vars: definitions.remove("vars").unwrap(),
-                spike_detection: definitions.remove("spike_detection").unwrap(),
-                on_iteration: definitions.remove("on_iteration").unwrap(),
-                on_spike: definitions.remove("on_spike").unwrap()
-            };
-
-            let mut file = File::create("neuron_file.rs")?;
-            file.write_all(neuron.to_code().as_bytes())?;
+            let mut file = File::create(&output_file_name)?;
+            file.write_all(code.join("\n").as_bytes())?;
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
