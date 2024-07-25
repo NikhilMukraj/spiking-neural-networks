@@ -14,4 +14,3 @@
     on_iteration:
         current = g * (v - e)
 [end]
-
