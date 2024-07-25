@@ -2248,23 +2248,21 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
 
-    // --relase build with maturin
-    // hodgkin huxley (ion channels too)
-    // macros for building receptors, ligand gates, neurotransmitters, and neurons
-    // macros for building lattices and lattice networks
-
-    // view weights, pos to index too
-
-    // verbose option that prints progress in running simulation
-    // should be printed from rust
-
-    // modify plasticity params on lattice    
-    
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
     // python wrapper should do f = lambda x: bool(x) to try and autoconvert before passing to rust
     // universal lattice and latticenetwork type that dynamically dispatch to a certain neuron type
     // depending on initialization
+
+    // view weights, pos to index too
+
+    // hodgkin huxley (ion channels too)
+    // macros for building receptors, ligand gates, neurotransmitters, and neurons
+
+    // verbose option that prints progress in running simulation
+    // should be printed from rust
+
+    // modify plasticity params on lattice    
 
     // temp env variable for building pyo3 with custom models
     // builtin models can be listed in a separate file associated with this crate
