@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+use std::{fs::File, io::{BufWriter, Write}};
 use rand::Rng;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError, graph::AdjacencyMatrix, neuron::{
@@ -26,6 +26,7 @@ fn weight_logic(_: (usize, usize), _: (usize, usize)) -> TraceRSTDP {
 }
 
 pub struct TestState {
+    pub dopamine_history: Vec<f32>,
     pub timestep: usize,
 }
 
@@ -41,11 +42,12 @@ impl State for TestState {
     type A = AgentType;
     fn update_state(&mut self, lattice: &Self::A) {
         self.timestep = lattice.internal_clock;
+        self.dopamine_history.push(lattice.reward_modulator.dopamine);
     }
 }
 
 fn reward_function(state: &TestState, _: &AgentType) -> f32 {
-    if state.timestep % 1000 == 0 {
+    if state.timestep % 2000 == 0 && state.timestep != 0 {
         1.
     } else {
         0.
@@ -59,8 +61,12 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     reward_modulated_lattice.populate(&izhikevich_neuron, 5, 5);
     reward_modulated_lattice.connect(&connection_conditional, &weight_logic);
+    reward_modulated_lattice.apply(|neuron: &mut _| {
+        let mut rng = rand::thread_rng();
+        neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+    });
 
-    let state = TestState { timestep: 0 };
+    let state = TestState { timestep: 0, dopamine_history: vec![] };
     let mut optimizer = Optimizer { 
         state: state, 
         agent: reward_modulated_lattice, 
@@ -69,7 +75,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     optimizer.run(10000)?;
 
-    let mut file = File::create("weights.csv").expect("Could not create file");
+    let mut file = BufWriter::new(File::create("weights.txt").expect("Could not create file"));
 
     for matrix in optimizer.agent.graph.history {
         for row in matrix {
@@ -84,6 +90,12 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         }
 
         writeln!(file, "-----").expect("Could not write to file");
+    }
+
+    let mut file = BufWriter::new(File::create("dopamine.txt").expect("Could not create file"));
+
+    for i in optimizer.state.dopamine_history {
+        writeln!(file, "{}", i).expect("Could not write to file");
     }
 
     Ok(())
