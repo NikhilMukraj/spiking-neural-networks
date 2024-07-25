@@ -848,13 +848,21 @@ fn main() -> Result<()> {
     // handle variables
     // handle continous detection
     // try code generation (assume default ligands)
-    // default functions
-    // handle function definitions
-    // function definitions should probably be seperate block than on_iteration/on_spike
-    // runge kutta
 
     // handle ion channels (handle builtin ion channels) 
     // (could import with name prefixed as DefaultChannel or something)
+
+    // test creating default impl
+
+    // default functions like max, min, exp, floor, ciel, heaviside
+    // if function in same space as on iteration and on spike
+    // add that function to the struct impl
+    // function declarations in separate space from on iteration and on spike
+
+    // runge kutta and import integrators
+
+    // handle function definitions in seperate block
+
     // handle ligand gates
     // neurotransmitter and approximate kinetics
     // handling function if statements and boolean vars
