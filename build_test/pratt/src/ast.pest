@@ -113,7 +113,7 @@ on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE+ ~ assignments }
 spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
 ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
 
-neuron_definition = _{
+neuron_definition = {
     "[neuron]" ~ NEWLINE ~ 
 	(on_iteration_def | type_def | on_spike_def | spike_detection_def | vars_def | vars_with_default_def){5,} ~ 
 	"[end]"
@@ -123,7 +123,7 @@ gating_variables_def = { variables_block ~ NEWLINE+ }
 // this should be added to expr parser (and bool expr parser)
 struct_call = @{ name ~ "." ~ name ~ ("(" ~ args ~ ")")? } 
 
-ion_channel_definition = _{
+ion_channel_definition = {
 	"[ion_channel]" ~ NEWLINE ~ 
 	(gating_variables_def | type_def | vars_def | vars_with_default_def | on_iteration_def){3,} ~
 	"[end]"
