@@ -767,6 +767,33 @@ macro_rules! impl_lattice {
             }
 
             #[getter]
+            fn weights_history(&self) -> Vec<Vec<Vec<f32>>> {
+                self.lattice.graph.history.clone()
+                    .iter()
+                    .map(|grid| {
+                        grid.iter()
+                            .map(|row| {
+                                row.iter().map(|i| {
+                                    i.unwrap_or(0.)
+                                })
+                                .collect()
+                            })
+                            .collect()
+                    })
+                    .collect()
+            }
+
+            #[getter]
+            fn get_update_graph_history(&self) -> bool {
+                self.lattice.update_graph_history
+            }
+
+            #[setter]
+            fn set_update_graph_history(&mut self, flag: bool) {
+                self.lattice.update_graph_history = flag;
+            }
+
+            #[getter]
             fn get_do_plasticity(&self) -> bool {
                 self.lattice.update_grid_history
             }
@@ -1009,488 +1036,601 @@ macro_rules! impl_network {
         $lattice_neuron_kind:ident, $spike_train_kind:ident,
         $lattice_neuron_name:literal, $spike_train_name:literal, $network_name:literal
     ) => {        
-    #[pymethods]
-    impl $network_kind {
-        #[new]
-        fn new() -> Self {
-            $network_kind { network: LatticeNetwork::default() }
-        }
-
-        fn add_lattice(&mut self, lattice: $lattice_kind) -> PyResult<()> {
-            match self.network.add_lattice(lattice.lattice) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(PyKeyError::new_err("Id already in network")),
+        #[pymethods]
+        impl $network_kind {
+            #[new]
+            fn new() -> Self {
+                $network_kind { network: LatticeNetwork::default() }
             }
-        }
 
-        fn add_spike_train_lattice(&mut self, spike_train_lattice: $spike_train_lattice_kind) -> PyResult<()> {
-            match self.network.add_spike_train_lattice(spike_train_lattice.lattice) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(PyKeyError::new_err("Id already in network")),
+            fn add_lattice(&mut self, lattice: $lattice_kind) -> PyResult<()> {
+                match self.network.add_lattice(lattice.lattice) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(PyKeyError::new_err("Id already in network")),
+                }
             }
-        }
 
-        #[pyo3(signature = (id, connection_conditional, weight_logic=None))]
-        fn connect_internally(
-            &mut self, py: Python, id: usize, connection_conditional: &PyAny, weight_logic: Option<&PyAny>,
-        ) -> PyResult<()> {
-            let py_callable = connection_conditional.to_object(connection_conditional.py());
-
-            let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
-                let args = PyTuple::new(py, &[a, b]);
-                py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
-            };
-
-            let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
-                Some(value) => {
-                    let py_callable = value.to_object(value.py()); 
-
-                    let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
-                        let args = PyTuple::new(py, &[a, b]);
-                        py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
-                    };
-
-                    Some(Box::new(closure))
-                },
-                None => None,
-            };
-
-            match self.network.connect_interally(id, &connection_closure, weight_closure.as_deref()) {
-                Ok(_) => Ok(()),
-                Err(_) => Err(PyKeyError::new_err("Id not found in network")),
+            fn add_spike_train_lattice(&mut self, spike_train_lattice: $spike_train_lattice_kind) -> PyResult<()> {
+                match self.network.add_spike_train_lattice(spike_train_lattice.lattice) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(PyKeyError::new_err("Id already in network")),
+                }
             }
-        }
 
-        #[pyo3(signature = (presynaptic_id, postsynaptic_id, connection_conditional, weight_logic=None))]
-        fn connect(
-            &mut self, 
-            py: Python, 
-            presynaptic_id: usize,  
-            postsynaptic_id: usize, 
-            connection_conditional: &PyAny, 
-            weight_logic: Option<&PyAny>,
-        ) -> PyResult<()> {
-            let py_callable = connection_conditional.to_object(connection_conditional.py());
+            #[pyo3(signature = (id, connection_conditional, weight_logic=None))]
+            fn connect_internally(
+                &mut self, py: Python, id: usize, connection_conditional: &PyAny, weight_logic: Option<&PyAny>,
+            ) -> PyResult<()> {
+                let py_callable = connection_conditional.to_object(connection_conditional.py());
 
-            let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
-                let args = PyTuple::new(py, &[a, b]);
-                py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
-            };
-
-            let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
-                Some(value) => {
-                    let py_callable = value.to_object(value.py()); 
-
-                    let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
-                        let args = PyTuple::new(py, &[a, b]);
-                        py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
-                    };
-
-                    Some(Box::new(closure))
-                },
-                None => None,
-            };
-
-            match self.network.connect(
-                presynaptic_id, 
-                postsynaptic_id, 
-                &connection_closure, 
-                weight_closure.as_deref()
-            ) {
-                Ok(_) => Ok(()),
-                Err(e) => match e {
-                    LatticeNetworkError::PresynapticIDNotFound(id) => Err(PyKeyError::new_err(
-                        format!("Presynaptic id ({}) not found", id)
-                    )),
-                    LatticeNetworkError::PostsynapticIDNotFound(id) => Err(PyKeyError::new_err(
-                        format!("Postsynaptic id ({}) not found", id)
-                    )),
-                    LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => Err(PyValueError::new_err(
-                        format!("Postsynaptic lattice cannot be spike train")
-                    )),
-                    _ => unreachable!(),
-                },
-            }
-        }
-
-        #[getter]
-        fn get_connecting_weights(&self) -> Vec<Vec<f32>> {
-            self.network.get_connecting_graph().matrix
-                .iter()
-                .map(|row|
-                    row.iter()
-                        .map(|i| i.unwrap_or(0.) )
-                        .collect::<Vec<f32>>()
-                )
-                .collect()
-        }
-
-        fn get_weight(&self, presynaptic: PyGraphPosition, postsynaptic: PyGraphPosition) -> PyResult<f32> {
-            let presynaptic = presynaptic.graph_position;
-            let postsynaptic = postsynaptic.graph_position;
-
-            if presynaptic.id == postsynaptic.id {
-                let current_lattice = match self.network.get_lattice(&presynaptic.id) {
-                    Some(lattice) => lattice,
-                    None => { return Err(PyKeyError::new_err("Id not found in lattice")); },
+                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+                    let args = PyTuple::new(py, &[a, b]);
+                    py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
                 };
-                    
-                match current_lattice.graph.lookup_weight(&presynaptic.pos, &postsynaptic.pos) {
-                    Ok(Some(value)) => Ok(value),
-                    Ok(None) => Ok(0.),
-                    Err(e) => Err(
-                        PyKeyError::new_err(format!("{}", e))
+
+                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+                    Some(value) => {
+                        let py_callable = value.to_object(value.py()); 
+
+                        let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                            let args = PyTuple::new(py, &[a, b]);
+                            py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                        };
+
+                        Some(Box::new(closure))
+                    },
+                    None => None,
+                };
+
+                match self.network.connect_interally(id, &connection_closure, weight_closure.as_deref()) {
+                    Ok(_) => Ok(()),
+                    Err(_) => Err(PyKeyError::new_err("Id not found in network")),
+                }
+            }
+
+            #[pyo3(signature = (presynaptic_id, postsynaptic_id, connection_conditional, weight_logic=None))]
+            fn connect(
+                &mut self, 
+                py: Python, 
+                presynaptic_id: usize,  
+                postsynaptic_id: usize, 
+                connection_conditional: &PyAny, 
+                weight_logic: Option<&PyAny>,
+            ) -> PyResult<()> {
+                let py_callable = connection_conditional.to_object(connection_conditional.py());
+
+                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+                    let args = PyTuple::new(py, &[a, b]);
+                    py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+                };
+
+                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+                    Some(value) => {
+                        let py_callable = value.to_object(value.py()); 
+
+                        let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                            let args = PyTuple::new(py, &[a, b]);
+                            py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                        };
+
+                        Some(Box::new(closure))
+                    },
+                    None => None,
+                };
+
+                match self.network.connect(
+                    presynaptic_id, 
+                    postsynaptic_id, 
+                    &connection_closure, 
+                    weight_closure.as_deref()
+                ) {
+                    Ok(_) => Ok(()),
+                    Err(e) => match e {
+                        LatticeNetworkError::PresynapticIDNotFound(id) => Err(PyKeyError::new_err(
+                            format!("Presynaptic id ({}) not found", id)
+                        )),
+                        LatticeNetworkError::PostsynapticIDNotFound(id) => Err(PyKeyError::new_err(
+                            format!("Postsynaptic id ({}) not found", id)
+                        )),
+                        LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => Err(PyValueError::new_err(
+                            format!("Postsynaptic lattice cannot be spike train")
+                        )),
+                        _ => unreachable!(),
+                    },
+                }
+            }
+
+            #[getter]
+            fn get_connecting_weights(&self) -> Vec<Vec<f32>> {
+                self.network.get_connecting_graph().matrix
+                    .iter()
+                    .map(|row|
+                        row.iter()
+                            .map(|i| i.unwrap_or(0.) )
+                            .collect::<Vec<f32>>()
                     )
-                }
-            } else {
-                match self.network.get_connecting_graph().lookup_weight(&presynaptic, &postsynaptic) {
-                    Ok(Some(value)) => Ok(value),
-                    Ok(None) => Ok(0.),
-                    Err(e) => Err(
-                        PyKeyError::new_err(format!("{}", e))
-                    )
-                }
+                    .collect()
             }
-        }
 
-        fn get_incoming_connections_within_lattice(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<(usize, usize)>> {
-            match self.network.get_lattice(&id) {
-                Some(lattice) => {
-                    match lattice.graph.get_incoming_connections(&position) {
-                        Ok(value) => Ok(value),
-                        Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+            fn get_weight(&self, presynaptic: PyGraphPosition, postsynaptic: PyGraphPosition) -> PyResult<f32> {
+                let presynaptic = presynaptic.graph_position;
+                let postsynaptic = postsynaptic.graph_position;
+
+                if presynaptic.id == postsynaptic.id {
+                    let current_lattice = match self.network.get_lattice(&presynaptic.id) {
+                        Some(lattice) => lattice,
+                        None => { return Err(PyKeyError::new_err("Id not found in lattice")); },
+                    };
+                        
+                    match current_lattice.graph.lookup_weight(&presynaptic.pos, &postsynaptic.pos) {
+                        Ok(Some(value)) => Ok(value),
+                        Ok(None) => Ok(0.),
+                        Err(e) => Err(
+                            PyKeyError::new_err(format!("{}", e))
+                        )
                     }
-                },
-                None => {
-                    Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
-                }
-            }
-        }
-
-        fn get_outgoing_connections_within_lattice(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<(usize, usize)>> {
-            match self.network.get_lattice(&id) {
-                Some(lattice) => {
-                    match lattice.graph.get_outgoing_connections(&position) {
-                        Ok(value) => Ok(value),
-                        Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+                } else {
+                    match self.network.get_connecting_graph().lookup_weight(&presynaptic, &postsynaptic) {
+                        Ok(Some(value)) => Ok(value),
+                        Ok(None) => Ok(0.),
+                        Err(e) => Err(
+                            PyKeyError::new_err(format!("{}", e))
+                        )
                     }
-                },
-                None => {
-                    Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
                 }
             }
-        }
 
-        fn get_incoming_connectings_across_lattices(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<PyGraphPosition>> {
-            match self.network.get_lattice(&id) {
-                Some(_) => {
-                    let graph_pos = GraphPosition { id: id, pos: position };
-                    let connections = self.network.get_connecting_graph().get_incoming_connections(&graph_pos);
-
-                    match connections {
-                        Ok(connections_value) => {
-                            Ok(
-                                connections_value.iter()
-                                    .map(|i| PyGraphPosition { graph_position: *i })
-                                    .collect()
-                            )
-                        },
-                        Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+            fn get_incoming_connections_within_lattice(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<(usize, usize)>> {
+                match self.network.get_lattice(&id) {
+                    Some(lattice) => {
+                        match lattice.graph.get_incoming_connections(&position) {
+                            Ok(value) => Ok(value),
+                            Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+                        }
+                    },
+                    None => {
+                        Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
                     }
-                },
-                None => {
-                    Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
                 }
             }
-        }
 
-        fn get_outgoing_connectings_across_lattices(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<PyGraphPosition>> {
-            match self.network.get_lattice(&id) {
-                Some(_) => {
-                    let graph_pos = GraphPosition { id: id, pos: position };
-                    let connections = self.network.get_connecting_graph().get_outgoing_connections(&graph_pos);
-
-                    match connections {
-                        Ok(connections_value) => {
-                            Ok(
-                                connections_value.iter()
-                                    .map(|i| PyGraphPosition { graph_position: *i })
-                                    .collect()
-                            )
-                        },
-                        Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+            fn get_outgoing_connections_within_lattice(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<(usize, usize)>> {
+                match self.network.get_lattice(&id) {
+                    Some(lattice) => {
+                        match lattice.graph.get_outgoing_connections(&position) {
+                            Ok(value) => Ok(value),
+                            Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+                        }
+                    },
+                    None => {
+                        Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
                     }
-                },
-                None => {
-                    Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
                 }
             }
-        }
 
-        fn get_neuron(&self, id: usize, row: usize, col: usize) -> PyResult<$lattice_neuron_kind> {
-            match self.network.get_lattice(&id) {
-                Some(lattice) => {
-                    let neuron = match lattice.cell_grid.get(row) {
-                        Some(row_cells) => match row_cells.get(col) {
-                            Some(neuron) => neuron.clone(),
+            fn get_incoming_connectings_across_lattices(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<PyGraphPosition>> {
+                match self.network.get_lattice(&id) {
+                    Some(_) => {
+                        let graph_pos = GraphPosition { id: id, pos: position };
+                        let connections = self.network.get_connecting_graph().get_incoming_connections(&graph_pos);
+
+                        match connections {
+                            Ok(connections_value) => {
+                                Ok(
+                                    connections_value.iter()
+                                        .map(|i| PyGraphPosition { graph_position: *i })
+                                        .collect()
+                                )
+                            },
+                            Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+                        }
+                    },
+                    None => {
+                        Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
+                    }
+                }
+            }
+
+            fn get_outgoing_connectings_across_lattices(&self, id: usize, position: (usize, usize)) -> PyResult<HashSet<PyGraphPosition>> {
+                match self.network.get_lattice(&id) {
+                    Some(_) => {
+                        let graph_pos = GraphPosition { id: id, pos: position };
+                        let connections = self.network.get_connecting_graph().get_outgoing_connections(&graph_pos);
+
+                        match connections {
+                            Ok(connections_value) => {
+                                Ok(
+                                    connections_value.iter()
+                                        .map(|i| PyGraphPosition { graph_position: *i })
+                                        .collect()
+                                )
+                            },
+                            Err(_) => Err(PyKeyError::new_err(format!("Position {:#?} not found in lattice", position))), 
+                        }
+                    },
+                    None => {
+                        Err(PyKeyError::new_err(format!("Lattice {} not found in network", id)))
+                    }
+                }
+            }
+
+            fn get_neuron(&self, id: usize, row: usize, col: usize) -> PyResult<$lattice_neuron_kind> {
+                match self.network.get_lattice(&id) {
+                    Some(lattice) => {
+                        let neuron = match lattice.cell_grid.get(row) {
+                            Some(row_cells) => match row_cells.get(col) {
+                                Some(neuron) => neuron.clone(),
+                                None => {
+                                    return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                                }
+                            },
                             None => {
-                                return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
                             }
-                        },
-                        None => {
-                            return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
-                        }
-                    };
-            
-                    Ok(
-                        $lattice_neuron_kind { 
-                            model: neuron
-                        }
-                    )
-                },
-                None => Err(PyKeyError::new_err("Id not found")),
+                        };
+                
+                        Ok(
+                            $lattice_neuron_kind { 
+                                model: neuron
+                            }
+                        )
+                    },
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
             }
-        }
 
-        fn set_neuron(&mut self, id: usize, row: usize, col: usize, neuron: $lattice_neuron_kind) -> PyResult<()> {
-            match self.network.get_mut_lattice(&id) {
-                Some(lattice) => {
-                    let row_cells = match lattice.cell_grid.get_mut(row) {
-                        Some(row_cells) => row_cells,
-                        None => {
-                            return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+            fn set_neuron(&mut self, id: usize, row: usize, col: usize, neuron: $lattice_neuron_kind) -> PyResult<()> {
+                match self.network.get_mut_lattice(&id) {
+                    Some(lattice) => {
+                        let row_cells = match lattice.cell_grid.get_mut(row) {
+                            Some(row_cells) => row_cells,
+                            None => {
+                                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                            }
+                        };
+                
+                        if let Some(existing_neuron) = row_cells.get_mut(col) {
+                            *existing_neuron = neuron.model.clone();
+                
+                            Ok(())
+                        } else {
+                            Err(PyKeyError::new_err(format!("Column at {} not found", col)))
                         }
-                    };
+                    },
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
+            }
+
+            fn get_spike_train(&self, id: usize, row: usize, col: usize) -> PyResult<$spike_train_kind> {
+                match self.network.get_spike_train_lattice(&id) {
+                    Some(lattice) => {
+                        let neuron = match lattice.cell_grid.get(row) {
+                            Some(row_cells) => match row_cells.get(col) {
+                                Some(neuron) => neuron.clone(),
+                                None => {
+                                    return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+                                }
+                            },
+                            None => {
+                                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                            }
+                        };
+                
+                        Ok(
+                            $spike_train_kind { 
+                                model: neuron
+                            }
+                        )
+                    },
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
+            }
+
+            fn set_spike_train(&mut self, id: usize, row: usize, col: usize, neuron: $spike_train_kind) -> PyResult<()> {
+                match self.network.get_mut_spike_train_lattice(&id) {
+                    Some(lattice) => {
+                        let row_cells = match lattice.cell_grid.get_mut(row) {
+                            Some(row_cells) => row_cells,
+                            None => {
+                                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+                            }
+                        };
+                
+                        if let Some(existing_neuron) = row_cells.get_mut(col) {
+                            *existing_neuron = neuron.model.clone();
+                
+                            Ok(())
+                        } else {
+                            Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+                        }
+                    },
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
+            }
+
+            fn get_lattice(&self, id: usize) -> PyResult<$lattice_kind> {
+                match self.network.get_lattice(&id) {
+                    Some(value) => Ok($lattice_kind { lattice: value.clone() }),
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
+            } 
+
+            fn get_spike_train_lattice(&self, id: usize) -> PyResult<$spike_train_lattice_kind> {
+                match self.network.get_spike_train_lattice(&id) {
+                    Some(value) => Ok($spike_train_lattice_kind { lattice: value.clone() }),
+                    None => Err(PyKeyError::new_err("Id not found")),
+                }
+            } 
+
+            fn set_lattice(&mut self, id: usize, lattice: $lattice_kind) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    *current_lattice = lattice.lattice.clone();
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
             
-                    if let Some(existing_neuron) = row_cells.get_mut(col) {
-                        *existing_neuron = neuron.model.clone();
-            
+            fn set_spike_train_lattice(&mut self, id: usize, lattice: $spike_train_lattice_kind) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                    *current_lattice = lattice.lattice.clone();
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
+
+            fn get_plasticity(&self, id: usize) -> PyResult<bool> {
+                if let Some(current_lattice) = self.network.get_lattice(&id) {
+                    Ok(current_lattice.do_plasticity)
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn set_plasticity(&mut self, id: usize, flag: bool) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.do_plasticity = flag;
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn reset_timing(&mut self, id: usize) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.reset_timing();
+
+                    Ok(())
+                } else {
+                    if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                        current_lattice.reset_timing();
+
                         Ok(())
                     } else {
-                        Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+                        Err(PyKeyError::new_err("Id not found"))
                     }
-                },
-                None => Err(PyKeyError::new_err("Id not found")),
+                }
             }
-        }
 
-        fn get_spike_train(&self, id: usize, row: usize, col: usize) -> PyResult<$spike_train_kind> {
-            match self.network.get_spike_train_lattice(&id) {
-                Some(lattice) => {
-                    let neuron = match lattice.cell_grid.get(row) {
-                        Some(row_cells) => match row_cells.get(col) {
-                            Some(neuron) => neuron.clone(),
-                            None => {
-                                return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
-                            }
-                        },
-                        None => {
-                            return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
-                        }
-                    };
-            
-                    Ok(
-                        $spike_train_kind { 
-                            model: neuron
-                        }
-                    )
-                },
-                None => Err(PyKeyError::new_err("Id not found")),
+            fn get_update_grid_history(&self, id: usize) -> PyResult<bool> {
+                if let Some(current_lattice) = self.network.get_lattice(&id) {
+                    Ok(current_lattice.update_grid_history)
+                } else {
+                    if let Some(current_lattice) = self.network.get_spike_train_lattice(&id) {
+                        Ok(current_lattice.update_grid_history)
+                    } else {
+                        Err(PyKeyError::new_err("Id not found"))
+                    }
+                }
             }
-        }
 
-        fn set_spike_train(&mut self, id: usize, row: usize, col: usize, neuron: $spike_train_kind) -> PyResult<()> {
-            match self.network.get_mut_spike_train_lattice(&id) {
-                Some(lattice) => {
-                    let row_cells = match lattice.cell_grid.get_mut(row) {
-                        Some(row_cells) => row_cells,
-                        None => {
-                            return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
-                        }
-                    };
-            
-                    if let Some(existing_neuron) = row_cells.get_mut(col) {
-                        *existing_neuron = neuron.model.clone();
-            
+            fn set_update_grid_history(&mut self, id: usize, flag: bool) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.update_grid_history = flag;
+
+                    Ok(())
+                } else {
+                    if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                        current_lattice.update_grid_history = flag;
+
                         Ok(())
                     } else {
-                        Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+                        Err(PyKeyError::new_err("Id not found"))
                     }
-                },
-                None => Err(PyKeyError::new_err("Id not found")),
+                }
+            }
+
+            fn reset_history(&mut self, id: usize) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.grid_history.reset();
+
+                    Ok(())
+                } else {
+                    if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                        current_lattice.grid_history.reset();
+
+                        Ok(())
+                    } else {
+                        Err(PyKeyError::new_err("Id not found"))
+                    }
+                }
+            }
+
+            fn get_update_graph_history(&self, id: usize) -> PyResult<bool> {
+                if let Some(current_lattice) = self.network.get_lattice(&id) {
+                    Ok(current_lattice.update_graph_history)
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn set_update_graph_history(&mut self, id: usize, flag: bool) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.update_graph_history = flag;
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            #[getter]
+            fn get_connecting_graph_history(&self) -> Vec<Vec<Vec<f32>>> {
+                self.network.get_connecting_graph().history.clone()
+                    .iter()
+                    .map(|grid| {
+                        grid.iter()
+                            .map(|row| {
+                                row.iter().map(|i| {
+                                    i.unwrap_or(0.)
+                                })
+                                .collect()
+                            })
+                            .collect()
+                    })
+                    .collect()
+            }
+
+            fn apply_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.apply(|neuron| {
+                        let py_neuron = $lattice_neuron_kind {
+                            model: neuron.clone(),
+                        };
+                        let result = py_callable.call1(py, (py_neuron,)).unwrap();
+                        let updated_py_neuron: $lattice_neuron_kind = result.extract(py).unwrap();
+                        *neuron = updated_py_neuron.model;
+                    });
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
+
+            fn apply_spike_train_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+
+                if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                    current_lattice.apply(|neuron| {
+                        let py_neuron = $spike_train_kind {
+                            model: neuron.clone(),
+                        };
+                        let result = py_callable.call1(py, (py_neuron,)).unwrap();
+                        let updated_py_neuron: $spike_train_kind = result.extract(py).unwrap();
+                        *neuron = updated_py_neuron.model;
+                    });
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
+
+            fn apply_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.apply_given_position(|(i, j), neuron| {
+                        let py_neuron = $lattice_neuron_kind {
+                            model: neuron.clone(),
+                        };
+                        let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
+                        let updated_py_neuron: $lattice_neuron_kind = result.extract(py).unwrap();
+                        *neuron = updated_py_neuron.model;
+                    });
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
+
+            fn apply_spike_train_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+
+                if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
+                    current_lattice.apply_given_position(|(i, j), neuron| {
+                        let py_neuron = $spike_train_kind {
+                            model: neuron.clone(),
+                        };
+                        let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
+                        let updated_py_neuron: $spike_train_kind = result.extract(py).unwrap();
+                        *neuron = updated_py_neuron.model;
+                    });
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found"))
+                }
+            }
+
+            fn run_lattices(&mut self, iterations: usize) -> PyResult<()> {
+                match self.network.run_lattices(iterations) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+                }
+            }
+
+            fn run_lattices_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
+                match self.network.run_lattices_chemical_synapses_only(iterations) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+                }
+            }
+
+            fn run_lattices_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
+                match self.network.run_lattices_with_electrical_and_chemical_synapses(iterations) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
+                }
+            }
+
+            fn __repr__(&self) -> PyResult<String> {
+                let lattice_strings = self.network.lattices_values()
+                    .map(|i| {
+                        let rows = i.cell_grid.len();
+                        let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+                        format!(
+                            "{} {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {} }}", 
+                            $lattice_neuron_name,
+                            rows,
+                            cols,
+                            i.get_id(),
+                            i.do_plasticity,
+                            i.update_grid_history,
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join("\n");
+
+                let spike_train_strings = self.network.spike_trains_values()
+                    .map(|i| {
+                        let rows = i.cell_grid.len();
+                        let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
+
+                        format!(
+                            "{} {{ ({}x{}), id: {}, update_grid_history: {} }}", 
+                            $spike_train_name,
+                            rows,
+                            cols,
+                            i.get_id(),
+                            i.update_grid_history,
+                        )
+                    })
+                    .collect::<Vec<String>>()
+                    .join(",");
+
+                Ok(format!("{} {{ \n    [{}],\n    [{}],\n}}", $network_name, lattice_strings, spike_train_strings))
             }
         }
-
-        fn get_lattice(&self, id: usize) -> PyResult<$lattice_kind> {
-            match self.network.get_lattice(&id) {
-                Some(value) => Ok($lattice_kind { lattice: value.clone() }),
-                None => Err(PyKeyError::new_err("Id not found")),
-            }
-        } 
-
-        fn get_spike_train_lattice(&self, id: usize) -> PyResult<$spike_train_lattice_kind> {
-            match self.network.get_spike_train_lattice(&id) {
-                Some(value) => Ok($spike_train_lattice_kind { lattice: value.clone() }),
-                None => Err(PyKeyError::new_err("Id not found")),
-            }
-        } 
-
-        fn set_lattice(&mut self, id: usize, lattice: $lattice_kind) -> PyResult<()> {
-            if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
-                *current_lattice = lattice.lattice.clone();
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-        
-        fn set_spike_train_lattice(&mut self, id: usize, lattice: $spike_train_lattice_kind) -> PyResult<()> {
-            if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
-                *current_lattice = lattice.lattice.clone();
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-
-        fn apply_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
-            let py_callable = function.to_object(py);
-
-            if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
-                current_lattice.apply(|neuron| {
-                    let py_neuron = $lattice_neuron_kind {
-                        model: neuron.clone(),
-                    };
-                    let result = py_callable.call1(py, (py_neuron,)).unwrap();
-                    let updated_py_neuron: $lattice_neuron_kind = result.extract(py).unwrap();
-                    *neuron = updated_py_neuron.model;
-                });
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-
-        fn apply_spike_train_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
-            let py_callable = function.to_object(py);
-
-            if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
-                current_lattice.apply(|neuron| {
-                    let py_neuron = $spike_train_kind {
-                        model: neuron.clone(),
-                    };
-                    let result = py_callable.call1(py, (py_neuron,)).unwrap();
-                    let updated_py_neuron: $spike_train_kind = result.extract(py).unwrap();
-                    *neuron = updated_py_neuron.model;
-                });
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-
-        fn apply_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
-            let py_callable = function.to_object(py);
-
-            if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
-                current_lattice.apply_given_position(|(i, j), neuron| {
-                    let py_neuron = $lattice_neuron_kind {
-                        model: neuron.clone(),
-                    };
-                    let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
-                    let updated_py_neuron: $lattice_neuron_kind = result.extract(py).unwrap();
-                    *neuron = updated_py_neuron.model;
-                });
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-
-        fn apply_spike_train_lattice_given_position(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
-            let py_callable = function.to_object(py);
-
-            if let Some(current_lattice) = self.network.get_mut_spike_train_lattice(&id) {
-                current_lattice.apply_given_position(|(i, j), neuron| {
-                    let py_neuron = $spike_train_kind {
-                        model: neuron.clone(),
-                    };
-                    let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
-                    let updated_py_neuron: $spike_train_kind = result.extract(py).unwrap();
-                    *neuron = updated_py_neuron.model;
-                });
-
-                Ok(())
-            } else {
-                Err(PyKeyError::new_err("Id not found"))
-            }
-        }
-
-        fn run_lattices(&mut self, iterations: usize) -> PyResult<()> {
-            match self.network.run_lattices(iterations) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-            }
-        }
-
-        fn run_lattices_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
-            match self.network.run_lattices_chemical_synapses_only(iterations) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-            }
-        }
-
-        fn run_lattices_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
-            match self.network.run_lattices_with_electrical_and_chemical_synapses(iterations) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-            }
-        }
-
-        fn __repr__(&self) -> PyResult<String> {
-            let lattice_strings = self.network.lattices_values()
-                .map(|i| {
-                    let rows = i.cell_grid.len();
-                    let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
-
-                    format!(
-                        "{} {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {} }}", 
-                        $lattice_neuron_name,
-                        rows,
-                        cols,
-                        i.get_id(),
-                        i.do_plasticity,
-                        i.update_grid_history,
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            let spike_train_strings = self.network.spike_trains_values()
-                .map(|i| {
-                    let rows = i.cell_grid.len();
-                    let cols = i.cell_grid.get(0).unwrap_or(&vec![]).len();
-
-                    format!(
-                        "{} {{ ({}x{}), id: {}, update_grid_history: {} }}", 
-                        $spike_train_name,
-                        rows,
-                        cols,
-                        i.get_id(),
-                        i.update_grid_history,
-                    )
-                })
-                .collect::<Vec<String>>()
-                .join(",");
-
-            Ok(format!("{} {{ \n    [{}],\n    [{}],\n}}", $network_name, lattice_strings, spike_train_strings))
-        }
-    }
     };
 }
 
@@ -2113,20 +2253,12 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // macros for building receptors, ligand gates, neurotransmitters, and neurons
     // macros for building lattices and lattice networks
 
-    // reset timing and history on a given lattice in a network
-    // reset_history(id) 
-    // reset methods should try the id on both the spike train lattices and the regular lattices
-    // set or get plasticity or update history on a given lattice (spike train or otherwise) in a network
-    // set_do_plasticity(id, bool)
+    // view weights, pos to index too
 
     // verbose option that prints progress in running simulation
     // should be printed from rust
 
-    // modify plasticity params on lattice
-    
-    // view weights, pos to index too
-    // eventually work with graph history
-    // connecting graph history should be also updated
+    // modify plasticity params on lattice    
     
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
