@@ -1928,7 +1928,7 @@ pub struct TraceRSTDP {
 
 impl Default for TraceRSTDP {
     fn default() -> Self {
-        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 1000., dt: 0.1 }
+        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 0.01, dt: 0.1 }
     }
 }
 
@@ -1968,13 +1968,14 @@ pub struct RewardModulatedSTDP {
     pub tau_plus: f32, 
     /// Negative STDP decay modifier 
     pub tau_minus: f32, 
-    dt: f32,
+    /// Timestep for calculating weight changes
+    pub dt: f32,
 }
 
 impl Default for RewardModulatedSTDP {
     fn default() -> Self {
         RewardModulatedSTDP { 
-            tau_d: 200., 
+            tau_d: 2., 
             dopamine: 0., 
             a_plus: 2., 
             a_minus: 2., 
@@ -1997,18 +1998,18 @@ where
     fn update_weight(&self, weight: &mut TraceRSTDP, presynaptic: &T, postsynaptic: &U) {
         let mut delta_w: f32 = 0.;
 
-            match (presynaptic.get_last_firing_time(), postsynaptic.get_last_firing_time()) {
-                (Some(t_pre), Some(t_post)) => {
-                    let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
+        match (presynaptic.get_last_firing_time(), postsynaptic.get_last_firing_time()) {
+            (Some(t_pre), Some(t_post)) => {
+                let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
 
-                    if t_pre < t_post {
-                        delta_w = self.a_plus * (-1. * ((t_pre - t_post) * self.dt).abs() / self.tau_plus).exp();
-                    } else if t_pre > t_post {
-                        delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
-                    }
-                },
-                _ => {}
-            };
+                if t_pre < t_post {
+                    delta_w = self.a_plus * (-1. * ((t_pre - t_post) * self.dt).abs() / self.tau_plus).exp();
+                } else if t_pre > t_post {
+                    delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
+                }
+            },
+            _ => {}
+        };
 
         weight.dw += delta_w;
 
@@ -2017,9 +2018,10 @@ where
         } else {
             weight.update_trace();
             weight.counter = 0;
+            weight.dw = 0.;
         }
 
-        weight.weight = weight.c * self.dopamine;
+        weight.weight += weight.c * self.dopamine;
     }
 
     fn do_update(&self, _: &U) -> bool {
@@ -2097,7 +2099,7 @@ where
             update_grid_history: false,
             electrical_synapse: true,
             chemical_synapse: false, 
-            do_modulation: false, 
+            do_modulation: true, 
             reward_modulator: W::default(), 
             gaussian: false, 
             internal_clock: 0,
