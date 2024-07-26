@@ -12,7 +12,7 @@ use spiking_neural_networks::{
 
 // connect neurons within a radius of 2 with an 80% chance of connection
 fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
-    (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 2. && 
+    ((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)).sqrt() <= 2. && 
     rand::thread_rng().gen_range(0.0..=1.0) <= 0.8 &&
     x != y
 }
@@ -68,7 +68,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let state = TestState { timestep: 0, dopamine_history: vec![] };
     let mut optimizer = Optimizer { 
-        state: state, 
+        state, 
         agent: reward_modulated_lattice, 
         reward_function: &reward_function,
     };
