@@ -55,7 +55,9 @@ where
                     delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
                 }
             },
-            _ => {}
+            (None, None) => {},
+            (None, Some(_)) =>  {},
+            (Some(_), None) =>  {},
         };
 
         *weight += delta_w;
