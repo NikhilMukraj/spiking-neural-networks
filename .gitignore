@@ -19,6 +19,7 @@
 /archive_backend/results/*.bin
 /archive_backend/results/*.txt
 /archive_backend/results/lattice_images/*
+/archive_backend/rstdp_example/*.csv
 /backend/target
 /backend/src/neuron/iterate_and_spike_traits/target
 /backend/examples/hopfield_example/*_hopfield.txt
