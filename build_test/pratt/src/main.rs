@@ -548,7 +548,7 @@ impl IonChannelDefinition {
             self.type_name.to_string(),
         );
         
-        let mut fields = match &self.vars {
+        let fields = match &self.vars {
             AST::VariablesAssignments(variables) => {
                 variables
                     .iter()
@@ -565,16 +565,45 @@ impl IonChannelDefinition {
             _ => unreachable!()
         };
 
-        let current_field = String::from("current: f32");
-        fields.push(current_field);
+        // let current_field = String::from("current: f32");
+        // fields.push(current_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
+
+        // let use_timestep = match &self.on_iteration {
+        //     AST::OnIteration(assignments) => {
+        //         let mut use_timestep = false;
+
+        //         for i in assignments {
+        //             match i.as_ref() {
+        //                 AST::DiffEqAssignment { .. } => { use_timestep = true },
+        //                 _ => {},
+        //             }
+        //         }
+
+        //         use_timestep
+        //     },
+        //     _ => unreachable!()
+        // };
+
+        let get_current = "fn get_current(&self) -> f32 { self.current }";
+
+        // if use_timestep {
+        //     let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
+        //     // get changes too
+        //     let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
+        //     let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
+        // } else {
+        //     let update_current_header = "fn update_current(&mut self, voltage: f32) {";
+        //     let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
+        //     let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
+        // }
 
         let update_current_header = "fn update_current(&mut self, voltage: f32) {";
         let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
         let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
 
-        format!("{}\n{}\n}}\n{}", header, fields, update_current)
+        format!("{}\n{}\n}}\n{}\n{}", header, fields, update_current, get_current)
     }
 }
 
