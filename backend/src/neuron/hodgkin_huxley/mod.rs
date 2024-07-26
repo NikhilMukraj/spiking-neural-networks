@@ -104,14 +104,14 @@ impl HodgkinHuxleyNeuron<DestexheNeurotransmitter, DestexheReceptor> {
     }
 }
 
-fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
+fn diff<T: Sub<Output = T> + Copy>(x: &[T]) -> Vec<T> {
     (1..x.len()).map(|i| x[i] - x[i-1])
         .collect()
 }
 
 /// Returns indices of where voltages have peaked given a certain tolerance
-pub fn find_peaks(voltages: &Vec<f32>, tolerance: f32) -> Vec<usize> {
-    let first_diff: Vec<f32> = diff(&voltages);
+pub fn find_peaks(voltages: &[f32], tolerance: f32) -> Vec<usize> {
+    let first_diff: Vec<f32> = diff(voltages);
     let second_diff: Vec<f32> = diff(&first_diff);
 
     let local_optima = first_diff.iter()
@@ -265,10 +265,10 @@ pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorK
 
         let _is_spiking = hodgkin_huxley_neuron.iterate_and_spike(current_input);
 
-        state_output.get_mut("current_voltage").map(|val| val.push(hodgkin_huxley_neuron.current_voltage));
-        state_output.get_mut("m").map(|val| val.push(hodgkin_huxley_neuron.na_channel.m.state));
-        state_output.get_mut("n").map(|val| val.push(hodgkin_huxley_neuron.na_channel.h.state));
-        state_output.get_mut("h").map(|val| val.push(hodgkin_huxley_neuron.k_channel.n.state));
+        if let Some(val) = state_output.get_mut("current_voltage") { val.push(hodgkin_huxley_neuron.current_voltage) }
+        if let Some(val) = state_output.get_mut("m") { val.push(hodgkin_huxley_neuron.na_channel.m.state) }
+        if let Some(val) = state_output.get_mut("n") { val.push(hodgkin_huxley_neuron.na_channel.h.state) }
+        if let Some(val) = state_output.get_mut("h") { val.push(hodgkin_huxley_neuron.k_channel.n.state) }
     }
 
     state_output
