@@ -601,7 +601,7 @@ implement_basic_getter_and_setter!(
 );
 
 macro_rules! impl_lattice {
-    ($lattice_kind:ident, $lattice_neuron:ident, $name:literal) => {
+    ($lattice_kind:ident, $lattice_neuron:ident, $name:literal, $plasticity_kind:ident) => {
         #[pymethods]
         impl $lattice_kind {
             #[new]
@@ -768,15 +768,15 @@ macro_rules! impl_lattice {
                 }
             }
 
-            // #[getter]
-            // fn get_plasticity(&self) -> $plasticity_kind {
-            //     $plasticity_kind { plasticity: self.lattice.plasticity }
-            // }
+            #[getter]
+            fn get_plasticity(&self) -> $plasticity_kind {
+                $plasticity_kind { plasticity: self.lattice.plasticity }
+            }
 
-            // #[setter]
-            // fn set_plasticity(&mut self, plasticity: $plasticity_kind) {
-            //     self.plasticity = plasticity.plasticity
-            // }
+            #[setter]
+            fn set_plasticity(&mut self, plasticity: $plasticity_kind) {
+                self.lattice.plasticity = plasticity.plasticity
+            }
 
             #[getter]
             fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
@@ -877,7 +877,7 @@ pub struct PyIzhikevichLattice {
     >
 }
 
-impl_lattice!(PyIzhikevichLattice, PyIzhikevichNeuron, "IzhikevichLattice");
+impl_lattice!(PyIzhikevichLattice, PyIzhikevichNeuron, "IzhikevichLattice", PySTDP);
 
 type LatticeSpikeTrain = PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
@@ -2226,7 +2226,7 @@ pub struct PyHodgkinHuxleyLattice {
     >
 }
 
-impl_lattice!(PyHodgkinHuxleyLattice, PyHodgkinHuxleyNeuron, "HodgkinHuxleyLattice");
+impl_lattice!(PyHodgkinHuxleyLattice, PyHodgkinHuxleyNeuron, "HodgkinHuxleyLattice", PySTDP);
 
 #[pyclass]
 #[pyo3(name = "HodgkinHuxleyNetwork")]
