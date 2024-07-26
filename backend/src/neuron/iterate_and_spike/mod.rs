@@ -675,6 +675,11 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
         self.ligand_gates.len()
     }
 
+    /// Returns if ligand gates is empty
+    pub fn is_empty(&self) -> bool {
+        self.ligand_gates.is_empty()
+    }
+
     /// Returns the neurotransmitter types as set of keys
     pub fn keys(&self) -> Keys<NeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.keys()
@@ -754,6 +759,11 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     /// Returns how many neurotransmitters there are
     pub fn len(&self) -> usize {
         self.neurotransmitters.keys().len()
+    }
+
+    /// Returns if neurotransmitters is empty
+    pub fn is_empty(&self) -> bool {
+        self.neurotransmitters.is_empty()
     }
 
     /// Returns the neurotransmitter types as a set of keys
