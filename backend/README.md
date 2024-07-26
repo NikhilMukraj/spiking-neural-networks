@@ -532,10 +532,6 @@ impl TimestepIndependentIonChannel for ReducedCalciumChannel {
     fn get_current(&self) -> f32 {
         self.current
     }
-
-    fn gate_type(&self) -> &str {
-        "Reduced Ca"
-    }
 }
 
 /// A potassium channel based on steady state calculations
@@ -582,10 +578,6 @@ impl IonChannel for KSteadyStateChannel {
     fn get_current(&self) -> f32 {
         self.current
     }
-
-    fn gate_type(&self) -> &str {
-        "Steady State K"
-    }
 }
 
 /// An implementation of a leak channel
@@ -606,10 +598,6 @@ impl TimestepIndependentIonChannel for LeakChannel {
 
     fn get_current(&self) -> f32 {
         self.current
-    }
-
-    fn gate_type(&self) -> &str {
-        "Leak"
     }
 }
 
