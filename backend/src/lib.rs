@@ -535,10 +535,6 @@
 //!     fn get_current(&self) -> f32 {
 //!         self.current
 //!     }
-//! 
-//!     fn gate_type(&self) -> &str {
-//!         "Reduced Ca"
-//!     }
 //! }
 //! 
 //! /// A potassium channel based on steady state calculations
@@ -585,10 +581,6 @@
 //!     fn get_current(&self) -> f32 {
 //!         self.current
 //!     }
-//! 
-//!     fn gate_type(&self) -> &str {
-//!         "Steady State K"
-//!     }
 //! }
 //! 
 //! /// An implementation of a leak channel
@@ -609,10 +601,6 @@
 //! 
 //!     fn get_current(&self) -> f32 {
 //!         self.current
-//!     }
-//! 
-//!     fn gate_type(&self) -> &str {
-//!         "Leak"
 //!     }
 //! }
 //! 
