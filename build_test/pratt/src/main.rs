@@ -865,7 +865,9 @@ fn main() -> Result<()> {
 
     // handle ligand gates
     // neurotransmitter and approximate kinetics
+    // handling spike trains
     // handling function if statements and boolean vars
+    // handling plasticity
 
     let output_file_name = format!(
         "{}.rs", filename.as_str().split(".").collect::<Vec<&str>>()[0]
