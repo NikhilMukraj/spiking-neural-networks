@@ -1409,7 +1409,7 @@ macro_rules! impl_network {
                 }
             }
 
-            fn get_plasticity(&self, id: usize) -> PyResult<bool> {
+            fn get_do_plasticity(&self, id: usize) -> PyResult<bool> {
                 if let Some(current_lattice) = self.network.get_lattice(&id) {
                     Ok(current_lattice.do_plasticity)
                 } else {
@@ -1417,7 +1417,7 @@ macro_rules! impl_network {
                 }
             }
 
-            fn set_plasticity(&mut self, id: usize, flag: bool) -> PyResult<()> {
+            fn set_do_plasticity(&mut self, id: usize, flag: bool) -> PyResult<()> {
                 if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
                     current_lattice.do_plasticity = flag;
 
