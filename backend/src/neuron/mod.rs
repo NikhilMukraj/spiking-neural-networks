@@ -341,16 +341,10 @@ impl LatticeHistory for EEGHistory {
 }
 
 /// Stores history as grid of voltages
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct GridVoltageHistory {
     /// Voltage history
     pub history: Vec<Vec<Vec<f32>>>
-}
-
-impl Default for GridVoltageHistory {
-    fn default() -> Self {
-        GridVoltageHistory { history: Vec::new() }
-    }
 }
 
 impl LatticeHistory for GridVoltageHistory {
@@ -546,7 +540,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
                 let final_input = gap_junction(input_cell, postsynaptic_neuron);
                 
-                final_input * self.graph.lookup_weight(&input_position, position).unwrap().unwrap()
+                final_input * self.graph.lookup_weight(input_position, position).unwrap().unwrap()
             })
             .sum();
 
@@ -556,7 +550,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
         input_val /= input_positions.len() as f32;
 
-        return input_val;
+        input_val
     }
 
     /// Calculates neurotransmitter input value from positions
@@ -572,7 +566,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
                 let input_cell = &self.cell_grid[*pos_x][*pos_y];
 
                 let mut final_input = input_cell.get_neurotransmitter_concentrations();
-                let weight = self.graph.lookup_weight(&input_position, position).unwrap().unwrap();
+                let weight = self.graph.lookup_weight(input_position, position).unwrap().unwrap();
                 
                 weight_neurotransmitter_concentration(&mut final_input, weight);
 
@@ -589,7 +583,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
 
-        return input_val;
+        input_val
     }
 
     /// Gets all internal electrical inputs 
@@ -627,7 +621,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|&pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
@@ -654,29 +648,29 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
-        let input_positions = self.graph.get_incoming_connections(&pos)?;
+        let input_positions = self.graph.get_incoming_connections(pos)?;
 
         for i in input_positions {
             let (x_in, y_in) = i;
-            let mut current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(&i, pos)?.unwrap();
             self.plasticity.update_weight(&mut current_weight, &self.cell_grid[x_in][y_in], given_neuron);
                                         
             self.graph.edit_weight(
                 &i, 
-                &pos, 
+                pos, 
                 Some(current_weight)
             )?;
         }
 
-        let out_going_connections = self.graph.get_outgoing_connections(&pos)?;
+        let out_going_connections = self.graph.get_outgoing_connections(pos)?;
 
         for i in out_going_connections {
             let (x_out, y_out) = i;
-            let mut current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(pos, &i)?.unwrap();
             self.plasticity.update_weight(&mut current_weight, given_neuron, &self.cell_grid[x_out][y_out]);
 
             self.graph.edit_weight(
-                &pos, 
+                pos, 
                 &i, 
                 Some(current_weight)
             )?; 
@@ -901,16 +895,10 @@ pub trait SpikeTrainLatticeHistory: Default {
 }
 
 /// Stores history as a grid of voltages
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct SpikeTrainGridHistory {
     /// Voltage history
     pub history: Vec<Vec<Vec<f32>>>,
-}
-
-impl Default for SpikeTrainGridHistory {
-    fn default() -> Self {
-        SpikeTrainGridHistory { history: Vec::new() }
-    }
 }
 
 impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
@@ -2008,7 +1996,9 @@ where
                     delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
                 }
             },
-            _ => {}
+            (None, None) => {},
+            (None, Some(_)) => {},
+            (Some(_), None) => {},
         };
 
         weight.dw += delta_w;
