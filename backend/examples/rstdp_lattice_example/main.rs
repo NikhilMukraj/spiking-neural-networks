@@ -4,7 +4,7 @@ use spiking_neural_networks::{
     error::SpikingNeuralNetworksError, graph::AdjacencyMatrix, neuron::{
         integrate_and_fire::IzhikevichNeuron, 
         iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor}, 
-        GridVoltageHistory, Optimizer, RewardModulatedLattice,
+        GridVoltageHistory, Environment, RewardModulatedLattice,
         RewardModulatedSTDP, State, TraceRSTDP
     }
 };
@@ -67,17 +67,17 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     });
 
     let state = TestState { timestep: 0, dopamine_history: vec![] };
-    let mut optimizer = Optimizer { 
+    let mut env = Environment { 
         state, 
         agent: reward_modulated_lattice, 
         reward_function: &reward_function,
     };
 
-    optimizer.run(10000)?;
+    env.run(10000)?;
 
     let mut file = BufWriter::new(File::create("weights.txt").expect("Could not create file"));
 
-    for matrix in optimizer.agent.graph.history {
+    for matrix in env.agent.graph.history {
         for row in matrix {
             for value in row {
                 match value {
@@ -94,7 +94,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let mut file = BufWriter::new(File::create("dopamine.txt").expect("Could not create file"));
 
-    for i in optimizer.state.dopamine_history {
+    for i in env.state.dopamine_history {
         writeln!(file, "{}", i).expect("Could not write to file");
     }
 
