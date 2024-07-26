@@ -1060,8 +1060,8 @@ impl PyGraphPosition {
 macro_rules! impl_network {
     (
         $network_kind:ident, $lattice_kind:ident, $spike_train_lattice_kind:ident,
-        $lattice_neuron_kind:ident, $spike_train_kind:ident,
-        $lattice_neuron_name:literal, $spike_train_name:literal, $network_name:literal
+        $lattice_neuron_kind:ident, $spike_train_kind:ident, $plasticity_kind:ident,
+        $lattice_neuron_name:literal, $spike_train_name:literal, $network_name:literal,
     ) => {        
         #[pymethods]
         impl $network_kind {
@@ -1427,6 +1427,24 @@ macro_rules! impl_network {
                 }
             }
 
+            fn get_plasticity(&self, id: usize) -> PyResult<$plasticity_kind> {
+                if let Some(current_lattice) = self.network.get_lattice(&id) {
+                    Ok($plasticity_kind { plasticity: current_lattice.plasticity })
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn set_plasticity(&mut self, id: usize, plasticity: $plasticity_kind) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.plasticity = plasticity.plasticity;
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
             fn reset_timing(&mut self, id: usize) -> PyResult<()> {
                 if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
                     current_lattice.reset_timing();
@@ -1678,7 +1696,7 @@ pub struct PyIzhikevichNetwork {
 
 impl_network!(
     PyIzhikevichNetwork, PyIzhikevichLattice, PyPoissonLattice, PyIzhikevichNeuron,
-    PyPoissonNeuron, "IzhikevichLattice", "PoissonLattice", "IzhikevichNetwork"
+    PyPoissonNeuron, PySTDP, "IzhikevichLattice", "PoissonLattice", "IzhikevichNetwork",
 );
 
 #[pyclass]
@@ -2245,7 +2263,7 @@ pub struct PyHodgkinHuxleyNetwork {
 
 impl_network!(
     PyHodgkinHuxleyNetwork, PyHodgkinHuxleyLattice, PyPoissonLattice, PyHodgkinHuxleyNeuron,
-    PyPoissonNeuron, "HodgkinHuxleyLattice", "PoissonLattice", "HodgkinHuxleyNetwork"
+    PyPoissonNeuron, PySTDP, "HodgkinHuxleyLattice", "PoissonLattice", "HodgkinHuxleyNetwork",
 );
 
 #[pymodule]
