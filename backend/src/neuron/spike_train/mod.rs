@@ -292,12 +292,12 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PresetSpikeTrain<T, U
             current_timestep += interval;
         }
 
-        let mut preset_spike_train = PresetSpikeTrain::<T, U>::default();
-        preset_spike_train.refractoriness_dt = dt;
-        preset_spike_train.firing_times = firing_times;
-        preset_spike_train.max_clock_value = current_timestep;
-
-        preset_spike_train
+        PresetSpikeTrain::<T, U> { 
+            refractoriness_dt: dt, 
+            firing_times, 
+            max_clock_value: current_timestep, 
+            ..Default::default() 
+        }
     }
 }
 
