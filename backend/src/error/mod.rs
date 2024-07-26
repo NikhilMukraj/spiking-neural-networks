@@ -168,9 +168,7 @@ pub enum AgentError {
 
 impl Display for AgentError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        let err_msg = match self {
-            AgentError::AgentIterationFailure(string) => string
-        };
+        let AgentError::AgentIterationFailure(err_msg) = self;
 
         write!(f, "{}", err_msg)
     }
