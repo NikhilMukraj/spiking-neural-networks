@@ -583,6 +583,23 @@ impl PyPoissonNeuron {
     }
 }
 
+#[pyclass]
+#[pyo3(name = "STDP")]
+#[derive(Clone)]
+pub struct PySTDP {
+    plasticity: STDP
+}
+
+implement_basic_getter_and_setter!(
+    PySTDP,
+    plasticity,
+    a_plus, get_a_plus, set_a_plus,
+    a_minus, get_a_minus, set_a_minus,
+    tau_plus, get_tau_plus, set_tau_plus,
+    tau_minus, get_tau_minus, set_tau_minus,
+    dt, get_dt, set_dt
+);
+
 macro_rules! impl_lattice {
     ($lattice_kind:ident, $lattice_neuron:ident, $name:literal) => {
         #[pymethods]
@@ -750,6 +767,16 @@ macro_rules! impl_lattice {
                     Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
                 }
             }
+
+            // #[getter]
+            // fn get_plasticity(&self) -> $plasticity_kind {
+            //     $plasticity_kind { plasticity: self.lattice.plasticity }
+            // }
+
+            // #[setter]
+            // fn set_plasticity(&mut self, plasticity: $plasticity_kind) {
+            //     self.plasticity = plasticity.plasticity
+            // }
 
             #[getter]
             fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
@@ -2259,14 +2286,15 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     // view weights, pos to index too
 
-    // hodgkin huxley (ion channels too)
-    // macros for building receptors, ligand gates, neurotransmitters, and neurons
-
     // verbose option that prints progress in running simulation
     // should be printed from rust
 
+    // spike train lattice macro
+
     // temp env variable for building pyo3 with custom models
     // builtin models can be listed in a separate file associated with this crate
+    // use pest to generate models from file
+    // macros for building receptors, ligand gates, neurotransmitters, and neurons
     // if env variable does not work when installing package, use a seperate build script
     // to generate new models that is associated with this package but accessible from the command line
     // or maybe wheel is built separately with a setup py and config is done through there
