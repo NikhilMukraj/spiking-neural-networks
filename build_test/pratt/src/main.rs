@@ -943,6 +943,12 @@ fn main() -> Result<()> {
     // self.w += self.w * self.dt
     // instead
     // perhaps through a different integrator
+    // or maybe all eq assignments before diff eq assignments
+
+    // probably most elegant solution is something like the following
+    // use --- to seperate iterations into seperate blocks
+    // changes calculated at beginning of block and added at the end
+    // to have something more sequential you can use blocking
 
     // handle function definitions in seperate block
 
