@@ -834,6 +834,7 @@ macro_rules! impl_lattice {
                 self.lattice.grid_history.reset();
             }
 
+            #[getter(weights)]
             fn get_weights(&self) -> Vec<Vec<f32>> {
                 self.lattice.graph.matrix.clone()
                     .into_iter()
@@ -843,6 +844,11 @@ macro_rules! impl_lattice {
                             .collect()
                     })
                     .collect()
+            }
+
+            #[getter(position_to_index)]
+            fn get_position_to_index_for_weights(&self) -> HashMap<(usize, usize), usize> {
+                self.lattice.graph.position_to_index.clone()
             }
 
             fn __repr__(&self) -> PyResult<String> {
@@ -1167,7 +1173,7 @@ macro_rules! impl_network {
                 }
             }
 
-            #[getter]
+            #[getter(connecting_weights)]
             fn get_connecting_weights(&self) -> Vec<Vec<f32>> {
                 self.network.get_connecting_graph().matrix
                     .iter()
@@ -1178,6 +1184,16 @@ macro_rules! impl_network {
                     )
                     .collect()
             }
+
+            #[getter(connecting_position_to_index)]
+            fn get_connecting_position_to_index(&self) -> HashMap<PyGraphPosition, usize> {
+                self.network.get_connecting_graph().position_to_index
+                    .iter()
+                    .map(|(key, value)| 
+                        (PyGraphPosition { graph_position: *key }, *value)
+                    )
+                    .collect()
+            }           
 
             fn get_weight(&self, presynaptic: PyGraphPosition, postsynaptic: PyGraphPosition) -> PyResult<f32> {
                 let presynaptic = presynaptic.graph_position;
