@@ -939,6 +939,10 @@ fn main() -> Result<()> {
     // self.dw = self.w * self.dt
     // self.a = self.r
     // self.w += self.dw
+    // or maybe option to do 
+    // self.w += self.w * self.dt
+    // instead
+    // perhaps through a different integrator
 
     // handle function definitions in seperate block
 
