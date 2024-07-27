@@ -1,12 +1,14 @@
 use std::{fs::File, io::{BufWriter, Write}};
 use rand::Rng;
 use spiking_neural_networks::{
-    error::SpikingNeuralNetworksError, graph::AdjacencyMatrix, neuron::{
+    neuron::{
         integrate_and_fire::IzhikevichNeuron, 
         iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor}, 
-        GridVoltageHistory, Environment, RewardModulatedLattice,
-        RewardModulatedSTDP, State, TraceRSTDP
-    }
+        GridVoltageHistory, RewardModulatedLattice, RewardModulatedSTDP, TraceRSTDP
+    },
+    error::SpikingNeuralNetworksError, 
+    graph::AdjacencyMatrix, 
+    reinforcement::{Environment, State},
 };
 
 
