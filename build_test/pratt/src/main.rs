@@ -593,10 +593,12 @@ impl IonChannelDefinition {
             let on_iteration = &self.on_iteration.to_string();
 
             let mut lines: Vec<&str> = on_iteration.split('\n').collect();
-            let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"))
-                .expect("Current is not modified");
+            let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"));
 
-            let current_assignment = lines.remove(current_line_index);
+            let current_assignment = match current_line_index {
+                Some(index) => lines.remove(index),
+                None => "",
+            };
 
             let update_current_body = add_indents(&lines.join("\n"), "\t");
 
@@ -640,6 +642,8 @@ impl IonChannelDefinition {
         // } else {
         //     format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
         // } 
+
+        // code may need to be updated if current is assigned using 
 
         format!("{}\n{}\n}}\n{}\n{}", header, fields, update_current, get_current)
     }
@@ -927,6 +931,14 @@ fn main() -> Result<()> {
     // function declarations in separate space from on iteration and on spike
 
     // runge kutta and import integrators
+
+    // neuron def may need to be handled differently if voltage is not updated with dv/dt
+    // if neuron is assigned with v =, similar to ion channels
+    // or maybe in general, assignments should be done after changes calculated
+    // but before changes applied
+    // self.dw = self.w * self.dt
+    // self.a = self.r
+    // self.w += self.dw
 
     // handle function definitions in seperate block
 
