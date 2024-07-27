@@ -840,4 +840,5 @@ pub mod error;
 pub mod fitting;
 pub mod ga;
 pub mod graph;
+pub mod reinforcement;
 pub mod neuron;
