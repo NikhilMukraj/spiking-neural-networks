@@ -570,38 +570,76 @@ impl IonChannelDefinition {
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
-        // let use_timestep = match &self.on_iteration {
-        //     AST::OnIteration(assignments) => {
-        //         let mut use_timestep = false;
+        let use_timestep = match &self.on_iteration {
+            AST::OnIteration(assignments) => {
+                let mut use_timestep = false;
 
-        //         for i in assignments {
-        //             match i.as_ref() {
-        //                 AST::DiffEqAssignment { .. } => { use_timestep = true },
-        //                 _ => {},
-        //             }
-        //         }
+                for i in assignments {
+                    match i.as_ref() {
+                        AST::DiffEqAssignment { .. } => { use_timestep = true },
+                        _ => {},
+                    }
+                }
 
-        //         use_timestep
-        //     },
-        //     _ => unreachable!()
-        // };
+                use_timestep
+            },
+            _ => unreachable!()
+        };
 
         let get_current = "fn get_current(&self) -> f32 { self.current }";
 
-        // if use_timestep {
-        //     let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
-        //     // get changes too
-        //     let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
-        //     let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
-        // } else {
-        //     let update_current_header = "fn update_current(&mut self, voltage: f32) {";
-        //     let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
-        //     let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
-        // }
+        let update_current = if use_timestep {
+            let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
+            let on_iteration = &self.on_iteration.to_string();
 
-        let update_current_header = "fn update_current(&mut self, voltage: f32) {";
-        let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
-        let update_current = format!("{}\n{}\n}}", update_current_header, update_current_body);
+            let mut lines: Vec<&str> = on_iteration.split('\n').collect();
+            let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"))
+                .expect("Current is not modified");
+
+            let current_assignment = lines.remove(current_line_index);
+
+            let update_current_body = add_indents(&lines.join("\n"), "\t");
+
+            let changes = match &self.on_iteration {
+                AST::OnIteration(assignments) => {
+                    let mut assignments_strings = vec![];
+    
+                    for i in assignments {
+                        match i.as_ref() {
+                            AST::DiffEqAssignment { name, .. } => {
+                                assignments_strings.push(format!("self.{} += d{}", name, name));
+                            }
+                            _ => {}
+                        }
+                    }
+    
+                    assignments_strings.join("\t\n")
+                },
+                _ => unreachable!()
+            };
+
+            let changes = add_indents(&changes, "\t");
+
+            format!(
+                "{}\n{}\n{}\n{}\n}}", 
+                update_current_header, 
+                update_current_body, 
+                changes, 
+                current_assignment
+            )
+        } else {
+            let update_current_header = "fn update_current(&mut self, voltage: f32) {";
+            let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
+            format!("{}\n{}\n}}", update_current_header, update_current_body)
+        };
+        
+        // if use timestep then header is ionchannel
+        // otherwise header is timestepindenpendentionchannel
+        // let impl_header = if use_timestep {
+        //     format!("impl IonChannel for {} {{", self.type_name.to_string())
+        // } else {
+        //     format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
+        // } 
 
         format!("{}\n{}\n}}\n{}\n{}", header, fields, update_current, get_current)
     }
