@@ -923,6 +923,8 @@ fn main() -> Result<()> {
     // handle ion channels (handle builtin ion channels) 
     // (could import with name prefixed as DefaultChannel or something)
 
+    // for now have all eq assignments last (after change is applied)
+
     // test creating default impl
 
     // default functions like max, min, exp, floor, ciel, heaviside
