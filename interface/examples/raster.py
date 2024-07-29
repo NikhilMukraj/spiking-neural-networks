@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import scipy
 import numpy as np
-import pandas as pd
 
 
 sns.set_theme(style='darkgrid')
@@ -41,5 +40,5 @@ filtered_peaks = [[i for i in j if i >= selection_min and i <= selection_max] fo
 
 for n in range(len(filtered_peaks)):
     plt.scatter(filtered_peaks[n], [n for i in range(len(filtered_peaks[n]))], color='black')
-    
+
 plt.show()
