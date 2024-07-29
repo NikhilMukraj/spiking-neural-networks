@@ -122,7 +122,8 @@ neuron_definition = {
 	"[end]"
 }
 
-gating_variables_def = { variables_block ~ NEWLINE+ }
+gating_variables_block = _{ "gating_vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
+gating_variables_def = { gating_variables_block ~ NEWLINE+ }
 
 ion_channel_definition = {
 	"[ion_channel]" ~ NEWLINE ~ 
