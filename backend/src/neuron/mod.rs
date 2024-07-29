@@ -2041,6 +2041,7 @@ where
 // enum { Weight(f32), RewardModulatedWeight(S) }
 // connecting function could generate different enums
 
+/// A lattice of neurons whose connections can be modulated by a reward signal
 #[derive(Debug, Clone)]
 pub struct RewardModulatedLattice<
     S: RewardModulatedWeight,
@@ -2499,3 +2500,36 @@ where
         }
     }
 }
+
+// #[derive(Debug, Clone)]
+// pub enum RewardModulatedConnection<T> {
+//     Weight(f32),
+//     RewardModulatedWeight(T),
+// }
+
+// #[derive(Debug, Clone)]
+// pub struct RewardModulatedLatticeNetwork<
+//     S: RewardModulatedWeight,
+//     T: IterateAndSpike, 
+//     U: Graph<T=(usize, usize), U=f32>, 
+//     V: LatticeHistory, 
+//     W: SpikeTrain, 
+//     X: SpikeTrainLatticeHistory,
+//     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+//     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+//     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
+//     C: Graph<T=(usize, usize), U=S>,
+// > {
+//     /// A hashmap of [`Lattice`]s associated with their respective identifier
+//     lattices: HashMap<usize, Lattice<T, U, V, Z>>,
+//     /// A hasmap of [`RewardModulatedLattice`]s associated with their respective identifier
+//     reward_modulated_lattices: HashMap<usize, RewardModulatedLattice<S, T, C, V, R>>,
+//     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
+//     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
+//     /// An array of graphs connecting different lattices together
+//     connecting_graph: Y,
+//     /// Whether to update connecting graph history
+//     pub update_connecting_graph_history: bool,
+//     /// Internal clock keeping track of what timestep the lattice is at
+//     pub internal_clock: usize,
+// }
