@@ -216,19 +216,7 @@ impl NeuronDefinition {
     // if defaults come with vars assignment then add default trait
     // if neurotransmitter kinetics and receptor kinetics specified then
     // create default_impl() function
-    fn to_code(&self) -> String {
-        let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
-        let necessary_imports = vec![
-            "CurrentVoltage", "GapConductance", "GaussianFactor", "LastFiringTime", "IsSpiking",
-            "IterateAndSpike", "GaussianParameters", "LigandGatedChannels", 
-            "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
-            "NeurotransmitterConcentrations",
-        ];
-        let necessary_imports = format!(
-            "use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};",
-            necessary_imports.join(", ")
-        );
-
+    fn to_code(&self) -> (String, String) {
         let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
         let receptor_kinetics = "ApproximateReceptor";
 
@@ -236,13 +224,6 @@ impl NeuronDefinition {
             "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
             neurotransmitter_kinetics,
             receptor_kinetics,
-        );
-
-        let import_statement = format!(
-            "{}\n{}\n{}\n\n",
-            iterate_and_spike_base,
-            necessary_imports,
-            kinetics_import,
         );
 
         let macros = "#[derive(Debug, Clone, IterateAndSpikeBase)]";
@@ -403,14 +384,16 @@ impl NeuronDefinition {
             impl_iterate_and_spike_body,
         );
 
-        format!(
-            "{}\n{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
-            import_statement,
-            macros, 
-            header, 
-            fields, 
-            impl_functions, 
-            impl_iterate_and_spike,
+        (
+            String::from(kinetics_import),
+            format!(
+                "{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
+                macros, 
+                header, 
+                fields, 
+                impl_functions, 
+                impl_iterate_and_spike,
+            )
         )
     }
 }
@@ -542,13 +525,13 @@ impl IonChannelDefinition {
     // check on iteration to see if diffeqs are used
     // if diff eqs are used generate ion channel that is time dependent
     // otherwise generate time independent
-    fn to_code(&self) -> String {
+    fn to_code(&self) -> (String, String) {
         let header = format!(
-            "pub struct {} {{", 
+            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
             self.type_name.to_string(),
         );
         
-        let fields = match &self.vars {
+        let mut fields = match &self.vars {
             AST::VariablesAssignments(variables) => {
                 variables
                     .iter()
@@ -565,8 +548,8 @@ impl IonChannelDefinition {
             _ => unreachable!()
         };
 
-        // let current_field = String::from("current: f32");
-        // fields.push(current_field);
+        let current_field = String::from("current: f32");
+        fields.push(current_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
@@ -637,15 +620,34 @@ impl IonChannelDefinition {
         
         // if use timestep then header is ionchannel
         // otherwise header is timestepindenpendentionchannel
-        // let impl_header = if use_timestep {
-        //     format!("impl IonChannel for {} {{", self.type_name.to_string())
-        // } else {
-        //     format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
-        // } 
+        let impl_header = if use_timestep {
+            format!("impl IonChannel for {} {{", self.type_name.to_string())
+        } else {
+            format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
+        };
+
+        let imports = if use_timestep {
+            "use spiking_neural_networks::neuron::ion_channels::IonChannel;"
+        } else {
+            "use spiking_neural_networks::neuron::ion_channels::TimestepIndependentIonChannel;"
+        };
 
         // code may need to be updated if current is assigned using 
 
-        format!("{}\n{}\n}}\n{}\n{}", header, fields, update_current, get_current)
+        let update_current = add_indents(&update_current, "\t");
+        let get_current = add_indents(&get_current, "\t");
+
+        (
+            String::from(imports), 
+            format!(
+                "{}\n{}\n}}\n\n{}\n{}\n\n{}\n}}", 
+                header, 
+                fields, 
+                impl_header, 
+                update_current, 
+                get_current
+            )
+        )
     }
 }
 
@@ -973,7 +975,20 @@ fn main() -> Result<()> {
     // a field for neuron import and a field for ion channel imports
     // maybe add get_imports() method
 
-    // let mut imports = vec![];
+    let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
+    let neuron_necessary_imports = vec![
+        "CurrentVoltage", "GapConductance", "GaussianFactor", "LastFiringTime", "IsSpiking",
+        "IterateAndSpike", "GaussianParameters", "LigandGatedChannels", 
+        "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
+        "NeurotransmitterConcentrations",
+    ];
+    let neuron_necessary_imports = format!(
+        "use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};",
+        neuron_necessary_imports.join(", ")
+    );
+    let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
+
+    let mut imports = vec![];
     let mut code = vec![];
 
     match ASTParser::parse(Rule::full, &contents) {
@@ -981,21 +996,34 @@ fn main() -> Result<()> {
             for pair in pairs {
                 match pair.as_rule()  {
                     Rule::neuron_definition => {
-                        let neuron_code = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
+                        let (import, neuron_code) = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
                             .to_code();
-
+                        
+                        if !imports.contains(&neuron_necessary_imports) {
+                            imports.push(neuron_necessary_imports.clone())
+                        }
+                        if !imports.contains(&import) {
+                            imports.push(import)
+                        }
                         code.push(neuron_code);
                     },
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner()).expect("Could not generate neuron");
 
-                        println!("{}", ion_channel.to_code())
+                        let (import, ion_channel_code) = ion_channel.to_code();
+
+                        if !imports.contains(&import) {
+                            imports.push(import);
+                        }
+                        code.push(ion_channel_code);
                     },
                     _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
                 }
             }
 
             let mut file = File::create(&output_file_name)?;
+            file.write_all(imports.join("\n").as_bytes())?;
+            file.write_all("\n\n\n".as_bytes())?;
             file.write_all(code.join("\n").as_bytes())?;
         }
         Err(e) => {
