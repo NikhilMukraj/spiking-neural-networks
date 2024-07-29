@@ -28,6 +28,8 @@ lattice.reset_history()
 
 lattice.run_lattice(10000)
 
+data = [i.flatten() for i in np.array(lattice.history)]
+
 def find_peaks_above_threshold(series, threshold):
     peaks, _ = scipy.signal.find_peaks(np.array(series))
     filtered_peaks = [index for index in peaks if series[index] > threshold]
