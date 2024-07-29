@@ -5,6 +5,8 @@ import scipy
 import numpy as np
 
 
+# eventually allow arguments to change parameters
+
 sns.set_theme(style='darkgrid')
 
 def connection_conditional(x, y):
