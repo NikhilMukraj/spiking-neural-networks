@@ -543,9 +543,7 @@ pub struct IonChannelDefinition {
 }
 
 impl IonChannelDefinition {
-    // check on iteration to see if diffeqs are used
-    // if diff eqs are used generate ion channel that is time dependent
-    // otherwise generate time independent
+    // for now assume all gating variables default to 0 for a and b
     fn to_code(&self) -> (String, String) {
         let header = format!(
             "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
