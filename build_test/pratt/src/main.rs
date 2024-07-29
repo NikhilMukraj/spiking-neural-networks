@@ -54,6 +54,11 @@ pub enum AST {
         name: String,
         args: Vec<Box<AST>>
     },
+    StructCall {
+        name: String,
+        attribute: String,
+        args: Option<Vec<Box<AST>>>,
+    },
     EqAssignment {
         name: String,
         expr: Box<AST>,
@@ -138,6 +143,22 @@ impl AST {
                         .join(", ")
                     )
             },
+            AST::StructCall { name, attribute, args } => {
+                format!(
+                    "{}.{}{}", 
+                    name, 
+                    attribute,
+                    match args {
+                        Some(args) => {
+                            args.iter()
+                                .map(|i| i.to_string())
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        },
+                        None => String::from(""),
+                    }
+                )
+            }
             AST::EqAssignment { name, expr } => {
                 let name = if name == "v" {
                     String::from("self.current_voltage")
@@ -438,7 +459,7 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             Rule::spike_detection_def => {
                 (
                     String::from("spike_detection"),
-                    AST::SpikeDetection(Box::new(bool_parse_expr(pair.into_inner())))
+                    AST::SpikeDetection(Box::new(parse_bool_expr(pair.into_inner())))
                 )
             }
             Rule::vars_def => {
@@ -753,11 +774,38 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
             Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => AST::Name(String::from(primary.as_str())),
             Rule::expr => parse_expr(primary.into_inner()),
+            Rule::struct_call => {
+                let mut inner_rules = primary.into_inner();
+
+                let name: String = String::from(
+                    inner_rules.next()
+                        .expect("Could not get struct name").as_str()
+                );
+
+                let attribute: String = String::from(
+                    inner_rules.next()
+                        .expect("Could not get attribute").as_str()
+                );
+
+                let args: Option<Vec<Box<AST>>> = match inner_rules.next() {
+                    Some(value) => {
+                        Some(
+                            value.into_inner()
+                            .map(|i| Box::new(parse_expr(i.into_inner())))
+                            .collect()
+                        )
+                    },
+                    None => None,
+                };
+                
+                AST::StructCall { name: name, attribute: attribute, args: args }
+            }
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
 
-                let name: String = String::from(inner_rules.next()
-                    .expect("Could not get function name").as_str()
+                let name: String = String::from(
+                    inner_rules.next()
+                        .expect("Could not get function name").as_str()
                 );
 
                 let args: Vec<Box<AST>> = inner_rules.next()
@@ -792,12 +840,38 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
         .parse(pairs)
 }
 
-pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
+pub fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
             Rule::name => AST::Name(String::from(primary.as_str())),
-            Rule::expr => bool_parse_expr(primary.into_inner()),
+            Rule::expr => parse_bool_expr(primary.into_inner()),
+            Rule::struct_call => {
+                let mut inner_rules = primary.into_inner();
+
+                let name: String = String::from(
+                    inner_rules.next()
+                        .expect("Could not get struct name").as_str()
+                );
+
+                let attribute: String = String::from(
+                    inner_rules.next()
+                        .expect("Could not get attribute").as_str()
+                );
+
+                let args: Option<Vec<Box<AST>>> = match inner_rules.next() {
+                    Some(value) => {
+                        Some(
+                            value.into_inner()
+                            .map(|i| Box::new(parse_bool_expr(i.into_inner())))
+                            .collect()
+                        )
+                    },
+                    None => None,
+                };
+                
+                AST::StructCall { name: name, attribute: attribute, args: args }
+            },
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
 
@@ -808,7 +882,7 @@ pub fn bool_parse_expr(pairs: Pairs<Rule>) -> AST {
                 let args: Vec<Box<AST>> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(bool_parse_expr(i.into_inner())))
+                    .map(|i| Box::new(parse_bool_expr(i.into_inner())))
                     .collect();
                 
                 AST::Function { name: name, args: args }
