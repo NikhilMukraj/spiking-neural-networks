@@ -923,6 +923,7 @@ fn main() -> Result<()> {
     // try code generation (assume default ligands)
 
     // handle ion channels (handle builtin ion channels) 
+    // handle gating variables
     // (could import with name prefixed as DefaultChannel or something)
 
     // for now have all eq assignments last (after change is applied)
