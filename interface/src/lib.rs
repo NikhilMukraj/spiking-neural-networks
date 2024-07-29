@@ -605,8 +605,12 @@ macro_rules! impl_lattice {
         #[pymethods]
         impl $lattice_kind {
             #[new]
-            fn new() -> Self {
-                $lattice_kind { lattice: Lattice::default() }
+            #[pyo3(signature = (id=0))]
+            fn new(id: usize) -> Self {
+                let mut lattice = $lattice_kind { lattice: Lattice::default() };
+                lattice.set_id(id);
+
+                lattice
             }
 
             fn populate(&mut self, neuron: $lattice_neuron, num_rows: usize, num_cols: usize) {
@@ -2308,8 +2312,6 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyNeuron>()?;
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
-
-    // lattice takes in one argument being id
 
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
