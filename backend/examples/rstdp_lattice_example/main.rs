@@ -8,7 +8,7 @@ use spiking_neural_networks::{
     },
     error::SpikingNeuralNetworksError, 
     graph::AdjacencyMatrix, 
-    reinforcement::{Environment, State},
+    reinforcement::{Environment, State, Agent},
 };
 
 
@@ -56,6 +56,8 @@ fn reward_function(state: &TestState, _: &AgentType) -> f32 {
     }
 }
 
+fn state_encoder<T: State, U: Agent>(_: &T, _: &mut U) {}
+
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let izhikevich_neuron = IzhikevichNeuron::default_impl();
     let mut reward_modulated_lattice = RewardModulatedLattice::default_impl();
@@ -72,6 +74,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut env = Environment { 
         state, 
         agent: reward_modulated_lattice, 
+        state_encoder: &state_encoder,
         reward_function: &reward_function,
     };
 
