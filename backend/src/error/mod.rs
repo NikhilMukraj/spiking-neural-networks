@@ -50,6 +50,11 @@ pub enum LatticeNetworkError {
     /// When connecting network, postsynaptic lattice cannot be a spike train lattice because spike trains
     /// cannot take inputs
     PostsynapticLatticeCannotBeSpikeTrain,
+    /// When connecting reward modulated network, at least one lattice has to be reward modulated
+    CannotConnectWithRewardModulatedConnection,
+    /// When connecting reward modulated lattice, [`RewardModulatedConnection`] cannot be used to connect a
+    /// reward modulated lattice internally
+    RewardModulatedConnectionNotCompatibleInternally,
 }
 
 impl Display for LatticeNetworkError {
@@ -69,6 +74,12 @@ impl Display for LatticeNetworkError {
             ),
             LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => String::from(
                 "Postsynaptic lattice cannot be a spike train lattice because spike trains cannot take inputs"
+            ),
+            LatticeNetworkError::CannotConnectWithRewardModulatedConnection => String::from(
+                "When connecting reward modulated network, at least one lattice has to be reward modulated"
+            ),
+            LatticeNetworkError::RewardModulatedConnectionNotCompatibleInternally => String::from(
+                "When connecting reward modulated lattice, RewardModulatedConnection cannot be used to connect a reward modulated lattice internally"
             ),
         };
 
