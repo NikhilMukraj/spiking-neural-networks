@@ -1081,16 +1081,28 @@ macro_rules! impl_network {
             }
 
             fn add_lattice(&mut self, lattice: $lattice_kind) -> PyResult<()> {
+                let id = lattice.lattice.get_id();
+
                 match self.network.add_lattice(lattice.lattice) {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(PyKeyError::new_err("Id already in network")),
+                    Err(_) => Err(
+                        PyKeyError::new_err(
+                            format!("Id ({}) already in network", id)
+                        )
+                    ),
                 }
             }
 
             fn add_spike_train_lattice(&mut self, spike_train_lattice: $spike_train_lattice_kind) -> PyResult<()> {
+                let id = spike_train_lattice.lattice.get_id();
+                
                 match self.network.add_spike_train_lattice(spike_train_lattice.lattice) {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(PyKeyError::new_err("Id already in network")),
+                    Err(_) => Err(
+                        PyKeyError::new_err(
+                            format!("Id ({}) already in network", id)
+                        )
+                    ),
                 }
             }
 
