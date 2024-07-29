@@ -21,6 +21,8 @@ pub struct Environment<'a, T: Agent, U: State<A=T>> {
     pub agent: T,
     /// State for agent to interact with
     pub state: U,
+    /// Functon that encodes the current state into the agent
+    pub state_encoder: &'a dyn Fn(&U, &mut T),
     /// Function that takes in the state and the agent to return a reward
     pub reward_function: &'a dyn Fn(&U, &T) -> f32,
 }
