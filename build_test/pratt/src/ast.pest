@@ -5,13 +5,16 @@ name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
 
 name = @{ name_characters ~ (name_characters | integer)* }
 
+// this should be added to expr parser (and bool expr parser)
+struct_call = { name ~ "." ~ name ~ ("(" ~ args ~ ")")? } 
+
 args = {
-    (expr | function | name | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","?
+    (expr | struct_call | function | name | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","?
 }
 function = { name ~ ("(" ~ args ~ ")") }
 
 unary_minus = { "-" }
-primary = _{ function | number | name | "(" ~ expr ~ ")" }
+primary = _{ struct_call | function | number | name | "(" ~ expr ~ ")" }
 
 atom = _{ not_operator? ~ unary_minus? ~ primary }
 
@@ -120,8 +123,6 @@ neuron_definition = {
 }
 
 gating_variables_def = { variables_block ~ NEWLINE+ }
-// this should be added to expr parser (and bool expr parser)
-struct_call = @{ name ~ "." ~ name ~ ("(" ~ args ~ ")")? } 
 
 ion_channel_definition = {
 	"[ion_channel]" ~ NEWLINE ~ 
