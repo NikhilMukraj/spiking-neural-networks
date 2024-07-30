@@ -93,7 +93,7 @@ pub struct TraceRSTDP {
 
 impl Default for TraceRSTDP {
     fn default() -> Self {
-        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 0.01, dt: 0.1 }
+        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 0.0001, dt: 0.1 }
     }
 }
 
@@ -143,7 +143,7 @@ pub struct RewardModulatedSTDP {
 impl Default for RewardModulatedSTDP {
     fn default() -> Self {
         RewardModulatedSTDP { 
-            tau_d: 2., 
+            tau_d: 20., 
             dopamine: 0., 
             a_plus: 2., 
             a_minus: 2., 
