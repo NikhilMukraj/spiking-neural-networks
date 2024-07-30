@@ -11,6 +11,7 @@
 [ion_channel]
     type: TestChannel
     vars: e = 0, g = 1
+    gating_vars: n
     on_iteration:
-        current = g * (v - e)
+        current = g * n.state * (v - e)
 [end]
