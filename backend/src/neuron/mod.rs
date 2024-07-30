@@ -30,7 +30,10 @@ use iterate_and_spike::{
     aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters 
 };
 pub mod plasticity;
-use plasticity::{Plasticity, STDP};
+use plasticity::{
+    Plasticity, STDP, RewardModulator,
+    RewardModulatedSTDP, RewardModulatedWeight, TraceRSTDP
+};
 /// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
@@ -1929,135 +1932,6 @@ where
         }
 
         Ok(())
-    }
-}
-
-/// A weight that can be reward modulated
-pub trait RewardModulatedWeight {
-    /// Get synaptic coupling factor
-    fn get_weight(&self) -> f32;
-}
-
-/// Weight trace for RSTDP
-#[derive(Debug, Clone, Copy)]
-pub struct TraceRSTDP {
-    counter: usize,
-    dw: f32,
-    /// Synaptic coupling factor
-    pub weight: f32,
-    /// Trace value
-    pub c: f32,
-    /// Trace decay
-    pub tau_c: f32,
-    /// Timestep increment
-    pub dt: f32,
-}
-
-impl Default for TraceRSTDP {
-    fn default() -> Self {
-        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 0.01, dt: 0.1 }
-    }
-}
-
-impl TraceRSTDP {
-    /// Updates trace based on weight change and current state
-    pub fn update_trace(&mut self) {
-        self.c = self.c * (-self.dt / self.tau_c).exp() + self.tau_c * self.dw;
-    }
-}
-
-impl RewardModulatedWeight for TraceRSTDP {
-    fn get_weight(&self) -> f32 {
-        self.weight
-    }
-}
-
-/// Handles modulation of neurons using reward
-pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
-    /// Update parameters based on reward
-    fn update(&mut self, reward: f32);
-    /// Update weight given two neurons and the weight itself
-    fn update_weight(&self, weight: &mut V, presynaptic_neuron: &T, postsynaptic_neuron: &U);
-    /// Whether to update the given neuron
-    fn do_update(&self, neuron: &U) -> bool;
-}
-
-/// An implementation of spike time dependent plasticity that is reward modulated with 
-/// dopamine based synapses
-#[derive(Debug, Clone, Copy)]
-pub struct RewardModulatedSTDP {
-    // Dopamine concentration
-    pub dopamine: f32,
-    // Dopamine decay factor
-    pub tau_d: f32,
-    /// Postitive STDP modifier 
-    pub a_plus: f32,
-    /// Negative STDP modifier  
-    pub a_minus: f32,
-    /// Postitive STDP decay modifier  
-    pub tau_plus: f32, 
-    /// Negative STDP decay modifier 
-    pub tau_minus: f32, 
-    /// Timestep for calculating weight changes
-    pub dt: f32,
-}
-
-impl Default for RewardModulatedSTDP {
-    fn default() -> Self {
-        RewardModulatedSTDP { 
-            tau_d: 2., 
-            dopamine: 0., 
-            a_plus: 2., 
-            a_minus: 2., 
-            tau_plus: 4.5, 
-            tau_minus: 4.5, 
-            dt: 0.1 
-        }
-    }
-}
-
-impl<T, U> RewardModulator<T, U, TraceRSTDP> for RewardModulatedSTDP 
-where 
-    T: LastFiringTime,
-    U: IterateAndSpike,
-{
-    fn update(&mut self, reward: f32) {
-        self.dopamine = self.dopamine * (-self.dt / self.tau_d).exp() + self.tau_d * reward;
-    }
-
-    fn update_weight(&self, weight: &mut TraceRSTDP, presynaptic: &T, postsynaptic: &U) {
-        let mut delta_w: f32 = 0.;
-
-        match (presynaptic.get_last_firing_time(), postsynaptic.get_last_firing_time()) {
-            (Some(t_pre), Some(t_post)) => {
-                let (t_pre, t_post): (f32, f32) = (t_pre as f32, t_post as f32);
-
-                if t_pre < t_post {
-                    delta_w = self.a_plus * (-1. * ((t_pre - t_post) * self.dt).abs() / self.tau_plus).exp();
-                } else if t_pre > t_post {
-                    delta_w = -1. * self.a_minus * (-1. * ((t_post - t_pre) * self.dt).abs() / self.tau_minus).exp();
-                }
-            },
-            (None, None) => {},
-            (None, Some(_)) => {},
-            (Some(_), None) => {},
-        };
-
-        weight.dw += delta_w;
-
-        if weight.counter == 0 {
-            weight.counter = 1;
-        } else {
-            weight.update_trace();
-            weight.counter = 0;
-            weight.dw = 0.;
-        }
-
-        weight.weight += weight.c * self.dopamine;
-    }
-
-    fn do_update(&self, _: &U) -> bool {
-        true
     }
 }
 
