@@ -647,7 +647,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     }
 
     /// Updates internal weights based on STDP
-    fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
+    fn update_weights_from_spiking_neurons(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
         let input_positions = self.graph.get_incoming_connections(pos)?;
@@ -702,7 +702,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_spiking_neurons(x, y, &pos)?;
             } 
         }
 
@@ -736,7 +736,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_spiking_neurons(x, y, &pos)?;
             } 
         }
 
@@ -767,7 +767,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_spiking_neurons(x, y, &pos)?;
             } 
         }
 
@@ -1605,7 +1605,7 @@ where
         (inputs, neurotransmitters_inputs)
     }
 
-    fn update_weights_from_spiking_neuron_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_spiking_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = &self.lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
@@ -1749,7 +1749,7 @@ where
         }
 
         for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
+            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
         }
 
@@ -1809,7 +1809,7 @@ where
         }
 
         for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
+            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
         }
 
@@ -1867,7 +1867,7 @@ where
         }
 
         for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neuron_across_lattices(x, y, &pos)?;
+            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
         }
 
@@ -2957,6 +2957,12 @@ where
 //                         .cell_grid[pos_x][pos_y];
 
 //                     gap_junction(input_cell, postsynaptic_neuron)
+//                 } else if self.reward_modulated_lattices.contains_key(&input_position.id) {
+//                     let input_cell = &self.reward_modulated_lattices.get(&input_position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     gap_junction(input_cell, postsynaptic_neuron)
 //                 } else {
 //                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
 //                         .unwrap()
@@ -2964,12 +2970,28 @@ where
 
 //                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
 //                 };
-                
-                // panic!("Need to account for connecting graph and internal graph")
-//                 let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
-//                     .unwrap_or(Some(RewardModulatedConnection::Weight(0.)))
-//                     .unwrap()
-//                     .get_weight();
+
+//                 let weight: f32 = if input_position.id != postsynaptic_position.id {
+//                     self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+//                         .unwrap()
+//                         .unwrap()
+//                         .get_weight()
+//                 } else {
+//                     if self.lattices.contains_key(&input_position.id) {
+//                         self.lattices.get(&input_position.id).unwrap()
+//                             .graph
+//                             .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+//                             .unwrap_or(Some(0.))
+//                             .unwrap()
+//                     } else {
+//                         self.reward_modulated_lattices.get(&input_position.id).unwrap()
+//                             .graph
+//                             .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+//                             .unwrap()
+//                             .unwrap()
+//                             .get_weight()
+//                     }
+//                 };
 
 //                 final_input * weight
 //             })
@@ -3006,6 +3028,14 @@ where
 //                     let final_input = input_cell.get_neurotransmitter_concentrations();
 
 //                     final_input
+//                 } else if self.reward_modulated_lattices.contains_key(&input_position.id) {
+//                     let input_cell = &self.reward_modulated_lattices.get(&input_position.id)
+//                         .unwrap()
+//                         .cell_grid[pos_x][pos_y];
+
+//                     let final_input = input_cell.get_neurotransmitter_concentrations();
+
+//                     final_input
 //                 } else {
 //                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
 //                         .unwrap()
@@ -3016,11 +3046,27 @@ where
 //                     final_input
 //                 };
                 
-                // panic!("Need to account for connecting graph and internal graph")
-//                 let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
-//                     .unwrap_or(Some(RewardModulatedConnection::Weight(0.)))
-//                     .unwrap()
-//                     .get_weight();
+//                 let weight: f32 = if input_position.id != postsynaptic_position.id {
+//                     self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+//                         .unwrap()
+//                         .unwrap()
+//                         .get_weight()
+//                 } else {
+//                     if self.lattices.contains_key(&input_position.id) {
+//                         self.lattices.get(&input_position.id).unwrap()
+//                             .graph
+//                             .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+//                             .unwrap_or(Some(0.))
+//                             .unwrap()
+//                     } else {
+//                         self.reward_modulated_lattices.get(&input_position.id).unwrap()
+//                             .graph
+//                             .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+//                             .unwrap()
+//                             .unwrap()
+//                             .get_weight()
+//                     }
+//                 };
 
 //                 weight_neurotransmitter_concentration(&mut neurotransmitter_input, weight);
 
@@ -3099,5 +3145,396 @@ where
 //         let inputs = self.get_all_electrical_inputs();
 
 //         (inputs, neurotransmitters_inputs)
+//     }
+
+//     fn update_weights_from_spiking_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+//         let current_lattice = &self.lattices.get(&pos.id).unwrap();
+//         let given_neuron = &current_lattice.cell_grid[x][y];
+
+//         for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
+//             let (x_in, y_in) = input_pos.pos;
+
+//             let connection = self.connecting_graph
+//                 .lookup_weight(&input_pos, &pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//             match connection {
+//                 RewardModulatedConnection::Weight(mut weight) => {
+//                     current_lattice.plasticity.update_weight(
+//                         &mut weight,
+//                         &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+//                         given_neuron,
+//                     );
+                                                
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &input_pos, 
+//                             &pos, 
+//                             Some(RewardModulatedConnection::Weight(weight)),
+//                         )?;
+//                 },
+//                 RewardModulatedConnection::RewardModulatedWeight(mut weight) => {
+//                     self.get_reward_modulated_lattice(&input_pos.id).unwrap().reward_modulator
+//                         .update_weight(
+//                             &mut weight, 
+//                             &self.get_reward_modulated_lattice(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+//                             given_neuron,
+//                         );
+                    
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &input_pos, 
+//                             &pos, 
+//                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
+//                         )?;
+//                 }
+//             }
+//         }
+
+//         for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
+//             let (x_out, y_out) = output_pos.pos;
+
+//             let connection = self.connecting_graph
+//                 .lookup_weight(&output_pos, &pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//             match connection {
+//                 RewardModulatedConnection::Weight(mut weight) => {
+//                     current_lattice.plasticity.update_weight(
+//                         &mut weight,
+//                         given_neuron,
+//                         &self.lattices.get(&output_pos.id).unwrap().cell_grid[x_out][y_out], 
+//                     );
+                                                
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &pos, 
+//                             &output_pos, 
+//                             Some(RewardModulatedConnection::Weight(weight)),
+//                         )?;
+//                 },
+//                 RewardModulatedConnection::RewardModulatedWeight(mut weight) => {
+//                     self.get_reward_modulated_lattice(&output_pos.id).unwrap().reward_modulator
+//                         .update_weight(
+//                             &mut weight, 
+//                             given_neuron,
+//                             &self.get_reward_modulated_lattice(&output_pos.id).unwrap().cell_grid[x_out][y_out], 
+//                         );
+                    
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &pos, 
+//                             &output_pos, 
+//                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
+//                         )?;
+//                 }
+//             }
+//         }
+
+//         Ok(())
+//     }
+
+//     fn update_weights_from_spiking_neurons_within_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+//         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
+//         let given_neuron = &current_lattice.cell_grid[x][y];
+        
+//         for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+//             let (x_in, y_in) = input_pos;
+
+//             let mut current_weight: f32 = current_lattice.graph
+//                 .lookup_weight(&input_pos, &pos.pos)
+//                 .unwrap_or(Some(0.))
+//                 .unwrap();
+
+//             current_lattice.plasticity.update_weight(
+//                 &mut current_weight,
+//                 &current_lattice.cell_grid[x_in][y_in], 
+//                 given_neuron,
+//             );
+                                        
+//             current_lattice.graph
+//                 .edit_weight(
+//                     &input_pos, 
+//                     &pos.pos, 
+//                     Some(current_weight)
+//                 )?;
+//         }
+
+//         for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+//             let (x_out, y_out) = output_pos;
+
+//             let mut current_weight: f32 = current_lattice.graph
+//                 .lookup_weight(&pos.pos, &output_pos)
+//                 .unwrap_or(Some(0.))
+//                 .unwrap();
+
+//             current_lattice.plasticity.update_weight(
+//                 &mut current_weight,
+//                 given_neuron,
+//                 &current_lattice.cell_grid[x_out][y_out], 
+//             );
+                                        
+//             current_lattice.graph
+//                 .edit_weight(
+//                     &pos.pos, 
+//                     &output_pos, 
+//                     Some(current_weight)
+//                 )?;
+//         }
+
+//         Ok(())
+//     }
+
+//     fn update_weights_from_spiking_neurons_across_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+//         let current_lattice = &self.reward_modulated_lattices.get(&pos.id).unwrap();
+//         let given_neuron = &current_lattice.cell_grid[x][y];
+
+//         for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
+//             let (x_in, y_in) = input_pos.pos;
+
+//             let connection = self.connecting_graph
+//                 .lookup_weight(&input_pos, &pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//             match connection {
+//                 RewardModulatedConnection::Weight(mut weight) => {
+//                         if self.lattices.contains_key(&input_pos.id) {
+//                             self.get_lattice(&input_pos.id).unwrap().plasticity.update_weight(
+//                                 &mut weight,
+//                                 &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+//                                 given_neuron,
+//                             );
+                                                        
+//                             self.connecting_graph
+//                                 .edit_weight(
+//                                     &input_pos, 
+//                                     &pos, 
+//                                     Some(RewardModulatedConnection::Weight(weight)),
+//                                 )?;
+//                         }
+//                     },
+//                 RewardModulatedConnection::RewardModulatedWeight(mut weight) => {
+//                     let input_neuron = if self.reward_modulated_lattices.contains_key(&input_pos.id) {
+//                         &self.get_reward_modulated_lattice(&input_pos.id).unwrap().cell_grid[x_in][y_in]
+//                     } else {
+//                         &self.get_lattice(&input_pos.id).unwrap().cell_grid[x_in][y_in]
+//                     };
+
+//                     current_lattice.reward_modulator
+//                         .update_weight(
+//                             &mut weight, 
+//                             input_neuron, 
+//                             given_neuron,
+//                         );
+                    
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &input_pos, 
+//                             &pos, 
+//                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
+//                         )?;
+//                 }
+//             }
+//         }
+
+//         for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
+//             let (x_out, y_out) = output_pos.pos;
+
+//             let connection = self.connecting_graph
+//                 .lookup_weight(&output_pos, &pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//             match connection {
+//                 RewardModulatedConnection::Weight(mut weight) => {
+//                     if self.lattices.contains_key(&output_pos.id) {
+//                         self.get_lattice(&output_pos.id).unwrap().plasticity.update_weight(
+//                             &mut weight,
+//                             given_neuron,
+//                             &self.lattices.get(&output_pos.id).unwrap().cell_grid[x_out][y_out], 
+//                         );
+                                                    
+//                         self.connecting_graph
+//                             .edit_weight(
+//                                 &pos, 
+//                                 &output_pos, 
+//                                 Some(RewardModulatedConnection::Weight(weight)),
+//                             )?;
+//                     }
+//                 },
+//                 RewardModulatedConnection::RewardModulatedWeight(mut weight) => {
+//                     let output_neuron = if self.reward_modulated_lattices.contains_key(&output_pos.id) {
+//                         &self.get_reward_modulated_lattice(&output_pos.id).unwrap().cell_grid[x_out][y_out]
+//                     } else {
+//                         &self.get_lattice(&output_pos.id).unwrap().cell_grid[x_out][y_out]
+//                     };
+
+//                     current_lattice.reward_modulator
+//                         .update_weight(
+//                             &mut weight, 
+//                             given_neuron,
+//                             output_neuron, 
+//                         );
+                    
+//                     self.connecting_graph
+//                         .edit_weight(
+//                             &pos, 
+//                             &output_pos, 
+//                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
+//                         )?;
+//                 }
+//             }
+//         }
+
+//         Ok(())
+//     }
+
+//     fn update_weights_from_spiking_neurons_within_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+//         let current_lattice = self.reward_modulated_lattices.get_mut(&pos.id).unwrap();
+//         let given_neuron = &current_lattice.cell_grid[x][y];
+        
+//         for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+//             let (x_in, y_in) = input_pos;
+
+//             let mut current_weight = current_lattice.graph
+//                 .lookup_weight(&input_pos, &pos.pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//             current_lattice.reward_modulator.update_weight(
+//                 &mut current_weight,
+//                 &current_lattice.cell_grid[x_in][y_in], 
+//                 given_neuron,
+//             );
+                                        
+//             current_lattice.graph
+//                 .edit_weight(
+//                     &input_pos, 
+//                     &pos.pos, 
+//                     Some(current_weight)
+//                 )?;
+//         }
+
+//         for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+//             let (x_out, y_out) = output_pos;
+
+//             let mut current_weight = current_lattice.graph
+//                 .lookup_weight(&pos.pos, &output_pos)
+//                 .unwrap()
+//                 .unwrap();
+
+//                 current_lattice.reward_modulator.update_weight(
+//                 &mut current_weight,
+//                 given_neuron,
+//                 &current_lattice.cell_grid[x_out][y_out], 
+//             );
+                                        
+//             current_lattice.graph
+//                 .edit_weight(
+//                     &pos.pos, 
+//                     &output_pos, 
+//                     Some(current_weight)
+//                 )?;
+//         }
+
+//         Ok(())
+//     }
+
+//     /// Iterates one simulation timestep lattice given a set of only electrical inputs
+//     pub fn iterate(
+//         &mut self,
+//         inputs: &HashMap<GraphPosition, f32>,
+//     ) -> Result<(), GraphError> {
+//         let mut spiking_positions = Vec::new();
+
+//         for lattice in self.lattices.values_mut() {
+//             for pos in lattice.graph.get_every_node() {
+//                 let (x, y) = pos;
+//                 let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+
+//                 let input_value = *inputs.get(&graph_pos).unwrap();
+
+//                 let is_spiking = lattice.cell_grid[x][y].iterate_and_spike(input_value);
+    
+//                 if is_spiking { 
+//                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+//                 }
+    
+//                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
+//                     if lattice.do_plasticity {
+//                         spiking_positions.push((x, y, graph_pos));
+//                     }
+//                 }
+//             }
+    
+//             if lattice.update_graph_history {
+//                 lattice.graph.update_history();
+//             }
+//             if lattice.update_grid_history {
+//                 lattice.grid_history.update(&lattice.cell_grid);
+//             }
+//         }
+
+//         let mut spiking_positions_with_reward_modulation = Vec::new();
+
+//         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
+//             for pos in reward_modulated_lattice.graph.get_every_node() {
+//                 let (x, y) = pos;
+//                 let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
+
+//                 let input_value = *inputs.get(&graph_pos).unwrap();
+
+//                 let is_spiking = reward_modulated_lattice.cell_grid[x][y].iterate_and_spike(input_value);
+    
+//                 if is_spiking { 
+//                     reward_modulated_lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
+//                 }
+    
+//                 if <R as RewardModulator<T, T, S>>::do_update(
+//                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
+//                 ) {
+//                     if reward_modulated_lattice.do_modulation {
+//                         spiking_positions_with_reward_modulation.push((x, y, graph_pos));
+//                     }
+//                 }
+//             }
+    
+//             if reward_modulated_lattice.update_graph_history {
+//                 reward_modulated_lattice.graph.update_history();
+//             }
+//             if reward_modulated_lattice.update_grid_history {
+//                 reward_modulated_lattice.grid_history.update(&reward_modulated_lattice.cell_grid);
+//             }
+//         }
+
+//         for (x, y, pos) in spiking_positions {
+//             self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
+//             self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+//         }
+
+//         for (x, y, pos) in spiking_positions_with_reward_modulation {
+//             self.update_weights_from_spiking_neurons_across_reward_lattices(x, y, &pos)?;
+//             self.update_weights_from_spiking_neurons_within_reward_lattices(x, y, &pos)?;
+//         }
+
+//         if self.update_connecting_graph_history {
+//             self.connecting_graph.update_history();
+//         }
+        
+//         self.internal_clock += 1;
+
+//         for lattice in self.lattices.values_mut() {
+//             lattice.internal_clock = self.internal_clock;
+//         }
+
+//         self.spike_train_lattices.values_mut()
+//             .for_each(|i|{
+//                 i.iterate();
+//             });
+
+//         Ok(())
 //     }
 // }
