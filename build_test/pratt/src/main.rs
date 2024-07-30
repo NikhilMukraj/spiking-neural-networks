@@ -1009,6 +1009,8 @@ fn main() -> Result<()> {
     // add that function to the struct impl
     // function declarations in separate space from on iteration and on spike
 
+    // refractory period (either if statements or separate block)
+
     // runge kutta and import integrators
 
     // neuron def may need to be handled differently if voltage is not updated with dv/dt
