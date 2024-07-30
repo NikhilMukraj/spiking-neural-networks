@@ -1,6 +1,7 @@
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{CurrentVoltage, GapConductance, GaussianFactor, LastFiringTime, IsSpiking, IterateAndSpike, GaussianParameters, LigandGatedChannels, Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics, NeurotransmitterConcentrations};
 use spiking_neural_networks::neuron::iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor};
+use spiking_neural_networks::neuron::ion_channels::BasicGatingVariable;
 use spiking_neural_networks::neuron::ion_channels::TimestepIndependentIonChannel;
 
 
@@ -62,12 +63,13 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Basic
 pub struct TestChannel {
 	e: f32,
 	g: f32,
+	n: BasicGatingVariable,
 	current: f32,
 }
 
 impl TimestepIndependentIonChannel for TestChannel {
 	fn update_current(&mut self, voltage: f32) {
-		self.current = (self.g * (self.current_voltage - self.e));
+		self.current = ((self.g * self.n.state) * (self.current_voltage - self.e));
 	}
 
 	fn get_current(&self) -> f32 { self.current }
