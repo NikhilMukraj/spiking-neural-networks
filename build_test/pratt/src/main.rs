@@ -76,6 +76,7 @@ pub enum AST {
     OnSpike(Vec<Box<AST>>),
     OnIteration(Vec<Box<AST>>),
     SpikeDetection(Box<AST>),
+    GatingVariables(Vec<String>),
     VariableAssignment {
         name: String,
         value: Option<f32>,
@@ -145,7 +146,7 @@ impl AST {
             },
             AST::StructCall { name, attribute, args } => {
                 format!(
-                    "{}.{}{}", 
+                    "self.{}.{}{}", 
                     name, 
                     attribute,
                     match args {
@@ -196,6 +197,9 @@ impl AST {
                     .join("\n\t\t")
             },
             AST::SpikeDetection(expr) => { expr.to_string() },
+            AST::GatingVariables(vars) => {
+                format!("gating_vars: {}", vars.join(", "))
+            },
             AST::VariableAssignment { name, value } => {
                 let value = match value {
                     Some(x) => x.to_string(),
@@ -237,7 +241,7 @@ impl NeuronDefinition {
     // if defaults come with vars assignment then add default trait
     // if neurotransmitter kinetics and receptor kinetics specified then
     // create default_impl() function
-    fn to_code(&self) -> (String, String) {
+    fn to_code(&self) -> (Vec<String>, String) {
         let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
         let receptor_kinetics = "ApproximateReceptor";
 
@@ -406,7 +410,7 @@ impl NeuronDefinition {
         );
 
         (
-            String::from(kinetics_import),
+            vec![String::from(kinetics_import)],
             format!(
                 "{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
                 macros, 
@@ -539,12 +543,15 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
 pub struct IonChannelDefinition {
     type_name: AST,
     vars: AST,
+    gating_vars: Option<AST>,
     on_iteration: AST,
 }
 
 impl IonChannelDefinition {
     // for now assume all gating variables default to 0 for a and b
-    fn to_code(&self) -> (String, String) {
+    fn to_code(&self) -> (Vec<String>, String) {
+        let mut imports = vec![];
+
         let header = format!(
             "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
             self.type_name.to_string(),
@@ -566,6 +573,27 @@ impl IonChannelDefinition {
             },
             _ => unreachable!()
         };
+
+        let gating_variables = match &self.gating_vars {
+            Some(AST::GatingVariables(variables)) => {
+                imports.push(
+                    String::from(
+                        "use spiking_neural_networks::neuron::ion_channels::BasicGatingVariable;"
+                    )
+                );
+
+                variables.clone()
+                    .iter()
+                    .map(|i| format!("{}: BasicGatingVariable", i))
+                    .collect()
+            },
+            None => vec![],
+            _ => unreachable!()
+        };
+
+        for i in gating_variables {
+            fields.push(i)
+        }
 
         let current_field = String::from("current: f32");
         fields.push(current_field);
@@ -645,10 +673,18 @@ impl IonChannelDefinition {
             format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
         };
 
-        let imports = if use_timestep {
-            "use spiking_neural_networks::neuron::ion_channels::IonChannel;"
+        if use_timestep {
+            imports.push(
+                String::from(
+                    "use spiking_neural_networks::neuron::ion_channels::IonChannel;"
+                )
+            );
         } else {
-            "use spiking_neural_networks::neuron::ion_channels::TimestepIndependentIonChannel;"
+            imports.push(
+                String::from(
+                    "use spiking_neural_networks::neuron::ion_channels::TimestepIndependentIonChannel;"
+                )
+            );
         };
 
         // code may need to be updated if current is assigned using 
@@ -657,7 +693,7 @@ impl IonChannelDefinition {
         let get_current = add_indents(&get_current, "\t");
 
         (
-            String::from(imports), 
+            imports, 
             format!(
                 "{}\n{}\n}}\n\n{}\n{}\n\n{}\n}}", 
                 header, 
@@ -742,6 +778,20 @@ pub fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> 
                     AST::VariablesAssignments(assignments)
                 )
             },
+            Rule::gating_variables_def => {
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<String> = inner_rules 
+                    .map(|i| {
+                        String::from(i.as_str())
+                    })
+                    .collect(); 
+
+                (
+                    String::from("gating_vars"),
+                    AST::GatingVariables(assignments)
+                )
+            },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
 
@@ -759,6 +809,7 @@ pub fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> 
     let ion_channel = IonChannelDefinition {
         type_name: definitions.remove("type").unwrap(),
         vars: definitions.remove("vars").unwrap(),
+        gating_vars: definitions.remove("gating_vars"),
         on_iteration: definitions.remove("on_iteration").unwrap(),
     };
 
@@ -1071,25 +1122,29 @@ fn main() -> Result<()> {
             for pair in pairs {
                 match pair.as_rule()  {
                     Rule::neuron_definition => {
-                        let (import, neuron_code) = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
+                        let (neuron_imports, neuron_code) = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
                             .to_code();
                         
                         if !imports.contains(&neuron_necessary_imports) {
                             imports.push(neuron_necessary_imports.clone())
                         }
-                        if !imports.contains(&import) {
-                            imports.push(import)
+                        if !imports.contains(&neuron_imports[0]) {
+                            imports.push(neuron_imports[0].clone())
                         }
+
                         code.push(neuron_code);
                     },
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner()).expect("Could not generate neuron");
 
-                        let (import, ion_channel_code) = ion_channel.to_code();
+                        let (ion_channel_imports, ion_channel_code) = ion_channel.to_code();
 
-                        if !imports.contains(&import) {
-                            imports.push(import);
+                        for i in ion_channel_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
                         }
+
                         code.push(ion_channel_code);
                     },
                     _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
