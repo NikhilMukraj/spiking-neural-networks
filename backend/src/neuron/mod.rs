@@ -24,12 +24,10 @@ pub mod hodgkin_huxley;
 pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
-use spike_train::{SpikeTrain, NeuralRefractoriness};
+use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
-    CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, 
-    NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters, 
+    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters 
 };
 pub mod plasticity;
 use plasticity::{Plasticity, STDP};
@@ -1120,6 +1118,24 @@ where
     }
 }
 
+impl<T> LatticeNetwork<
+    T, 
+    AdjacencyMatrix<(usize, usize), f32>, 
+    GridVoltageHistory, 
+    PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+    SpikeTrainGridHistory, 
+    AdjacencyMatrix<GraphPosition, f32>, 
+    STDP,
+>
+where
+    T: IterateAndSpike,
+{
+    // Generates a default lattice network implementation given a neuron and spike train type
+    pub fn default_impl() -> Self { 
+        LatticeNetwork::default()
+    }
+}
+
 impl<T, U, V, W, X, Y, Z> LatticeNetwork<T, U, V, W, X, Y, Z>
 where
     T: IterateAndSpike,
@@ -1437,10 +1453,18 @@ where
 
                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
                 };
-                
-                let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
-                    .unwrap_or(Some(0.))
-                    .unwrap();
+
+                let weight: f32 = if input_position.id != postsynaptic_position.id {
+                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
+                } else {
+                    self.lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
+                };
 
                 final_input * weight
             })
@@ -1487,9 +1511,17 @@ where
                     final_input
                 };
                 
-                let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
-                    .unwrap_or(Some(0.))
-                    .unwrap();
+                let weight: f32 = if input_position.id != postsynaptic_position.id {
+                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
+                } else {
+                    self.lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
+                };
 
                 weight_neurotransmitter_concentration(&mut neurotransmitter_input, weight);
 
@@ -1900,18 +1932,24 @@ where
     }
 }
 
+/// A weight that can be reward modulated
 pub trait RewardModulatedWeight {
+    /// Get synaptic coupling factor
     fn get_weight(&self) -> f32;
 }
 
 /// Weight trace for RSTDP
 #[derive(Debug, Clone, Copy)]
 pub struct TraceRSTDP {
-    pub counter: usize,
-    pub dw: f32,
+    counter: usize,
+    dw: f32,
+    /// Synaptic coupling factor
     pub weight: f32,
+    /// Trace value
     pub c: f32,
+    /// Trace decay
     pub tau_c: f32,
+    /// Timestep increment
     pub dt: f32,
 }
 
@@ -1934,6 +1972,7 @@ impl RewardModulatedWeight for TraceRSTDP {
     }
 }
 
+/// Handles modulation of neurons using reward
 pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
     /// Update parameters based on reward
     fn update(&mut self, reward: f32);
@@ -1943,6 +1982,8 @@ pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
     fn do_update(&self, neuron: &U) -> bool;
 }
 
+/// An implementation of spike time dependent plasticity that is reward modulated with 
+/// dopamine based synapses
 #[derive(Debug, Clone, Copy)]
 pub struct RewardModulatedSTDP {
     // Dopamine concentration
@@ -2100,6 +2141,7 @@ where
 }
 
 impl<T: IterateAndSpike> RewardModulatedLattice<TraceRSTDP, T, AdjacencyMatrix<(usize, usize), TraceRSTDP>, GridVoltageHistory, RewardModulatedSTDP> {
+    // Generates a default reward modulated lattice implementation given a neuron and spike train type
     pub fn default_impl() -> Self {
         RewardModulatedLattice::default()
     }
@@ -2424,6 +2466,8 @@ where
         Ok(())
     }
 
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag
     pub fn run_lattice(&mut self, reward: f32) -> Result<(), GraphError> {
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(reward),
@@ -3047,6 +3091,7 @@ where
 //                     spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
 //                 };
                 
+                // panic!("Need to account for connecting graph and internal graph")
 //                 let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
 //                     .unwrap_or(Some(RewardModulatedConnection::Weight(0.)))
 //                     .unwrap()
@@ -3097,6 +3142,7 @@ where
 //                     final_input
 //                 };
                 
+                // panic!("Need to account for connecting graph and internal graph")
 //                 let weight: f32 = self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
 //                     .unwrap_or(Some(RewardModulatedConnection::Weight(0.)))
 //                     .unwrap()
