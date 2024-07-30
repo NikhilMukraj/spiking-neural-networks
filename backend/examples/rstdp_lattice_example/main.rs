@@ -4,7 +4,8 @@ use spiking_neural_networks::{
     neuron::{
         integrate_and_fire::IzhikevichNeuron, 
         iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor}, 
-        GridVoltageHistory, RewardModulatedLattice, RewardModulatedSTDP, TraceRSTDP
+        plasticity::{RewardModulatedSTDP, TraceRSTDP},
+        GridVoltageHistory, RewardModulatedLattice,
     },
     error::SpikingNeuralNetworksError, 
     graph::AdjacencyMatrix, 
