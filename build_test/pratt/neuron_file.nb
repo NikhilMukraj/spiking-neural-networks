@@ -15,3 +15,21 @@
     on_iteration:
         current = g * n.state * (v - e)
 [end]
+
+[ion_channel]
+    type: TestLeak
+    vars: e = 0, g = 1,
+    on_iteration:
+        current = g * (v - e)
+[end]
+
+[neuron]
+    type: IonChannelNeuron
+    vars: r = 0
+    ion_channels: l = TestLeak
+    on_spike: 
+        v = v_reset
+    spike_detection: v >= v_th
+    on_iteration:
+        dv/dt = l.current + r * i
+[end]
