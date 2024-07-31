@@ -85,22 +85,18 @@ pub struct TraceRSTDP {
     pub weight: f32,
     /// Trace value
     pub c: f32,
-    /// Trace decay
-    pub tau_c: f32,
-    /// Timestep increment
-    pub dt: f32,
 }
 
 impl Default for TraceRSTDP {
     fn default() -> Self {
-        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0., tau_c: 0.0001, dt: 0.1 }
+        TraceRSTDP { counter: 0, dw: 0., weight: 0., c: 0. }
     }
 }
 
 impl TraceRSTDP {
     /// Updates trace based on weight change and current state
-    pub fn update_trace(&mut self) {
-        self.c = self.c * (-self.dt / self.tau_c).exp() + self.tau_c * self.dw;
+    pub fn update_trace(&mut self, dt: f32, tau_c: f32) {
+        self.c = self.c * (-dt / tau_c).exp() + tau_c * self.dw;
     }
 }
 
@@ -128,6 +124,8 @@ pub struct RewardModulatedSTDP {
     pub dopamine: f32,
     // Dopamine decay factor
     pub tau_d: f32,
+    // Trace decay factor
+    pub tau_c: f32,
     /// Postitive STDP modifier 
     pub a_plus: f32,
     /// Negative STDP modifier  
@@ -143,8 +141,9 @@ pub struct RewardModulatedSTDP {
 impl Default for RewardModulatedSTDP {
     fn default() -> Self {
         RewardModulatedSTDP { 
-            tau_d: 20., 
             dopamine: 0., 
+            tau_d: 20., 
+            tau_c: 0.0001,
             a_plus: 2., 
             a_minus: 2., 
             tau_plus: 4.5, 
@@ -186,7 +185,7 @@ where
         if weight.counter == 0 {
             weight.counter = 1;
         } else {
-            weight.update_trace();
+            weight.update_trace(self.dt, self.tau_c);
             weight.counter = 0;
             weight.dw = 0.;
         }
