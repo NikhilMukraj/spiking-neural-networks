@@ -1216,6 +1216,22 @@ where
         self.spike_train_lattices.values_mut()
             .for_each(|i| i.reset_timing());
     }
+    
+    /// Resets all grid histories in the network
+    pub fn reset_grid_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+    }
+
+    /// Resets all graph histories in the network (including connecting graph)
+    pub fn reset_graph_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.graph.reset_history());
+
+        self.connecting_graph.reset_history();
+    }
 
     /// Returns an immutable reference to all the lattice hashmaps
     pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
@@ -2642,6 +2658,26 @@ where
             .for_each(|i| i.reset_timing());
         self.spike_train_lattices.values_mut()
             .for_each(|i| i.reset_timing());
+    }
+
+    /// Resets all grid histories in the network
+    pub fn reset_grid_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+        self.reward_modulated_lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+    }
+
+    /// Resets all graph histories in the network (including connecting graph)
+    pub fn reset_graph_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.graph.reset_history());
+        self.reward_modulated_lattices.values_mut()
+            .for_each(|i| i.graph.reset_history());
+
+        self.connecting_graph.reset_history();
     }
 
     /// Returns an immutable reference to all the lattice hashmaps
