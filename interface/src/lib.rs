@@ -2325,6 +2325,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
 
+    // reset timing and history across network
+
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
     // python wrapper should do f = lambda x: bool(x) to try and autoconvert before passing to rust
@@ -2335,6 +2337,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // should be printed from rust
 
     // spike train lattice macro
+
+    // reward modulation
 
     // temp env variable for building pyo3 with custom models
     // builtin models can be listed in a separate file associated with this crate
