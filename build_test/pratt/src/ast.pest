@@ -97,9 +97,16 @@ WHITESPACE = _{ " " }
 signed_number = @{ unary_minus? ~ number }
 variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
 variables_assignment = { name ~ " "* ~ "=" ~ " "* ~ signed_number }
-variables_with_default = _{ 
+variables_with_assignment = _{ 
 	"vars:" ~ " "* ~ variables_assignment ~ 
     (" "* ~ "," ~ " "* ~ variables_assignment)* ~ 
+    ","? 
+}
+
+struct_assignment = { name ~ " "* ~ "=" ~ " "* ~ name }
+ion_channels_def_with_assignment = _{ 
+	"ion_channels:" ~ " "* ~ struct_assignment ~ 
+    (" "* ~ "," ~ " "* ~ struct_assignment)* ~ 
     ","? 
 }
 
@@ -110,15 +117,19 @@ assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
 type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
 vars_def  = { variables_block ~ NEWLINE+ }
-vars_with_default_def  = { variables_with_default ~ NEWLINE+ }
+vars_with_default_def  = { variables_with_assignment ~ NEWLINE+ }
 on_spike_def = { "on_spike:" ~ " "* ~ NEWLINE+ ~ eq_assignments }
 on_iteration_def = { "on_iteration:" ~ " "* ~ NEWLINE+ ~ assignments }
 spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
+ion_channels_def = { ion_channels_def_with_assignment ~ NEWLINE+ }
 ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
 
 neuron_definition = {
     "[neuron]" ~ NEWLINE ~ 
-	(on_iteration_def | type_def | on_spike_def | spike_detection_def | vars_def | vars_with_default_def){5,} ~ 
+	(
+		on_iteration_def | type_def | on_spike_def | spike_detection_def | 
+		vars_def | vars_with_default_def | ion_channels_def
+	){5,} ~ 
 	"[end]"
 }
 
