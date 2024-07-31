@@ -646,8 +646,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         (inputs, neurotransmitter_inputs)
     }
 
-    /// Updates internal weights based on STDP
-    fn update_weights_from_spiking_neurons(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
+    /// Updates internal weights based on plasticity trait
+    fn update_weights_from_neurons(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
         let input_positions = self.graph.get_incoming_connections(pos)?;
@@ -702,7 +702,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neurons(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -736,7 +736,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neurons(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -767,7 +767,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             }
 
             if self.do_plasticity && self.plasticity.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neurons(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -1621,7 +1621,7 @@ where
         (inputs, neurotransmitters_inputs)
     }
 
-    fn update_weights_from_spiking_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = &self.lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
@@ -1673,7 +1673,7 @@ where
         Ok(())
     }
 
-    fn update_weights_from_spiking_neurons_within_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_within_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
@@ -1730,7 +1730,7 @@ where
         inputs: &HashMap<GraphPosition, f32>, 
         neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -1751,7 +1751,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -1764,9 +1764,9 @@ where
             }
         }
 
-        for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
-            self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+        for (x, y, pos) in positions_to_update {
+            self.update_weights_from_neurons_across_lattices(x, y, &pos)?;
+            self.update_weights_from_neurons_within_lattices(x, y, &pos)?;
         }
 
         if self.update_connecting_graph_history {
@@ -1792,7 +1792,7 @@ where
         &mut self,
         inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -1811,7 +1811,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -1824,9 +1824,9 @@ where
             }
         }
 
-        for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
-            self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+        for (x, y, pos) in positions_to_update {
+            self.update_weights_from_neurons_across_lattices(x, y, &pos)?;
+            self.update_weights_from_neurons_within_lattices(x, y, &pos)?;
         }
 
         if self.update_connecting_graph_history {
@@ -1852,7 +1852,7 @@ where
         &mut self,
         inputs: &HashMap<GraphPosition, f32>,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -1869,7 +1869,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -1882,9 +1882,9 @@ where
             }
         }
 
-        for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neurons_across_lattices(x, y, &pos)?;
-            self.update_weights_from_spiking_neurons_within_lattices(x, y, &pos)?;
+        for (x, y, pos) in positions_to_update {
+            self.update_weights_from_neurons_across_lattices(x, y, &pos)?;
+            self.update_weights_from_neurons_within_lattices(x, y, &pos)?;
         }
 
         if self.update_connecting_graph_history {
@@ -2180,8 +2180,8 @@ where
         (inputs, neurotransmitter_inputs)
     }
     
-    /// Updates internal weights based on STDP
-    fn update_weights_from_spiking_neuron(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
+    /// Updates internal weights based on plasticity
+    fn update_weights_from_neurons(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
         let input_positions = self.graph.get_incoming_connections(&pos)?;
@@ -2239,7 +2239,7 @@ where
             }
 
             if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -2276,7 +2276,7 @@ where
             }
 
             if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -2311,7 +2311,7 @@ where
             }
 
             if self.do_modulation && self.reward_modulator.do_update(&self.cell_grid[x][y]) {
-                self.update_weights_from_spiking_neuron(x, y, &pos)?;
+                self.update_weights_from_neurons(x, y, &pos)?;
             } 
         }
 
@@ -3276,7 +3276,7 @@ where
         (inputs, neurotransmitters_inputs)
     }
 
-    fn update_weights_from_spiking_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_across_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = &self.lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
@@ -3365,7 +3365,7 @@ where
         Ok(())
     }
 
-    fn update_weights_from_spiking_neurons_within_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_within_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
@@ -3416,7 +3416,7 @@ where
         Ok(())
     }
 
-    fn update_weights_from_spiking_neurons_across_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_across_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = &self.reward_modulated_lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
@@ -3521,7 +3521,7 @@ where
         Ok(())
     }
 
-    fn update_weights_from_spiking_neurons_within_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
+    fn update_weights_from_neurons_within_reward_lattices(&mut self, x: usize, y: usize, pos: &GraphPosition) -> Result<(), GraphError> {
         let current_lattice = self.reward_modulated_lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
@@ -3574,17 +3574,17 @@ where
 
     fn post_neuron_update_step(
         &mut self,
-        spiking_positions: &[(usize, usize, GraphPosition)],
-        spiking_positions_with_reward_modulation: &[(usize, usize, GraphPosition)],
+        positions_to_update: &[(usize, usize, GraphPosition)],
+        positions_to_update_with_reward_modulation: &[(usize, usize, GraphPosition)],
     ) -> Result<(), GraphError> {
-        for (x, y, pos) in spiking_positions {
-            self.update_weights_from_spiking_neurons_across_lattices(*x, *y, &pos)?;
-            self.update_weights_from_spiking_neurons_within_lattices(*x, *y, &pos)?;
+        for (x, y, pos) in positions_to_update {
+            self.update_weights_from_neurons_across_lattices(*x, *y, &pos)?;
+            self.update_weights_from_neurons_within_lattices(*x, *y, &pos)?;
         }
 
-        for (x, y, pos) in spiking_positions_with_reward_modulation {
-            self.update_weights_from_spiking_neurons_across_reward_lattices(*x, *y, &pos)?;
-            self.update_weights_from_spiking_neurons_within_reward_lattices(*x, *y, &pos)?;
+        for (x, y, pos) in positions_to_update_with_reward_modulation {
+            self.update_weights_from_neurons_across_reward_lattices(*x, *y, &pos)?;
+            self.update_weights_from_neurons_within_reward_lattices(*x, *y, &pos)?;
         }
 
         if self.update_connecting_graph_history {
@@ -3611,7 +3611,7 @@ where
         inputs: &HashMap<GraphPosition, f32>,
         reward: f32,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -3628,7 +3628,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3641,7 +3641,7 @@ where
             }
         }
 
-        let mut spiking_positions_with_reward_modulation = Vec::new();
+        let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
@@ -3662,7 +3662,7 @@ where
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
                 ) {
                     if reward_modulated_lattice.do_modulation {
-                        spiking_positions_with_reward_modulation.push((x, y, graph_pos));
+                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3675,7 +3675,7 @@ where
             }
         }
 
-        self.post_neuron_update_step(&spiking_positions, &spiking_positions_with_reward_modulation)?;
+        self.post_neuron_update_step(&positions_to_update, &positions_to_update_with_reward_modulation)?;
 
         Ok(())
     }
@@ -3686,7 +3686,7 @@ where
         neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
         reward: f32,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -3705,7 +3705,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3718,7 +3718,7 @@ where
             }
         }
 
-        let mut spiking_positions_with_reward_modulation = Vec::new();
+        let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
@@ -3741,7 +3741,7 @@ where
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
                 ) {
                     if reward_modulated_lattice.do_modulation {
-                        spiking_positions_with_reward_modulation.push((x, y, graph_pos));
+                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3754,7 +3754,7 @@ where
             }
         }
 
-        self.post_neuron_update_step(&spiking_positions, &spiking_positions_with_reward_modulation)?;
+        self.post_neuron_update_step(&positions_to_update, &positions_to_update_with_reward_modulation)?;
 
         Ok(())
     }
@@ -3766,7 +3766,7 @@ where
         neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
         reward: f32,
     ) -> Result<(), GraphError> {
-        let mut spiking_positions = Vec::new();
+        let mut positions_to_update = Vec::new();
 
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
@@ -3786,7 +3786,7 @@ where
     
                 if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
                     if lattice.do_plasticity {
-                        spiking_positions.push((x, y, graph_pos));
+                        positions_to_update.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3799,7 +3799,7 @@ where
             }
         }
 
-        let mut spiking_positions_with_reward_modulation = Vec::new();
+        let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
@@ -3823,7 +3823,7 @@ where
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
                 ) {
                     if reward_modulated_lattice.do_modulation {
-                        spiking_positions_with_reward_modulation.push((x, y, graph_pos));
+                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                     }
                 }
             }
@@ -3836,7 +3836,7 @@ where
             }
         }
 
-        self.post_neuron_update_step(&spiking_positions, &spiking_positions_with_reward_modulation)?;
+        self.post_neuron_update_step(&positions_to_update, &positions_to_update_with_reward_modulation)?;
 
         Ok(())
     }
