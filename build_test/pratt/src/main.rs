@@ -1112,8 +1112,7 @@ fn main() -> Result<()> {
     // handle ion channels (handle builtin ion channels) 
     // handle gating variables
     // (could import with name prefixed as DefaultChannel or something)
-    
-    // ion channels in neuron definition
+
     // update ion channel is called before other neuron
     // current could then be extracted and used in iteration
 
