@@ -59,6 +59,11 @@ pub enum AST {
         attribute: String,
         args: Option<Vec<Box<AST>>>,
     },
+    StructAssignment {
+        name: String,
+        type_name: String,
+    },
+    StructAssignments(Vec<Box<AST>>),
     EqAssignment {
         name: String,
         expr: Box<AST>,
@@ -215,6 +220,17 @@ impl AST {
                     .join("\n\t");
 
                 format!("vars:\n\t{}", assignments_string)
+            },
+            AST::StructAssignment { name, type_name } => {
+                format!("{} = {}", name, type_name)
+            },
+            AST::StructAssignments(assignments) => {
+                let assignments_string = assignments.iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join("\n\t");
+
+                format!("structs:\n\t{}", assignments_string)
             }
         }
     }
@@ -233,6 +249,7 @@ pub struct NeuronDefinition {
     on_spike: AST,
     on_iteration: AST,
     spike_detection: AST,
+    ion_channels: Option<AST>,
 }
 
 impl NeuronDefinition {
@@ -288,6 +305,27 @@ impl NeuronDefinition {
         fields.push(gap_conductance_field);
         fields.push(dt_field);
         fields.push(c_m_field);
+
+        let ion_channels = match &self.ion_channels {
+            Some(AST::StructAssignments(variables)) => {
+                variables.iter()
+                    .map(|i| {
+                        let (var_name, type_name) = match i.as_ref() {
+                            AST::StructAssignment { name, type_name } => (name, type_name),
+                            _ => unreachable!(),
+                        };
+
+                        format!("{}: {}", var_name, type_name)
+                    })
+                    .collect::<Vec<String>>()
+            },
+            None => vec![],
+            _ => unreachable!()
+        };
+
+        ion_channels.iter()
+            .for_each(|i| fields.push(i.clone()));
+
         fields.push(is_spiking_field);
         fields.push(last_firing_time_field);
         fields.push(gaussian_field);
@@ -478,8 +516,6 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                     }))
                     .collect();
 
-                println!("{:#?}", assignments);
-
                 (
                     String::from("vars"),
                     AST::VariablesAssignments(assignments)
@@ -513,6 +549,29 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                     AST::VariablesAssignments(assignments)
                 )
             },
+            Rule::ion_channels_def => {
+                let inner_rules = pair.into_inner();
+
+                let assignments: Vec<Box<AST>> = inner_rules 
+                    .map(|i| {
+                        let mut nested_rule = i.into_inner();
+
+                        Box::new(AST::StructAssignment { 
+                            name: String::from(nested_rule.next().unwrap().as_str()), 
+                            type_name: String::from(
+                                nested_rule.next()
+                                    .unwrap()
+                                    .as_str()
+                            )
+                        })
+                    })
+                    .collect(); 
+
+                (
+                    String::from("ion_channels"),
+                    AST::StructAssignments(assignments)
+                )
+            },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
 
@@ -534,7 +593,8 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
         vars: definitions.remove("vars").unwrap(),
         spike_detection: definitions.remove("spike_detection").unwrap(),
         on_iteration: definitions.remove("on_iteration").unwrap(),
-        on_spike: definitions.remove("on_spike").unwrap()
+        on_spike: definitions.remove("on_spike").unwrap(),
+        ion_channels: definitions.remove("ion_channels"),
     };
 
     Ok(neuron)
@@ -548,6 +608,24 @@ pub struct IonChannelDefinition {
 }
 
 impl IonChannelDefinition {
+    fn get_use_timestep(&self) -> bool {
+        match &self.on_iteration {
+            AST::OnIteration(assignments) => {
+                let mut use_timestep = false;
+
+                for i in assignments {
+                    match i.as_ref() {
+                        AST::DiffEqAssignment { .. } => { use_timestep = true },
+                        _ => {},
+                    }
+                }
+
+                use_timestep
+            },
+            _ => unreachable!()
+        }
+    }
+
     // for now assume all gating variables default to 0 for a and b
     fn to_code(&self) -> (Vec<String>, String) {
         let mut imports = vec![];
@@ -600,21 +678,7 @@ impl IonChannelDefinition {
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
-        let use_timestep = match &self.on_iteration {
-            AST::OnIteration(assignments) => {
-                let mut use_timestep = false;
-
-                for i in assignments {
-                    match i.as_ref() {
-                        AST::DiffEqAssignment { .. } => { use_timestep = true },
-                        _ => {},
-                    }
-                }
-
-                use_timestep
-            },
-            _ => unreachable!()
-        };
+        let use_timestep = self.get_use_timestep();
 
         let get_current = "fn get_current(&self) -> f32 { self.current }";
 
@@ -695,7 +759,7 @@ impl IonChannelDefinition {
         (
             imports, 
             format!(
-                "{}\n{}\n}}\n\n{}\n{}\n\n{}\n}}", 
+                "{}\n{}\n}}\n\n{}\n{}\n\n{}\n}}\n", 
                 header, 
                 fields, 
                 impl_header, 
@@ -1048,6 +1112,10 @@ fn main() -> Result<()> {
     // handle ion channels (handle builtin ion channels) 
     // handle gating variables
     // (could import with name prefixed as DefaultChannel or something)
+    
+    // ion channels in neuron definition
+    // update ion channel is called before other neuron
+    // current could then be extracted and used in iteration
 
     // CHANGE SO ASSIGNMENTS EVALUATED IN ORDER
     // for now have all eq assignments last (after change is applied)
@@ -1055,6 +1123,12 @@ fn main() -> Result<()> {
     // next set of changes applied when next set of diff eqs assigned
 
     // test creating default impl
+
+    // allow 
+    // on_spike: expr
+    // and
+    // on_spike:
+    //     expr
 
     // default functions like max, min, exp, floor, ciel, heaviside
     // if function in same space as on iteration and on spike
