@@ -1049,6 +1049,7 @@ fn main() -> Result<()> {
     // handle gating variables
     // (could import with name prefixed as DefaultChannel or something)
 
+    // CHANGE SO ASSIGNMENTS EVALUATED IN ORDER
     // for now have all eq assignments last (after change is applied)
     // or changes applied after consecutive diff eq assignments end
     // next set of changes applied when next set of diff eqs assigned
