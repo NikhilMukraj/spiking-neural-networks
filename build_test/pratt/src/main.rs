@@ -1138,6 +1138,12 @@ fn main() -> Result<()> {
 
     // runge kutta and import integrators
 
+    // check for syntax errors
+    // could check to see if number of defintions matches
+    // number of blocks ([item]-[end])
+    // if not get each block and try individually parsing to see if
+    // that returns the correct error
+
     // neuron def may need to be handled differently if voltage is not updated with dv/dt
     // if neuron is assigned with v =, similar to ion channels
     // or maybe in general, assignments should be done after changes calculated
