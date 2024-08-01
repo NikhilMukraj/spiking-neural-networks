@@ -2552,16 +2552,14 @@ where
     }
 }
 
-
-impl<S, T, U, V, W, X, Y, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+impl<S, T, U, V, W, X, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, AdjacencyMatrix<GraphPosition, RewardModulatedConnection<S>>, Z, R, C>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
-    U: Graph<T=(usize, usize), U=f32>, 
-    V: LatticeHistory, 
-    W: SpikeTrain, 
+    T: IterateAndSpike,
+    U: Graph<T=(usize, usize), U=f32>,
+    V: LatticeHistory,
+    W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
@@ -2703,6 +2701,11 @@ where
     /// Returns a mutable reference to a [`Lattice`] given the identifier
     pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z>> {
         self.lattices.get_mut(id)
+    }
+
+    /// Returns a immutable set [`RewardModulatedLattice`]s in the hashmap of lattices
+    pub fn reward_modulated_lattices_values(&self) -> Values<usize, RewardModulatedLattice<S, T, C, V, R>> {
+        self.reward_modulated_lattices.values()
     }
 
     /// Returns a mutable set [`RewardModulatedLattice`]s in the hashmap of lattices
@@ -3879,6 +3882,27 @@ where
             (true, false) => self.run_lattices_electrical_synapses_only(reward),
             (false, true) => self.run_lattices_chemical_synapses_only(reward),
             (false, false) => Ok(()),
+        }
+    }
+}
+
+impl<S, T, U, V, W, X, Y, Z, R, C> Agent for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+where
+    S: RewardModulatedWeight,
+    T: IterateAndSpike, 
+    U: Graph<T=(usize, usize), U=f32>, 
+    V: LatticeHistory, 
+    W: SpikeTrain, 
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
+    C: Graph<T=(usize, usize), U=S>,
+{
+    fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
+        match self.run_lattices(reward) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
     }
 }
