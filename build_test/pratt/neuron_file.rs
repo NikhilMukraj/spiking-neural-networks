@@ -5,6 +5,37 @@ use spiking_neural_networks::neuron::ion_channels::BasicGatingVariable;
 use spiking_neural_networks::neuron::ion_channels::TimestepIndependentIonChannel;
 
 
+#[derive(Debug, Clone, Copy)]
+pub struct TestChannel {
+	e: f32,
+	g: f32,
+	n: BasicGatingVariable,
+	current: f32,
+}
+
+impl TimestepIndependentIonChannel for TestChannel {
+	fn update_current(&mut self, voltage: f32) {
+		self.current = ((self.g * self.n.state) * (self.current_voltage - self.e));
+	}
+
+	fn get_current(&self) -> f32 { self.current }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TestLeak {
+	e: f32,
+	g: f32,
+	current: f32,
+}
+
+impl TimestepIndependentIonChannel for TestLeak {
+	fn update_current(&mut self, voltage: f32) {
+		self.current = (self.g * (self.current_voltage - self.e));
+	}
+
+	fn get_current(&self) -> f32 { self.current }
+}
+
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct BasicIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
 	current_voltage: f32,
@@ -57,37 +88,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Basic
 		self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 		self.handle_spiking()
 	}
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TestChannel {
-	e: f32,
-	g: f32,
-	n: BasicGatingVariable,
-	current: f32,
-}
-
-impl TimestepIndependentIonChannel for TestChannel {
-	fn update_current(&mut self, voltage: f32) {
-		self.current = ((self.g * self.n.state) * (self.current_voltage - self.e));
-	}
-
-	fn get_current(&self) -> f32 { self.current }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct TestLeak {
-	e: f32,
-	g: f32,
-	current: f32,
-}
-
-impl TimestepIndependentIonChannel for TestLeak {
-	fn update_current(&mut self, voltage: f32) {
-		self.current = (self.g * (self.current_voltage - self.e));
-	}
-
-	fn get_current(&self) -> f32 { self.current }
 }
 
 #[derive(Debug, Clone, IterateAndSpikeBase)]
