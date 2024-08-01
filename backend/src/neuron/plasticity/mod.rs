@@ -69,7 +69,7 @@ where
 }
 
 /// A weight that can be reward modulated
-pub trait RewardModulatedWeight {
+pub trait RewardModulatedWeight: std::fmt::Debug + Clone + Copy {
     /// Get synaptic coupling factor
     fn get_weight(&self) -> f32;
 }
