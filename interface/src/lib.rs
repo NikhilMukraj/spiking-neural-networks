@@ -798,6 +798,16 @@ macro_rules! impl_lattice {
             }
 
             #[getter]
+            fn get_gaussian(&self) -> bool {
+                self.lattice.gaussian
+            }
+
+            #[setter]
+            fn set_gaussian(&mut self, flag: bool) {
+                self.lattice.gaussian = flag;
+            }
+
+            #[getter]
             fn weights_history(&self) -> Vec<Vec<Vec<f32>>> {
                 self.lattice.graph.history.clone()
                     .iter()
@@ -1452,6 +1462,24 @@ macro_rules! impl_network {
             fn set_do_plasticity(&mut self, id: usize, flag: bool) -> PyResult<()> {
                 if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
                     current_lattice.do_plasticity = flag;
+
+                    Ok(())
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn get_gaussian(&self, id: usize) -> PyResult<bool> {
+                if let Some(current_lattice) = self.network.get_lattice(&id) {
+                    Ok(current_lattice.gaussian)
+                } else {
+                    Err(PyKeyError::new_err("Id not found (in non spike train lattices)"))
+                }
+            }
+
+            fn set_gaussian(&mut self, id: usize, flag: bool) -> PyResult<()> {
+                if let Some(current_lattice) = self.network.get_mut_lattice(&id) {
+                    current_lattice.gaussian = flag;
 
                     Ok(())
                 } else {
