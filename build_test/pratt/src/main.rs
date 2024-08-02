@@ -1195,46 +1195,69 @@ fn main() -> Result<()> {
     let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
 
     let mut imports = vec![];
-    let mut code = vec![];
+    let mut code: HashMap<String, HashMap<String, String>> = HashMap::new();
 
     match ASTParser::parse(Rule::full, &contents) {
         Ok(pairs) => {
             for pair in pairs {
-                match pair.as_rule()  {
+                match pair.as_rule() {
                     Rule::neuron_definition => {
-                        let (neuron_imports, neuron_code) = generate_neuron(pair.into_inner()).expect("Could not generate neuron")
-                            .to_code();
-                        
+                        let neuron_definition = generate_neuron(pair.into_inner())
+                            .expect("Could not generate neuron");
+
+                        let (neuron_imports, neuron_code) = neuron_definition.to_code();
+    
                         if !imports.contains(&neuron_necessary_imports) {
-                            imports.push(neuron_necessary_imports.clone())
+                            imports.push(neuron_necessary_imports.clone());
                         }
                         if !imports.contains(&neuron_imports[0]) {
-                            imports.push(neuron_imports[0].clone())
+                            imports.push(neuron_imports[0].clone());
                         }
-
-                        code.push(neuron_code);
+    
+                        let neuron_type_name = neuron_definition.type_name.to_string();
+    
+                        let neuron_code_map = code.entry(String::from("neuron"))
+                            .or_insert_with(HashMap::new);
+                        
+                        neuron_code_map.insert(neuron_type_name, neuron_code);
                     },
                     Rule::ion_channel_definition => {
-                        let ion_channel = generate_ion_channel(pair.into_inner()).expect("Could not generate neuron");
-
+                        let ion_channel = generate_ion_channel(pair.into_inner())
+                            .expect("Could not generate ion channel");
+    
                         let (ion_channel_imports, ion_channel_code) = ion_channel.to_code();
-
+    
                         for i in ion_channel_imports {
                             if !imports.contains(&i) {
                                 imports.push(i);
                             }
                         }
-
-                        code.push(ion_channel_code);
+    
+                        let ion_channel_type_name = ion_channel.type_name.to_string();
+                        
+                        let ion_channel_code_map = code.entry(String::from("ion_channel"))
+                            .or_insert_with(HashMap::new);
+    
+                        ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
                     },
                     _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
                 }
             }
+            
+            // if any of the ion channel names found in neuron
+            // (use substring to detect)
+            // modify neuron code to insert proper update current code before dv changes
 
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
             file.write_all("\n\n\n".as_bytes())?;
-            file.write_all(code.join("\n").as_bytes())?;
+            file.write_all(
+                code.values()
+                    .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+                    .as_bytes()
+            )?;
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
