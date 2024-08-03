@@ -3906,3 +3906,105 @@ where
         }
     }
 }
+
+/// Generates a default agent type for a reward modulated lattice
+#[macro_export]
+#[doc(hidden)]
+macro_rules! raw_create_agent_type_for_lattice {
+    // Default case with no optional parameters
+    (
+        $name:ident,
+        $reward_mod_weight:ty,
+        $reward_modulator:ty,
+        $iterate_and_spike:ty,
+    ) => {
+        type $name = RewardModulatedLattice<
+            $reward_mod_weight,
+            $iterate_and_spike,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            spiking_neural_networks::neuron::GridVoltageHistory,
+            $reward_modulator
+        >;
+    };
+
+    // Case with optional lattice history
+    (
+        $name:ident,
+        $reward_mod_weight:ty,
+        $iterate_and_spike:ty,
+        $reward_modulator:ty,
+        lattice_history = $lattice_history:ty
+    ) => {
+        type $name = RewardModulatedLattice<
+            $reward_mod_weight,
+            $iterate_and_spike,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            $lattice_history,
+            $reward_modulator
+        >;
+    };
+}
+
+#[doc(inline)]
+pub use raw_create_agent_type_for_lattice as create_agent_type_for_lattice;
+
+/// Generates a default agent type for a reward modulated lattice network
+#[doc(hidden)]
+#[macro_export]
+macro_rules! raw_create_agent_type_for_network {
+    // Default case with no optional parameters
+    (
+        $name:ident,
+        $plasticity:ty,
+        $reward_mod_plasticity:ty,
+        $reward_mod_weight:ty,
+        $iterate_and_spike:ty,
+        $spike_train:ty
+    ) => {
+        type $name = RewardModulatedLatticeNetwork<
+            $reward_mod_weight,
+            $iterate_and_spike,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), f32>,
+            spiking_neural_networks::neuron::GridVoltageHistory,
+            $spike_train,
+            spiking_neural_networks::neuron::SpikeTrainGridHistory,
+            spiking_neural_networks::graph::AdjacencyMatrix<spiking_neural_networks::graph::GraphPosition, RewardModulatedConnection<$reward_mod_weight>>,
+            $plasticity,
+            $reward_mod_plasticity,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+        >;
+    };
+
+    // Case with optional lattice history
+    (
+        $name:ident,
+        $plasticity:ty,
+        $reward_mod_plasticity:ty,
+        $reward_mod_weight:ty,
+        $iterate_and_spike:ty,
+        $spike_train:ty,
+        lattice_history = $lattice_history:ty $(, spike_train_lattice_history = $spike_train_lattice_history:ty)?
+    ) => {
+        type $name = RewardModulatedLatticeNetwork<
+            $reward_mod_weight,
+            $iterate_and_spike,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), f32>,
+            $lattice_history,
+            $spike_train,
+            $crate::type_or_default!(
+                $($spike_train_lattice_history)?, 
+                spiking_neural_networks::neuron::SpikeTrainGridHistory
+            ),
+            spiking_neural_networks::graph::AdjacencyMatrix<
+                spiking_neural_networks::graph::GraphPosition, 
+                spiking_neural_networks::neuron::RewardModulatedConnection<$reward_mod_weight>
+            >,
+            $plasticity,
+            $reward_mod_plasticity,
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+        >;
+    };
+}
+
+#[doc(inline)]
+pub use raw_create_agent_type_for_network as create_agent_type_for_network;
