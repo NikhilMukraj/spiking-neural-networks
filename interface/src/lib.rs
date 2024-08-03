@@ -2353,6 +2353,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
 
+    // generate network method
+
     // reset timing and history across network
 
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
