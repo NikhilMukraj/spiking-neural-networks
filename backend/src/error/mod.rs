@@ -52,7 +52,7 @@ pub enum LatticeNetworkError {
     PostsynapticLatticeCannotBeSpikeTrain,
     /// When connecting reward modulated network, at least one lattice has to be reward modulated
     CannotConnectWithRewardModulatedConnection,
-    /// When connecting reward modulated lattice, [`RewardModulatedConnection`] cannot be used to connect a
+    /// When connecting reward modulated lattice, RewardModulatedConnection cannot be used to connect a
     /// reward modulated lattice internally
     RewardModulatedConnectionNotCompatibleInternally,
 }
