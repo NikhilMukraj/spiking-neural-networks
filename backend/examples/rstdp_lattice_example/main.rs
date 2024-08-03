@@ -57,6 +57,8 @@ fn reward_function(state: &TestState, _: &AgentType) -> f32 {
 
 fn state_encoder<T: State, U: Agent>(_: &T, _: &mut U) {}
 
+/// Creates a reward modulated lattice and iterates it to demonstrate how
+/// weights will change over time in response to reward modulation
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let izhikevich_neuron = IzhikevichNeuron::default_impl();
     let mut reward_modulated_lattice = RewardModulatedLattice::default_impl();
