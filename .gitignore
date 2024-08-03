@@ -36,6 +36,8 @@
 /backend/examples/lattice_example/*.gif
 /backend/examples/lattice_network_example/*.txt
 /backend/examples/lattice_network_example/*.ipynb
+/backend/examples/lsm_architecture_example/*.ipynb
+/backend/examples/lsm_architecture_example/*.txt
 /backend/examples/interacting_pools_example/*
 /images/data/*
 /archive_interface/target
