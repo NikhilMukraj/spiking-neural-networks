@@ -2788,7 +2788,15 @@ where
         }
 
         if !self.lattices.contains_key(&postsynaptic_id) {
-            return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
+            if self.reward_modulated_lattices.contains_key(&postsynaptic_id) {
+                return Err(LatticeNetworkError::ConnectFunctionMustHaveNonRewardModulatedLattice);
+            } else {
+                return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
+            }
+        }
+
+        if self.reward_modulated_lattices.contains_key(&presynaptic_id) {
+            return Err(LatticeNetworkError::ConnectFunctionMustHaveNonRewardModulatedLattice);
         }
 
         if presynaptic_id == postsynaptic_id {
@@ -3038,12 +3046,21 @@ where
     }
 
     fn get_all_input_positions(&self, pos: GraphPosition) -> HashSet<GraphPosition> {
-        let mut input_positions: HashSet<GraphPosition> = self.lattices[&pos.id].graph
-            .get_incoming_connections(&pos.pos)
-            .expect("Cannot find position")
-            .iter()
-            .map(|i| GraphPosition { id: pos.id, pos: *i})
-            .collect();
+        let mut input_positions: HashSet<GraphPosition> = if self.lattices.contains_key(&pos.id) {
+            self.lattices[&pos.id].graph
+                .get_incoming_connections(&pos.pos)
+                .expect("Cannot find position")
+                .iter()
+                .map(|i| GraphPosition { id: pos.id, pos: *i})
+                .collect()
+        } else {
+            self.reward_modulated_lattices[&pos.id].graph
+                .get_incoming_connections(&pos.pos)
+                .expect("Cannot find position")
+                .iter()
+                .map(|i| GraphPosition { id: pos.id, pos: *i})
+                .collect()
+        };
 
         match self.connecting_graph.get_incoming_connections(&pos) {
             Ok(value) => {
@@ -3074,9 +3091,17 @@ where
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> f32 {
-        let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
-            .unwrap()
-            .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
+        let is_not_reward_modulated = self.lattices.contains_key(&postsynaptic_position.id);
+
+        let postsynaptic_neuron: &T = if is_not_reward_modulated {
+            &self.lattices.get(&postsynaptic_position.id)
+                .unwrap()
+                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
+        } else {
+            &self.reward_modulated_lattices.get(&postsynaptic_position.id)
+                .unwrap()
+                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
+        };
 
         let mut input_val = input_positions
             .iter()
@@ -3129,11 +3154,22 @@ where
             })
             .sum::<f32>();
 
-        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            input_val *= postsynaptic_neuron.get_gaussian_factor();
+        if is_not_reward_modulated {
+            if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+                input_val *= postsynaptic_neuron.get_gaussian_factor();
+            }
+        } else {
+            if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+                input_val *= postsynaptic_neuron.get_gaussian_factor();
+            }
         }
 
-        input_val /= input_positions.len() as f32;
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => input_positions.len() as f32,
+        };
+
+        input_val /= averager;
 
         return input_val;
     }
@@ -3143,9 +3179,17 @@ where
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> NeurotransmitterConcentrations {
-        let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
-            .unwrap()
-            .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
+        let is_not_reward_modulated = self.lattices.contains_key(&postsynaptic_position.id);
+
+        let postsynaptic_neuron: &T = if is_not_reward_modulated {
+            &self.lattices.get(&postsynaptic_position.id)
+                .unwrap()
+                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
+        } else {
+            &self.reward_modulated_lattices.get(&postsynaptic_position.id)
+                .unwrap()
+                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
+        };
 
         let input_vals: Vec<NeurotransmitterConcentrations> = input_positions
             .iter()
@@ -3208,11 +3252,20 @@ where
 
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
-        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            weight_neurotransmitter_concentration(
-                &mut input_val, 
-                postsynaptic_neuron.get_gaussian_factor()
-            );
+        if is_not_reward_modulated {
+            if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+                weight_neurotransmitter_concentration(
+                    &mut input_val, 
+                    postsynaptic_neuron.get_gaussian_factor()
+                );
+            }
+        } else {
+            if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+                weight_neurotransmitter_concentration(
+                    &mut input_val, 
+                    postsynaptic_neuron.get_gaussian_factor()
+                );
+            }
         }
 
         weight_neurotransmitter_concentration(
@@ -3227,6 +3280,14 @@ where
         let mut nodes = HashSet::new();
 
         for i in self.lattices.values() {
+            let current_nodes: HashSet<GraphPosition> = i.graph.get_every_node_as_ref()
+                .iter()
+                .map(|j| GraphPosition { id: i.get_id(), pos: **j})
+                .collect();
+            nodes.extend(current_nodes);
+        }
+
+        for i in self.reward_modulated_lattices.values() {
             let current_nodes: HashSet<GraphPosition> = i.graph.get_every_node_as_ref()
                 .iter()
                 .map(|j| GraphPosition { id: i.get_id(), pos: **j})
