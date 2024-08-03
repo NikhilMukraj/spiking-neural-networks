@@ -1,18 +1,17 @@
 use rand::Rng;
 extern crate spiking_neural_networks;
+use spiking_neural_networks::neuron::create_agent_type_for_network;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError, 
-    graph::{AdjacencyMatrix, GraphPosition}, 
     neuron::{
         integrate_and_fire::IzhikevichNeuron, 
         iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor}, 
         plasticity::{RewardModulatedSTDP, TraceRSTDP, STDP}, 
         spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
-        GridVoltageHistory, Lattice, RewardModulatedConnection, 
-        RewardModulatedLattice, RewardModulatedLatticeNetwork, SpikeTrainGridHistory, 
-        SpikeTrainLattice
+        Lattice, RewardModulatedConnection, RewardModulatedLattice, 
+        RewardModulatedLatticeNetwork, SpikeTrainLattice
     }, 
-    reinforcement::{Environment, State} 
+    reinforcement::{Environment, State},
 };
 
 
@@ -27,13 +26,14 @@ fn feedforward_connect(x: (usize, usize), y: (usize, usize)) -> bool {
     y.1 - x.1 == 1 
 }
 
-type AgentType = RewardModulatedLatticeNetwork<
-    TraceRSTDP, IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
-    AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, 
-    PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
-    SpikeTrainGridHistory, AdjacencyMatrix<GraphPosition, RewardModulatedConnection<TraceRSTDP>>, 
-    STDP, RewardModulatedSTDP, AdjacencyMatrix<(usize, usize), TraceRSTDP>
->;
+create_agent_type_for_network!(
+    AgentType,
+    STDP, 
+    RewardModulatedSTDP, 
+    TraceRSTDP,
+    IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
+    PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>
+);
 
 pub struct TestState {
     pub dopamine_history: Vec<f32>,
@@ -114,7 +114,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let reward_modulated_lattices = vec![readout];
     let spike_trains = vec![poisson_input];
 
-    let mut lsm = RewardModulatedLatticeNetwork::generate_network(
+    let mut lsm: AgentType = RewardModulatedLatticeNetwork::generate_network(
         lattices, 
         reward_modulated_lattices, 
         spike_trains,
