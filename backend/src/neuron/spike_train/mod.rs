@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use rand::Rng;
 use super::{
-    iterate_and_spike::{ApproximateNeurotransmitter, NeurotransmitterKinetics}, 
+    iterate_and_spike::{ApproximateNeurotransmitter, IsSpiking, NeurotransmitterKinetics}, 
     CurrentVoltage, LastFiringTime, NeurotransmitterType, Neurotransmitters,
 };
 
@@ -79,7 +79,7 @@ fn exponential_decay_effect(k: f32, a: f32, time_difference: f32, v_resting: f32
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 /// Handles spike train dynamics
-pub trait SpikeTrain: CurrentVoltage + LastFiringTime + Clone + Send + Sync {
+pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Clone + Send + Sync {
     type U: NeuralRefractoriness;
     /// Updates spike train
     fn iterate(&mut self) -> bool;
@@ -98,6 +98,16 @@ macro_rules! impl_current_voltage_spike_train {
         impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> CurrentVoltage for $struct<T, U> {
             fn get_current_voltage(&self) -> f32 {
                 self.current_voltage
+            }
+        }
+    };
+}
+
+macro_rules! impl_is_spiking_spike_train {
+    ($struct:ident) => {
+        impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> IsSpiking for $struct<T, U> {
+            fn is_spiking(&self) -> bool {
+                self.is_spiking
             }
         }
     };
@@ -126,6 +136,8 @@ pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     pub v_th: f32,
     /// Minimum voltage (mV)
     pub v_resting: f32,
+    /// Whether the spike train is currently spiking
+    pub is_spiking: bool,
     /// Last firing time
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
@@ -161,6 +173,7 @@ macro_rules! impl_default_spike_train_methods {
 }
 
 impl_current_voltage_spike_train!(PoissonNeuron);
+impl_is_spiking_spike_train!(PoissonNeuron);
 impl_last_firing_time_spike_train!(PoissonNeuron);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNeuron<T, U> {
@@ -169,6 +182,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNe
             current_voltage: 0.,
             v_th: 30.,
             v_resting: 0.,
+            is_spiking: false,
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
@@ -214,6 +228,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Poisso
 
             false
         };
+        self.is_spiking = is_spiking;
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 
@@ -235,6 +250,8 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     pub v_th: f32,
     /// Minimum voltage (mV)
     pub v_resting: f32,
+    /// Whether the spike train is currently spiking
+    pub is_spiking: bool,
     /// Last spiking time
     pub last_firing_time: Option<usize>,
     /// Postsynaptic eurotransmitters in cleft
@@ -252,6 +269,7 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
 }
 
 impl_current_voltage_spike_train!(PresetSpikeTrain);
+impl_is_spiking_spike_train!(PresetSpikeTrain);
 impl_last_firing_time_spike_train!(PresetSpikeTrain);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpikeTrain<T, U> {
@@ -260,6 +278,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             current_voltage: 0.,
             v_th: 30.,
             v_resting: 0.,
+            is_spiking: false,
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
@@ -317,6 +336,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Preset
 
             false
         };
+        self.is_spiking = is_spiking;
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
 
