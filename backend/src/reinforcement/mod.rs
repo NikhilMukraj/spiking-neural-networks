@@ -29,13 +29,15 @@ pub struct Environment<'a, T: Agent, U: State<A=T>> {
 
 impl<'a, T: Agent, U: State<A=T>> Environment<'a, T, U> {
     pub fn run(&mut self, iterations: usize) -> Result<(), AgentError> {
-        for _ in 0..iterations {
+        for _ in 0..iterations {            
             // get reward
             let reward = (self.reward_function)(&self.state, &self.agent);
             // update agent (taking action) and apply reward for the action
             self.agent.update_and_apply_reward(reward)?;
             // update state based on agent
             self.state.update_state(&self.agent);
+            // encodes state into agent
+            (self.state_encoder)(&self.state, &mut self.agent);
         }
 
         Ok(())
