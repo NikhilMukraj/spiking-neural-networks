@@ -172,7 +172,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNe
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
-            chance_of_firing: 0.01,
+            chance_of_firing: 0.,
             refractoriness_dt: 0.1,
         }
     }
