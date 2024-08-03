@@ -1,15 +1,14 @@
 use std::{fs::File, io::{BufWriter, Write}};
 use rand::Rng;
 use spiking_neural_networks::{
+    error::SpikingNeuralNetworksError, 
     neuron::{
+        create_agent_type_for_lattice, 
         integrate_and_fire::IzhikevichNeuron, 
         iterate_and_spike::{ApproximateNeurotransmitter, ApproximateReceptor}, 
-        plasticity::{RewardModulatedSTDP, TraceRSTDP},
-        GridVoltageHistory, RewardModulatedLattice,
-    },
-    error::SpikingNeuralNetworksError, 
-    graph::AdjacencyMatrix, 
-    reinforcement::{Environment, State, Agent},
+        plasticity::{RewardModulatedSTDP, TraceRSTDP}, 
+        RewardModulatedLattice
+    }, reinforcement::{Agent, Environment, State}
 };
 
 
@@ -33,13 +32,12 @@ pub struct TestState {
     pub timestep: usize,
 }
 
-type AgentType = RewardModulatedLattice<
-    TraceRSTDP,
-    IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
-    AdjacencyMatrix<(usize, usize), TraceRSTDP>,
-    GridVoltageHistory,
+create_agent_type_for_lattice!(
+    AgentType,
+    TraceRSTDP, 
     RewardModulatedSTDP,
->;
+    IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
+);
 
 impl State for TestState {
     type A = AgentType;
