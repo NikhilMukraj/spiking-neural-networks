@@ -1248,6 +1248,29 @@ fn main() -> Result<()> {
             // (use substring to detect)
             // modify neuron code to insert proper update current code before dv changes
 
+            // let ion_channel_names = code.get("ion_channel")
+            //     .keys()
+            //     .cloned()
+            //     .collect();
+
+            // code.get("neuron")
+            //     .unwrap()
+            //     .values_mut()
+            //     .map(|i| {
+            //         for i in ion_channel_names {
+            //             if i.contains(&i) {
+            //                 if code.get("ion_channel")
+            //                     .unwrap()
+            //                     .get(&i)
+            //                     .contains("impl TimestepIndependentIonChannel") {
+                                        // insert update current right after iterate and spike
+                                        // header and iterate and spike with
+                                        // neurotransmission header
+            //                     }
+            //             }
+            //         }
+            //     });
+
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
             file.write_all("\n\n\n".as_bytes())?;
