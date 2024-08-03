@@ -27,9 +27,9 @@ fn weight_logic(_: (usize, usize), _: (usize, usize)) -> TraceRSTDP {
     }
 }
 
-pub struct TestState {
-    pub dopamine_history: Vec<f32>,
-    pub timestep: usize,
+struct TestState {
+    dopamine_history: Vec<f32>,
+    timestep: usize,
 }
 
 create_agent_type_for_lattice!(

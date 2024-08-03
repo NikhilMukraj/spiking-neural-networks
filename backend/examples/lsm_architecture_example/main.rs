@@ -38,9 +38,9 @@ create_agent_type_for_network!(
     PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>
 );
 
-pub struct TestState {
-    pub dopamine_history: Vec<f32>,
-    pub timestep: usize,
+struct TestState {
+    dopamine_history: Vec<f32>,
+    timestep: usize,
 }
 
 impl State for TestState {
