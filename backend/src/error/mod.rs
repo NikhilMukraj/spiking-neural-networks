@@ -55,6 +55,8 @@ pub enum LatticeNetworkError {
     /// When connecting reward modulated lattice, RewardModulatedConnection cannot be used to connect a
     /// reward modulated lattice internally
     RewardModulatedConnectionNotCompatibleInternally,
+    /// Connect function must have non reward modulated lattices, connect with reward modulation instead
+    ConnectFunctionMustHaveNonRewardModulatedLattice,
 }
 
 impl Display for LatticeNetworkError {
@@ -81,6 +83,9 @@ impl Display for LatticeNetworkError {
             LatticeNetworkError::RewardModulatedConnectionNotCompatibleInternally => String::from(
                 "When connecting reward modulated lattice, RewardModulatedConnection cannot be used to connect a reward modulated lattice internally"
             ),
+            LatticeNetworkError::ConnectFunctionMustHaveNonRewardModulatedLattice => String::from(
+                "Connect function must have non reward modulated lattices, connect with reward modulation instead",
+            )
         };
 
         write!(f, "{}", err_msg)
