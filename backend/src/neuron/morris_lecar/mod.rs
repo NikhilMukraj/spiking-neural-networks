@@ -113,7 +113,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
         let last_voltage = self.current_voltage;
         self.current_voltage += self.get_dv_change(input_current);
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking(last_voltage)
     }
@@ -132,7 +132,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
         let receptor_current = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking(last_voltage)
     }
