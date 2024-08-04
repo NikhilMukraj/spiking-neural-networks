@@ -147,7 +147,7 @@ pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Chance of neuron firing at a given timestep
     pub chance_of_firing: f32,
     /// Timestep for refractoriness (ms)
-    pub refractoriness_dt: f32,
+    pub dt: f32,
 }
 
 macro_rules! impl_default_spike_train_methods {
@@ -159,7 +159,7 @@ macro_rules! impl_default_spike_train_methods {
         }
     
         fn get_refractoriness_timestep(&self) -> f32 {
-            self.refractoriness_dt
+            self.dt
         }
     
         fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32> {
@@ -187,7 +187,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNe
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
             chance_of_firing: 0.,
-            refractoriness_dt: 0.1,
+            dt: 0.1,
         }
     }
 }
@@ -210,8 +210,8 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PoissonNeuron<T, U> {
     pub fn from_firing_rate(hertz: f32, dt: f32) -> Self {
         let mut poisson_neuron = PoissonNeuron::<T, U>::default();
 
-        poisson_neuron.refractoriness_dt = dt;
-        poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.refractoriness_dt) / hertz);
+        poisson_neuron.dt = dt;
+        poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.dt) / hertz);
 
         poisson_neuron
     }
@@ -230,7 +230,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Poisso
         };
         self.is_spiking = is_spiking;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         is_spiking
     }
@@ -265,7 +265,7 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     /// Value to reset internal clock at
     pub max_clock_value: usize,
     /// Timestep for refractoriness (ms)
-    pub refractoriness_dt: f32,
+    pub dt: f32,
 }
 
 impl_current_voltage_spike_train!(PresetSpikeTrain);
@@ -285,7 +285,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             firing_times: HashSet::default(),
             internal_clock: 0,
             max_clock_value: 500,
-            refractoriness_dt: 0.1,
+            dt: 0.1,
         }
     }
 }
@@ -312,7 +312,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PresetSpikeTrain<T, U
         }
 
         PresetSpikeTrain::<T, U> { 
-            refractoriness_dt: dt, 
+            dt: dt, 
             firing_times, 
             max_clock_value: current_timestep, 
             ..Default::default() 
@@ -338,7 +338,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Preset
         };
         self.is_spiking = is_spiking;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         is_spiking
     }
