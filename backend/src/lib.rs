@@ -696,7 +696,7 @@
 //!         input_current: f32, 
 //!         t_total: &NeurotransmitterConcentrations,
 //!     ) -> bool {
-//!         self.ligand_gates.update_receptor_kinetics(t_total);
+//!         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
 //!         self.ligand_gates.set_receptor_currents(self.current_voltage);
 //!         
 //!         self.update_channels();
@@ -782,8 +782,6 @@
 //!     pub r: f32,
 //!     /// Amount to decay neurotransmitter concentration by
 //!     pub decay_constant: f32,
-//!     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-//!     pub dt: f32,
 //! }
 //! 
 //! // calculate change in receptor gating variable over time
@@ -792,9 +790,9 @@
 //! }
 //! 
 //! impl ReceptorKinetics for ExponentialDecayReceptor {
-//!     fn apply_r_change(&mut self, t: f32) {
+//!     fn apply_r_change(&mut self, t: f32, dt: f32) {
 //!         // calculate and apply change
-//!         self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
+//!         self.r += exp_decay(self.r, self.decay_constant, dt) + t;
 //!         self.r = self.r_max.min(self.r.max(0.)); // clamp values
 //!     }
 //!
@@ -817,8 +815,7 @@
 //!                     r_max: 1.0,
 //!                     r: 0.,
 //!                     decay_constant: 2.,
-//!                     dt: 0.1,
-//!                    }
+//!                 }
 //!             }
 //!         }
 //!     };
