@@ -914,8 +914,13 @@ pub struct PyPoissonLattice {
 #[pymethods]
 impl PyPoissonLattice {
     #[new]
-    fn new() -> Self {
-        PyPoissonLattice { lattice: SpikeTrainLattice::default() }
+    #[pyo3(signature = (id=0))]
+    fn new(id: usize) -> Self {
+        let mut lattice = PyPoissonLattice { lattice: SpikeTrainLattice::default() };
+
+        lattice.set_id(id);
+
+        lattice
     }
 
     fn populate(&mut self, neuron: PyPoissonNeuron, num_rows: usize, num_cols: usize) {
