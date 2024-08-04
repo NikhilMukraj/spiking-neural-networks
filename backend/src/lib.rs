@@ -682,7 +682,7 @@
 //!         let last_voltage = self.current_voltage;
 //!         self.current_voltage += self.get_dv_change(input_current);
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
@@ -705,7 +705,7 @@
 //!         let receptor_current = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 //!         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
@@ -730,8 +730,6 @@
 //!     pub v_th: f32,
 //!     /// Amount to decay neurotransmitter concentration by
 //!     pub decay_constant: f32,
-//!     /// Timestep factor in decreasing neurotransmitter concentration (ms)
-//!     pub dt: f32,
 //! }
 //! 
 //! // used to determine when voltage spike occurs
@@ -749,8 +747,8 @@
 //! }
 //! 
 //! impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-//!     fn apply_t_change(&mut self, voltage: f32) {
-//!         let t_change = exp_decay(self.t, self.decay_constant, self.dt);
+//!     fn apply_t_change(&mut self, voltage: f32, dt: f32) {
+//!         let t_change = exp_decay(self.t, self.decay_constant, dt);
 //!         // add change and account for spike
 //!         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
 //!         self.t = self.t_max.min(self.t.max(0.)); // clamp values
