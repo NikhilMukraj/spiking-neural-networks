@@ -165,7 +165,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 
     /// Updates neurotransmitter concentrations based on membrane potential
     pub fn update_neurotransmitters(&mut self) {
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
     }
 
     /// Updates receptor gating based on neurotransmitter input
