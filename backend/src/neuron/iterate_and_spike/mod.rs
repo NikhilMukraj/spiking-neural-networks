@@ -349,7 +349,7 @@ impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
 pub trait ReceptorKinetics: 
 Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync + Send {
     /// Calculates the change in receptor gating based on neurotransmitter input
-    fn apply_r_change(&mut self, t: f32);
+    fn apply_r_change(&mut self, t: f32, dt: f32);
     /// Gets the receptor gating value
     fn get_r(&self) -> f32;
     fn set_r(&mut self, r: f32);
@@ -365,13 +365,11 @@ pub struct DestexheReceptor {
     pub alpha: f32,
     /// Backwards rate constant (ms^-1)
     pub beta: f32,
-    /// Timestep value (ms)
-    pub dt: f32,
 }
 
 impl ReceptorKinetics for DestexheReceptor {
-    fn apply_r_change(&mut self, t: f32) {
-        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * self.dt;
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r += (self.alpha * t * (1. - self.r) - self.beta * self.r) * dt;
     }
 
     fn get_r(&self) -> f32 {
@@ -384,26 +382,25 @@ impl ReceptorKinetics for DestexheReceptor {
 }
 
 macro_rules! impl_destexhe_receptor_default {
-    ($trait:ident, $method:ident, $alpha:expr, $beta:expr, $dt:expr) => {
+    ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
         impl $trait for DestexheReceptor {
             fn $method() -> Self {
                 DestexheReceptor {
                     r: 0.,
                     alpha: $alpha, // mM^-1 * ms^-1
                     beta: $beta, // ms^-1
-                    dt: $dt,
                 }
             }
         }
     };
 }
 
-impl_destexhe_receptor_default!(Default, default, 1., 1., 0.1);
-impl_destexhe_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19, 0.1);
-impl_destexhe_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18, 0.1);
-impl_destexhe_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047, 0.1);
-impl_destexhe_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013, 0.1);
-impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066, 0.1);
+impl_destexhe_receptor_default!(Default, default, 1., 1.);
+impl_destexhe_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
+impl_destexhe_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
+impl_destexhe_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
+impl_destexhe_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
+impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
 
 /// Receptor dynamics approximation that just sets the receptor
 /// gating value to the inputted neurotransmitter concentration
@@ -413,7 +410,7 @@ pub struct ApproximateReceptor {
 }
 
 impl ReceptorKinetics for ApproximateReceptor {
-    fn apply_r_change(&mut self, t: f32) {
+    fn apply_r_change(&mut self, t: f32, _: f32) {
         self.r = t;
     }
 
@@ -453,13 +450,11 @@ pub struct ExponentialDecayReceptor {
     pub r: f32,
     /// Amount to decay neurotransmitter concentration by
     pub decay_constant: f32,
-    /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f32,
 }
 
 impl ReceptorKinetics for ExponentialDecayReceptor {
-    fn apply_r_change(&mut self, t: f32) {
-        self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r += exp_decay(self.r, self.decay_constant, dt) + t;
         self.r = self.r_max.min(self.r.max(0.));
     }
 
@@ -480,7 +475,6 @@ macro_rules! impl_exp_decay_receptor_default {
                     r_max: 1.0,
                     r: 0.,
                     decay_constant: 2.,
-                    dt: 0.1,
                 }
             }
         }
@@ -722,11 +716,11 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Updates the receptor gating values based on the neurotransitter concentrations (mM)
-    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations) {
+    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations, dt: f32) {
         t_total.iter()
             .for_each(|(key, value)| {
                 if let Some(gate) = self.ligand_gates.get_mut(key) {
-                    gate.receptor.apply_r_change(*value);
+                    gate.receptor.apply_r_change(*value, dt);
                 }
             })
     }
