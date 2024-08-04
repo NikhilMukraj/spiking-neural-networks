@@ -173,7 +173,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
         let dv = self.leaky_get_dv_change(input_current);
         self.current_voltage += dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking()
     }
@@ -191,7 +191,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
 
         self.current_voltage += dv + neurotransmitter_dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking()
     }
@@ -209,7 +209,7 @@ macro_rules! impl_iterate_and_spike {
                 self.current_voltage += dv;
                 self.w_value += dw;
 
-                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
                 self.$handle_spiking()
             }
@@ -229,7 +229,7 @@ macro_rules! impl_iterate_and_spike {
                 self.current_voltage += dv + neurotransmitter_dv;
                 self.w_value += dw;
 
-                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
                 self.$handle_spiking()
             }
@@ -321,7 +321,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         let dv = self.quadratic_get_dv_change(input_current);
         self.current_voltage += dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking()
     }
@@ -339,7 +339,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 
         self.current_voltage += dv + neurotransmitter_dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.handle_spiking()
     }
