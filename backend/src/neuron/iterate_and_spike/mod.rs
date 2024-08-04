@@ -126,7 +126,7 @@ impl NeurotransmitterType {
 /// Calculates neurotransmitter concentration over time based on voltage of neuron
 pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     /// Calculates change in neurotransmitter concentration based on voltage
-    fn apply_t_change(&mut self, voltage: f32);
+    fn apply_t_change(&mut self, voltage: f32, dt: f32);
     /// Returns neurotransmitter concentration
     fn get_t(&self) -> f32;
     /// Manually sets neurotransmitter concentration
@@ -169,7 +169,7 @@ impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 impl NeurotransmitterKinetics for DestexheNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32) {
+    fn apply_t_change(&mut self, voltage: f32, _: f32) {
         self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
     }
 
@@ -195,8 +195,6 @@ pub struct ApproximateNeurotransmitter {
     pub v_th: f32,
     /// Amount to decrease neurotransmitter concentration by
     pub clearance_constant: f32,
-    /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f32,
 }
 
 macro_rules! impl_approximate_neurotransmitter_default {
@@ -208,7 +206,6 @@ macro_rules! impl_approximate_neurotransmitter_default {
                     t: 0.,
                     v_th: 25.,
                     clearance_constant: 0.1,
-                    dt: 0.1,
                 }
             }
         }
@@ -230,8 +227,8 @@ fn heaviside(x: f32) -> f32 {
 }
 
 impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32) {
-        self.t += self.dt * -self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
+    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
+        self.t += dt * -self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
 
@@ -258,7 +255,7 @@ pub struct DiscreteSpikeNeurotransmitter {
 }
 
 impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32) {
+    fn apply_t_change(&mut self, voltage: f32, _: f32) {
         self.t = self.t_max * heaviside(voltage - self.v_th);
     }
 
@@ -305,8 +302,6 @@ pub struct ExponentialDecayNeurotransmitter {
     pub v_th: f32,
     /// Amount to decay neurotransmitter concentration by
     pub decay_constant: f32,
-    /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f32,
 }
 
 macro_rules! impl_exp_decay_neurotransmitter_default {
@@ -318,7 +313,6 @@ macro_rules! impl_exp_decay_neurotransmitter_default {
                     t: 0.,
                     v_th: 25.,
                     decay_constant: 2.0,
-                    dt: 0.1,
                 }
             }
         }
@@ -336,8 +330,8 @@ fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 }
 
 impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32) {
-        let t_change = exp_decay(self.t, self.decay_constant, self.dt);
+    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
+        let t_change = exp_decay(self.t, self.decay_constant, dt);
         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
@@ -808,9 +802,9 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     }
 
     /// Calculates the neurotransmitter concentrations based on the given voltage (mV)
-    pub fn apply_t_changes(&mut self, voltage: f32) {
+    pub fn apply_t_changes(&mut self, voltage: f32, dt: f32) {
         self.neurotransmitters.values_mut()
-            .for_each(|value| value.apply_t_change(voltage));
+            .for_each(|value| value.apply_t_change(voltage, dt));
     }
 }
 
@@ -927,6 +921,14 @@ pub trait LastFiringTime {
     fn set_last_firing_time(&mut self, timestep: Option<usize>);
 }
 
+/// Handles changes in simulation timestep information
+pub trait Timestep {
+    /// Retrieves timestep value
+    fn get_dt(&self) -> f32;
+    /// Updates instance with new timestep information
+    fn set_dt(&mut self, dt: f32);
+}
+
 /// Handles dynamics neurons that can take in an input to update membrane potential
 /// 
 /// Example implementation:
@@ -1019,7 +1021,7 @@ pub trait LastFiringTime {
 ///         self.current_voltage += dv; // updates voltage
 /// 
 ///         // calculates neurotransmitter concentration
-///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 /// 
 ///         self.handle_spiking()
 ///     }
@@ -1038,7 +1040,7 @@ pub trait LastFiringTime {
 /// 
 ///         self.current_voltage += dv + neurotransmitter_dv; // applies receptor currents and change in voltage
 /// 
-///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);
+///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 /// 
 ///         self.handle_spiking()
 ///     }
