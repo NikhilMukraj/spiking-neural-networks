@@ -173,7 +173,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         &mut self, 
         t_total: &NeurotransmitterConcentrations
     ) {
-        self.ligand_gates.update_receptor_kinetics(t_total);
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage);
     }
 
