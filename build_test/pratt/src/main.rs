@@ -1090,6 +1090,18 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
     }
 }
 
+// fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> Option<String> {
+//     if let Some(start) = original.find(to_find) {
+//         let mut result = String::new();
+//         result.push_str(&original[..start]); // Add the part before the substring
+//         result.push_str(to_insert); // Add the string to insert
+//         result.push_str(&original[start..]); // Add the part from the substring to the end
+//         Some(result)
+//     } else {
+//         None // Substring not found
+//     }
+// }
+
 fn main() -> Result<()> {
     let mut filename = String::from("");
 
@@ -1253,6 +1265,14 @@ fn main() -> Result<()> {
             //     .cloned()
             //     .collect();
 
+            // let iteration_header = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
+            // let iteration_with_neurotransmission_start = "fn iterate_with_neurotransmitter_and_spike(";
+            // let iteration_with_neurotransmission_args = vec![
+            //     "&mut self", 
+            //     "input_current: f32",
+            //     "t_total: &NeurotransmitterConcentrations",
+            // ];
+
             // code.get("neuron")
             //     .unwrap()
             //     .values_mut()
@@ -1266,6 +1286,8 @@ fn main() -> Result<()> {
                                         // insert update current right after iterate and spike
                                         // header and iterate and spike with
                                         // neurotransmission header
+
+                                        // use insert_at_substring method
             //                     }
             //             }
             //         }
