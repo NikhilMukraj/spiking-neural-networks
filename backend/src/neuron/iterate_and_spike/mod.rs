@@ -930,7 +930,7 @@ pub trait Timestep {
 /// ```rust
 /// use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 /// use spiking_neural_networks::neuron::iterate_and_spike::{
-///     GaussianFactor, GaussianParameters, IsSpiking, 
+///     GaussianFactor, GaussianParameters, IsSpiking, Timestep,
 ///     CurrentVoltage, GapConductance, IterateAndSpike, 
 ///     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 ///     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
