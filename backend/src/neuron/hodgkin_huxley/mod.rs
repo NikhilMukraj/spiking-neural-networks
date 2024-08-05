@@ -8,8 +8,8 @@ use std::{
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage, IsSpiking,
-    GapConductance, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
-    NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
+    GapConductance, LastFiringTime, LigandGatedChannels, Timestep,
+    NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
     DestexheNeurotransmitter, DestexheReceptor,
 };
 use super::ion_channels::{

@@ -3,7 +3,7 @@
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     CurrentVoltage, GapConductance, GaussianFactor, LastFiringTime, IsSpiking,
-    IterateAndSpike, GaussianParameters, LigandGatedChannels, 
+    Timestep, IterateAndSpike, GaussianParameters, LigandGatedChannels, 
     Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics,
     NeurotransmitterConcentrations, DestexheNeurotransmitter, DestexheReceptor,
 };
