@@ -5,7 +5,8 @@
 //! Neuronal dynamics are made using traits so they can be expanded via the 
 //! type system to add new dynamics for different neurotransmitters, receptors
 //! or neuron models. Currently implements system for spike trains, spike time depedent
-//! plasticity, basic attractors, and dynamics for neurons connected in a lattice. 
+//! plasticity, basic attractors, reward modulated dynamics,
+//! and dynamics for neurons connected in a lattice. 
 //! See below for examples and how to add custom models.
 //! 
 //! ### Morris-Lecar Model with Static Input
