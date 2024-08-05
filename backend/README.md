@@ -1,6 +1,13 @@
 # Spiking Neural Networks
 
-`spiking_neural_networks` is a package focused on designing neuron models with neurotransmission and calculating dynamics between neurons over time. Neuronal dynamics are made using traits so they can be expanded via the type system to add new dynamics for different neurotransmitters, receptors or neuron models. Currently implements system for spike trains, spike time depedent plasticity, basic attractors, and dynamics for neurons connected in a lattice. See below for examples and how to add custom models.
+`spiking_neural_networks` is a package focused on designing neuron models
+with neurotransmission and calculating dynamics between neurons over time.
+Neuronal dynamics are made using traits so they can be expanded via the
+type system to add new dynamics for different neurotransmitters, receptors
+or neuron models. Currently implements system for spike trains, spike time depedent
+plasticity, basic attractors, reward modulated dynamics,
+and dynamics for neurons connected in a lattice.
+See below for examples and how to add custom models.
 
 ## Quick Examples
 
@@ -494,7 +501,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 ```rust
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, IsSpiking, 
+    GaussianFactor, GaussianParameters, IsSpiking, Timestep,
     CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
@@ -728,8 +735,6 @@ pub struct ExponentialDecayNeurotransmitter {
     pub v_th: f32,
     /// Amount to decay neurotransmitter concentration by
     pub decay_constant: f32,
-    /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f32,
 }
 
 // used to determine when voltage spike occurs
@@ -747,8 +752,8 @@ fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 }
 
 impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32) {
-        let t_change = exp_decay(self.t, self.decay_constant, self.dt);
+    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
+        let t_change = exp_decay(self.t, self.decay_constant, dt);
         // add change and account for spike
         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.)); // clamp values
@@ -783,8 +788,6 @@ pub struct ExponentialDecayReceptor {
     pub r: f32,
     /// Amount to decay neurotransmitter concentration by
     pub decay_constant: f32,
-    /// Timestep factor in decreasing neurotransmitter concentration (ms)
-    pub dt: f32,
 }
 
 // calculate change in receptor gating variable over time
@@ -793,9 +796,9 @@ fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 }
 
 impl ReceptorKinetics for ExponentialDecayReceptor {
-    fn apply_r_change(&mut self, t: f32) {
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
         // calculate and apply change
-        self.r += exp_decay(self.r, self.decay_constant, self.dt) + t;
+        self.r += exp_decay(self.r, self.decay_constant, dt) + t;
         self.r = self.r_max.min(self.r.max(0.)); // clamp values
     }
 
@@ -818,7 +821,6 @@ macro_rules! impl_exp_decay_receptor_default {
                     r_max: 1.0,
                     r: 0.,
                     decay_constant: 2.,
-                    dt: 0.1,
                 }
             }
         }
