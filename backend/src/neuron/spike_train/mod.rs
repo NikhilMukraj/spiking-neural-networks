@@ -1,12 +1,12 @@
 //! A few implementations of different spike trains that can be coupled with `IterateAndSpike`
 //! based neurons.
 
-use std::collections::{HashMap, HashSet};
 use rand::Rng;
-use super::{
-    iterate_and_spike::{ApproximateNeurotransmitter, IsSpiking, NeurotransmitterKinetics}, 
-    CurrentVoltage, LastFiringTime, NeurotransmitterType, Neurotransmitters,
+use super::iterate_and_spike::{
+    ApproximateNeurotransmitter, CurrentVoltage, IsSpiking, LastFiringTime, 
+    NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, Timestep,
 };
+use super::iterate_and_spike_traits::Timestep;
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
 /// of the simulation (neural refractoriness function), when the spike train spikes
@@ -79,7 +79,7 @@ fn exponential_decay_effect(k: f32, a: f32, time_difference: f32, v_resting: f32
 impl_default_neural_refractoriness!(ExponentialDecayRefractoriness, exponential_decay_effect);
 
 /// Handles spike train dynamics
-pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Clone + Send + Sync {
+pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + Clone + Send + Sync {
     type U: NeuralRefractoriness;
     /// Updates spike train
     fn iterate(&mut self) -> bool;
@@ -88,7 +88,7 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Clone + Send
     /// Gets timestep or `dt` (ms)
     fn get_refractoriness_timestep(&self) -> f32;
     /// Returns neurotransmitter concentrations
-    fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32>;
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Returns refractoriness dynamics
     fn get_refractoriness_function(&self) -> &Self::U;
 }
@@ -162,7 +162,7 @@ macro_rules! impl_default_spike_train_methods {
             self.dt
         }
     
-        fn get_neurotransmitter_concentrations(&self) -> HashMap<NeurotransmitterType, f32> {
+        fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
             self.synaptic_neurotransmitters.get_concentrations()
         }
     
@@ -217,6 +217,18 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PoissonNeuron<T, U> {
     }
 }
 
+impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Timestep for PoissonNeuron<T, U> {
+    fn get_dt(&self) -> f32 {
+        self.dt
+    }
+
+    fn set_dt(&mut self, dt: f32) {
+        let scalar = dt / self.dt;
+        self.chance_of_firing *= scalar;
+        self.dt = dt;
+    }
+}
+
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for PoissonNeuron<T, U> {
     fn iterate(&mut self) -> bool {
         let is_spiking = if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
@@ -239,10 +251,11 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Poisso
 }
 
 /// A preset spike train that has a set of designated firing times and an internal clock,
-/// the internal clock is updated every iteration and once the internal clock reaches one of the 
-/// firing times the neuron fires, the internal clock is reset once it reaches the maximum value
-/// and cyclees through the designated firing times again
-#[derive(Debug, Clone)]
+/// the internal clock is updated every iteration by `dt` and once the internal clock reaches one of the 
+/// firing times the neuron fires, the internal clock is reset and the clock will iterate until the
+/// next firing time is reached, this will cycle until the last firing time is reached and the 
+/// next firing time becomes the first firing time
+#[derive(Debug, Clone, Timestep)]
 pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Membrane potential (mV)
     pub current_voltage: f32,
@@ -259,11 +272,11 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     /// Neural refactoriness dynamics
     pub neural_refractoriness: U,
     /// Set of times to fire at
-    pub firing_times: HashSet<usize>,
+    pub firing_times: Vec<f32>,
     /// Internal clock to track when to fire
-    pub internal_clock: usize,
-    /// Value to reset internal clock at
-    pub max_clock_value: usize,
+    pub internal_clock: f32,
+    /// Pointer to which firing time is next
+    pub counter: usize,
     /// Timestep for refractoriness (ms)
     pub dt: f32,
 }
@@ -282,9 +295,9 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpi
             last_firing_time: None,
             synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
             neural_refractoriness: U::default(),
-            firing_times: HashSet::default(),
-            internal_clock: 0,
-            max_clock_value: 500,
+            firing_times: Vec::new(),
+            internal_clock: 0.,
+            counter: 0,
             dt: 0.1,
         }
     }
@@ -297,38 +310,19 @@ impl PresetSpikeTrain<ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
     }
 }
 
-impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> PresetSpikeTrain<T, U> {
-    /// Generates a spike train that evenly divides up a preset spike train's
-    /// firing times across a timeframe given the number of spikes
-    /// and the timestep (dt)
-    pub fn from_evenly_divided(num_spikes: usize, dt: f32) -> Self {
-        let mut firing_times: HashSet<usize> =  HashSet::new();
-        let interval = ((1000. / dt) / (num_spikes as f32)) as usize;
-
-        let mut current_timestep = 0;
-        for _ in 0..num_spikes {
-            firing_times.insert(current_timestep);
-            current_timestep += interval;
-        }
-
-        PresetSpikeTrain::<T, U> { 
-            dt: dt, 
-            firing_times, 
-            max_clock_value: current_timestep, 
-            ..Default::default() 
-        }
-    }
-}
-
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for PresetSpikeTrain<T, U> {
     fn iterate(&mut self) -> bool {
-        self.internal_clock += 1;
-        if self.internal_clock > self.max_clock_value {
-            self.internal_clock = 0;
-        }
+        self.internal_clock += self.dt;
 
-        let is_spiking = if self.firing_times.contains(&self.internal_clock) {
+        let is_spiking = if self.internal_clock > self.firing_times[self.counter] {
             self.current_voltage = self.v_th;
+
+            self.internal_clock = 0.;
+
+            self.counter += 1;
+            if self.counter > self.firing_times.len() {
+                self.counter = 0;
+            }
 
             true
         } else {
