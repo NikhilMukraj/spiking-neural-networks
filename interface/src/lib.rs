@@ -1095,6 +1095,44 @@ macro_rules! impl_network {
                 $network_kind { network: LatticeNetwork::default() }
             }
 
+            #[staticmethod]
+            #[pyo3(signature = (lattices=Vec::new(), spike_train_lattices=Vec::new()))]
+            fn generate_network(
+                lattices: Vec<$lattice_kind>, spike_train_lattices: Vec<$spike_train_lattice_kind>
+            ) -> PyResult<Self> {
+                let mut network = $network_kind { network: LatticeNetwork::default() };
+
+                for i in lattices {
+                    let id = i.lattice.get_id();
+                    match network.network.add_lattice(i.lattice) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            return Err(
+                                PyValueError::new_err(
+                                    format!("Id ({}) already in network", id)
+                                )
+                            )
+                        },
+                    };
+                }
+
+                for i in spike_train_lattices {
+                    let id = i.lattice.get_id();
+                    match network.network.add_spike_train_lattice(i.lattice) {
+                        Ok(_) => {},
+                        Err(_) => {
+                            return Err(
+                                PyValueError::new_err(
+                                    format!("Id ({}) already in network", id)
+                                )
+                            )
+                        },
+                    };
+                }
+
+                Ok(network)
+            }
+
             fn add_lattice(&mut self, lattice: $lattice_kind) -> PyResult<()> {
                 let id = lattice.lattice.get_id();
 
@@ -2362,8 +2400,6 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // falliable connect (specifically for pyo3)
 
     // generate network method
-
-    // reset timing and history across network
 
     // reward modulation
 
