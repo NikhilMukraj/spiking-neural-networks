@@ -1,9 +1,10 @@
-use super::iterate_and_spike::{LastFiringTime, IterateAndSpike};
+use super::iterate_and_spike::{LastFiringTime, IterateAndSpike, Timestep};
+use super::iterate_and_spike_traits::Timestep;
 
 
 /// Handles plasticity rules given the two neurons and whether to 
 /// update weights based on the given neuron
-pub trait Plasticity<T, U, V>: Default + Send + Sync {
+pub trait Plasticity<T, U, V>: Timestep + Default + Send + Sync {
     /// Modifies the weight between given two neurons
     fn update_weight(&self, weight: &mut V, presynaptic: &T, postsynaptic: &U);
     // Determines whether to update weights given the neuron
@@ -11,7 +12,7 @@ pub trait Plasticity<T, U, V>: Default + Send + Sync {
 }
 
 /// Spike time dependent plasticity rule
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Timestep)]
 pub struct STDP {
     /// Postitive STDP modifier 
     pub a_plus: f32,
@@ -107,7 +108,7 @@ impl RewardModulatedWeight for TraceRSTDP {
 }
 
 /// Handles modulation of neurons using reward
-pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
+pub trait RewardModulator<T, U, V>: Timestep + Default + Clone + Send + Sync {
     /// Update parameters based on reward
     fn update(&mut self, reward: f32);
     /// Update weight given two neurons and the weight itself
@@ -118,7 +119,7 @@ pub trait RewardModulator<T, U, V>: Default + Clone + Send + Sync {
 
 /// An implementation of spike time dependent plasticity that is reward modulated with 
 /// dopamine based synapses
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Timestep)]
 pub struct RewardModulatedSTDP {
     // Dopamine concentration
     pub dopamine: f32,
