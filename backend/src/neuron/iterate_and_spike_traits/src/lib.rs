@@ -12,26 +12,29 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
 
     let name = input.ident;
 
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     let expanded = quote! {
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> CurrentVoltage for #name<T, R> {
+        impl #impl_generics CurrentVoltage for #name #ty_generics #where_clause {
             fn get_current_voltage(&self) -> f32 {
                 self.current_voltage
             }
         }
 
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GapConductance for #name<T, R> {
+        impl #impl_generics GapConductance for #name #ty_generics #where_clause {
             fn get_gap_conductance(&self) -> f32 {
                 self.gap_conductance
             }
         }
 
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> GaussianFactor for #name<T, R> {
+        impl #impl_generics GaussianFactor for #name #ty_generics #where_clause {
             fn get_gaussian_factor(&self) -> f32 {
                 self.gaussian_params.get_random_number()
             }
         }
 
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Timestep for #name<T, R> {
+        impl #impl_generics Timestep for #name #ty_generics #where_clause {
             fn get_dt(&self) -> f32 {
                 self.dt
             }
@@ -41,13 +44,13 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IsSpiking for #name<T, R> {
+        impl #impl_generics IsSpiking for #name #ty_generics #where_clause {
             fn is_spiking(&self) -> bool {
                 self.is_spiking
             }
         }
 
-        impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> LastFiringTime for #name<T, R> {
+        impl #impl_generics LastFiringTime for #name #ty_generics #where_clause {
             fn set_last_firing_time(&mut self, timestep: Option<usize>) {
                 self.last_firing_time = timestep;
             }
