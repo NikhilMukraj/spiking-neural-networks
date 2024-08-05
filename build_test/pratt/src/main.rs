@@ -1265,6 +1265,7 @@ fn main() -> Result<()> {
             //     .cloned()
             //     .collect();
 
+            // move these to consts
             // let iteration_header = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
             // let iteration_with_neurotransmission_start = "fn iterate_with_neurotransmitter_and_spike(";
             // let iteration_with_neurotransmission_args = vec![
@@ -1273,22 +1274,45 @@ fn main() -> Result<()> {
             //     "t_total: &NeurotransmitterConcentrations",
             // ];
 
+            // let iteration_with_neurotransmission_function = format!(
+            //     "{}\n{}\n}}", 
+            //     iteration_with_neurotransmitter_header,
+            //     iteration_with_neurotransmission_body,
+            // );
+
             // code.get("neuron")
             //     .unwrap()
             //     .values_mut()
-            //     .map(|i| {
-            //         for i in ion_channel_names {
-            //             if i.contains(&i) {
-            //                 if code.get("ion_channel")
+            //     .for_each(|i| {
+            //         for j in ion_channel_names {
+            //             if i.contains(&j) {
+            //                  let to_insert = if code.get("ion_channel")
             //                     .unwrap()
-            //                     .get(&i)
-            //                     .contains("impl TimestepIndependentIonChannel") {
-                                        // insert update current right after iterate and spike
-                                        // header and iterate and spike with
-                                        // neurotransmission header
+            //                     .get(&j)
+            //                     .contains("impl TimestepIndependentIonChannel") 
+            //                  {
+                                // format!(
+                                //     "self.{}.update_current(self.current_voltage, self.dt);\n",
+                                //     j
+                                // );            
+        //                      } else {
+                                //    format!(
+                                //         "self.{}.update_current(self.current_voltage);\n",
+                                //         j
+                                //     )
+                                // }
 
-                                        // use insert_at_substring method
-            //                     }
+                                // insert_at_substring(
+                                //     i, 
+                                //     iteration_header,
+                                //     to_insert,
+                                // );
+
+                                // insert_at_substring(
+                                //     i, 
+                                //     iteration_with_neurotransmisssion_function,
+                                //     to_insert,
+                                // );
             //             }
             //         }
             //     });
