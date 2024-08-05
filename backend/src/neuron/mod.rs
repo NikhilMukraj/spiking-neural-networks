@@ -27,12 +27,14 @@ pub mod spike_train;
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterType, Neurotransmitters 
+    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
+    ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, 
+    NeurotransmitterConcentrations, 
 };
 pub mod plasticity;
 use plasticity::{
     Plasticity, STDP, RewardModulator,
-    RewardModulatedSTDP, RewardModulatedWeight, TraceRSTDP
+    RewardModulatedSTDP, RewardModulatedWeight, TraceRSTDP,
 };
 /// A set of macros to automatically derive traits necessary for the `IterateAndSpike` trait.
 pub mod iterate_and_spike_traits {
