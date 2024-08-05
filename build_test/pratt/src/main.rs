@@ -5,6 +5,7 @@ use std::{io::Result, env, fs};
 use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
+use regex::Regex;
 
 
 #[derive(pest_derive::Parser)]
@@ -252,6 +253,22 @@ pub struct NeuronDefinition {
     ion_channels: Option<AST>,
 }
 
+const ITERATION_HEADER: &str = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
+const ITERATION_WITH_NEUROTRANSMITTER_START: &str = "fn iterate_with_neurotransmitter_and_spike(";
+const ITERATION_WITH_NEUROTRANSMITTER_ARGS: [&str; 3] = [
+    "&mut self", 
+    "input_current: f32",
+    "t_total: &NeurotransmitterConcentrations",
+];
+
+fn generate_iteration_with_neurotransmitter_header() -> String {
+    format!(
+        "{}\n\t{},\n) -> bool {{", 
+        ITERATION_WITH_NEUROTRANSMITTER_START, 
+        ITERATION_WITH_NEUROTRANSMITTER_ARGS.join(",\n\t"),
+    )
+}
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -284,22 +301,22 @@ impl NeuronDefinition {
                             _ => unreachable!(),
                         };
 
-                        format!("{}: f32", var_name)
+                        format!("pub {}: f32", var_name)
                     })
                     .collect::<Vec<String>>()
             },
             _ => unreachable!()
         };
 
-        let current_voltage_field = String::from("current_voltage: f32");
-        let dt_field = String::from("dt: f32");
-        let c_m_field = String::from("c_m: f32");
-        let gap_conductance_field = String::from("gap_conductance: f32");
-        let is_spiking_field = String::from("is_spiking: bool");
-        let last_firing_time_field = String::from("last_firing_time: Option<usize>");
-        let gaussian_field = String::from("gaussian_params: GaussianParameters");
-        let neurotransmitter_field = String::from("synaptic_neurotransmitters: Neurotransmitters<T>");
-        let ligand_gates_field = String::from("ligand_gates: LigandGatedChannels<R>");
+        let current_voltage_field = String::from("pub current_voltage: f32");
+        let dt_field = String::from("pub dt: f32");
+        let c_m_field = String::from("pub c_m: f32");
+        let gap_conductance_field = String::from("pub gap_conductance: f32");
+        let is_spiking_field = String::from("pub is_spiking: bool");
+        let last_firing_time_field = String::from("pub last_firing_time: Option<usize>");
+        let gaussian_field = String::from("pub gaussian_params: GaussianParameters");
+        let neurotransmitter_field = String::from("pub synaptic_neurotransmitters: Neurotransmitters<T>");
+        let ligand_gates_field = String::from("pub ligand_gates: LigandGatedChannels<R>");
 
         fields.insert(0, current_voltage_field);
         fields.push(gap_conductance_field);
@@ -315,7 +332,7 @@ impl NeuronDefinition {
                             _ => unreachable!(),
                         };
 
-                        format!("{}: {}", var_name, type_name)
+                        format!("pub {}: {}", var_name, type_name)
                     })
                     .collect::<Vec<String>>()
             },
@@ -379,7 +396,6 @@ impl NeuronDefinition {
 
         let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage);";
         let handle_spiking_call = "self.handle_spiking()";
-        let iteration_header = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
         let iteration_body = format!(
             "\n\t{}\n\t{}\n\t{}\n\t{}", 
             on_iteration_assignments, 
@@ -387,26 +403,16 @@ impl NeuronDefinition {
             handle_neurotransmitter_conc,
             handle_spiking_call,
         );
-        let iteration_function = format!("{}{}\n}}", iteration_header, iteration_body);
+        let iteration_function = format!("{}{}\n}}", ITERATION_HEADER, iteration_body);
 
-        let iteration_with_neurotransmission_start = "fn iterate_with_neurotransmitter_and_spike(";
-        let iteration_with_neurotransmission_args = vec![
-            "&mut self", 
-            "input_current: f32",
-            "t_total: &NeurotransmitterConcentrations",
-        ];
-        let iteration_with_neurotransmitter_header = format!(
-            "{}\n\t{},\n) -> bool {{", 
-            iteration_with_neurotransmission_start, 
-            iteration_with_neurotransmission_args.join(",\n\t"),
-        );
+        let iteration_with_neurotransmitter_header = generate_iteration_with_neurotransmitter_header();
 
         let ligand_gates_update = "self.ligand_gates.update_receptor_kinetics(t_total);";
         let ligand_gates_set_current = "self.ligand_gates.set_receptor_currents(self.current_voltage);";
 
         let update_with_receptor_current = "self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);";
 
-        let iteration_with_neurotransmission_body = format!(
+        let iteration_with_neurotransmitter_body = format!(
             "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
             ligand_gates_update,
             ligand_gates_set_current,
@@ -417,10 +423,10 @@ impl NeuronDefinition {
             handle_spiking_call,
         );
 
-        let iteration_with_neurotransmission_function = format!(
+        let iteration_with_neurotransmitter_function = format!(
             "{}\n{}\n}}", 
             iteration_with_neurotransmitter_header,
-            iteration_with_neurotransmission_body,
+            iteration_with_neurotransmitter_body,
         );
 
         let impl_header = format!(
@@ -438,7 +444,7 @@ impl NeuronDefinition {
             "{}\n\n{}\n\n{}\n",
             get_concentrations_function,
             iteration_function,
-            iteration_with_neurotransmission_function,
+            iteration_with_neurotransmitter_function,
         );
         let impl_iterate_and_spike_body = add_indents(&impl_iterate_and_spike_body, "\t");
         let impl_iterate_and_spike = format!(
@@ -645,7 +651,7 @@ impl IonChannelDefinition {
                             _ => unreachable!(),
                         };
 
-                        format!("{}: f32", var_name)
+                        format!("pub {}: f32", var_name)
                     })
                     .collect::<Vec<String>>()
             },
@@ -662,7 +668,7 @@ impl IonChannelDefinition {
 
                 variables.clone()
                     .iter()
-                    .map(|i| format!("{}: BasicGatingVariable", i))
+                    .map(|i| format!("pub {}: BasicGatingVariable", i))
                     .collect()
             },
             None => vec![],
@@ -673,7 +679,7 @@ impl IonChannelDefinition {
             fields.push(i)
         }
 
-        let current_field = String::from("current: f32");
+        let current_field = String::from("pub current: f32");
         fields.push(current_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
@@ -1090,17 +1096,32 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
     }
 }
 
-// fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> Option<String> {
-//     if let Some(start) = original.find(to_find) {
-//         let mut result = String::new();
-//         result.push_str(&original[..start]); // Add the part before the substring
-//         result.push_str(to_insert); // Add the string to insert
-//         result.push_str(&original[start..]); // Add the part from the substring to the end
-//         Some(result)
-//     } else {
-//         None // Substring not found
-//     }
-// }
+fn extract_name_from_pattern(s: &str, i: &str) -> Vec<String> {
+    let re = Regex::new(&format!(r"pub (.*): {}", i)).unwrap();
+    let mut output = vec![];
+
+    for caps in re.captures_iter(s) {
+        let first_part = &caps[1];
+        if s.contains(i) {
+            output.push(first_part.to_string());
+        }
+    }
+
+    output
+}
+
+fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> String {
+    if let Some(start) = original.find(to_find) {
+        let mut result = String::new();
+        result.push_str(&original[..start + to_find.len()]);
+        result.push_str(to_insert);
+        result.push_str(&original[start + to_find.len()..]);
+
+        result
+    } else {
+        String::from(original)
+    }
+}
 
 fn main() -> Result<()> {
     let mut filename = String::from("");
@@ -1260,62 +1281,54 @@ fn main() -> Result<()> {
             // (use substring to detect)
             // modify neuron code to insert proper update current code before dv changes
 
-            // let ion_channel_names = code.get("ion_channel")
-            //     .keys()
-            //     .cloned()
-            //     .collect();
+            let ion_channel_data: HashMap<String, bool> = code.get("ion_channel")
+                .unwrap_or(&HashMap::<String, String>::new())
+                .iter()
+                .map(|(name, code)| {
+                    let is_timestep_independent = code.contains("impl TimestepIndependentIonChannel");
+                    (name.clone(), is_timestep_independent)
+                })
+                .collect();
 
-            // move these to consts
-            // let iteration_header = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
-            // let iteration_with_neurotransmission_start = "fn iterate_with_neurotransmitter_and_spike(";
-            // let iteration_with_neurotransmission_args = vec![
-            //     "&mut self", 
-            //     "input_current: f32",
-            //     "t_total: &NeurotransmitterConcentrations",
-            // ];
+            let iteration_with_neurotransmitter_header = add_indents(
+                &generate_iteration_with_neurotransmitter_header(), "\t"
+            );
 
-            // let iteration_with_neurotransmission_function = format!(
-            //     "{}\n{}\n}}", 
-            //     iteration_with_neurotransmitter_header,
-            //     iteration_with_neurotransmission_body,
-            // );
+            if let Some(neuron_code_map) = code.get_mut("neuron") {
+                for i in neuron_code_map.values_mut() {
+                    for (ion_channel_name, is_timestep_independent) in &ion_channel_data {
+                        if i.contains(ion_channel_name) {
+                            let names = extract_name_from_pattern(i, &ion_channel_name);
 
-            // code.get("neuron")
-            //     .unwrap()
-            //     .values_mut()
-            //     .for_each(|i| {
-            //         for j in ion_channel_names {
-            //             if i.contains(&j) {
-            //                  let to_insert = if code.get("ion_channel")
-            //                     .unwrap()
-            //                     .get(&j)
-            //                     .contains("impl TimestepIndependentIonChannel") 
-            //                  {
-                                // format!(
-                                //     "self.{}.update_current(self.current_voltage, self.dt);\n",
-                                //     j
-                                // );            
-        //                      } else {
-                                //    format!(
-                                //         "self.{}.update_current(self.current_voltage);\n",
-                                //         j
-                                //     )
-                                // }
-
-                                // insert_at_substring(
-                                //     i, 
-                                //     iteration_header,
-                                //     to_insert,
-                                // );
-
-                                // insert_at_substring(
-                                //     i, 
-                                //     iteration_with_neurotransmisssion_function,
-                                //     to_insert,
-                                // );
-            //             }
-            //         }
-            //     });
+                            for name in names {
+                                let to_insert = if *is_timestep_independent {
+                                    format!(
+                                        "\n\t\tself.{}.update_current(self.current_voltage, self.dt);",
+                                        name
+                                    )
+                                } else {
+                                    format!(
+                                        "\n\t\tself.{}.update_current(self.current_voltage);",
+                                        name
+                                    )
+                                };
+        
+                                *i = insert_at_substring(
+                                    i, 
+                                    ITERATION_HEADER,
+                                    &to_insert,
+                                );
+        
+                                *i = insert_at_substring(
+                                    i, 
+                                    &iteration_with_neurotransmitter_header,
+                                    &to_insert,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
 
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
