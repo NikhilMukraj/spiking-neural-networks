@@ -110,28 +110,26 @@ implement_basic_getter_and_setter!(
     t_max, get_t_max, set_t_max, 
     t, get_t, set_t, 
     v_th, get_v_th, set_v_th, 
-    dt, get_dt, set_dt, 
     clearance_constant, get_clearance_constant, set_clearance_constant
 );
 
 #[pymethods]
 impl PyApproximateNeurotransmitter {
     #[new]
-    #[pyo3(signature = (t_max=1., t=0., v_th=30., dt=0.1, clearance_constant=0.1))]
-    fn new(t_max: f32, t: f32, v_th: f32, dt: f32, clearance_constant: f32) -> Self {
+    #[pyo3(signature = (t_max=1., t=0., v_th=30., clearance_constant=0.1))]
+    fn new(t_max: f32, t: f32, v_th: f32, clearance_constant: f32) -> Self {
         PyApproximateNeurotransmitter {
             neurotransmitter: ApproximateNeurotransmitter {
                 t_max: t_max,
                 t: t,
                 v_th: v_th,
-                dt: dt,
                 clearance_constant: clearance_constant,
             }
         }
     }
 
-    fn apply_t_change(&mut self, voltage: f32) {
-        self.neurotransmitter.apply_t_change(voltage);
+    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
+        self.neurotransmitter.apply_t_change(voltage, dt);
     }
 }
 
@@ -198,8 +196,8 @@ impl PyApproximateNeurotransmitters {
         );
     }
 
-    fn apply_t_changes(&mut self, voltage: f32) {
-        self.neurotransmitters.apply_t_changes(voltage);
+    fn apply_t_changes(&mut self, voltage: f32, dt: f32) {
+        self.neurotransmitters.apply_t_changes(voltage, dt);
     }
 }
 
@@ -228,8 +226,8 @@ impl PyApproximateReceptor {
         }
     }
 
-    fn apply_r_change(&mut self, neurotransmitter_conc: f32) {
-        self.receptor.apply_r_change(neurotransmitter_conc);
+    fn apply_r_change(&mut self, neurotransmitter_conc: f32, _dt: f32) {
+        self.receptor.apply_r_change(neurotransmitter_conc, _dt);
     }
 }
 
@@ -354,10 +352,10 @@ impl PyApproximateLigandGatedChannels {
         );
     }
 
-    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict) -> PyResult<()> {
+    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict, dt: f32) -> PyResult<()> {
         let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
 
-        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs);
+        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs, dt);
 
         Ok(())
     }
@@ -536,7 +534,7 @@ implement_basic_getter_and_setter!(
     v_th, get_v_th, set_v_th,
     v_resting, get_v_resting, set_v_resting,
     chance_of_firing, get_chance_of_firing, set_chance_of_firing,
-    refractoriness_dt, get_refractoriness_dt, set_refractoriness_dt
+    dt, get_dt, set_dt
 );
 
 impl_repr!(PyPoissonNeuron, model);
@@ -544,9 +542,9 @@ impl_repr!(PyPoissonNeuron, model);
 #[pymethods]
 impl PyPoissonNeuron {
     #[new]
-    #[pyo3(signature = (current_voltage=0., v_th=30., v_resting=0., chance_of_firing=0.01, refactoriness_dt=0.1))]
+    #[pyo3(signature = (current_voltage=0., v_th=30., v_resting=0., chance_of_firing=0.01, dt=0.1))]
     fn new(
-        current_voltage: f32, v_th: f32, v_resting: f32, chance_of_firing: f32, refactoriness_dt: f32
+        current_voltage: f32, v_th: f32, v_resting: f32, chance_of_firing: f32, dt: f32
     ) -> Self {
         PyPoissonNeuron {
             model: PoissonNeuron { 
@@ -554,12 +552,23 @@ impl PyPoissonNeuron {
                 v_th: v_th, 
                 v_resting: v_resting, 
                 last_firing_time: None, 
+                is_spiking: false,
                 synaptic_neurotransmitters: Neurotransmitters::default(), 
                 neural_refractoriness: DeltaDiracRefractoriness::default(), 
                 chance_of_firing: chance_of_firing, 
-                refractoriness_dt: refactoriness_dt, 
+                dt: dt, 
             }
         }
+    }
+
+    #[getter]
+    fn get_is_spiking(&self) -> bool {
+        self.model.is_spiking
+    }
+
+    #[setter]
+    fn set_is_spiking(&mut self, flag: bool) {
+        self.model.is_spiking = flag;
     }
 
     fn iterate(&mut self) -> bool {
@@ -612,6 +621,10 @@ macro_rules! impl_lattice {
 
                 lattice
             }
+
+            fn set_dt(&mut self, dt: f32) {
+                self.lattice.set_dt(dt);
+            } 
 
             fn populate(&mut self, neuron: $lattice_neuron, num_rows: usize, num_cols: usize) {
                 self.lattice.populate(&neuron.model, num_rows, num_cols);
@@ -923,6 +936,10 @@ impl PyPoissonLattice {
         lattice
     }
 
+    fn set_dt(&mut self, dt: f32) {
+        self.lattice.set_dt(dt);
+    }
+
     fn populate(&mut self, neuron: PyPoissonNeuron, num_rows: usize, num_cols: usize) {
         self.lattice.populate(&neuron.model, num_rows, num_cols);
     }
@@ -1131,6 +1148,10 @@ macro_rules! impl_network {
                 }
 
                 Ok(network)
+            }
+
+            fn set_dt(&mut self, dt: f32) {
+                self.network.set_dt(dt);
             }
 
             fn add_lattice(&mut self, lattice: $lattice_kind) -> PyResult<()> {
@@ -1833,8 +1854,8 @@ impl PyDestexheNeurotransmitter {
         }
     }
 
-    fn apply_t_change(&mut self, voltage: f32) {
-        self.neurotransmitter.apply_t_change(voltage);
+    fn apply_t_change(&mut self, voltage: f32, _dt: f32) {
+        self.neurotransmitter.apply_t_change(voltage, _dt);
     }
 }
 
@@ -1901,8 +1922,8 @@ impl PyDestexheNeurotransmitters {
         );
     }
 
-    fn apply_t_changes(&mut self, voltage: f32) {
-        self.neurotransmitters.apply_t_changes(voltage);
+    fn apply_t_changes(&mut self, voltage: f32, dt: f32) {
+        self.neurotransmitters.apply_t_changes(voltage, dt);
     }
 }
 
@@ -1918,27 +1939,25 @@ implement_basic_getter_and_setter!(
     receptor,
     r, get_r, set_r,
     alpha, get_alpha, set_alpha,
-    beta, get_beta, set_beta,
-    dt, get_dt, set_dt
+    beta, get_beta, set_beta
 );
 
 #[pymethods]
 impl PyDestexheReceptor {
     #[new]
-    #[pyo3(signature = (r=1., alpha=1., beta=1.0, dt=0.1))]
-    fn new(r: f32, alpha: f32, beta: f32, dt: f32) -> Self {
+    #[pyo3(signature = (r=1., alpha=1., beta=1.0))]
+    fn new(r: f32, alpha: f32, beta: f32) -> Self {
         PyDestexheReceptor { 
             receptor: DestexheReceptor {
                 r: r,
                 alpha: alpha,
                 beta: beta,
-                dt: dt,
             } 
         }
     }
 
-    fn apply_r_change(&mut self, neurotransmitter_conc: f32) {
-        self.receptor.apply_r_change(neurotransmitter_conc);
+    fn apply_r_change(&mut self, neurotransmitter_conc: f32, dt: f32) {
+        self.receptor.apply_r_change(neurotransmitter_conc, dt);
     }
 }
 
@@ -2018,10 +2037,10 @@ impl PyDestexheLigandGatedChannels {
         );
     }
 
-    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict) -> PyResult<()> {
+    fn update_receptor_kinetics(&mut self, neurotransmitter_concs: &PyDict, dt: f32) -> PyResult<()> {
         let neurotransmitter_concs = pydict_to_neurotransmitters_concentration(neurotransmitter_concs)?;
 
-        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs);
+        self.ligand_gates.update_receptor_kinetics(&neurotransmitter_concs, dt);
 
         Ok(())
     }
