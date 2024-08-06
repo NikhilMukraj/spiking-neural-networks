@@ -76,9 +76,9 @@ checksum = "f958d3d68f4167080a18141e10381e7634563984a537f2a49a30fd8e53ac5767"
 
 [[package]]
 name = "iterate_and_spike_traits"
-version = "0.5.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "660b53296134430d1b801f68e23b322bf1d26f0a86a369e4ce650dc8e8117241"
+checksum = "49011f6a1a8e7d2508fcc73decf19bd453d769f8a5fda03f9c0f853d81c89d06"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -402,9 +402,9 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 
 [[package]]
 name = "spiking_neural_networks"
-version = "0.19.3"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c8da4da98b857f8a6ff69f331d11391fad31d04f01613dd41a71b5de1cd98da"
+checksum = "3d0e0e8046af746809de5a6df285952e50398fc97f67e3270edf64b46f91d104"
 dependencies = [
  "iterate_and_spike_traits",
  "ndarray",
