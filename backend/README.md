@@ -700,8 +700,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total);
-        self.ligand_gates.set_receptor_currents(self.current_voltage);
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
         
         self.update_channels();
 
