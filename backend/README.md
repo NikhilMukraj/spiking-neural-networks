@@ -499,7 +499,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 ### Custom `IterateAndSpike` implementation
 
 ```rust
-use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpike;
+use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
     GaussianFactor, GaussianParameters, IsSpiking, Timestep,
     CurrentVoltage, GapConductance, IterateAndSpike, 
@@ -608,7 +608,7 @@ impl TimestepIndependentIonChannel for LeakChannel {
     }
 }
 
-#[derive(Debug, Clone, IterateAndSpike)]
+#[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
     pub current_voltage: f32, 
