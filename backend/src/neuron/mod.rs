@@ -148,7 +148,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 
     let last_firing_time = presynaptic_neuron.get_last_firing_time().unwrap();
     let refractoriness_function = presynaptic_neuron.get_refractoriness_function();
-    let dt = presynaptic_neuron.get_refractoriness_timestep();
+    let dt = presynaptic_neuron.get_dt();
     let conductance = postsynaptic_neuron.get_gap_conductance();
     let effect = refractoriness_function.get_effect(timestep, last_firing_time, v_max, v_resting, dt);
 
