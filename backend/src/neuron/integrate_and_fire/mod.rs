@@ -184,7 +184,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
         t_total: &NeurotransmitterConcentrations,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.leaky_get_dv_change(input_current);
         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
@@ -220,7 +220,7 @@ macro_rules! impl_iterate_and_spike {
                 t_total: &NeurotransmitterConcentrations,
             ) -> bool {
                 self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-                self.ligand_gates.set_receptor_currents(self.current_voltage);
+                self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
                 let dv = self.$dv_method(input_current);
                 let dw = self.$dw_method();
@@ -332,7 +332,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         t_total: &NeurotransmitterConcentrations,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.quadratic_get_dv_change(input_current);
         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
