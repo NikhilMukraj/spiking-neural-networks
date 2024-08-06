@@ -44,7 +44,6 @@ pub struct GABAbDissociation {
     // k2: ,
     pub k3: f32,
     pub k4: f32,
-    pub dt: f32,
 }
 
 impl Default for GABAbDissociation {
@@ -57,7 +56,6 @@ impl Default for GABAbDissociation {
             // k2: ,
             k3: 0.098,
             k4: 0.033, 
-            dt: 0.1,
         }
     }
 }
@@ -609,12 +607,12 @@ impl<T: ReceptorKinetics> NMDADefault for LigandGatedChannel<T> {
 
 impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     /// Calculates modifier for current calculation
-    fn get_modifier(&mut self, voltage: f32) -> f32 {
+    fn get_modifier(&mut self, voltage: f32, dt: f32) -> f32 {
         match &mut self.receptor_type {
             IonotropicLigandGatedReceptorType::AMPA(value) => *value,
             IonotropicLigandGatedReceptorType::GABAa(value) => *value,
             IonotropicLigandGatedReceptorType::GABAb(value) => {
-                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * value.dt;
+                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * dt;
                 value.calculate_modifer() // G^N / (G^N + Kd)
             }, 
             IonotropicLigandGatedReceptorType::NMDA(value) => value.calculate_b(voltage),
@@ -622,9 +620,9 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
         }
     }
 
-    /// Calculates current generated from receptor based on input `voltage` in mV
-    pub fn calculate_current(&mut self, voltage: f32) -> f32 {
-        let modifier = self.get_modifier(voltage);
+    /// Calculates current generated from receptor based on input `voltage` in mV and `dt` in ms
+    pub fn calculate_current(&mut self, voltage: f32, dt: f32) -> f32 {
+        let modifier = self.get_modifier(voltage, dt);
 
         self.current = modifier * self.receptor.get_r() * self.g * (voltage - self.reversal);
 
@@ -698,11 +696,11 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Calculates the receptor currents for each channel based on a given voltage (mV)
-    pub fn set_receptor_currents(&mut self, voltage: f32) {
+    pub fn set_receptor_currents(&mut self, voltage: f32, dt: f32) {
         self.ligand_gates
             .values_mut()
             .for_each(|i| {
-                i.calculate_current(voltage);
+                i.calculate_current(voltage, dt);
         });
     }
 
