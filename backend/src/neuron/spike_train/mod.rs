@@ -6,7 +6,7 @@ use super::iterate_and_spike::{
     ApproximateNeurotransmitter, CurrentVoltage, IsSpiking, LastFiringTime, 
     NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, Timestep,
 };
-use super::iterate_and_spike_traits::Timestep;
+use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
 /// of the simulation (neural refractoriness function), when the spike train spikes
@@ -85,50 +85,14 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
     fn iterate(&mut self) -> bool;
     /// Gets maximum and minimum voltage values
     fn get_height(&self) -> (f32, f32);
-    /// Gets timestep or `dt` (ms)
-    fn get_refractoriness_timestep(&self) -> f32;
     /// Returns neurotransmitter concentrations
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
     /// Returns refractoriness dynamics
     fn get_refractoriness_function(&self) -> &Self::U;
 }
 
-macro_rules! impl_current_voltage_spike_train {
-    ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> CurrentVoltage for $struct<T, U> {
-            fn get_current_voltage(&self) -> f32 {
-                self.current_voltage
-            }
-        }
-    };
-}
-
-macro_rules! impl_is_spiking_spike_train {
-    ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> IsSpiking for $struct<T, U> {
-            fn is_spiking(&self) -> bool {
-                self.is_spiking
-            }
-        }
-    };
-}
-
-macro_rules! impl_last_firing_time_spike_train {
-    ($struct:ident) => {
-        impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> LastFiringTime for $struct<T, U> {
-            fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-                self.last_firing_time = timestep;
-            }
-        
-            fn get_last_firing_time(&self) -> Option<usize> {
-                self.last_firing_time
-            }
-        }
-    };
-}
-
 /// A Poisson neuron
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SpikeTrainBase)]
 pub struct PoissonNeuron<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Membrane potential (mV)
     pub current_voltage: f32,
@@ -158,10 +122,6 @@ macro_rules! impl_default_spike_train_methods {
             (self.v_th, self.v_resting)
         }
     
-        fn get_refractoriness_timestep(&self) -> f32 {
-            self.dt
-        }
-    
         fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
             self.synaptic_neurotransmitters.get_concentrations()
         }
@@ -171,10 +131,6 @@ macro_rules! impl_default_spike_train_methods {
         }
     }
 }
-
-impl_current_voltage_spike_train!(PoissonNeuron);
-impl_is_spiking_spike_train!(PoissonNeuron);
-impl_last_firing_time_spike_train!(PoissonNeuron);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PoissonNeuron<T, U> {
     fn default() -> Self {
@@ -255,7 +211,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Poisso
 /// firing times the neuron fires, the internal clock is reset and the clock will iterate until the
 /// next firing time is reached, this will cycle until the last firing time is reached and the 
 /// next firing time becomes the first firing time
-#[derive(Debug, Clone, Timestep)]
+#[derive(Debug, Clone, SpikeTrainBase, Timestep)]
 pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
     /// Membrane potential (mV)
     pub current_voltage: f32,
@@ -280,10 +236,6 @@ pub struct PresetSpikeTrain<T: NeurotransmitterKinetics, U: NeuralRefractoriness
     /// Timestep for refractoriness (ms)
     pub dt: f32,
 }
-
-impl_current_voltage_spike_train!(PresetSpikeTrain);
-impl_is_spiking_spike_train!(PresetSpikeTrain);
-impl_last_firing_time_spike_train!(PresetSpikeTrain);
 
 impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for PresetSpikeTrain<T, U> {
     fn default() -> Self {
