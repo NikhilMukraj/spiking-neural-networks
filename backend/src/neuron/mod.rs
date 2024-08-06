@@ -527,6 +527,12 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         self.graph.set_id(id);
     }
 
+    /// Sets the timestep variable of each neuron and plasticity modulator to `dt`
+    pub fn set_dt(&mut self, dt: f32) {
+        self.apply(|neuron| neuron.set_dt(dt));
+        self.plasticity.set_dt(dt);
+    }
+
     /// Calculates electrical input value from positions
     fn calculate_internal_input_from_positions(
         &self,
@@ -961,7 +967,12 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
     /// Sets the identifier of the lattice
     pub fn set_id(&mut self, id: usize) {
         self.id = id;
-    }    
+    }   
+
+    /// Sets the timestep variable of each spike train to `dt`
+    pub fn set_dt(&mut self, dt: f32) {
+        self.apply(|neuron| neuron.set_dt(dt));
+    } 
 
     /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
@@ -1181,6 +1192,14 @@ where
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
 {
+    /// Sets the timestep variable for each neuron, spike train, and plasticity modulator to `dt`
+    pub fn set_dt(&mut self, dt: f32) {
+        self.lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+    }
+
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
         &mut self, 
@@ -2060,6 +2079,12 @@ where
         self.graph.set_id(id);
     }
 
+    /// Sets the timestep variable of each neuron and reward modulator to dt
+    pub fn set_dt(&mut self, dt: f32) {
+        self.apply(|neuron| neuron.set_dt(dt));
+        self.reward_modulator.set_dt(dt);
+    }
+
     /// Calculates electrical input value from positions
     fn calculate_internal_input_from_positions(
         &self,
@@ -2646,6 +2671,17 @@ where
         self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
 
         Ok(())
+    }
+
+    /// Sets the timestep variable for each neuron, spike train, and plasticity modulator, 
+    /// and reward modulator to `dt`
+    pub fn set_dt(&mut self, dt: f32) {
+        self.lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+        self.reward_modulated_lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
     }
 
     /// Resets the clock and last firing times for the entire network
