@@ -1025,7 +1025,7 @@ pub trait Timestep {
 ///     ) -> bool {
 ///         // accounts for receptor currents
 ///         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-///         self.ligand_gates.set_receptor_currents(self.current_voltage);
+///         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 /// 
 ///         let dv = self.quadratic_get_dv_change(input_current);
 ///         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
