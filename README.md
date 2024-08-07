@@ -443,6 +443,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Basic functions
   - [ ] Ligand gates
   - [ ] Parameterizable neurotransmitter type
+  - [ ] Plasticity
+- [ ] BCM rule
+  - [ ] Reward modulated BCM
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
@@ -510,6 +513,8 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] Plasticity
   - [x] Regular STDP
   - [ ] R-STDP
+  - [ ] BCM
+  - [ ] R-BCM
 - [ ] Lattice
   - [ ] Graphs input
     - [ ] Adjacency list
