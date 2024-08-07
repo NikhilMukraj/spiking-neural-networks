@@ -503,6 +503,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Adaptive Exponential
   - [x] Izhikevich
   - [x] Izhikevich Leaky Hybrid
+- [x] Hodgkin Huxley
+  - [x] Basic gating
+  - [x] Neurotransmission
 - [x] Static input test
 - [ ] Plasticity
   - [x] Regular STDP
@@ -511,10 +514,6 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [ ] Graphs input
     - [ ] Adjacency list
     - [x] Adjacency matrix
-- [ ] Hodgkin Huxley
-  - [x] Basic gating
-  - [x] Neurotransmission
-  - [ ] Additional gating
 - [ ] Parsing of `.nb` file into neuron model
 
 ### GPU
