@@ -383,25 +383,24 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] STDP test
   - [x] Single coupled neurons
   - [x] Multiple coupled neurons
-  - [ ] Single coupled R-STDP
+  - [x] Single coupled R-STDP
     - Note: input spike train is being inputted into input layers, depending on how strongly the output neurons are firing (and which neurons are spiking) reward is applied, this input is being inputted for specific duration *it is not instantaneous*
-  - [ ] Multiple coupled R-STDP
-  - [ ] Testing with weights summing to 1
+  - [x] Multiple coupled R-STDP
 - [x] Lattice
   - [x] Graph representation of lattice
     - [x] Adjacency list
     - [x] Adjacency matrix
-  - [ ] Generating GIFs from lattice
+  - [x] Generating GIFs from lattice
     - [x] Naive approach
-    - [ ] Optimized GIF generation
+    - [x] Optimized GIF generation
   - [x] Different potentiation types
     - [x] Inhibitory
     - [x] Excitatory
-  - [ ] Recording lattice over time
-    - [ ] Textual
+  - [x] Recording lattice over time
+    - [x] Textual
       - [x] Averaged
       - [x] Grid
-      - [ ] EEG
+      - [x] EEG
     - [x] Binary
       - [x] Averaged
       - [x] Grid
@@ -424,11 +423,7 @@ EEG processing with fourier transforms, and power spectral density calculations
       - [ ] GABAb
         - [x] GABAb primary
         - [ ] GABAb secondary
-  - [ ] Additional gating
-    - [x] Systemized method for adding gates
-    - [ ] L-Type Calcium
-    - [ ] T-Type Calcium
-    - [ ] M-current
+  - [x] Additional gating
   - [ ] More complex neurotransmission equations (with delay time constants and such)
   - [ ] Multicompartmental models
     - [ ] [Cable theory](https://boulderschool.yale.edu/sites/default/files/files/DayanAbbott.pdf)
@@ -437,50 +432,17 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Should implement a trait shared with integrate and fire neuron that iterates the state of the neuron and returns whether it is spiking
     - Should be implemented for coupling test, STDP, and lattice simulation
     - Hodgkin Huxley lattice function should share as much code as possible with integrate and fire function
-- [ ] FitzHugh-Nagumo model
-- [ ] TOML parsing
-  - [x] Integrate and fire parsing
-    - [x] Static input
-    - [x] STDP testing
-    - [x] Lattice
-  - [ ] Hodgkin Huxley
-    - [x] Static input
-    - [ ] STDP testing
-    - [x] Built in neurotransmitters
-    - [x] Built in additional gates
-- [ ] Izhikevich neurotransmission
-  - [ ] Fitting Izhikevich neuron to Hodgkin Huxley model with genetic algorithm
-    - [x] Objective function
-      - [x] Finding spikes
-      - [x] Comparing spikes
-        - [x] Amplitude of spikes, spike time differences, and number of spikes
-        - [x] Scaling data properly
-      - [x] Comparing static and coupled inputs
-      - [x] Comparing spikes under various input conditions
-    - [ ] [Spike time concidence objective function](https://www.sciencedirect.com/science/article/pii/S0893608019303065)
-    - [ ] Potential objective function refactor with spike amplitude being height subtracted by minimum
-    - [ ] Fitting with CUDA backend (and transfering this to Python interface)
-  - [ ] Using existing neurotransmitter framework with Izhikevich as either input stimulus or additional current added on
-    - [x] Remove existing neurotranmission system
-    - [x] Integrate and fire models with ligand gated channels interacting with neurotransmitters
-      - [x] Moving neurotransmitter concentration into seperate struct and moving receptor kinetics variables to seperate struct (with parameter $T_max$)
-        - [x] Presynaptic neuron calculates concentration and saves it
-        - [x] Post synaptic neuron applies weight to the concentration and sums it, then applies receptor kinetics
-          - [x] Neurotransmission current should be calculated with `iterate_and_spike` function after $dv$ is calculated and before spike is handled, `iterate_and_spike` should have a input neurotransmitter concentration as an option, if some do neurotransmitter current processing, if `None` then do not perform neurotransmitter current operation
-            - [ ] Update this within fitting Izhikevich neuron too
-        - [x] Integrate this into Hodgkin Huxley models too
-    - [x] Approximation of neurotransmitter in synapse over time (as well as receptor occupancy over time)
-      - $\frac{dT}{dt} = \alpha T + T_{max} H(V_p - V_{th})$ where $T$ is neurotransmitter concentration, $T_{max}$ is maximum neurotransmitter concentration, $\alpha$ is clearance rate, $H(x)$ is the heaviside function, $V_p$ is the average of the presynaptic voltages, and $V_{th}$ is the spiking threshold
-      - Receptor occupancy could be assumed to be at maximum
-      - Could be implemented with a trait neurotransmitter that has apply neurotransmitter change to apply t and r changes and get r to retrieve modifier
+- [x] Neurotransmitter refactor
 - [x] Poisson neuron
   - [x] Coupling
     - [x] Potentiation type
-- [ ] Spike train struct
-  - Given a set of times, the neuron will spike and not spike at given times
-    - Vector of times to spike at + delay before first spike + delay after last spike
-  - Internal clock starts at 0, and increments every iteration until the end time is reached where it will return to 0
-    - [ ] Potentiation type
+- [x] Spike train struct
+- [ ] Parsing of `.nb` file into model
+  - [x] Ion channels
+  - [x] Neuron model
+  - [x] Basic functions
+  - [ ] Ligand gates
+  - [ ] Parameterizable neurotransmitter type
 - [ ] Astrocytes model
   - [Coupled with Hodgkin Huxley neurons](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3843665/)
   - [Astrocytes equations](https://www.sciencedirect.com/science/article/pii/S0960077922011481)
@@ -542,26 +504,31 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Izhikevich
   - [x] Izhikevich Leaky Hybrid
 - [x] Static input test
-- [ ] STDP test
+- [ ] Plasticity
   - [x] Regular STDP
   - [ ] R-STDP
 - [ ] Lattice
   - [ ] Graphs input
     - [ ] Adjacency list
-    - [ ] Adjacency matrix
+    - [x] Adjacency matrix
 - [ ] Hodgkin Huxley
   - [x] Basic gating
-  - [ ] Neurotransmission
+  - [x] Neurotransmission
   - [ ] Additional gating
+- [ ] Parsing of `.nb` file into neuron model
 
-### CUDA
+### GPU
 
-- [ ] Parallel integrate and fire
-  - [ ] Parallel voltage update
-  - [ ] Parallel adaptive update
-  - [ ] Parallel input calculation
-- [ ] Parallel Hodgkin Huxley
-- [ ] Interfacing from Python
+- [ ] WGPU
+  - [ ] Shader kernel for neuron model
+  - [ ] Associative map
+  - [ ] Kernel for calculating inputs
+  - [ ] Kernel for plasticity
+- [ ] CUDA
+  - [ ] Shader kernel for neuron model
+  - [ ] Associative map
+  - [ ] Kernel for calculating inputs
+  - [ ] Kernel for plasticity
 
 <!-- ## Results
 
