@@ -24,6 +24,7 @@ pub mod hodgkin_huxley;
 pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
+// use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
@@ -282,7 +283,7 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
 }
 
 /// Handles history of a lattice
-pub trait LatticeHistory: Default {
+pub trait LatticeHistory: Default + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>);
     /// Resets history
@@ -625,6 +626,41 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             .collect()
     }
 
+    // fn par_get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
+    //     self.graph.get_every_node_as_ref()
+    //         .par_iter()
+    //         .map(|pos| {
+    //             let input_positions = self.graph.get_incoming_connections(&pos)
+    //             .expect("Cannot find position");
+
+    //             let input = self.calculate_internal_input_from_positions(
+    //                 &pos,
+    //                 &input_positions,
+    //             );
+
+    //             (**pos, input)
+    //         })
+    //         .collect()
+    // }
+
+    // fn par_get_internal_neurotransmitter_inputs(&self) -> 
+    // HashMap<(usize, usize), NeurotransmitterConcentrations> {
+    //     self.graph.get_every_node_as_ref()
+    //         .par_iter()
+    //         .map(|&pos| {
+    //             let input_positions = self.graph.get_incoming_connections(pos)
+    //                 .expect("Cannot find position");
+
+    //             let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
+    //                 &pos,
+    //                 &input_positions,
+    //             );
+
+    //             (*pos, neurotransmitter_input)
+    //         })
+    //         .collect()
+    // }
+
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_neurotransmitter_inputs(&self) -> 
     HashMap<(usize, usize), NeurotransmitterConcentrations> {
@@ -897,7 +933,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 }
 
 /// Handles history of a spike train lattice
-pub trait SpikeTrainLatticeHistory: Default {
+pub trait SpikeTrainLatticeHistory: Default + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
     /// Resets history
