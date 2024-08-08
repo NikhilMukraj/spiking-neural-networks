@@ -22,9 +22,9 @@ pub struct GraphPosition {
 }
 
 /// Implementation of a basic graph
-pub trait Graph: Default {
-    type T: Debug + Hash + Eq + PartialEq + Clone + Copy;
-    type U: Debug + Clone + Copy;
+pub trait Graph: Default + Send + Sync {
+    type T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy;
+    type U: Send + Sync + Debug + Clone + Copy;
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
@@ -52,15 +52,15 @@ pub trait Graph: Default {
     fn reset_history(&mut self);
 }
 
-pub trait ToGraphPosition {
+pub trait ToGraphPosition: Send + Sync {
     type GraphPos: Graph<T = GraphPosition>;
 }
 
-impl<U: Debug + Clone + Copy> ToGraphPosition for AdjacencyMatrix<Position, U> {
+impl<U: Send + Sync + Debug + Clone + Copy> ToGraphPosition for AdjacencyMatrix<Position, U> {
     type GraphPos = AdjacencyMatrix<GraphPosition, U>;
 }
 
-impl<U: Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Position, U> {
+impl<U: Send + Sync + Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Position, U> {
     type GraphPos = AdjacencyMatrix<GraphPosition, U>;
 }
 
@@ -94,7 +94,7 @@ impl<U: Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Position, U> {
 /// assert!(adjacency_matrix.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
 #[derive(Clone, Debug)]
-pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> {
+pub struct AdjacencyMatrix<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Debug + Clone + Copy> {
     /// Converts position to a index for the matrix
     pub position_to_index: HashMap<T, usize>,
     /// Converts the index back to a position
@@ -107,13 +107,19 @@ pub struct AdjacencyMatrix<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + C
     pub id: usize,
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> AdjacencyMatrix<T, U> {
+impl<
+    T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy,
+    U: Send + Sync + Debug + Clone + Copy
+> AdjacencyMatrix<T, U> {
     pub fn nodes_len(&self) -> usize {
         self.position_to_index.len()
     }
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Graph for AdjacencyMatrix<T, U> {
+impl<
+    T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
+    U: Send + Sync + Debug + Clone + Copy
+> Graph for AdjacencyMatrix<T, U> {
     type T = T;
     type U = U;
 
@@ -218,7 +224,7 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> G
     }
 }
 
-impl<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default for AdjacencyMatrix<T, U> {
+impl<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Debug + Clone + Copy> Default for AdjacencyMatrix<T, U> {
     fn default() -> Self {
         AdjacencyMatrix { 
             position_to_index: HashMap::new(), 
@@ -259,7 +265,10 @@ impl<T: Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default f
 /// assert!(adjacency_list.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
 #[derive(Clone, Debug)]
-pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> {
+pub struct AdjacencyList<
+    T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
+    U: Send + Sync + Debug + Clone + Copy
+> {
     /// All presynaptic connections
     pub incoming_connections: HashMap<T, HashMap<T, U>>,
     /// All postsynaptic connections
@@ -270,7 +279,10 @@ pub struct AdjacencyList<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Deb
     pub id: usize,
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Graph for AdjacencyList<T, U> {
+impl<
+    T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
+    U: Send + Sync + Debug + Clone + Copy
+> Graph for AdjacencyList<T, U> {
     type T = T;
     type U = U;
 
@@ -387,7 +399,10 @@ impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> G
     }
 }
 
-impl<T: Debug + Hash + Eq + PartialEq + Clone + Copy, U: Debug + Clone + Copy> Default for AdjacencyList<T, U> {
+impl<
+    T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
+    U: Send + Sync + Debug + Clone + Copy
+> Default for AdjacencyList<T, U> {
     fn default() -> Self {
         AdjacencyList { 
             incoming_connections: HashMap::new(), 
