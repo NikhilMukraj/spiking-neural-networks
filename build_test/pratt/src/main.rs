@@ -1096,13 +1096,13 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
     }
 }
 
-fn extract_name_from_pattern(s: &str, i: &str) -> Vec<String> {
+fn extract_name_from_pattern(string: &str, i: &str) -> Vec<String> {
     let re = Regex::new(&format!(r"pub (.*): {}", i)).unwrap();
     let mut output = vec![];
 
-    for caps in re.captures_iter(s) {
+    for caps in re.captures_iter(string) {
         let first_part = &caps[1];
-        if s.contains(i) {
+        if string.contains(i) {
             output.push(first_part.to_string());
         }
     }
@@ -1374,6 +1374,19 @@ fn main() -> Result<()> {
 
             // if "{}(" where {} is name is found, then find 
             // associated function and add to code at the bottom
+
+            // let functions_to_add = Vec::new();
+
+            // let all_code = code.values()
+            //     .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
+            //     .collect::<Vec<String>>()
+            //     .join("\n");
+
+            // for (key, value) in functions.iter() {
+            //     if all_code.contains(&key) {
+            //         functions_to_add.push(value.clone());
+            //     }
+            // }
 
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
