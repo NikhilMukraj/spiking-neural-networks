@@ -18,13 +18,13 @@ use std::{
     f32::consts::PI, 
     result::Result,
 };
+use rayon::prelude::*;
 pub mod integrate_and_fire;
 pub mod ion_channels;
 pub mod hodgkin_huxley;
 pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
-// use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
@@ -626,22 +626,22 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             .collect()
     }
 
-    // fn par_get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
-    //     self.graph.get_every_node_as_ref()
-    //         .par_iter()
-    //         .map(|pos| {
-    //             let input_positions = self.graph.get_incoming_connections(&pos)
-    //             .expect("Cannot find position");
+    fn par_get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
+        self.graph.get_every_node_as_ref()
+            .par_iter()
+            .map(|pos| {
+                let input_positions = self.graph.get_incoming_connections(&pos)
+                    .expect("Cannot find position");
 
-    //             let input = self.calculate_internal_input_from_positions(
-    //                 &pos,
-    //                 &input_positions,
-    //             );
+                let input = self.calculate_internal_input_from_positions(
+                    &pos,
+                    &input_positions,
+                );
 
-    //             (**pos, input)
-    //         })
-    //         .collect()
-    // }
+                (**pos, input)
+            })
+            .collect()
+    }
 
     // fn par_get_internal_neurotransmitter_inputs(&self) -> 
     // HashMap<(usize, usize), NeurotransmitterConcentrations> {
@@ -826,6 +826,55 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         Ok(())
     }
 
+    pub fn par_iterate(
+        &mut self,
+        inputs: &HashMap<(usize, usize), f32>,
+    ) -> Result<(), GraphError> {
+        // may need to only use par iter on the outer versus the inner
+        // test par being par iter and only outer being par iter
+
+        let current_clock = self.internal_clock;
+        let do_plasticity = self.do_plasticity;
+        let plasticity = &self.plasticity;
+
+        let positions_to_update: Vec<_> = self.cell_grid.par_iter_mut().enumerate().map(|(x, row)| {
+                let inner: Vec<_> = row.iter_mut().enumerate().filter_map(move |(y, given_neuron)| {
+                    let pos = (x, y);
+                    let input_value = *inputs.get(&pos).unwrap();
+
+                    let is_spiking = given_neuron.iterate_and_spike(input_value);
+
+                    if is_spiking {
+                        given_neuron.set_last_firing_time(Some(current_clock));
+                    }
+
+                    if do_plasticity && plasticity.do_update(&given_neuron) {
+                        Some((x, y, pos))
+                    } else {
+                        None
+                    }
+                }).collect();
+
+                inner
+            })
+            .flatten()
+            .collect();
+
+        for (x, y, pos) in positions_to_update {
+            self.update_weights_from_neurons(x, y, &pos)?;
+        }
+
+        if self.update_graph_history {
+            self.graph.update_history();
+        }
+        if self.update_grid_history {
+            self.grid_history.update(&self.cell_grid);
+        }
+        self.internal_clock += 1;
+
+        Ok(())
+    }
+
     /// Iterates the lattice based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs
     pub fn run_lattice_with_electrical_and_chemical_synapses(
@@ -864,6 +913,19 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     ) -> Result<(), GraphError> {
         for _ in 0..iterations {
             let inputs = self.get_internal_electrical_inputs();
+
+            self.iterate(&inputs)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn run_par_inputs_lattice(
+        &mut self,
+        iterations: usize,
+    ) -> Result<(), GraphError> {
+        for _ in 0..iterations {
+            let inputs = self.par_get_internal_electrical_inputs();
 
             self.iterate(&inputs)?;
         }
@@ -2187,17 +2249,6 @@ where
 
     /// Gets all internal electrical inputs 
     fn get_internal_electrical_inputs(&self) -> HashMap<(usize, usize), f32> {
-        // eventually convert to this, same with neurotransmitter input
-        // convert on lattice network too
-        // let inputs: HashMap<Position, f32> = graph
-        //     .get_every_node()
-        //     .par_iter()
-        //     .map(|&pos| {
-        //     // .. calculating input
-        //     (pos, change)
-        //     });
-        //     .collect();
-
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|pos| {
