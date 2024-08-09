@@ -244,10 +244,10 @@ fn add_indents(input: &str, indent: &str) -> String {
         .join("\n")
 }
 
-pub struct NeuronDefinition {
+struct NeuronDefinition {
     type_name: AST,
     vars: AST,
-    on_spike: AST,
+    on_spike: Option<AST>,
     on_iteration: AST,
     spike_detection: AST,
     ion_channels: Option<AST>,
@@ -352,17 +352,43 @@ impl NeuronDefinition {
         let fields = format!("\t{},", fields.join(",\n\t"));
 
         let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
-        let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.to_string());
-        let handle_spiking_check = "\tif self.is_spiking {";
-        let handle_spiking_function = format!("\t\t{}", self.on_spike.to_string());
 
-        let handle_spiking = format!(
-            "{}\n{}\n{}\n{}\n\t}}\n\n\tself.is_spiking\n}}", 
-            handle_spiking_header, 
-            handle_is_spiking_calc,
-            handle_spiking_check, 
-            handle_spiking_function
-        );
+        let handle_spiking_function = match &self.on_spike {
+            Some(value) => {
+                let handle_spiking_check = "\tif self.is_spiking {";
+                let handle_spiking_function = format!("\t\t{}", value.to_string());
+
+                format!("{}\n{}\n\t}}", handle_spiking_check, handle_spiking_function)
+            },
+            None => String::from(""),
+        };
+
+        let handle_spiking = if self.spike_detection.to_string() != "continuous()" {
+            let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.to_string());
+    
+            format!(
+                "{}\n{}\n{}\n\n\tself.is_spiking\n}}", 
+                handle_spiking_header, 
+                handle_is_spiking_calc,
+                handle_spiking_function,
+            )
+        } else {
+            let handle_is_spiking_calc = vec![
+                "let increasing_right_now = last_voltage < self.current_voltage;",
+                "let threshold_crossed = self.current_voltage > self.v_th;",
+                "let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;",
+                "self.is_spiking = is_spiking;",
+                "self.was_increasing = increasing_right_now;",
+            ];
+            let handle_is_spiking_calc = add_indents(&handle_is_spiking_calc.join("\n"), "\t");
+
+            format!(
+                "{}\n{}\n{}\n\tself.is_spiking\n}}",
+                handle_spiking_header, 
+                handle_is_spiking_calc,
+                handle_spiking_function,
+            )
+        };
 
         let on_iteration_assignments = self.on_iteration.to_string();
 
@@ -467,7 +493,7 @@ impl NeuronDefinition {
     }
 }
 
-pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
+fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     let mut definitions: HashMap<String, AST> = HashMap::new();
 
     for pair in pairs {
@@ -599,14 +625,14 @@ pub fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
         vars: definitions.remove("vars").unwrap(),
         spike_detection: definitions.remove("spike_detection").unwrap(),
         on_iteration: definitions.remove("on_iteration").unwrap(),
-        on_spike: definitions.remove("on_spike").unwrap(),
+        on_spike: definitions.remove("on_spike"),
         ion_channels: definitions.remove("ion_channels"),
     };
 
     Ok(neuron)
 }
 
-pub struct IonChannelDefinition {
+struct IonChannelDefinition {
     type_name: AST,
     vars: AST,
     gating_vars: Option<AST>,
@@ -776,7 +802,7 @@ impl IonChannelDefinition {
     }
 }
 
-pub fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
+fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     let mut definitions: HashMap<String, AST> = HashMap::new();
 
     for pair in pairs {
@@ -1155,6 +1181,8 @@ fn main() -> Result<()> {
 
     // test creating default impl
 
+    // handle comments
+    
     // allow 
     // on_spike: expr
     // and
@@ -1405,8 +1433,6 @@ fn main() -> Result<()> {
             eprintln!("Parse failed: {:?}", e);
         }
     }
-
-    // *** handle continous detection ***
 
     Ok(())
 }
