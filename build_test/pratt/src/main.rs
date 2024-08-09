@@ -1402,5 +1402,7 @@ fn main() -> Result<()> {
         }
     }
 
+    // *** handle continous detection ***
+
     Ok(())
 }
