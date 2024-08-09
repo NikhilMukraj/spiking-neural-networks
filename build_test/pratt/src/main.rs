@@ -1182,7 +1182,7 @@ fn main() -> Result<()> {
     // test creating default impl
 
     // handle comments
-    
+
     // allow 
     // on_spike: expr
     // and
@@ -1402,6 +1402,7 @@ fn main() -> Result<()> {
                 String::from("heaviside"),
                 String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
             );
+            // continous is also a reserved function name
 
             let mut functions_to_add = Vec::new();
 
