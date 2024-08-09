@@ -745,7 +745,7 @@ macro_rules! impl_lattice {
                 Ok(())
             }
 
-            fn apply_function_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+            fn apply_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
                 let py_callable = function.to_object(py);
 
                 self.lattice.apply_given_position(|(i, j), neuron| {
@@ -991,7 +991,7 @@ impl PyPoissonLattice {
         }
     }
     
-    fn apply_function(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+    fn apply(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
         let py_callable = function.to_object(py);
 
         self.lattice.apply(|neuron| {
@@ -1006,7 +1006,7 @@ impl PyPoissonLattice {
         Ok(())
     }
 
-    fn apply_function_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+    fn apply_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
         let py_callable = function.to_object(py);
 
         self.lattice.apply_given_position(|(i, j), neuron| {
