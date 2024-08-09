@@ -188,15 +188,28 @@ impl<
             return Err(GraphError::PositionNotFound(format!("{:#?}", pos)));
         }
 
-        let mut connections: HashSet<T> = HashSet::new();
-        for i in self.position_to_index.keys() {
-            match self.lookup_weight(i, &pos).unwrap() {
-                Some(_) => { connections.insert(*i); },
-                None => {}
-            };
-        }
+        // let mut connections: HashSet<T> = HashSet::new();
+        // for i in self.position_to_index.keys() {
+        //     match self.lookup_weight(i, &pos).unwrap() {
+        //         Some(_) => { connections.insert(*i); },
+        //         None => {}
+        //     };
+        // }
 
-        Ok(connections)
+        // Ok(connections)
+
+        Ok(
+            self.matrix.iter()
+                .enumerate()
+                .filter_map(|(i, row)| {
+                    if row[self.position_to_index[pos]].is_some() { 
+                        Some(self.index_to_position[&i]) 
+                    } else { 
+                        None 
+                    }
+                })
+                .collect()
+        )
     }
 
     fn get_outgoing_connections(&self, pos: &T) -> Result<HashSet<T>, GraphError> {
