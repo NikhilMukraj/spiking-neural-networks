@@ -1164,7 +1164,11 @@ fn main() -> Result<()> {
     // default functions like max, min, exp, floor, ciel, heaviside
     // if function in same space as on iteration and on spike
     // add that function to the struct impl
+
     // function declarations in separate space from on iteration and on spike
+
+    // error handling by matching individual blocks (matching every [x] [end] and seeing if 
+    // neuron matches, ion channels matches, or none match)
 
     // refractory period (either if statements or separate block)
 
