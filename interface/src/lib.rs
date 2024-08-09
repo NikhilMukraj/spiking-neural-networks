@@ -2415,8 +2415,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
 
-    // isspiking trait spike train in pyo3
     // falliable connect (specifically for pyo3)
+
+    // option to use adjacency list instead of matrix
 
     // generate network method
 
