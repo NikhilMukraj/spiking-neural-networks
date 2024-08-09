@@ -526,6 +526,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - [ ] WGPU
   - [ ] Shader kernel for neuron model
   - [ ] Associative map
+    - Graph could store positions in a vector and position in vector corresponds to its index instead of a hashmap
   - [ ] Kernel for calculating inputs
   - [ ] Kernel for plasticity
 - [ ] CUDA
