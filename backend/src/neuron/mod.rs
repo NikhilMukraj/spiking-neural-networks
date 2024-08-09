@@ -2787,7 +2787,7 @@ where
     }
 }
 
-impl<S, T, U, V, W, X, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, AdjacencyMatrix<GraphPosition, RewardModulatedConnection<S>>, Z, R, C>
+impl<S, T, U, V, W, Y, X, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike,
@@ -2795,6 +2795,7 @@ where
     V: LatticeHistory,
     W: SpikeTrain,
     X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
