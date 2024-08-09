@@ -1435,5 +1435,10 @@ fn main() -> Result<()> {
         }
     }
 
+    // check for number of [neuron] and [ion_channel] blocks (exclude comments)
+    // make sure they all close
+    // if they do close and the number of generated code blocks does not line up
+    // match on that specific block and return an error
+
     Ok(())
 }
