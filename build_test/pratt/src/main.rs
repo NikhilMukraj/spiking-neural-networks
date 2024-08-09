@@ -1142,9 +1142,8 @@ fn main() -> Result<()> {
     // handle continous detection
     // try code generation (assume default ligands)
 
-    // handle ion channels (handle builtin ion channels) 
+    // handle ion channels
     // handle gating variables
-    // (could import with name prefixed as DefaultChannel or something)
 
     // update ion channel is called before other neuron
     // current could then be extracted and used in iteration
