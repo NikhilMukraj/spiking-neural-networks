@@ -221,8 +221,13 @@ impl<
         let out_going_connections = self.matrix[node]
             .iter()
             .enumerate()
-            .filter(|(_, &val)| val.is_some())
-            .map(|(n, _)| self.index_to_position[&n])
+            .filter_map(|(n, &val)| {
+                if val.is_some() {
+                    Some(self.index_to_position[&n])
+                } else {
+                    None
+                }
+            })
             .collect::<HashSet<T>>();
             
         Ok(out_going_connections)
