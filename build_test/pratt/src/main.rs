@@ -1330,74 +1330,69 @@ fn main() -> Result<()> {
                 }
             }
 
-            // let mut functions: HashMap<String, String> = HashMap::new();
-            // functions.insert(
-            //     String::from("max"), 
-            //     String::from("fn max(a: f32, b: f32) -> f32 { a.max(b) }"),
-            // );
-            // functions.insert(
-            //     String::from("min"),
-            //     String::from("fn min(a: f32, b: f32) -> f32 { a.min(b) }")
-            // );
-            // functions.insert(
-            //     String::from("exp"),
-            //     String::from("fn exp(x: f32) -> f32 { x.exp() }") 
-            // );
-            // functions.insert(
-            //     String::from("tanh"),
-            //     String::from("fn tanh(x: f32) -> f32 { x.tanh() }"),
-            // );
-            // functions.insert(
-            //     String::from("sinh"),
-            //     String::from("fn sinh(x: f32) -> f32 { x.sinh() }"),
-            // );
-            // functions.insert(
-            //     String::from("cosh"),
-            //     String::from("fn cosh(x: f32) -> f32 { x.cosh() }"),
-            // );
-            // functions.insert(
-            //     String::from("tan"),
-            //     String::from("fn tan(x: f32) -> f32 { x.tan() }"),
-            // );
-            // functions.insert(
-            //     String::from("sin"),
-            //     String::from("fn sin(x: f32) -> f32 { x.sin() }"),
-            // );
-            // functions.insert(
-            //     String::from("cos"),
-            //     String::from("fn cos(x: f32) -> f32 { x.cos() }"),
-            // );
-            // functions.insert(
-            //     String::from("heaviside"),
-            //     String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
-            // );
+            let mut functions: HashMap<String, String> = HashMap::new();
+            functions.insert(
+                String::from("max"), 
+                String::from("fn max(a: f32, b: f32) -> f32 { a.max(b) }"),
+            );
+            functions.insert(
+                String::from("min"),
+                String::from("fn min(a: f32, b: f32) -> f32 { a.min(b) }")
+            );
+            functions.insert(
+                String::from("exp"),
+                String::from("fn exp(x: f32) -> f32 { x.exp() }") 
+            );
+            functions.insert(
+                String::from("tanh"),
+                String::from("fn tanh(x: f32) -> f32 { x.tanh() }"),
+            );
+            functions.insert(
+                String::from("sinh"),
+                String::from("fn sinh(x: f32) -> f32 { x.sinh() }"),
+            );
+            functions.insert(
+                String::from("cosh"),
+                String::from("fn cosh(x: f32) -> f32 { x.cosh() }"),
+            );
+            functions.insert(
+                String::from("tan"),
+                String::from("fn tan(x: f32) -> f32 { x.tan() }"),
+            );
+            functions.insert(
+                String::from("sin"),
+                String::from("fn sin(x: f32) -> f32 { x.sin() }"),
+            );
+            functions.insert(
+                String::from("cos"),
+                String::from("fn cos(x: f32) -> f32 { x.cos() }"),
+            );
+            functions.insert(
+                String::from("heaviside"),
+                String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
+            );
 
-            // if "{}(" where {} is name is found, then find 
-            // associated function and add to code at the bottom
+            let mut functions_to_add = Vec::new();
 
-            // let functions_to_add = Vec::new();
+            let mut all_code = code.values()
+                .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
+                .collect::<Vec<String>>()
+                .join("\n");
 
-            // let all_code = code.values()
-            //     .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
-            //     .collect::<Vec<String>>()
-            //     .join("\n");
+            // check whitespace or ( before function to ensure that it is a function call
+            // (do not need to check for operator) as long as code generator formats with whitespace
+            for (key, value) in functions.iter() {
+                if all_code.contains(&format!(" {}(", key)) || all_code.contains(&format!("({}(", key)) {
+                    functions_to_add.push(value.clone());
+                }
+            }
 
-            // for (key, value) in functions.iter() {
-            //     if all_code.contains(&key) {
-            //         functions_to_add.push(value.clone());
-            //     }
-            // }
+            all_code = format!("{}\n{}\n", all_code, functions_to_add.join("\n\n"));
 
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
             file.write_all("\n\n\n".as_bytes())?;
-            file.write_all(
-                code.values()
-                    .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
-                    .collect::<Vec<String>>()
-                    .join("\n")
-                    .as_bytes()
-            )?;
+            file.write_all(all_code.as_bytes())?;
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
