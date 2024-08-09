@@ -1387,7 +1387,11 @@ fn main() -> Result<()> {
                 }
             }
 
-            all_code = format!("{}\n{}\n", all_code, functions_to_add.join("\n\n"));
+            all_code = if !functions_to_add.is_empty() {
+                format!("{}\n{}\n", all_code, functions_to_add.join("\n\n"))
+            } else {
+                all_code
+            };
 
             let mut file = File::create(&output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
