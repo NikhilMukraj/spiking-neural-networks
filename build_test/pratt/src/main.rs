@@ -1435,6 +1435,12 @@ fn main() -> Result<()> {
         }
     }
 
+    // allow this syntax for on_iteration and on_spike
+    // on_spike: expr
+    // and
+    // on_spike:
+    //     expr
+
     // check for number of [neuron] and [ion_channel] blocks (exclude comments)
     // make sure they all close
     // if they do close and the number of generated code blocks does not line up
