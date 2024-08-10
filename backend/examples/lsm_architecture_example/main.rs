@@ -3,6 +3,7 @@ use std::io::{BufWriter, Write};
 
 use rand::Rng;
 extern crate spiking_neural_networks;
+use spiking_neural_networks::error::AgentError;
 use spiking_neural_networks::neuron::create_agent_type_for_network;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError, 
@@ -45,22 +46,26 @@ struct TestState {
 
 impl State for TestState {
     type A = AgentType;
-    fn update_state(&mut self, network: &Self::A) {
+    fn update_state(&mut self, network: &Self::A) -> Result<(), AgentError> {
         self.timestep = network.internal_clock;
         self.dopamine_history.push(
             network.reward_modulated_lattices_values()
                 .map(|i| i.reward_modulator.dopamine)
                 .sum()
         );
+
+        Ok(())
     }
 }
 
-fn reward_function(state: &TestState, _: &AgentType) -> f32 {
-    if state.timestep % 2000 == 0 && state.timestep != 0 {
+fn reward_function(state: &TestState, _: &AgentType) -> Result<f32, AgentError> {
+    let reward = if state.timestep % 2000 == 0 && state.timestep != 0 {
         1.
     } else {
         0.
-    }
+    };
+
+    Ok(reward)
 }
 
 fn state_encoder(state: &TestState, network: &mut AgentType) {
