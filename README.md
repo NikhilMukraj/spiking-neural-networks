@@ -147,15 +147,9 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Reward optimizer structure, takes in a reward modulated network and a reward function and a state structure and optimizes reward given the state structure, state structure encapsulates state of network (firing rate of readout for example) as well as a state representing something the network is interacting with, also needs a function that given parameters sets the state of network (for instance doing rate encoding on poisson lattice) based on the current state of the environment or the function the network is interacting with and trying to optimize
     - Maybe function optimized by rstdp contains a state within the closure that is mutated
 
-- Use Rayon to thread lattice calculations
+- **Use Rayon to thread calculations**
   - Inputs should be calculated in parallel
-  - Cells could be modified with `par_iter_mut` or a `par_chunk_mut`, this part would need to be benchmarked but could modify weights but not in parallel and see if the parallel implemenation is still faster since a majority of the calculation is threaded
-    - **Update cells by looping over grid**
-    - Or could parallelize editing of weights by using `par_iter_mut` to calculate the weights and then applying them
-    - **STDP should be calculated differently**, all neurons that are spiking should added to a list of spiking neurons which should then be updated after neuron states are updated
-    - Both lattice struct and lattice network should use Rayon
-  - Parallel functionality should also be benchmarked
-  - In order to improve performance, may want to phase out optional receptor kinetics with neurotransmitters, neurotransmitters should maybe always have an effect on receptors and makes option stuff cleaner, simpler coupling tests should have option to not use neurotransmitters (instead of receptor kinetics bool)
+  - Could aggregate `HashMap<GraphPosition, WeightType>` when calculating weight changes from plasticity and then apply each change, calculation could then be threaded with rayon
 
 - Astrocytes
 
