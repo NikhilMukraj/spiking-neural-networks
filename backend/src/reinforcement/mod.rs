@@ -12,7 +12,7 @@ pub trait Agent {
 /// Updates self based on the agent's state
 pub trait State {
     type A: Agent;
-    fn update_state(&mut self, agent: &Self::A);
+    fn update_state(&mut self, agent: &Self::A) -> Result<(), AgentError>;
 }
 
 /// An encapsulation of the state and the agent
@@ -24,18 +24,18 @@ pub struct Environment<'a, T: Agent, U: State<A=T>> {
     /// Functon that encodes the current state into the agent
     pub state_encoder: &'a dyn Fn(&U, &mut T),
     /// Function that takes in the state and the agent to return a reward
-    pub reward_function: &'a dyn Fn(&U, &T) -> f32,
+    pub reward_function: &'a dyn Fn(&U, &T) -> Result<f32, AgentError>,
 }
 
 impl<'a, T: Agent, U: State<A=T>> Environment<'a, T, U> {
     pub fn run(&mut self, iterations: usize) -> Result<(), AgentError> {
         for _ in 0..iterations {            
             // get reward
-            let reward = (self.reward_function)(&self.state, &self.agent);
+            let reward = (self.reward_function)(&self.state, &self.agent)?;
             // update agent (taking action) and apply reward for the action
             self.agent.update_and_apply_reward(reward)?;
             // update state based on agent
-            self.state.update_state(&self.agent);
+            self.state.update_state(&self.agent)?;
             // encodes state into agent
             (self.state_encoder)(&self.state, &mut self.agent);
         }
