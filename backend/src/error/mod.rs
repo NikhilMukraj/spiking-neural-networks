@@ -37,7 +37,7 @@ impl Display for GraphError {
 impl_debug_default!(GraphError);
 
 /// Error set for potential lattice network errors
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum LatticeNetworkError {
     /// Graph id already present in network (network must have graphs with unique identifiers)
     GraphIDAlreadyPresent(usize),
@@ -57,6 +57,8 @@ pub enum LatticeNetworkError {
     RewardModulatedConnectionNotCompatibleInternally,
     /// Connect function must have non reward modulated lattices, connect with reward modulation instead
     ConnectFunctionMustHaveNonRewardModulatedLattice,
+    /// Connection function failed
+    ConnectionFailure(String)
 }
 
 impl Display for LatticeNetworkError {
@@ -85,7 +87,10 @@ impl Display for LatticeNetworkError {
             ),
             LatticeNetworkError::ConnectFunctionMustHaveNonRewardModulatedLattice => String::from(
                 "Connect function must have non reward modulated lattices, connect with reward modulation instead",
-            )
+            ),
+            LatticeNetworkError::ConnectionFailure(value) => {
+                format!("Failed to connect: {}", value)
+            },
         };
 
         write!(f, "{}", err_msg)
