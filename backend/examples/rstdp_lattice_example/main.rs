@@ -1,7 +1,7 @@
 use std::{fs::File, io::{BufWriter, Write}};
 use rand::Rng;
 use spiking_neural_networks::{
-    error::SpikingNeuralNetworksError, 
+    error::{AgentError, SpikingNeuralNetworksError}, 
     neuron::{
         create_agent_type_for_lattice, 
         integrate_and_fire::IzhikevichNeuron, 
@@ -41,18 +41,22 @@ create_agent_type_for_lattice!(
 
 impl State for TestState {
     type A = AgentType;
-    fn update_state(&mut self, lattice: &Self::A) {
+    fn update_state(&mut self, lattice: &Self::A) -> Result<(), AgentError> {
         self.timestep = lattice.internal_clock;
         self.dopamine_history.push(lattice.reward_modulator.dopamine);
+
+        Ok(())
     }
 }
 
-fn reward_function(state: &TestState, _: &AgentType) -> f32 {
-    if state.timestep % 2000 == 0 && state.timestep != 0 {
+fn reward_function(state: &TestState, _: &AgentType) -> Result<f32, AgentError> {
+    let reward = if state.timestep % 2000 == 0 && state.timestep != 0 {
         1.
     } else {
         0.
-    }
+    };
+
+    Ok(reward)
 }
 
 fn state_encoder<T: State, U: Agent>(_: &T, _: &mut U) {}
