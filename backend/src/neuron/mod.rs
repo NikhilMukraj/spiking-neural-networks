@@ -481,7 +481,7 @@ pub struct Lattice<
     pub update_graph_history: bool,
     /// Whether to update grid's history
     pub update_grid_history: bool,
-    // Plasticity rule
+    /// Plasticity rule
     pub plasticity: W,
     /// Whether to update weights with based on plasticity when iterating
     pub do_plasticity: bool,
@@ -2905,6 +2905,7 @@ where
     }
 }
 
+/// A network of lattices and reward modulated lattices that can be updated based on a reward
 #[derive(Debug, Clone)]
 pub struct RewardModulatedLatticeNetwork<
     S: RewardModulatedWeight,
