@@ -2612,10 +2612,7 @@ where
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
         neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
-        reward: f32,
     ) -> Result<(), GraphError> {
-        self.reward_modulator.update(reward);
-
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
             let input_value = *inputs.get(&pos).unwrap();
@@ -2650,10 +2647,7 @@ where
     pub fn iterate_with_chemical_synapses_only(
         &mut self, 
         neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
-        reward: f32,
     ) -> Result<(), GraphError> {
-        self.reward_modulator.update(reward);
-
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
 
@@ -2687,10 +2681,7 @@ where
     pub fn iterate(
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
-        reward: f32,
     ) -> Result<(), GraphError> {
-        self.reward_modulator.update(reward);
-
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
 
@@ -2727,7 +2718,23 @@ where
             self.get_internal_electrical_inputs()
         };
 
-        self.iterate(&inputs, reward)?;
+        self.reward_modulator.update(reward);
+
+        self.iterate(&inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical synapses only reward applying reward
+    pub fn run_lattice_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+        let inputs = if self.parallel {
+            self.par_get_internal_electrical_inputs()
+        } else {
+            self.get_internal_electrical_inputs()
+        };
+
+        self.iterate(&inputs)?;
 
         Ok(())
     }
@@ -2741,7 +2748,23 @@ where
             self.get_internal_neurotransmitter_inputs()
         };
 
-        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs, reward)?;
+        self.reward_modulator.update(reward);
+
+        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// chemical synapses only without applying reward
+    pub fn run_lattice_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+        let neurotransmitter_inputs = if self.parallel { 
+            self.par_get_internal_neurotransmitter_inputs()
+        } else {
+            self.get_internal_neurotransmitter_inputs()
+        };
+
+        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs)?;
 
         Ok(())
     }
@@ -2755,7 +2778,23 @@ where
             self.get_internal_electrical_and_neurotransmitter_inputs()
         };
 
-        self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs, reward)?;
+        self.reward_modulator.update(reward);
+
+        self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical and chemical synapses without a reward signal
+    pub fn run_lattice_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
+        let (inputs, neurotransmitter_inputs) = if self.parallel {
+            self.par_get_internal_electrical_and_neurotransmitter_inputs()
+        } else {
+            self.get_internal_electrical_and_neurotransmitter_inputs()
+        };
+
+        self.iterate_with_neurotransmission(&inputs, &neurotransmitter_inputs)?;
 
         Ok(())
     }
@@ -2767,6 +2806,17 @@ where
             (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(reward),
             (true, false) => self.run_lattice_electrical_synapses_only(reward),
             (false, true) => self.run_lattice_chemical_synapses_only(reward),
+            (false, false) => Ok(()),
+        }
+    }
+
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag without a reward signal
+    pub fn run_lattice_without_reward(&mut self) -> Result<(), GraphError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses_without_reward(),
+            (true, false) => self.run_lattice_electrical_synapses_only_without_reward(),
+            (false, true) => self.run_lattice_chemical_synapses_only_without_reward(),
             (false, false) => Ok(()),
         }
     }
@@ -2863,6 +2913,13 @@ where
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
         match self.run_lattice(reward) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
+        }
+    }
+
+    fn update(&mut self) -> Result<(), AgentError> {
+        match self.run_lattice_without_reward() {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
@@ -4484,7 +4541,6 @@ where
     pub fn iterate(
         &mut self,
         inputs: &HashMap<GraphPosition, f32>,
-        reward: f32,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -4519,8 +4575,6 @@ where
         let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
-            <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
-
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
                 let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
@@ -4559,7 +4613,6 @@ where
     pub fn iterate_with_chemical_synapses_only(
         &mut self,
         neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
-        reward: f32,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -4596,8 +4649,6 @@ where
         let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
-            <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
-
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
                 let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
@@ -4639,7 +4690,6 @@ where
         &mut self,
         inputs: &HashMap<GraphPosition, f32>,
         neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
-        reward: f32,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -4677,8 +4727,6 @@ where
         let mut positions_to_update_with_reward_modulation = Vec::new();
 
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
-            <R as RewardModulator<T, T, S>>::update(&mut reward_modulated_lattice.reward_modulator, reward);
-
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
                 let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
@@ -4725,7 +4773,28 @@ where
             self.get_all_electrical_inputs()
         };
 
-        self.iterate(&inputs, reward)?;
+        for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
+            <R as RewardModulator<T, T, S>>::update(
+                &mut reward_modulated_lattice.reward_modulator, 
+                reward
+            );
+        }
+
+        self.iterate(&inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical synapses only without a reward signal
+    pub fn run_lattices_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+        let inputs = if self.parallel {
+            self.par_get_all_electrical_inputs()
+        } else {
+            self.get_all_electrical_inputs()
+        };
+
+        self.iterate(&inputs)?;
 
         Ok(())
     }
@@ -4739,7 +4808,28 @@ where
             self.get_all_neurotransmitter_inputs()
         };
 
-        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs, reward)?;
+        for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
+            <R as RewardModulator<T, T, S>>::update(
+                &mut reward_modulated_lattice.reward_modulator, 
+                reward
+            );
+        }
+
+        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// chemical synapses only without a reward signal
+    pub fn run_lattices_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+        let neurotransmitter_inputs = if self.parallel {
+            self.par_get_all_neurotransmitter_inputs()
+        } else {
+            self.get_all_neurotransmitter_inputs()
+        };
+
+        self.iterate_with_chemical_synapses_only(&neurotransmitter_inputs)?;
 
         Ok(())
     }
@@ -4753,7 +4843,28 @@ where
             self.get_all_electrical_and_neurotransmitter_inputs()
         };
 
-        self.iterate_with_chemical_and_electrical_synapses(&inputs, &neurotransmitter_inputs, reward)?;
+        for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
+            <R as RewardModulator<T, T, S>>::update(
+                &mut reward_modulated_lattice.reward_modulator, 
+                reward
+            );
+        }
+
+        self.iterate_with_chemical_and_electrical_synapses(&inputs, &neurotransmitter_inputs)?;
+
+        Ok(())
+    }
+
+    /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
+    /// electrical and chemical synapses without a reward signal
+    pub fn run_lattices_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
+        let (inputs, neurotransmitter_inputs) = if self.parallel {
+            self.par_get_all_electrical_and_neurotransmitter_inputs()
+        } else {
+            self.get_all_electrical_and_neurotransmitter_inputs()
+        };
+
+        self.iterate_with_chemical_and_electrical_synapses(&inputs, &neurotransmitter_inputs)?;
 
         Ok(())
     }
@@ -4765,6 +4876,17 @@ where
             (true, true) => self.run_lattices_with_electrical_and_chemical_synapses(reward),
             (true, false) => self.run_lattices_electrical_synapses_only(reward),
             (false, true) => self.run_lattices_chemical_synapses_only(reward),
+            (false, false) => Ok(()),
+        }
+    }
+
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag without a reward signal
+    pub fn run_lattices_without_reward(&mut self) -> Result<(), GraphError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (true, true) => self.run_lattices_with_electrical_and_chemical_synapses_without_reward(),
+            (true, false) => self.run_lattices_electrical_synapses_only_without_reward(),
+            (false, true) => self.run_lattices_chemical_synapses_only_without_reward(),
             (false, false) => Ok(()),
         }
     }
@@ -4785,6 +4907,13 @@ where
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
         match self.run_lattices(reward) {
+            Ok(()) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
+        }
+    }
+
+    fn update(&mut self) -> Result<(), AgentError> {
+        match self.run_lattices_without_reward() {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
