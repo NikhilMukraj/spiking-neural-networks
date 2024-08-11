@@ -68,7 +68,7 @@ fn reward_function(state: &TestState, _: &AgentType) -> Result<f32, AgentError> 
     Ok(reward)
 }
 
-fn state_encoder(state: &TestState, network: &mut AgentType) {
+fn state_encoder(state: &TestState, network: &mut AgentType) -> Result<(), AgentError> {
     if state.timestep % 2000 == 0 && state.timestep != 0 {
         network.spike_trains_values_mut()
             .for_each(|i| {
@@ -84,6 +84,8 @@ fn state_encoder(state: &TestState, network: &mut AgentType) {
                 })
             })
     }
+
+    Ok(())
 }
 
 /// Creates a skeleton for a liquid state machine and writes the history
@@ -150,7 +152,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         reward_function: &reward_function,
     };
 
-    env.run(10000)?;
+    env.run_with_reward(10000)?;
 
     let mut weights_file = BufWriter::new(File::create("weights.txt").expect("Could not create file"));
 
