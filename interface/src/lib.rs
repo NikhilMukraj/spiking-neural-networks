@@ -631,21 +631,27 @@ macro_rules! impl_lattice {
             }
 
             #[pyo3(signature = (connection_conditional, weight_logic=None))]
-            fn connect(&mut self, py: Python, connection_conditional: &PyAny, weight_logic: Option<&PyAny>) {
+            fn connect(&mut self, py: Python, connection_conditional: &PyAny, weight_logic: Option<&PyAny>) -> PyResult<()> {
                 let py_callable = connection_conditional.to_object(connection_conditional.py());
 
-                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> Result<bool, LatticeNetworkError> {
                     let args = PyTuple::new(py, &[a, b]);
-                    py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+                    match py_callable.call1(py, args).unwrap().extract::<bool>(py) {
+                        Ok(value) => Ok(value),
+                        Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                    }
                 };
 
-                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>> = match weight_logic {
                     Some(value) => {
                         let py_callable = value.to_object(value.py()); 
 
-                        let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                        let closure = move |a: (usize, usize), b: (usize, usize)| -> Result<f32, LatticeNetworkError> {
                             let args = PyTuple::new(py, &[a, b]);
-                            py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                            match py_callable.call1(py, args).unwrap().extract::<f32>(py) {
+                                Ok(value) => Ok(value),
+                                Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                            }
                         };
 
                         Some(Box::new(closure))
@@ -653,7 +659,10 @@ macro_rules! impl_lattice {
                     None => None,
                 };
 
-                self.lattice.connect(&connection_closure, weight_closure.as_deref());
+                match self.lattice.falliable_connect(&connection_closure, weight_closure.as_deref()) {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(PyValueError::new_err(e.to_string())),
+                }
             }
 
             fn get_every_node(&self) -> HashSet<(usize, usize)> {
@@ -1186,18 +1195,24 @@ macro_rules! impl_network {
             ) -> PyResult<()> {
                 let py_callable = connection_conditional.to_object(connection_conditional.py());
 
-                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> Result<bool, LatticeNetworkError> {
                     let args = PyTuple::new(py, &[a, b]);
-                    py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+                    match py_callable.call1(py, args).unwrap().extract::<bool>(py) {
+                        Ok(value) => Ok(value),
+                        Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                    }
                 };
 
-                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>> = match weight_logic {
                     Some(value) => {
                         let py_callable = value.to_object(value.py()); 
 
-                        let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                        let closure = move |a: (usize, usize), b: (usize, usize)| -> Result<f32, LatticeNetworkError> {
                             let args = PyTuple::new(py, &[a, b]);
-                            py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                            match py_callable.call1(py, args).unwrap().extract::<f32>(py) {
+                                Ok(value) => Ok(value),
+                                Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                            }
                         };
 
                         Some(Box::new(closure))
@@ -1205,9 +1220,17 @@ macro_rules! impl_network {
                     None => None,
                 };
 
-                match self.network.connect_interally(id, &connection_closure, weight_closure.as_deref()) {
+                match self.network.falliable_connect_interally(id, &connection_closure, weight_closure.as_deref()) {
                     Ok(_) => Ok(()),
-                    Err(_) => Err(PyKeyError::new_err("Id not found in network")),
+                    Err(e) => match e {
+                        LatticeNetworkError::IDNotFoundInLattices(id) => Err(PyKeyError::new_err(
+                            format!("Presynaptic id ({}) not found", id)
+                        )),
+                        LatticeNetworkError::ConnectionFailure(_) => Err(PyValueError::new_err(
+                            e.to_string()
+                        )),
+                        _ => unreachable!(),
+                    },
                 }
             }
 
@@ -1222,18 +1245,24 @@ macro_rules! impl_network {
             ) -> PyResult<()> {
                 let py_callable = connection_conditional.to_object(connection_conditional.py());
 
-                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> bool {
+                let connection_closure = move |a: (usize, usize), b: (usize, usize)| -> Result<bool, LatticeNetworkError> {
                     let args = PyTuple::new(py, &[a, b]);
-                    py_callable.call1(py, args).unwrap().extract::<bool>(py).unwrap()
+                    match py_callable.call1(py, args).unwrap().extract::<bool>(py) {
+                        Ok(value) => Ok(value),
+                        Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                    }
                 };
 
-                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> f32>> = match weight_logic {
+                let weight_closure: Option<Box<dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>> = match weight_logic {
                     Some(value) => {
                         let py_callable = value.to_object(value.py()); 
 
-                        let closure = move |a: (usize, usize), b: (usize, usize)| -> f32 {
+                        let closure = move |a: (usize, usize), b: (usize, usize)| -> Result<f32, LatticeNetworkError> {
                             let args = PyTuple::new(py, &[a, b]);
-                            py_callable.call1(py, args).unwrap().extract::<f32>(py).unwrap()
+                            match py_callable.call1(py, args).unwrap().extract::<f32>(py) {
+                                Ok(value) => Ok(value),
+                                Err(e) => Err(LatticeNetworkError::ConnectionFailure(e.to_string())),
+                            }
                         };
 
                         Some(Box::new(closure))
@@ -1241,7 +1270,7 @@ macro_rules! impl_network {
                     None => None,
                 };
 
-                match self.network.connect(
+                match self.network.falliable_connect(
                     presynaptic_id, 
                     postsynaptic_id, 
                     &connection_closure, 
@@ -1257,6 +1286,9 @@ macro_rules! impl_network {
                         )),
                         LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain => Err(PyValueError::new_err(
                             format!("Postsynaptic lattice cannot be spike train")
+                        )),
+                        LatticeNetworkError::ConnectionFailure(_) => Err(PyValueError::new_err(
+                            e.to_string()
                         )),
                         _ => unreachable!(),
                     },
