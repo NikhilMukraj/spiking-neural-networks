@@ -59,7 +59,7 @@ fn reward_function(state: &TestState, _: &AgentType) -> Result<f32, AgentError> 
     Ok(reward)
 }
 
-fn state_encoder<T: State, U: Agent>(_: &T, _: &mut U) {}
+fn state_encoder<T: State, U: Agent>(_: &T, _: &mut U) -> Result<(), AgentError> { Ok(()) }
 
 /// Creates a reward modulated lattice and iterates it to demonstrate how
 /// weights will change over time in response to reward modulation
@@ -83,7 +83,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         reward_function: &reward_function,
     };
 
-    env.run(10000)?;
+    env.run_with_reward(10000)?;
 
     let mut file = BufWriter::new(File::create("weights.txt").expect("Could not create file"));
 
