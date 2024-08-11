@@ -2447,14 +2447,13 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
 
-    // falliable connect (specifically for pyo3)
-
     // option to use adjacency list instead of matrix
 
     // generate network method
 
     // reward modulation
     // iterating reward modulated networks without applying reward
+    // pub struct env { state: Py<PyAny>, ... }
 
     // in python wrapper for pyo3, connect conditional errors could be caught and made more readable
     // python could automatically generate wrappers given the __dir__ of the module
