@@ -434,8 +434,8 @@ impl NeuronDefinition {
 
         let iteration_with_neurotransmitter_header = generate_iteration_with_neurotransmitter_header();
 
-        let ligand_gates_update = "self.ligand_gates.update_receptor_kinetics(t_total);";
-        let ligand_gates_set_current = "self.ligand_gates.set_receptor_currents(self.current_voltage);";
+        let ligand_gates_update = "self.ligand_gates.update_receptor_kinetics(t_total, self.dt);";
+        let ligand_gates_set_current = "self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);";
 
         let update_with_receptor_current = "self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);";
 
