@@ -43,7 +43,7 @@ pub mod iterate_and_spike_traits {
 }
 use crate::error::{AgentError, GraphError, LatticeNetworkError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
-use crate::reinforcement::Agent;
+use crate::reinforcement::{Agent, UnsupervisedAgent};
 
 
 /// Calculates the current between two neurons based on the voltage and
@@ -481,6 +481,10 @@ pub struct Lattice<
     pub update_graph_history: bool,
     /// Whether to update grid's history
     pub update_grid_history: bool,
+    /// Whether to use electrical synapses
+    pub electrical_synapses: bool,
+    /// Whether to use chemical synapses
+    pub chemical_synapses: bool,
     /// Plasticity rule
     pub plasticity: W,
     /// Whether to update weights with based on plasticity when iterating
@@ -501,6 +505,8 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
             grid_history: V::default(),
             update_graph_history: false,
             update_grid_history: false,
+            electrical_synapses: true,
+            chemical_synapses: false,
             do_plasticity: false,
             plasticity: W::default(),
             gaussian: false,
@@ -881,7 +887,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Iterates the lattice based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs
-    pub fn run_lattice_with_electrical_and_chemical_synapses(
+    fn run_lattice_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -900,7 +906,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Iterates the lattice based only on internal connections for a given amount of time using
     /// neurotransmitter inputs alone
-    pub fn run_lattice_chemical_synapses_only(
+    fn run_lattice_chemical_synapses_only(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -919,7 +925,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Iterates lattice based only on internal connections for a given amount of time using
     /// only electrical inputs
-    pub fn run_lattice(
+    fn run_lattice_electrical_synapses_only(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -934,6 +940,20 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         }
 
         Ok(())
+    }
+
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag
+    pub fn run_lattice(
+        &mut self,
+        iterations: usize,
+    ) -> Result<(), GraphError> {
+        match (self.electrical_synapses, self.chemical_synapses) {
+            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(iterations),
+            (true, false) => self.run_lattice_electrical_synapses_only(iterations),
+            (false, true) => self.run_lattice_chemical_synapses_only(iterations),
+            (false, false) => Ok(()),
+        }
     }
 
     fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
@@ -1032,6 +1052,15 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         match output {
             Ok(_) => Ok(()),
             Err(e) => Err(e)
+        }
+    }
+}
+
+impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W> {
+    fn update(&mut self) -> Result<(), AgentError> {
+        match self.run_lattice(1) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(e.to_string())),
         }
     }
 }
@@ -1247,6 +1276,10 @@ pub struct LatticeNetwork<
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
     /// An array of graphs connecting different lattices together
     connecting_graph: Y,
+    /// Whether to use electrical synapses throughout entire network
+    pub electrical_synapse: bool,
+    /// Whether to use chemical synapses throughout entire network
+    pub chemical_synapse: bool,
     /// Whether to update connecting graph history
     pub update_connecting_graph_history: bool,
     /// Whether to use parallel input calculation
@@ -1270,6 +1303,8 @@ where
             lattices: HashMap::new(),
             spike_train_lattices: HashMap::new(),
             connecting_graph: Y::default(),
+            electrical_synapse: true,
+            chemical_synapse: false,
             update_connecting_graph_history: false,
             parallel: false,
             internal_clock: 0,
@@ -2242,7 +2277,7 @@ where
 
     /// Iterates the lattices based only on internal connections for a given amount of time using
     /// both electrical and neurotransmitter inputs
-    pub fn run_lattices_with_electrical_and_chemical_synapses(
+    fn run_lattices_with_electrical_and_chemical_synapses(
         &mut self, 
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -2261,7 +2296,7 @@ where
 
     /// Iterates the lattices based only on internal connections for a given amount of time using
     /// neurotransmitter inputs alone
-    pub fn run_lattices_chemical_synapses_only(
+    fn run_lattices_chemical_synapses_only(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -2280,7 +2315,7 @@ where
 
     /// Iterates lattices based only on internal connections for a given amount of time using
     /// only electrical inputs
-    pub fn run_lattices(
+    fn run_lattices_electrical_synapses_only(
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
@@ -2295,6 +2330,35 @@ where
         }
 
         Ok(())
+    }
+
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag
+    pub fn run_lattices(&mut self, iterations: usize) -> Result<(), GraphError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (true, true) => self.run_lattices_with_electrical_and_chemical_synapses(iterations),
+            (true, false) => self.run_lattices_electrical_synapses_only(iterations),
+            (false, true) => self.run_lattices_chemical_synapses_only(iterations),
+            (false, false) => Ok(()),
+        }
+    }
+}
+
+impl<T, U, V, W, X, Y, Z> UnsupervisedAgent for LatticeNetwork<T, U, V, W, X, Y, Z>
+where
+    T: IterateAndSpike,
+    U: Graph<T=(usize, usize), U=f32>,
+    V: LatticeHistory,
+    W: SpikeTrain,
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<T=GraphPosition, U=f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+{
+    fn update(&mut self) -> Result<(), AgentError> {
+        match self.run_lattices(1) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(AgentError::AgentIterationFailure(e.to_string())),
+        }
     }
 }
 
@@ -2711,7 +2775,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical synapses only
-    pub fn run_lattice_electrical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattice_electrical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
         let inputs = if self.parallel {
             self.par_get_internal_electrical_inputs()
         } else {
@@ -2727,7 +2791,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical synapses only reward applying reward
-    pub fn run_lattice_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattice_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
         let inputs = if self.parallel {
             self.par_get_internal_electrical_inputs()
         } else {
@@ -2741,7 +2805,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// chemical synapses only
-    pub fn run_lattice_chemical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattice_chemical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
         let neurotransmitter_inputs = if self.parallel { 
             self.par_get_internal_neurotransmitter_inputs()
         } else {
@@ -2757,7 +2821,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// chemical synapses only without applying reward
-    pub fn run_lattice_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattice_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
         let neurotransmitter_inputs = if self.parallel { 
             self.par_get_internal_neurotransmitter_inputs()
         } else {
@@ -2771,7 +2835,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical and chemical synapses
-    pub fn run_lattice_with_electrical_and_chemical_synapses(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattice_with_electrical_and_chemical_synapses(&mut self, reward: f32) -> Result<(), GraphError> {
         let (inputs, neurotransmitter_inputs) = if self.parallel {
             self.par_get_internal_electrical_and_neurotransmitter_inputs()
         } else {
@@ -2787,7 +2851,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical and chemical synapses without a reward signal
-    pub fn run_lattice_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattice_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
         let (inputs, neurotransmitter_inputs) = if self.parallel {
             self.par_get_internal_electrical_and_neurotransmitter_inputs()
         } else {
@@ -4766,7 +4830,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical synapses only
-    pub fn run_lattices_electrical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattices_electrical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
         let inputs = if self.parallel {
             self.par_get_all_electrical_inputs()
         } else {
@@ -4787,7 +4851,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical synapses only without a reward signal
-    pub fn run_lattices_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattices_electrical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
         let inputs = if self.parallel {
             self.par_get_all_electrical_inputs()
         } else {
@@ -4801,7 +4865,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// chemical synapses only
-    pub fn run_lattices_chemical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattices_chemical_synapses_only(&mut self, reward: f32) -> Result<(), GraphError> {
         let neurotransmitter_inputs = if self.parallel {
             self.par_get_all_neurotransmitter_inputs()
         } else {
@@ -4822,7 +4886,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// chemical synapses only without a reward signal
-    pub fn run_lattices_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattices_chemical_synapses_only_without_reward(&mut self) -> Result<(), GraphError> {
         let neurotransmitter_inputs = if self.parallel {
             self.par_get_all_neurotransmitter_inputs()
         } else {
@@ -4836,7 +4900,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical and chemical synapses
-    pub fn run_lattices_with_electrical_and_chemical_synapses(&mut self, reward: f32) -> Result<(), GraphError> {
+    fn run_lattices_with_electrical_and_chemical_synapses(&mut self, reward: f32) -> Result<(), GraphError> {
         let (inputs, neurotransmitter_inputs) = if self.parallel {
             self.par_get_all_electrical_and_neurotransmitter_inputs()
         } else {
@@ -4857,7 +4921,7 @@ where
 
     /// Calculates inputs for the lattice, iterates, and applies reward for one timestep for
     /// electrical and chemical synapses without a reward signal
-    pub fn run_lattices_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
+    fn run_lattices_with_electrical_and_chemical_synapses_without_reward(&mut self) -> Result<(), GraphError> {
         let (inputs, neurotransmitter_inputs) = if self.parallel {
             self.par_get_all_electrical_and_neurotransmitter_inputs()
         } else {
