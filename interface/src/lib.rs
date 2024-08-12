@@ -820,6 +820,16 @@ macro_rules! impl_lattice {
             }
 
             #[getter]
+            fn get_parallel(&self) -> bool {
+                self.lattice.parallel
+            }
+
+            #[setter]
+            fn set_parallel(&mut self, flag: bool) {
+                self.lattice.parallel = flag;
+            }
+
+            #[getter]
             fn get_gaussian(&self) -> bool {
                 self.lattice.gaussian
             }
@@ -1694,6 +1704,26 @@ macro_rules! impl_network {
                             .collect()
                     })
                     .collect()
+            }
+
+            #[getter]
+            fn get_update_connecting_graph_history(&self) -> bool {
+                self.network.update_connecting_graph_history
+            }
+
+            #[setter]
+            fn set_update_connecting_graph_history(&mut self, flag: bool) {
+                self.network.update_connecting_graph_history = flag;
+            }
+
+            #[getter]
+            fn get_parallel(&self) -> bool {
+                self.network.parallel
+            }
+
+            #[setter]
+            fn set_parallel(&mut self, flag: bool) {
+                self.network.parallel = flag;
             }
 
             fn apply_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
