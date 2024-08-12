@@ -5,6 +5,7 @@ use std::{io::Result, env, fs};
 use pest::iterators::{Pair, Pairs};
 use pest::pratt_parser::PrattParser;
 use pest::Parser;
+use pest::error::{LineColLocation, ErrorVariant::{ParsingError, CustomError}};
 use regex::Regex;
 
 
@@ -1304,6 +1305,9 @@ fn main() -> Result<()> {
     
                         ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
                     },
+                    Rule::EOI => {
+                        continue
+                    }
                     _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
                 }
             }
@@ -1432,6 +1436,44 @@ fn main() -> Result<()> {
         }
         Err(e) => {
             eprintln!("Parse failed: {:?}", e);
+
+            match e.line_col {
+                // Handle the case where the error is at a single position
+                LineColLocation::Pos((line_number, _)) => {
+                    let lines: Vec<&str> = contents.lines().collect();
+                    if line_number > 0 && line_number <= lines.len() {
+                        println!("Error occurred at line {}: {}", line_number, lines[line_number - 1]);
+                    } else {
+                        println!("Line number {} is out of bounds", line_number);
+                    }
+                }
+                // Handle the case where the error spans multiple positions
+                LineColLocation::Span((start_line, _), (end_line, _)) => {
+                    let lines: Vec<&str> = contents.lines().collect();
+                    if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line <= lines.len() {
+                        println!("Error starts at line {}: {}", start_line, lines[start_line - 1]);
+                        if start_line != end_line {
+                            println!("Error ends at line {}: {}", end_line, lines[end_line - 1]);
+                        }
+                    } else {
+                        println!("Line numbers are out of bounds");
+                    }
+                }
+            }
+
+            match &e.variant {
+                ParsingError { positives, negatives } => {
+                    if !positives.is_empty() {
+                        println!("Expected to find: {:?}", positives);
+                    }
+                    if !negatives.is_empty() {
+                        println!("Did not expect to find: {:?}", negatives);
+                    }
+                }
+                CustomError { message } => {
+                    println!("Custom error: {}", message);
+                }
+            }
         }
     }
 
