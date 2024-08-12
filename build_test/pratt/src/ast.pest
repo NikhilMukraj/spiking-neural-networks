@@ -55,8 +55,6 @@ eq_declaration = { name ~ " "* ~ "=" ~ " "* ~ expr }
 func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
 func_declaration = { name ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
 
-equation = _{ SOI ~ ( func_declaration | diff_eq_declaration | eq_declaration ) ~ " "* ~ "=" ~ " "* ~ expr ~ EOI }
-
 WHITESPACE = _{ " " }
 
 // neuron block
@@ -143,7 +141,7 @@ ion_channel_definition = {
 }
 
 full = _{
-	NEWLINE* ~ ((neuron_definition | ion_channel_definition) ~ NEWLINE*)*
+	SOI ~ NEWLINE* ~ ((neuron_definition | ion_channel_definition)+ ~ NEWLINE*)* ~ EOI
 }
 
 // [ligand_gates]
