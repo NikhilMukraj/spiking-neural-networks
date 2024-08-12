@@ -59,18 +59,39 @@ impl<'a, T: Agent, U: State<A=T>> Environment<'a, T, U> {
     }
 }
 
-// /// Agent to be used in unsupervised environment
-// pub trait UnsupervisedAgent {
-//     /// Updates agent
-//     fn update(&mut self) -> Result<(), AgentError>;
-// }
+/// Agent to be used in unsupervised environment
+pub trait UnsupervisedAgent {
+    /// Updates agent
+    fn update(&mut self) -> Result<(), AgentError>;
+}
 
-// /// Environment without a reward signal
-// pub struct UnsupervisedEnvironment<'a, T: UnsupervisedAgent, U: State> {
-//     /// Unsupervised agent
-//     pub agent: T,
-//     /// State of the environment
-//     pub state: U,
-//     /// Function to encode state into agent
-//     pub state_encoder: &'a dyn Fn(&U, &mut T) -> Result<(), AgentError>,
-// }
+/// Updates self based on the agent's state
+pub trait UnsupervisedState {
+    type A: UnsupervisedAgent;
+    fn update_state(&mut self, agent: &Self::A) -> Result<(), AgentError>;
+}
+
+/// Environment without a reward signal
+pub struct UnsupervisedEnvironment<'a, T: UnsupervisedAgent, U: UnsupervisedState> {
+    /// Unsupervised agent
+    pub agent: T,
+    /// State of the environment
+    pub state: U,
+    /// Function to encode state into agent
+    pub state_encoder: &'a dyn Fn(&U, &mut T) -> Result<(), AgentError>,
+}
+
+impl<'a, T: UnsupervisedAgent, U: UnsupervisedState<A=T>> UnsupervisedEnvironment<'a, T, U> {
+    pub fn run(&mut self, iterations: usize) -> Result<(), AgentError> {
+        for _ in 0..iterations {
+            // take action
+            self.agent.update()?;
+            // update state
+            self.state.update_state(&self.agent)?;
+            // encodes state into agent
+            (self.state_encoder)(&self.state, &mut self.agent)?;
+        }
+
+        Ok(())
+    }
+}
