@@ -1443,6 +1443,8 @@ fn main() -> Result<()> {
                     let lines: Vec<&str> = contents.lines().collect();
                     if line_number > 0 && line_number <= lines.len() {
                         println!("Error occurred at line {}: {}", line_number, lines[line_number - 1]);
+                    } else if line_number == lines.len() + 1 {
+                        println!("Error occured at line: {}", line_number);
                     } else {
                         println!("Line number {} is out of bounds", line_number);
                     }
@@ -1454,6 +1456,11 @@ fn main() -> Result<()> {
                         println!("Error starts at line {}: {}", start_line, lines[start_line - 1]);
                         if start_line != end_line {
                             println!("Error ends at line {}: {}", end_line, lines[end_line - 1]);
+                        }
+                    } else if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line == lines.len() + 1 { 
+                        println!("Error starts at line {}: {}", start_line, lines[start_line - 1]);
+                        if start_line != end_line {
+                            println!("Error ends at line {}", end_line);
                         }
                     } else {
                         println!("Line numbers are out of bounds");
@@ -1476,11 +1483,6 @@ fn main() -> Result<()> {
             }
         }
     }
-
-    // check for number of [neuron] and [ion_channel] blocks (exclude comments)
-    // make sure they all close
-    // if they do close and the number of generated code blocks does not line up
-    // match on that specific block and return an error
 
     Ok(())
 }
