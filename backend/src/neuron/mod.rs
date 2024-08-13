@@ -30,7 +30,7 @@ pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
     ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, 
-    NeurotransmitterConcentrations, 
+    NeurotransmitterConcentrations, NeurotransmitterType, 
 };
 pub mod plasticity;
 use plasticity::{
@@ -176,7 +176,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 /// the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
-pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: IterateAndSpike>(
+pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
     spike_train: &mut T,
     presynaptic_neuron: &mut U, 
     postsynaptic_neuron: &mut U,
@@ -184,7 +184,12 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: Iterate
     electrical_synapse: bool,
     chemical_synapse: bool,
     gaussian: bool,
-) -> (bool, bool, bool) {
+) -> (bool, bool, bool) 
+where
+    T: SpikeTrain<N=N>,
+    U: IterateAndSpike<N=N>,
+    N: NeurotransmitterType,
+{
     let (pre_t_total, post_t_total, pre_current, post_current) = if gaussian {
         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
         let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
@@ -466,10 +471,11 @@ macro_rules! impl_apply {
 /// ```
 #[derive(Debug, Clone)]
 pub struct Lattice<
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
     W: Plasticity<T, T, f32>,
+    N: NeurotransmitterType,
 > {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
@@ -497,7 +503,7 @@ pub struct Lattice<
     pub internal_clock: usize,
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W, N> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -516,14 +522,14 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     }
 }
 
-impl<T: IterateAndSpike> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDP> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>> Lattice<T, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDP, N> {
     // Generates a default lattice implementation given a neuron type
     pub fn default_impl() -> Self {
         Lattice::default()
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Lattice<T, U, V, W> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Lattice<T, U, V, W, N> {
     impl_reset_timing!();
     impl_apply!();
 
@@ -578,7 +584,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
         &self,
         position: &(usize, usize),
         input_positions: &HashSet<(usize, usize)>, 
-    ) -> NeurotransmitterConcentrations {
+    ) -> NeurotransmitterConcentrations<N> {
         let input_vals = input_positions
             .iter()
             .map(|input_position| {
@@ -592,7 +598,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
                 final_input
             })
-            .collect::<Vec<NeurotransmitterConcentrations>>();
+            .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
@@ -644,7 +650,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Gets all internal chemical inputs in parallel
     fn par_get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|&pos| {
@@ -663,7 +669,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|&pos| {
@@ -682,7 +688,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Gets all internal electrical and neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
         let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
@@ -692,7 +698,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
 
     /// Gets all internal electrical and neurotransmitter inputs in parallel
     fn par_get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
         let neurotransmitter_inputs = self.par_get_internal_neurotransmitter_inputs();
 
         let inputs = self.par_get_internal_electrical_inputs();
@@ -739,7 +745,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
-        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
@@ -774,7 +780,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     /// Iterates one simulation timestep given only chemical inputs
     pub fn iterate_chemical_synapses_only(
         &mut self, 
-        inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>
+        inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations<N>>
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
@@ -1056,7 +1062,7 @@ impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W
     }
 }
 
-impl<T: IterateAndSpike, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W, N> {
     fn update(&mut self) -> Result<(), AgentError> {
         match self.run_lattice(1) {
             Ok(_) => Ok(()),
@@ -1092,7 +1098,7 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
 
 /// Lattice of [`SpikeTrain`] neurons
 #[derive(Debug, Clone)]
-pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
+pub struct SpikeTrainLattice<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> {
     /// Grid of spike trains
     pub cell_grid: Vec<Vec<T>>,
     /// History of grid states
@@ -1105,7 +1111,7 @@ pub struct SpikeTrainLattice<T: SpikeTrain, U: SpikeTrainLatticeHistory> {
     pub id: usize,
 }
 
-impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<T, U> {
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<N, T, U> {
     fn default() -> Self {
         SpikeTrainLattice {
             cell_grid: vec![],
@@ -1117,14 +1123,14 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<T
     }
 }
 
-impl<T: SpikeTrain> SpikeTrainLattice<T, SpikeTrainGridHistory> {
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>> SpikeTrainLattice<N, T, SpikeTrainGridHistory> {
     // Generates a default lattice implementation given a spike train type
     pub fn default_impl() -> Self {
         SpikeTrainLattice::default()
     }
 }
 
-impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> SpikeTrainLattice<N, T, U> {
     impl_reset_timing!();
     impl_apply!();
 
@@ -1262,18 +1268,19 @@ impl<T: SpikeTrain, U: SpikeTrainLatticeHistory> SpikeTrainLattice<T, U> {
 /// ```
 #[derive(Debug, Clone)]
 pub struct LatticeNetwork<
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: SpikeTrain, 
+    W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
-    lattices: HashMap<usize, Lattice<T, U, V, Z>>,
+    lattices: HashMap<usize, Lattice<T, U, V, Z, N>>,
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
-    spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
+    spike_train_lattices: HashMap<usize, SpikeTrainLattice<N, W, X>>,
     /// An array of graphs connecting different lattices together
     connecting_graph: Y,
     /// Whether to use electrical synapses throughout entire network
@@ -1288,15 +1295,16 @@ pub struct LatticeNetwork<
     pub internal_clock: usize,
 }
 
-impl<T, U, V, W, X, Y, Z> Default for LatticeNetwork<T, U, V, W, X, Y, Z>
+impl<T, U, V, W, X, Y, Z, N> Default for LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
-    W: SpikeTrain,
+    W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
 {
     fn default() -> Self { 
         LatticeNetwork {
@@ -1312,17 +1320,19 @@ where
     }
 }
 
-impl<T> LatticeNetwork<
+impl<N, T> LatticeNetwork<
     T, 
     AdjacencyMatrix<(usize, usize), f32>, 
     GridVoltageHistory, 
-    PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+    PoissonNeuron<N, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
     SpikeTrainGridHistory, 
     AdjacencyMatrix<GraphPosition, f32>, 
     STDP,
+    N,
 >
 where
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
+    N: NeurotransmitterType,
 {
     // Generates a default lattice network implementation given a neuron and spike train type
     pub fn default_impl() -> Self { 
@@ -1330,21 +1340,22 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y, Z> LatticeNetwork<T, U, V, W, X, Y, Z>
+impl<T, U, V, W, X, Y, Z, N> LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=f32> + ToGraphPosition<GraphPos = Y>,
     V: LatticeHistory,
-    W: SpikeTrain,
+    W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
 {
     /// Generates a [`LatticeNetwork`] given lattices to use within the network, (all lattices
     /// must have unique id fields)
     pub fn generate_network(
-        lattices: Vec<Lattice<T, U, V, Z>>, 
-        spike_train_lattices: Vec<SpikeTrainLattice<W, X>>
+        lattices: Vec<Lattice<T, U, V, Z, N>>, 
+        spike_train_lattices: Vec<SpikeTrainLattice<N, W, X>>
     ) -> Result<Self, LatticeNetworkError> {
         let mut network = LatticeNetwork::default();
 
@@ -1360,15 +1371,16 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y, Z> LatticeNetwork<T, U, V, W, X, Y, Z>
+impl<T, U, V, W, X, Y, Z, N> LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
-    W: SpikeTrain,
+    W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
 {
     /// Sets the timestep variable for each neuron, spike train, and plasticity modulator to `dt`
     pub fn set_dt(&mut self, dt: f32) {
@@ -1381,7 +1393,7 @@ where
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
         &mut self, 
-        lattice: Lattice<T, U, V, Z>
+        lattice: Lattice<T, U, V, Z, N>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
@@ -1395,7 +1407,7 @@ where
     /// not already in the network
     pub fn add_spike_train_lattice(
         &mut self, 
-        spike_train_lattice: SpikeTrainLattice<W, X>, 
+        spike_train_lattice: SpikeTrainLattice<N, W, X>, 
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&spike_train_lattice.id) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(spike_train_lattice.id));
@@ -1433,47 +1445,47 @@ where
     }
 
     /// Returns an immutable reference to all the lattice hashmaps
-    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
+    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z, N>>, &HashMap<usize, SpikeTrainLattice<N, W, X>>) {
         (&self.lattices, &self.spike_train_lattices)
     }
 
     /// Returns the set of [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z>> {
+    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values()
     }
 
     /// Returns a mutable set [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Z>> {
+    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values_mut()
     }
 
     /// Returns a reference to [`Lattice`] given the identifier
-    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z>> {
+    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z, N>> {
         self.lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`Lattice`] given the identifier
-    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z>> {
+    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z, N>> {
         self.lattices.get_mut(id)
     }
 
     /// Returns a reference to [`SpikeTrainLattice`] given the identifier
-    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<W, X>> {
+    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`SpikeTrainLattice`] given the identifier
-    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<W, X>> {
+    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.get_mut(id)
     }
 
     /// Returns the set of [`SpikeTrainLattice`]s in the hashmap of spike train lattices
-    pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<W, X>> {
+    pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.values()
     }
 
     /// Returns a mutable set [`SpikeTrainLattice`]s in the hashmap of spike train lattices    
-    pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<W, X>> {
+    pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.values_mut()
     }
 
@@ -1834,12 +1846,12 @@ where
         &self, 
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
-    ) -> NeurotransmitterConcentrations {
+    ) -> NeurotransmitterConcentrations<N> {
         let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
             .unwrap()
             .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
 
-        let input_vals: Vec<NeurotransmitterConcentrations> = input_positions
+        let input_vals: Vec<NeurotransmitterConcentrations<N>> = input_positions
             .iter()
             .map(|input_position| {
                 let (pos_x, pos_y) = input_position.pos;
@@ -1928,7 +1940,7 @@ where
     }
 
     fn get_all_neurotransmitter_inputs(&self) -> 
-    HashMap<GraphPosition, NeurotransmitterConcentrations> {
+    HashMap<GraphPosition, NeurotransmitterConcentrations<N>> {
         self.get_every_node()
             .iter()
             .map(|pos| {
@@ -1959,7 +1971,7 @@ where
     }
 
     fn par_get_all_neurotransmitter_inputs(&self) -> 
-    HashMap<GraphPosition, NeurotransmitterConcentrations> {
+    HashMap<GraphPosition, NeurotransmitterConcentrations<N>> {
         self.get_every_node()
             .par_iter()
             .map(|pos| {
@@ -1974,7 +1986,7 @@ where
     }
 
     fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations<N>>) {
         let neurotransmitters_inputs = self.get_all_neurotransmitter_inputs();
 
         let inputs = self.get_all_electrical_inputs();
@@ -1983,7 +1995,7 @@ where
     }
 
     fn par_get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations<N>>) {
         let neurotransmitters_inputs = self.par_get_all_neurotransmitter_inputs();
 
         let inputs = self.par_get_all_electrical_inputs();
@@ -2098,7 +2110,7 @@ where
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<GraphPosition, f32>, 
-        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -2160,7 +2172,7 @@ where
     /// Iterates one simulation timestep lattice given a set of only chemical inputs
     pub fn iterate_chemical_synapses_only(
         &mut self,
-        inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
+        inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -2344,15 +2356,16 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y, Z> UnsupervisedAgent for LatticeNetwork<T, U, V, W, X, Y, Z>
+impl<T, U, V, W, X, Y, Z, N> UnsupervisedAgent for LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
-    W: SpikeTrain,
+    W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
 {
     fn update(&mut self) -> Result<(), AgentError> {
         match self.run_lattices(1) {
@@ -2387,10 +2400,11 @@ where
 #[derive(Debug, Clone)]
 pub struct RewardModulatedLattice<
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=S>, 
     V: LatticeHistory, 
     W: RewardModulator<T, T, S>, 
+    N: NeurotransmitterType,
 > {
     /// Grid of neurons
     pub cell_grid: Vec<Vec<T>>,
@@ -2418,13 +2432,14 @@ pub struct RewardModulatedLattice<
     pub internal_clock: usize,
 }
 
-impl<S, T, U, V, W> Default for RewardModulatedLattice<S, T, U, V, W>
+impl<S, T, U, V, W, N> Default for RewardModulatedLattice<S, T, U, V, W, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T = (usize, usize), U = S>,
     V: LatticeHistory,
     W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
 {
     fn default() -> Self {
         RewardModulatedLattice { 
@@ -2444,20 +2459,21 @@ where
     }
 }
 
-impl<T: IterateAndSpike> RewardModulatedLattice<TraceRSTDP, T, AdjacencyMatrix<(usize, usize), TraceRSTDP>, GridVoltageHistory, RewardModulatedSTDP> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>> RewardModulatedLattice<TraceRSTDP, T, AdjacencyMatrix<(usize, usize), TraceRSTDP>, GridVoltageHistory, RewardModulatedSTDP, N> {
     // Generates a default reward modulated lattice implementation given a neuron and spike train type
     pub fn default_impl() -> Self {
         RewardModulatedLattice::default()
     }
 }
 
-impl<S, T, U, V, W> RewardModulatedLattice<S, T, U, V, W>
+impl<S, T, U, V, W, N> RewardModulatedLattice<S, T, U, V, W, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=S>,
     V: LatticeHistory,
     W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
 {
     impl_reset_timing!();
     impl_apply!();
@@ -2514,7 +2530,7 @@ where
         &self,
         position: &(usize, usize),
         input_positions: &HashSet<(usize, usize)>, 
-    ) -> NeurotransmitterConcentrations {
+    ) -> NeurotransmitterConcentrations<N> {
         let input_vals = input_positions
             .iter()
             .map(|input_position| {
@@ -2528,7 +2544,7 @@ where
 
                 final_input
             })
-            .collect::<Vec<NeurotransmitterConcentrations>>();
+            .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
         let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
@@ -2562,7 +2578,7 @@ where
 
     /// Gets all internal neurotransmitter inputs 
     fn get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|&pos| {
@@ -2581,7 +2597,7 @@ where
 
     /// Gets all internal electrical and neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
         let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
@@ -2609,7 +2625,7 @@ where
 
     /// Gets all internal neurotransmitter inputs in parallel
     fn par_get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations> {
+    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|&pos| {
@@ -2628,7 +2644,7 @@ where
 
     /// Gets all internal electrical and neurotransmitter inputs in parallel
     fn par_get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations>) {
+    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
         let neurotransmitter_inputs = self.par_get_internal_neurotransmitter_inputs();
 
         let inputs = self.par_get_internal_electrical_inputs();
@@ -2675,7 +2691,7 @@ where
     pub fn iterate_with_neurotransmission(
         &mut self, 
         inputs: &HashMap<(usize, usize), f32>, 
-        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
@@ -2710,7 +2726,7 @@ where
     /// Iterates lattice one simulation timestep given a set of neurotransmitter inputs
     pub fn iterate_with_chemical_synapses_only(
         &mut self, 
-        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<(usize, usize), NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         for pos in self.graph.get_every_node() {
             let (x, y) = pos;
@@ -2967,13 +2983,14 @@ where
     }
 } 
 
-impl<S, T, U, V, W> Agent for RewardModulatedLattice<S, T, U, V, W> 
+impl<S, T, U, V, W, N> Agent for RewardModulatedLattice<S, T, U, V, W, N> 
 where 
     S: RewardModulatedWeight,
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=S>,
     V: LatticeHistory,
-    W: RewardModulator<T, T, S>
+    W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
         match self.run_lattice(reward) {
@@ -3030,22 +3047,23 @@ where
 #[derive(Debug, Clone)]
 pub struct RewardModulatedLatticeNetwork<
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: SpikeTrain, 
+    W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
+    N: NeurotransmitterType,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
-    lattices: HashMap<usize, Lattice<T, U, V, Z>>,
+    lattices: HashMap<usize, Lattice<T, U, V, Z, N>>,
     /// A hasmap of [`RewardModulatedLattice`]s associated with their respective identifier
-    reward_modulated_lattices: HashMap<usize, RewardModulatedLattice<S, T, C, V, R>>,
+    reward_modulated_lattices: HashMap<usize, RewardModulatedLattice<S, T, C, V, R, N>>,
     /// A hashmap of [`SpikeTrainLattice`]s associated with their respective identifier
-    spike_train_lattices: HashMap<usize, SpikeTrainLattice<W, X>>,
+    spike_train_lattices: HashMap<usize, SpikeTrainLattice<N, W, X>>,
     /// An array of graphs connecting different lattices together
     connecting_graph: Y,
     /// Whether to use electrical synapses throughout entire network
@@ -3060,18 +3078,19 @@ pub struct RewardModulatedLatticeNetwork<
     pub internal_clock: usize,
 }
 
-impl<S, T, U, V, W, X, Y, Z, R, C> Default for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+impl<S, T, U, V, W, X, Y, Z, R, C, N> Default for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: SpikeTrain, 
+    W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
+    N: NeurotransmitterType,
 {
     fn default() -> Self { 
         RewardModulatedLatticeNetwork {
@@ -3088,7 +3107,7 @@ where
     }
 }
 
-impl<T, W> RewardModulatedLatticeNetwork<
+impl<T, W, N> RewardModulatedLatticeNetwork<
     TraceRSTDP,
     T,
     AdjacencyMatrix<(usize, usize), f32>,
@@ -3099,10 +3118,12 @@ impl<T, W> RewardModulatedLatticeNetwork<
     STDP,
     RewardModulatedSTDP,
     AdjacencyMatrix<(usize, usize), TraceRSTDP>,
+    N,
 >
 where
-    T: IterateAndSpike,
-    W: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    W: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 {
     // Generates a default reward modulated lattice network implementation given a neuron type
     // spike train that uses reward modulated spike time dependent plasticity
@@ -3111,25 +3132,26 @@ where
     }
 }
 
-impl<S, T, U, V, W, Y, X, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+impl<S, T, U, V, W, Y, X, Z, R, C, N> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike,
+    T: IterateAndSpike<N=N>,
     U: Graph<T=(usize, usize), U=f32>,
     V: LatticeHistory,
-    W: SpikeTrain,
+    W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
+    N: NeurotransmitterType,
 {
     /// Generates a [`RewardModulatedLatticeNetwork`] given lattices to use within the network, 
     /// (all lattices must have unique id fields)
     pub fn generate_network(
-        lattices: Vec<Lattice<T, U, V, Z>>, 
-        reward_modulated_lattices: Vec<RewardModulatedLattice<S, T, C, V, R>>,
-        spike_train_lattices: Vec<SpikeTrainLattice<W, X>>,
+        lattices: Vec<Lattice<T, U, V, Z, N>>, 
+        reward_modulated_lattices: Vec<RewardModulatedLattice<S, T, C, V, R, N>>,
+        spike_train_lattices: Vec<SpikeTrainLattice<N, W, X>>,
     ) -> Result<Self, LatticeNetworkError> {
         let mut network = RewardModulatedLatticeNetwork::default();
 
@@ -3149,23 +3171,24 @@ where
     }
 }
 
-impl<S, T, U, V, W, X, Y, Z, R, C> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+impl<S, T, U, V, W, X, Y, Z, R, C, N> RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: SpikeTrain, 
+    W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
+    N: NeurotransmitterType,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
     pub fn add_lattice(
         &mut self, 
-        lattice: Lattice<T, U, V, Z>
+        lattice: Lattice<T, U, V, Z, N>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&lattice.get_id()) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
@@ -3179,7 +3202,7 @@ where
     /// not already in the network
     pub fn add_reward_modulated_lattice(
         &mut self, 
-        reward_modulated_lattice: RewardModulatedLattice<S, T, C, V, R>
+        reward_modulated_lattice: RewardModulatedLattice<S, T, C, V, R, N>
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&reward_modulated_lattice.get_id()) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(reward_modulated_lattice.get_id()));
@@ -3195,7 +3218,7 @@ where
     /// not already in the network
     pub fn add_spike_train_lattice(
         &mut self, 
-        spike_train_lattice: SpikeTrainLattice<W, X>, 
+        spike_train_lattice: SpikeTrainLattice<N, W, X>, 
     ) -> Result<(), LatticeNetworkError> {
         if self.get_all_ids().contains(&spike_train_lattice.id) {
             return Err(LatticeNetworkError::GraphIDAlreadyPresent(spike_train_lattice.id));
@@ -3250,67 +3273,67 @@ where
     }
 
     /// Returns an immutable reference to all the lattice hashmaps
-    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z>>, &HashMap<usize, SpikeTrainLattice<W, X>>) {
+    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z, N>>, &HashMap<usize, SpikeTrainLattice<N, W, X>>) {
         (&self.lattices, &self.spike_train_lattices)
     }
 
     /// Returns the set of [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z>> {
+    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values()
     }
 
     /// Returns a mutable set [`Lattice`]s in the hashmap of lattices
-    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Z>> {
+    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values_mut()
     }
 
     /// Returns a reference to [`Lattice`] given the identifier
-    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z>> {
+    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z, N>> {
         self.lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`Lattice`] given the identifier
-    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z>> {
+    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z, N>> {
         self.lattices.get_mut(id)
     }
 
     /// Returns a immutable set [`RewardModulatedLattice`]s in the hashmap of lattices
-    pub fn reward_modulated_lattices_values(&self) -> Values<usize, RewardModulatedLattice<S, T, C, V, R>> {
+    pub fn reward_modulated_lattices_values(&self) -> Values<usize, RewardModulatedLattice<S, T, C, V, R, N>> {
         self.reward_modulated_lattices.values()
     }
 
     /// Returns a mutable set [`RewardModulatedLattice`]s in the hashmap of lattices
-    pub fn reward_modulated_lattices_values_mut(&mut self) -> ValuesMut<usize, RewardModulatedLattice<S, T, C, V, R>> {
+    pub fn reward_modulated_lattices_values_mut(&mut self) -> ValuesMut<usize, RewardModulatedLattice<S, T, C, V, R, N>> {
         self.reward_modulated_lattices.values_mut()
     }
 
     /// Returns a reference to [`RewardModulatedLattice`] given the identifier
-    pub fn get_reward_modulated_lattice(&self, id: &usize) -> Option<&RewardModulatedLattice<S, T, C, V, R>> {
+    pub fn get_reward_modulated_lattice(&self, id: &usize) -> Option<&RewardModulatedLattice<S, T, C, V, R, N>> {
         self.reward_modulated_lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`RewardModulatedLattice`] given the identifier
-    pub fn get_mut_reward_modulated_lattice(&mut self, id: &usize) -> Option<&mut RewardModulatedLattice<S, T, C, V, R>> {
+    pub fn get_mut_reward_modulated_lattice(&mut self, id: &usize) -> Option<&mut RewardModulatedLattice<S, T, C, V, R, N>> {
         self.reward_modulated_lattices.get_mut(id)
     }
 
     /// Returns a reference to [`SpikeTrainLattice`] given the identifier
-    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<W, X>> {
+    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.get(id)
     }
 
     /// Returns a mutable reference to a [`SpikeTrainLattice`] given the identifier
-    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<W, X>> {
+    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.get_mut(id)
     }
 
     /// Returns the set of [`SpikeTrainLattice`]s in the hashmap of spike train lattices
-    pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<W, X>> {
+    pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.values()
     }
 
     /// Returns a mutable set [`SpikeTrainLattice`]s in the hashmap of spike train lattices    
-    pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<W, X>> {
+    pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<N, W, X>> {
         self.spike_train_lattices.values_mut()
     }
 
@@ -4072,7 +4095,7 @@ where
         &self, 
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
-    ) -> NeurotransmitterConcentrations {
+    ) -> NeurotransmitterConcentrations<N> {
         let is_not_reward_modulated = self.lattices.contains_key(&postsynaptic_position.id);
 
         let postsynaptic_neuron: &T = if is_not_reward_modulated {
@@ -4085,7 +4108,7 @@ where
                 .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
         };
 
-        let input_vals: Vec<NeurotransmitterConcentrations> = input_positions
+        let input_vals: Vec<NeurotransmitterConcentrations<N>> = input_positions
             .iter()
             .map(|input_position| {
                 let (pos_x, pos_y) = input_position.pos;
@@ -4209,7 +4232,7 @@ where
     }
 
     fn get_all_neurotransmitter_inputs(&self) -> 
-    HashMap<GraphPosition, NeurotransmitterConcentrations> {
+    HashMap<GraphPosition, NeurotransmitterConcentrations<N>> {
         self.get_every_node()
             .iter()
             .map(|pos| {
@@ -4224,7 +4247,7 @@ where
     }
 
     fn get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations<N>>) {
         let neurotransmitters_inputs = self.get_all_neurotransmitter_inputs();
 
         let inputs = self.get_all_electrical_inputs();
@@ -4249,7 +4272,7 @@ where
     }
 
     fn par_get_all_neurotransmitter_inputs(&self) -> 
-    HashMap<GraphPosition, NeurotransmitterConcentrations> {
+    HashMap<GraphPosition, NeurotransmitterConcentrations<N>> {
         self.get_every_node()
             .par_iter()
             .map(|pos| {
@@ -4264,7 +4287,7 @@ where
     }
 
     fn par_get_all_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations>) {
+    (HashMap<GraphPosition, f32>, HashMap<GraphPosition, NeurotransmitterConcentrations<N>>) {
         let neurotransmitters_inputs = self.par_get_all_neurotransmitter_inputs();
 
         let inputs = self.par_get_all_electrical_inputs();
@@ -4676,7 +4699,7 @@ where
     /// Iterates one simulation timestep lattice given a set of only chemical inputs
     pub fn iterate_with_chemical_synapses_only(
         &mut self,
-        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -4753,7 +4776,7 @@ where
     pub fn iterate_with_chemical_and_electrical_synapses(
         &mut self,
         inputs: &HashMap<GraphPosition, f32>,
-        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations>,
+        neurotransmitter_inputs: &HashMap<GraphPosition, NeurotransmitterConcentrations<N>>,
     ) -> Result<(), GraphError> {
         let mut positions_to_update = Vec::new();
 
@@ -4956,18 +4979,19 @@ where
     }
 }
 
-impl<S, T, U, V, W, X, Y, Z, R, C> Agent for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C>
+impl<S, T, U, V, W, X, Y, Z, R, C, N> Agent for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C, N>
 where
     S: RewardModulatedWeight,
-    T: IterateAndSpike, 
+    T: IterateAndSpike<N=N>, 
     U: Graph<T=(usize, usize), U=f32>, 
     V: LatticeHistory, 
-    W: SpikeTrain, 
+    W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
     Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
     C: Graph<T=(usize, usize), U=S>,
+    N: NeurotransmitterType,
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
         match self.run_lattices(reward) {
@@ -4993,13 +5017,15 @@ macro_rules! raw_create_agent_type_for_lattice {
         $reward_mod_weight:ty,
         $reward_modulator:ty,
         $iterate_and_spike:ty,
+        $neurotransitter_kind:ty,
     ) => {
         type $name = RewardModulatedLattice<
             $reward_mod_weight,
             $iterate_and_spike,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
             spiking_neural_networks::neuron::GridVoltageHistory,
-            $reward_modulator
+            $reward_modulator,
+            $neurotransitter_kind:ty,
         >;
     };
 
@@ -5008,6 +5034,7 @@ macro_rules! raw_create_agent_type_for_lattice {
         $reward_mod_weight:ty,
         $iterate_and_spike:ty,
         $reward_modulator:ty,
+        $neurotransitter_kind:ty,
         lattice_history = $lattice_history:ty
     ) => {
         type $name = RewardModulatedLattice<
@@ -5015,7 +5042,8 @@ macro_rules! raw_create_agent_type_for_lattice {
             $iterate_and_spike,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
             $lattice_history,
-            $reward_modulator
+            $reward_modulator,
+            $neurotransitter_kind:ty,
         >;
     };
 }
@@ -5033,7 +5061,8 @@ macro_rules! raw_create_agent_type_for_network {
         $reward_mod_plasticity:ty,
         $reward_mod_weight:ty,
         $iterate_and_spike:ty,
-        $spike_train:ty
+        $spike_train:ty,
+        $neurotransitter_kind:ty,
     ) => {
         type $name = RewardModulatedLatticeNetwork<
             $reward_mod_weight,
@@ -5045,7 +5074,8 @@ macro_rules! raw_create_agent_type_for_network {
             spiking_neural_networks::graph::AdjacencyMatrix<spiking_neural_networks::graph::GraphPosition, RewardModulatedConnection<$reward_mod_weight>>,
             $plasticity,
             $reward_mod_plasticity,
-            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            $neurotransitter_kind:ty,
         >;
     };
 
@@ -5057,6 +5087,7 @@ macro_rules! raw_create_agent_type_for_network {
         $reward_mod_weight:ty,
         $iterate_and_spike:ty,
         $spike_train:ty,
+        $neurotransitter_kind:ty,
         lattice_history = $lattice_history:ty,
     ) => {
         type $name = RewardModulatedLatticeNetwork<
@@ -5072,7 +5103,8 @@ macro_rules! raw_create_agent_type_for_network {
             >,
             $plasticity,
             $reward_mod_plasticity,
-            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            $neurotransitter_kind:ty,
         >;
     };
 
@@ -5083,6 +5115,7 @@ macro_rules! raw_create_agent_type_for_network {
         $reward_mod_weight:ty,
         $iterate_and_spike:ty,
         $spike_train:ty,
+        $neurotransitter_kind:ty,
         spike_train_lattice_history = $spike_train_lattice_history:ty
     ) => {
         type $name = RewardModulatedLatticeNetwork<
@@ -5098,7 +5131,8 @@ macro_rules! raw_create_agent_type_for_network {
             >,
             $plasticity,
             $reward_mod_plasticity,
-            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            $neurotransitter_kind:ty,
         >;
     };
 
@@ -5109,6 +5143,7 @@ macro_rules! raw_create_agent_type_for_network {
         $reward_mod_weight:ty,
         $iterate_and_spike:ty,
         $spike_train:ty,
+        $neurotransitter_kind:ty,
         lattice_history = $lattice_history:ty,
         spike_train_lattice_history = $spike_train_lattice_history:ty
     ) => {
@@ -5125,7 +5160,8 @@ macro_rules! raw_create_agent_type_for_network {
             >,
             $plasticity,
             $reward_mod_plasticity,
-            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>
+            spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
+            $neurotransitter_kind:ty,
         >;
     };
 }
