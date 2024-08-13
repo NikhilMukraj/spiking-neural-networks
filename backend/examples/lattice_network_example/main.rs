@@ -7,9 +7,9 @@ extern crate spiking_neural_networks;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError,
     neuron::{
-        Lattice, LatticeNetwork, SpikeTrainLattice,
-        integrate_and_fire::IzhikevichNeuron, 
-        spike_train::PoissonNeuron,
+        integrate_and_fire::IzhikevichNeuron,
+        spike_train::PoissonNeuron, 
+        Lattice, LatticeNetwork, SpikeTrainLattice
     },
 };
 
@@ -43,7 +43,9 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     lattice.populate(&izhikevich_neuron, num_rows, num_cols);
     lattice.update_grid_history = true;
 
-    let mut network = LatticeNetwork::generate_network(vec![lattice], vec![spike_train_lattice])?;
+    let lattices = vec![lattice];
+    let spike_train_lattices = vec![spike_train_lattice];
+    let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
 
     network.connect(0, 1, &connection_conditional, None)?;
 
