@@ -5,7 +5,7 @@ use std::{
 extern crate spiking_neural_networks;
 use spiking_neural_networks::neuron::{
     iterate_and_spike::{
-        AMPADefault, IterateAndSpike, LigandGatedChannel, NeurotransmitterType, 
+        AMPADefault, IterateAndSpike, LigandGatedChannel, IonotropicNeurotransmitterType, 
         ReceptorKinetics, DestexheNeurotransmitter,
     }, 
     hodgkin_huxley::HodgkinHuxleyNeuron, 
@@ -19,9 +19,9 @@ use spiking_neural_networks::neuron::{
 fn main() {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
     presynaptic_neuron.ligand_gates
-        .insert(NeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
+        .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
     presynaptic_neuron.synaptic_neurotransmitters
-        .insert(NeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
+        .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
 
     let mut postsynaptic_neuron = presynaptic_neuron.clone();
 
@@ -47,11 +47,11 @@ fn main() {
 
         postsynaptic_voltages.push(postsynaptic_neuron.current_voltage);
         presynaptic_neurotransmitter_concs.push(
-            *presynaptic_neuron.get_neurotransmitter_concentrations().get(&NeurotransmitterType::AMPA)
+            *presynaptic_neuron.get_neurotransmitter_concentrations().get(&IonotropicNeurotransmitterType::AMPA)
                 .expect("Could not find concentration")
         );
         receptor_values.push(
-            postsynaptic_neuron.ligand_gates.get(&NeurotransmitterType::AMPA)
+            postsynaptic_neuron.ligand_gates.get(&IonotropicNeurotransmitterType::AMPA)
                 .expect("Could not find ligand gate")
                 .receptor
                 .get_r()
