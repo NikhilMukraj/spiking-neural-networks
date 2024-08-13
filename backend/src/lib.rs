@@ -147,7 +147,7 @@
 //! use spiking_neural_networks::{
 //!     neuron::{
 //!         iterate_and_spike::{
-//!             IterateAndSpike, weight_neurotransmitter_concentration,
+//!             IterateAndSpike, weight_neurotransmitter_concentration, NeurotransmitterType
 //!         },
 //!         spike_train::SpikeTrain,
 //!         spike_train_gap_juncton, gap_junction,
@@ -174,7 +174,7 @@
 //! /// the neurons based on neurotransmitter input during the simulation
 //! /// 
 //! /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
-//! pub fn iterate_coupled_spiking_neurons_and_spike_train<T: SpikeTrain, U: IterateAndSpike>(
+//! pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
 //!     spike_train: &mut T,
 //!     presynaptic_neuron: &mut U, 
 //!     postsynaptic_neuron: &mut U,
@@ -182,7 +182,12 @@
 //!     electrical_synapse: bool,
 //!     chemical_synapse: bool,
 //!     gaussian: bool,
-//! ) -> (bool, bool, bool) {
+//! ) -> (bool, bool, bool) 
+//! where
+//!     T: SpikeTrain<N=N>,
+//!     U: IterateAndSpike<N=N>,
+//!     N: NeurotransmitterType,
+//! {
 //!     let (pre_t_total, post_t_total, pre_current, post_current) = if gaussian {
 //!         // gets normally distributed factor to add noise with by scaling
 //!         let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
@@ -411,7 +416,7 @@
 //!             };
 //! 
 //!         // calculates weighted neurotransmitter inputs
-//!         let presynaptic_neurotransmitters: NeurotransmitterConcentrations = if chemical_synapse {
+//!         let presynaptic_neurotransmitters: NeurotransmitterConcentrations<T::N> = if chemical_synapse {
 //!             let neurotransmitters_vec = (0..n) 
 //!                 .map(|i| {
 //!                     let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
@@ -419,7 +424,7 @@
 //! 
 //!                     presynaptic_neurotransmitter
 //!                 }
-//!             ).collect::<Vec<NeurotransmitterConcentrations>>();
+//!             ).collect::<Vec<NeurotransmitterConcentrations<T::N>>>();
 //! 
 //!             let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 //! 
@@ -503,6 +508,7 @@
 //!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
+//!     IonotropicNeurotransmitterType,
 //! };
 //! use spiking_neural_networks::neuron::ion_channels::{
 //!     BasicGatingVariable, IonChannel, TimestepIndependentIonChannel,
@@ -634,7 +640,7 @@
 //!     /// Parameters used in generating noise
 //!     pub gaussian_params: GaussianParameters,
 //!     /// Postsynaptic neurotransmitters in cleft
-//!     pub synaptic_neurotransmitters: Neurotransmitters<T>,
+//!     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
 //!     /// Ionotropic receptor ligand gated channels
 //!     pub ligand_gates: LigandGatedChannels<R>,
 //! }
@@ -670,7 +676,9 @@
 //! }
 //! 
 //! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
-//!     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
+//!     type N = IonotropicNeurotransmitterType;
+//! 
+//!     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
 //!         self.synaptic_neurotransmitters.get_concentrations()
 //!     }
 //! 
@@ -695,7 +703,7 @@
 //!     fn iterate_with_neurotransmitter_and_spike(
 //!         &mut self, 
 //!         input_current: f32, 
-//!         t_total: &NeurotransmitterConcentrations,
+//!         t_total: &NeurotransmitterConcentrations<Self::N>,
 //!     ) -> bool {
 //!         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
 //!         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
