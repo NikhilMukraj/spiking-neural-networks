@@ -2,7 +2,11 @@
 //! as well as [`NeurotransmitterKinetics`] for neurotransmission and [`ReceptorKinetics`]
 //! for receptor dynamics over time.
 
-use std::collections::{HashMap, hash_map::{Values, ValuesMut, Keys}};
+use std::{
+    collections::{HashMap, hash_map::{Values, ValuesMut, Keys}},
+    fmt::Debug,
+    hash::Hash,
+};
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -92,10 +96,12 @@ pub trait NMDADefault {
     fn nmda_default() -> Self;
 }
 
+/// Marker trait for neurotransmitter type
+pub trait NeurotransmitterType: Hash + PartialEq + Eq + Clone + Copy + Debug + Send + Sync {}
 
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
-pub enum NeurotransmitterType {
+pub enum IonotropicNeurotransmitterType {
     /// Unspecific general neurotransmitter
     Basic,
     /// Neurotransmitter type that effects only AMPA receptors
@@ -108,15 +114,17 @@ pub enum NeurotransmitterType {
     GABAb,
 }
 
-impl NeurotransmitterType {
+impl NeurotransmitterType for IonotropicNeurotransmitterType {}
+
+impl IonotropicNeurotransmitterType {
     /// Converts type to string
     pub fn to_str(&self) -> &str {
         match self {
-            NeurotransmitterType::Basic => "Basic",
-            NeurotransmitterType::AMPA => "AMPA",
-            NeurotransmitterType::GABAa => "GABAa",
-            NeurotransmitterType::GABAb => "GABAb",
-            NeurotransmitterType::NMDA => "NMDA",
+            IonotropicNeurotransmitterType::Basic => "Basic",
+            IonotropicNeurotransmitterType::AMPA => "AMPA",
+            IonotropicNeurotransmitterType::GABAa => "GABAa",
+            IonotropicNeurotransmitterType::GABAb => "GABAb",
+            IonotropicNeurotransmitterType::NMDA => "NMDA",
         }
     }
 }
@@ -644,7 +652,7 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
 /// Multiple igand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
-    pub ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<T>> 
+    pub ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
 }
 
 impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
@@ -667,29 +675,29 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Returns the neurotransmitter types as set of keys
-    pub fn keys(&self) -> Keys<NeurotransmitterType, LigandGatedChannel<T>> {
+    pub fn keys(&self) -> Keys<IonotropicNeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.keys()
     }
 
     /// Returns the ligand gates as a set of values
-    pub fn values(&self) -> Values<NeurotransmitterType, LigandGatedChannel<T>> {
+    pub fn values(&self) -> Values<IonotropicNeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.values()
     }
 
     /// Gets the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
+    pub fn get(&self, neurotransmitter_type: &IonotropicNeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
         self.ligand_gates.get(neurotransmitter_type)
     }
 
     /// Gets a mutable reference to the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get_mut(&mut self, neurotransmitter_type: &NeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
+    pub fn get_mut(&mut self, neurotransmitter_type: &IonotropicNeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
         self.ligand_gates.get_mut(neurotransmitter_type)
     }
 
     /// Inserts the given [`LigandGatedChannel`] with the associated [`NeurotransmitterType`]
     pub fn insert(
         &mut self, 
-        neurotransmitter_type: NeurotransmitterType, 
+        neurotransmitter_type: IonotropicNeurotransmitterType, 
         ligand_gate: LigandGatedChannel<T>
     ) {
         self.ligand_gates.insert(neurotransmitter_type, ligand_gate);
@@ -714,7 +722,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Updates the receptor gating values based on the neurotransitter concentrations (mM)
-    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations, dt: f32) {
+    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>, dt: f32) {
         t_total.iter()
             .for_each(|(key, value)| {
                 if let Some(gate) = self.ligand_gates.get_mut(key) {
@@ -726,14 +734,14 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 
 /// Multiple neurotransmitters with their associated types
 #[derive(Clone, Debug)]
-pub struct Neurotransmitters<T: NeurotransmitterKinetics> {
-    pub neurotransmitters: HashMap<NeurotransmitterType, T>
+pub struct Neurotransmitters<N: NeurotransmitterType, T: NeurotransmitterKinetics> {
+    pub neurotransmitters: HashMap<N, T>
 }
 
 /// A hashmap of neurotransmitter types and their associated concentration
-pub type NeurotransmitterConcentrations = HashMap<NeurotransmitterType, f32>;
+pub type NeurotransmitterConcentrations<N> = HashMap<N, f32>;
 
-impl<T: NeurotransmitterKinetics> Default for Neurotransmitters<T> {
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics> Default for Neurotransmitters<N, T> {
     fn default() -> Self {
         Neurotransmitters {
             neurotransmitters: HashMap::new(),
@@ -741,7 +749,7 @@ impl<T: NeurotransmitterKinetics> Default for Neurotransmitters<T> {
     }
 }
 
-impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
+impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N, T> {
     /// Returns how many neurotransmitters there are
     pub fn len(&self) -> usize {
         self.neurotransmitters.keys().len()
@@ -753,44 +761,44 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
     }
 
     /// Returns the neurotransmitter types as a set of keys
-    pub fn keys(&self) -> Keys<NeurotransmitterType, T> {
+    pub fn keys(&self) -> Keys<N, T> {
         self.neurotransmitters.keys()
     }
 
     // Returns the neurotransmitter dynamics as a set of values
-    pub fn values(&self) -> Values<NeurotransmitterType, T> {
+    pub fn values(&self) -> Values<N, T> {
         self.neurotransmitters.values()
     }
 
     /// Returns a set of mutable neurotransmitters 
-    pub fn values_mut(&mut self) -> ValuesMut<NeurotransmitterType, T> {
+    pub fn values_mut(&mut self) -> ValuesMut<N, T> {
         self.neurotransmitters.values_mut()
     }
 
     /// Gets the neurotransmitter associated with the given [`NeurotransmitterType`]
-    pub fn get(&self, neurotransmitter_type: &NeurotransmitterType) -> Option<&T> {
+    pub fn get(&self, neurotransmitter_type: &N) -> Option<&T> {
         self.neurotransmitters.get(neurotransmitter_type)
     }
 
     /// Gets a mutable reference to the neurotransmitter associated with the given [`NeurotransmitterType`]
-    pub fn get_mut(&mut self, neurotransmitter_type: &NeurotransmitterType) -> Option<&mut T> {
+    pub fn get_mut(&mut self, neurotransmitter_type: &N) -> Option<&mut T> {
         self.neurotransmitters.get_mut(neurotransmitter_type)
     }
 
     /// Inserts the given neurotransmitter with the associated [`NeurotransmitterType`]
     pub fn insert(
         &mut self, 
-        neurotransmitter_type: NeurotransmitterType, 
+        neurotransmitter_type: N, 
         neurotransmitter: T
     ) {
         self.neurotransmitters.insert(neurotransmitter_type, neurotransmitter);
     }
 
     /// Returns the neurotransmitter concentration (mM) with their associated types
-    pub fn get_concentrations(&self) -> NeurotransmitterConcentrations {
+    pub fn get_concentrations(&self) -> NeurotransmitterConcentrations<N> {
         self.neurotransmitters.iter()
             .map(|(neurotransmitter_type, neurotransmitter)| (*neurotransmitter_type, neurotransmitter.get_t()))
-            .collect::<NeurotransmitterConcentrations>()
+            .collect::<NeurotransmitterConcentrations<N>>()
     }
 
     /// Calculates the neurotransmitter concentrations based on the given voltage (mV)
@@ -801,18 +809,18 @@ impl <T: NeurotransmitterKinetics> Neurotransmitters<T> {
 }
 
 /// Multiplies multiple neurotransmitters concentrations by a single scalar value
-pub fn weight_neurotransmitter_concentration(
-    neurotransmitter_hashmap: &mut NeurotransmitterConcentrations, 
+pub fn weight_neurotransmitter_concentration<N: NeurotransmitterType>(
+    neurotransmitter_hashmap: &mut NeurotransmitterConcentrations<N>, 
     weight: f32
 ) {
     neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
 
 /// Sums the neurotransmitter concentrations together
-pub fn aggregate_neurotransmitter_concentrations(
-    neurotransmitter_hashmaps: &Vec<NeurotransmitterConcentrations>
-) -> NeurotransmitterConcentrations {
-    let mut cumulative_map: NeurotransmitterConcentrations = HashMap::new();
+pub fn aggregate_neurotransmitter_concentrations<N: NeurotransmitterType>(
+    neurotransmitter_hashmaps: &Vec<NeurotransmitterConcentrations<N>>
+) -> NeurotransmitterConcentrations<N> {
+    let mut cumulative_map: NeurotransmitterConcentrations<N> = HashMap::new();
 
     for map in neurotransmitter_hashmaps {
         for (key, value) in map {
@@ -1042,11 +1050,12 @@ pub trait IterateAndSpike:
     CurrentVoltage + Timestep + GapConductance + GaussianFactor + IsSpiking + 
     LastFiringTime + Clone + Send + Sync 
 {
+    type N: NeurotransmitterType;
     /// Takes in an input current and returns whether the model is spiking
     /// after the membrane potential is updated
     fn iterate_and_spike(&mut self, input_current: f32) -> bool;
     /// Gets the neurotransmitter concentrations of the neuron (mM)
-    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations;
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N>;
     /// Takes in an input current and neurotransmitter input and returns whether the model
     /// is spiking after the membrane potential is updated, neurotransmitter input updates
     /// receptor currents based on the associated neurotransmitter concentration,
@@ -1054,6 +1063,6 @@ pub trait IterateAndSpike:
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: &NeurotransmitterConcentrations,
+        t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool;
 }
