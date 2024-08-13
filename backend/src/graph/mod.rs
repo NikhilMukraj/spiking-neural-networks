@@ -23,29 +23,31 @@ pub struct GraphPosition {
 
 /// Implementation of a basic graph
 pub trait Graph: Default + Send + Sync {
-    type T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy;
-    type U: Send + Sync + Debug + Clone + Copy;
+    /// Key type
+    type K: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy;
+    /// Weight type
+    type V: Send + Sync + Debug + Clone + Copy;
     /// Sets the identifier of the graph
     fn set_id(&mut self, id: usize);
     /// Gets the identifier of the graph
     fn get_id(&self) -> usize;
     /// Adds a new node to the graph, unconnected to other nodes, no change if node
     /// is already in graph
-    fn add_node(&mut self, position: Self::T);
+    fn add_node(&mut self, position: Self::K);
     /// Returns every node or vertex on the graph
-    fn get_every_node(&self) -> HashSet<Self::T>;
+    fn get_every_node(&self) -> HashSet<Self::K>;
     /// Returns every node as a reference without cloning
-    fn get_every_node_as_ref(&self) -> HashSet<&Self::T>;
+    fn get_every_node_as_ref(&self) -> HashSet<&Self::K>;
     /// Gets the weight between two neurons, errors if the positions are not in the graph 
     /// and returns `None` if there is no connection between the given neurons
-    fn lookup_weight(&self, presynaptic: &Self::T, postsynaptic: &Self::T) -> Result<Option<Self::U>, GraphError>; 
+    fn lookup_weight(&self, presynaptic: &Self::K, postsynaptic: &Self::K) -> Result<Option<Self::V>, GraphError>; 
     /// Edits the weight between two neurons, errors if the positions are not in the graph,
     /// `None` represents no connection while `Some(U)` represents some weight
-    fn edit_weight(&mut self, presynaptic: &Self::T, postsynaptic: &Self::T, weight: Option<Self::U>) -> Result<(), GraphError>;
+    fn edit_weight(&mut self, presynaptic: &Self::K, postsynaptic: &Self::K, weight: Option<Self::V>) -> Result<(), GraphError>;
     /// Returns all presynaptic connections if the position is in the graph
-    fn get_incoming_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>; 
+    fn get_incoming_connections(&self, pos: &Self::K) -> Result<HashSet<Self::K>, GraphError>; 
     /// Returns all postsynaptic connections if the position is in the graph
-    fn get_outgoing_connections(&self, pos: &Self::T) -> Result<HashSet<Self::T>, GraphError>;
+    fn get_outgoing_connections(&self, pos: &Self::K) -> Result<HashSet<Self::K>, GraphError>;
     /// Updates the history of the graph with the current state
     fn update_history(&mut self);
     /// Resets graph history
@@ -53,7 +55,7 @@ pub trait Graph: Default + Send + Sync {
 }
 
 pub trait ToGraphPosition: Send + Sync {
-    type GraphPos: Graph<T = GraphPosition>;
+    type GraphPos: Graph<K = GraphPosition>;
 }
 
 impl<U: Send + Sync + Debug + Clone + Copy> ToGraphPosition for AdjacencyMatrix<Position, U> {
@@ -120,8 +122,8 @@ impl<
     T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
     U: Send + Sync + Debug + Clone + Copy
 > Graph for AdjacencyMatrix<T, U> {
-    type T = T;
-    type U = U;
+    type K = T;
+    type V = U;
 
     fn set_id(&mut self, id: usize) {
         self.id = id;
@@ -301,8 +303,8 @@ impl<
     T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
     U: Send + Sync + Debug + Clone + Copy
 > Graph for AdjacencyList<T, U> {
-    type T = T;
-    type U = U;
+    type K = T;
+    type V = U;
 
     fn set_id(&mut self, id: usize) {
         self.id = id;
