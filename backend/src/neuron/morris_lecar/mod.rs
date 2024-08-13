@@ -2,10 +2,7 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    CurrentVoltage, GapConductance, GaussianFactor, LastFiringTime, IsSpiking,
-    Timestep, IterateAndSpike, GaussianParameters, LigandGatedChannels, 
-    Neurotransmitters, NeurotransmitterKinetics, ReceptorKinetics,
-    NeurotransmitterConcentrations, DestexheNeurotransmitter, DestexheReceptor,
+    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
 use super::ion_channels::{
     TimestepIndependentIonChannel, IonChannel, ReducedCalciumChannel, 
@@ -42,7 +39,7 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
@@ -63,7 +60,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             was_increasing: false,
             last_firing_time: None,
             gaussian_params: GaussianParameters::default(),
-            synaptic_neurotransmitters: Neurotransmitters::<T>::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::<R>::default(),
         }
     }
@@ -103,7 +100,9 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
-    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
+    type N = IonotropicNeurotransmitterType;
+
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
     }
 
@@ -121,7 +120,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: &NeurotransmitterConcentrations,
+        t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
