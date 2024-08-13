@@ -7,10 +7,7 @@ use std::{
 };
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    IterateAndSpike, GaussianFactor, GaussianParameters, CurrentVoltage, IsSpiking,
-    GapConductance, LastFiringTime, LigandGatedChannels, Timestep,
-    NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics,
-    DestexheNeurotransmitter, DestexheReceptor,
+    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
 use super::ion_channels::{
     NaIonChannel, KIonChannel, KLeakChannel, IonChannel, TimestepIndependentIonChannel
@@ -71,7 +68,7 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
@@ -171,7 +168,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     /// Updates receptor gating based on neurotransmitter input
     pub fn update_receptors(
         &mut self, 
-        t_total: &NeurotransmitterConcentrations
+        t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>
     ) {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
@@ -193,7 +190,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
     fn iterate_with_neurotransmitter(
         &mut self, 
         input: f32, 
-        t_total: &NeurotransmitterConcentrations
+        t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>
     ) {
         self.update_receptors(t_total);
         self.iterate(input);
@@ -201,6 +198,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for HodgkinHuxleyNeuron<T, R> {
+    type N = IonotropicNeurotransmitterType;
+
     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate(input_current);
@@ -215,14 +214,14 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
         is_spiking
     }
 
-    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations {
+    fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<IonotropicNeurotransmitterType> {
         self.synaptic_neurotransmitters.get_concentrations()
     }
 
     fn iterate_with_neurotransmitter_and_spike(
         &mut self, 
         input_current: f32, 
-        t_total: &NeurotransmitterConcentrations,
+        t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>,
     ) -> bool {
         let last_voltage = self.current_voltage;
         self.iterate_with_neurotransmitter(input_current, t_total);
