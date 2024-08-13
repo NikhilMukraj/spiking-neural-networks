@@ -8,7 +8,8 @@ use spiking_neural_networks::{
         iterate_and_spike::{IonotropicNeurotransmitterType, ApproximateNeurotransmitter, ApproximateReceptor}, 
         plasticity::{RewardModulatedSTDP, TraceRSTDP}, 
         RewardModulatedLattice
-    }, reinforcement::{Agent, Environment, State}
+    }, 
+    interactable::{Agent, Environment, State}
 };
 
 

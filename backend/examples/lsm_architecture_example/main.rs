@@ -15,7 +15,7 @@ use spiking_neural_networks::{
         Lattice, RewardModulatedConnection, RewardModulatedLattice, 
         RewardModulatedLatticeNetwork, SpikeTrainLattice
     }, 
-    reinforcement::{Environment, State},
+    interactable::{Environment, State},
 };
 
 

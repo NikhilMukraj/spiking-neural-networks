@@ -43,7 +43,7 @@ pub mod iterate_and_spike_traits {
 }
 use crate::error::{AgentError, GraphError, LatticeNetworkError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
-use crate::reinforcement::{Agent, UnsupervisedAgent};
+use crate::interactable::{Agent, UnsupervisedAgent};
 
 
 /// Calculates the current between two neurons based on the voltage and
