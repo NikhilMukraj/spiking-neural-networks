@@ -488,9 +488,9 @@ pub struct Lattice<
     /// Whether to update grid's history
     pub update_grid_history: bool,
     /// Whether to use electrical synapses
-    pub electrical_synapses: bool,
+    pub electrical_synapse: bool,
     /// Whether to use chemical synapses
-    pub chemical_synapses: bool,
+    pub chemical_synapse: bool,
     /// Plasticity rule
     pub plasticity: W,
     /// Whether to update weights with based on plasticity when iterating
@@ -511,8 +511,8 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             grid_history: V::default(),
             update_graph_history: false,
             update_grid_history: false,
-            electrical_synapses: true,
-            chemical_synapses: false,
+            electrical_synapse: true,
+            chemical_synapse: false,
             do_plasticity: false,
             plasticity: W::default(),
             gaussian: false,
@@ -954,7 +954,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         &mut self,
         iterations: usize,
     ) -> Result<(), GraphError> {
-        match (self.electrical_synapses, self.chemical_synapses) {
+        match (self.electrical_synapse, self.chemical_synapse) {
             (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(iterations),
             (true, false) => self.run_lattice_electrical_synapses_only(iterations),
             (false, true) => self.run_lattice_chemical_synapses_only(iterations),
