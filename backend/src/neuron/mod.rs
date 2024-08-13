@@ -472,7 +472,7 @@ macro_rules! impl_apply {
 #[derive(Debug, Clone)]
 pub struct Lattice<
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: Plasticity<T, T, f32>,
     N: NeurotransmitterType,
@@ -503,7 +503,7 @@ pub struct Lattice<
     pub internal_clock: usize,
 }
 
-impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W, N> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W, N> {
     fn default() -> Self {
         Lattice {
             cell_grid: vec![],
@@ -529,7 +529,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>> Lattice<T, AdjacencyMatri
     }
 }
 
-impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Lattice<T, U, V, W, N> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Lattice<T, U, V, W, N> {
     impl_reset_timing!();
     impl_apply!();
 
@@ -1062,7 +1062,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize)
     }
 }
 
-impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<T=(usize, usize), U=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W, N> {
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W, N> {
     fn update(&mut self) -> Result<(), AgentError> {
         match self.run_lattice(1) {
             Ok(_) => Ok(()),
@@ -1243,7 +1243,10 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
 ///     spike_train_lattice.set_id(2);
 ///     spike_train_lattice.populate(&base_spike_train, 3, 3);
 /// 
-///     let mut network = LatticeNetwork::generate_network(vec![lattice1, lattice2], vec![spike_train_lattice])?;
+///     let lattices = vec![lattice1, lattice2];
+///     let spike_train_lattices = vec![spike_train_lattice];
+///     
+///     let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
 ///     
 ///     // connects each corressponding neuron in the presynaptic lattice to a neuron in the
 ///     // postsynaptic lattice as long as their position is the same, scales the weight
@@ -1269,11 +1272,11 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
 #[derive(Debug, Clone)]
 pub struct LatticeNetwork<
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=f32>,
+    Y: Graph<K=GraphPosition, V=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     N: NeurotransmitterType,
 > {
@@ -1298,11 +1301,11 @@ pub struct LatticeNetwork<
 impl<T, U, V, W, X, Y, Z, N> Default for LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=f32>,
+    U: Graph<K=(usize, usize), V=f32>,
     V: LatticeHistory,
     W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=f32>,
+    Y: Graph<K=GraphPosition, V=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     N: NeurotransmitterType,
 {
@@ -1339,15 +1342,14 @@ where
         LatticeNetwork::default()
     }
 }
-
 impl<T, U, V, W, X, Y, Z, N> LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=f32> + ToGraphPosition<GraphPos = Y>,
+    U: Graph<K=(usize, usize), V=f32> + ToGraphPosition<GraphPos=Y>,
     V: LatticeHistory,
     W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=f32>,
+    Y: Graph<K=GraphPosition, V=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     N: NeurotransmitterType,
 {
@@ -1374,11 +1376,11 @@ where
 impl<T, U, V, W, X, Y, Z, N> LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=f32>,
+    U: Graph<K=(usize, usize), V=f32>,
     V: LatticeHistory,
     W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=f32>,
+    Y: Graph<K=GraphPosition, V=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     N: NeurotransmitterType,
 {
@@ -2359,11 +2361,11 @@ where
 impl<T, U, V, W, X, Y, Z, N> UnsupervisedAgent for LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=f32>,
+    U: Graph<K=(usize, usize), V=f32>,
     V: LatticeHistory,
     W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=f32>,
+    Y: Graph<K=GraphPosition, V=f32>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     N: NeurotransmitterType,
 {
@@ -2401,7 +2403,7 @@ where
 pub struct RewardModulatedLattice<
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=S>, 
+    U: Graph<K=(usize, usize), V=S>, 
     V: LatticeHistory, 
     W: RewardModulator<T, T, S>, 
     N: NeurotransmitterType,
@@ -2436,7 +2438,7 @@ impl<S, T, U, V, W, N> Default for RewardModulatedLattice<S, T, U, V, W, N>
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>,
-    U: Graph<T = (usize, usize), U = S>,
+    U: Graph<K = (usize, usize), V = S>,
     V: LatticeHistory,
     W: RewardModulator<T, T, S>,
     N: NeurotransmitterType,
@@ -2470,7 +2472,7 @@ impl<S, T, U, V, W, N> RewardModulatedLattice<S, T, U, V, W, N>
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=S>,
+    U: Graph<K=(usize, usize), V=S>,
     V: LatticeHistory,
     W: RewardModulator<T, T, S>,
     N: NeurotransmitterType,
@@ -2987,7 +2989,7 @@ impl<S, T, U, V, W, N> Agent for RewardModulatedLattice<S, T, U, V, W, N>
 where 
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=S>,
+    U: Graph<K=(usize, usize), V=S>,
     V: LatticeHistory,
     W: RewardModulator<T, T, S>,
     N: NeurotransmitterType,
@@ -3025,15 +3027,15 @@ impl<T: RewardModulatedWeight> RewardModulatedConnection<T> {
 }
 
 #[derive(Debug, Clone)]
-enum GraphWrapper<'a, U: Graph<T = (usize, usize)>, V: Graph<T = (usize, usize)>> {
+enum GraphWrapper<'a, U: Graph<K = (usize, usize)>, V: Graph<K = (usize, usize)>> {
     Graph1(&'a U),
     Graph2(&'a V),
 }
 
 impl<'a, U, V> GraphWrapper<'a, U, V>
 where
-    U: Graph<T = (usize, usize)>,
-    V: Graph<T = (usize, usize)>,
+    U: Graph<K = (usize, usize)>,
+    V: Graph<K = (usize, usize)>,
 {
     fn get_every_node(&self) -> HashSet<(usize, usize)> {
         match self {
@@ -3048,14 +3050,14 @@ where
 pub struct RewardModulatedLatticeNetwork<
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
-    C: Graph<T=(usize, usize), U=S>,
+    C: Graph<K=(usize, usize), V=S>,
     N: NeurotransmitterType,
 > {
     /// A hashmap of [`Lattice`]s associated with their respective identifier
@@ -3082,14 +3084,14 @@ impl<S, T, U, V, W, X, Y, Z, R, C, N> Default for RewardModulatedLatticeNetwork<
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
-    C: Graph<T=(usize, usize), U=S>,
+    C: Graph<K=(usize, usize), V=S>,
     N: NeurotransmitterType,
 {
     fn default() -> Self { 
@@ -3136,14 +3138,14 @@ impl<S, T, U, V, W, Y, X, Z, R, C, N> RewardModulatedLatticeNetwork<S, T, U, V, 
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>,
-    U: Graph<T=(usize, usize), U=f32>,
+    U: Graph<K=(usize, usize), V=f32>,
     V: LatticeHistory,
     W: SpikeTrain<N=N>,
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
-    C: Graph<T=(usize, usize), U=S>,
+    C: Graph<K=(usize, usize), V=S>,
     N: NeurotransmitterType,
 {
     /// Generates a [`RewardModulatedLatticeNetwork`] given lattices to use within the network, 
@@ -3175,14 +3177,14 @@ impl<S, T, U, V, W, X, Y, Z, R, C, N> RewardModulatedLatticeNetwork<S, T, U, V, 
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
-    C: Graph<T=(usize, usize), U=S>,
+    C: Graph<K=(usize, usize), V=S>,
     N: NeurotransmitterType,
 {
     /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
@@ -4983,14 +4985,14 @@ impl<S, T, U, V, W, X, Y, Z, R, C, N> Agent for RewardModulatedLatticeNetwork<S,
 where
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
-    U: Graph<T=(usize, usize), U=f32>, 
+    U: Graph<K=(usize, usize), V=f32>, 
     V: LatticeHistory, 
     W: SpikeTrain<N=N>, 
     X: SpikeTrainLatticeHistory,
-    Y: Graph<T=GraphPosition, U=RewardModulatedConnection<S>>,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
     Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
     R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
-    C: Graph<T=(usize, usize), U=S>,
+    C: Graph<K=(usize, usize), V=S>,
     N: NeurotransmitterType,
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
@@ -5025,7 +5027,7 @@ macro_rules! raw_create_agent_type_for_lattice {
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
             spiking_neural_networks::neuron::GridVoltageHistory,
             $reward_modulator,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 
@@ -5043,7 +5045,7 @@ macro_rules! raw_create_agent_type_for_lattice {
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
             $lattice_history,
             $reward_modulator,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 }
@@ -5075,7 +5077,7 @@ macro_rules! raw_create_agent_type_for_network {
             $plasticity,
             $reward_mod_plasticity,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 
@@ -5104,7 +5106,7 @@ macro_rules! raw_create_agent_type_for_network {
             $plasticity,
             $reward_mod_plasticity,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 
@@ -5132,7 +5134,7 @@ macro_rules! raw_create_agent_type_for_network {
             $plasticity,
             $reward_mod_plasticity,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 
@@ -5161,7 +5163,7 @@ macro_rules! raw_create_agent_type_for_network {
             $plasticity,
             $reward_mod_plasticity,
             spiking_neural_networks::graph::AdjacencyMatrix<(usize, usize), $reward_mod_weight>,
-            $neurotransitter_kind:ty,
+            $neurotransitter_kind,
         >;
     };
 }
