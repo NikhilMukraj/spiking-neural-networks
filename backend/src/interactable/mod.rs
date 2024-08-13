@@ -1,4 +1,4 @@
-//! A set of tools for reward based learning.
+//! A set of tools for allowing the networks to interact with a state.
 
 use crate::error::AgentError;
 
