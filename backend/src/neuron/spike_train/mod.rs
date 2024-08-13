@@ -272,7 +272,7 @@ impl<T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for Preset
             self.internal_clock = 0.;
 
             self.counter += 1;
-            if self.counter > self.firing_times.len() {
+            if self.counter == self.firing_times.len() {
                 self.counter = 0;
             }
 
