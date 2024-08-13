@@ -6,7 +6,7 @@ use std::{
     io::{Error, ErrorKind, Result},
     ops::Sub,
 };
-use crate::error::GeneticAlgorithmError;
+use crate::{error::GeneticAlgorithmError, neuron::iterate_and_spike::NeurotransmitterType};
 use crate::neuron::{   
     iterate_and_spike::IterateAndSpike, 
     spike_train::SpikeTrain,
@@ -194,8 +194,9 @@ pub fn compare_summary(summary1: &ActionPotentialSummary, summary2: &ActionPoten
 /// on neurotransmitter input or to `false` to not account for chemical neurotransmission, 
 /// use `gaussian` to add normally distributed random noise
 pub fn get_reference_summary<
-    T: IterateAndSpike,
-    U: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    U: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 >(
     neuron: &T, 
     input_spike_train: &U, 
@@ -250,8 +251,9 @@ pub fn get_reference_summary<
 #[derive(Clone)]
 pub struct FittingSettings<
     'a,  
-    T: IterateAndSpike,
-    U: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    U: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 >{
     /// Neuron to fit to reference neuron
     pub neuron_to_fit: T,
@@ -277,12 +279,13 @@ pub struct FittingSettings<
 /// Generates a summary of the neuron's action potentials over time
 /// given a presynaptic and postsynaptic neuron
 fn get_summary_given_settings<
-    T: IterateAndSpike,
-    U: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    U: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 >(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
-    settings: &FittingSettings<T, U>,
+    settings: &FittingSettings<T, U, N>,
     index: usize,
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = settings.spike_trains[index].clone();
@@ -330,13 +333,14 @@ fn get_summary_given_settings<
 // if fitting does not generalize, optimize other coefs in equation
 // or can try optimizing tau_m and c_m
 fn fitting_objective<
-    T: IterateAndSpike,
-    U: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    U: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 >(
     bitstring: &BitString, 
     bounds: &Vec<(f32, f32)>, 
     n_bits: usize, 
-    settings: &HashMap<&str, FittingSettings<T, U>>
+    settings: &HashMap<&str, FittingSettings<T, U, N>>
 ) -> result::Result<f32, GeneticAlgorithmError> {
     let settings = settings.get("settings").unwrap();
 
@@ -419,9 +423,10 @@ fn fitting_objective<
 /// 
 /// - `verbose` : use `true` to print extra information
 pub fn fit_neuron_to_neuron<
-    T: IterateAndSpike,
-    U: IterateAndSpike,
-    V: SpikeTrain,
+    T: IterateAndSpike<N=N>,
+    U: IterateAndSpike<N=N>,
+    V: SpikeTrain<N=N>,
+    N: NeurotransmitterType,
 >(
     neuron_to_fit: &T,
     reference_neuron: &U,
@@ -503,7 +508,7 @@ pub fn fit_neuron_to_neuron<
         converter: converter,
     };
 
-    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V>> = HashMap::new();
+    let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V, N>> = HashMap::new();
     fitting_settings_map.insert("settings", fitting_settings.clone());
 
     if verbose {
