@@ -261,7 +261,6 @@ pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f32) -> Vec<Vec<i
     output
 }
 
-// could try random turing patterns as well
 /// Generates a random pattern based on a given size, number of patterns
 /// and degree of noise to use when generating the pattern
 pub fn generate_random_patterns(
