@@ -9,6 +9,8 @@
 //! and dynamics for neurons connected in a lattice. 
 //! See below for examples and how to add custom models.
 //! 
+//! ## Quick Examples
+//! 
 //! ### Morris-Lecar Model with Static Input
 //! 
 //! ![Morris-Lecar with static current input](https://github.com/NikhilMukraj/spiking-neural-networks/blob/main/images/ml_static.png?raw=true)
