@@ -79,7 +79,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
                 0.
             };
             
-        let presynaptic_neurotransmitters: NeurotransmitterConcentrations = if chemical_synapse {
+        let presynaptic_neurotransmitters: NeurotransmitterConcentrations<T::N> = if chemical_synapse {
             let neurotransmitters_vec = (0..n) 
                 .map(|i| {
                     let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
@@ -87,7 +87,7 @@ fn test_isolated_stdp<T: IterateAndSpike>(
 
                     presynaptic_neurotransmitter
                 }
-            ).collect::<Vec<NeurotransmitterConcentrations>>();
+            ).collect::<Vec<NeurotransmitterConcentrations<T::N>>>();
 
             let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
 
