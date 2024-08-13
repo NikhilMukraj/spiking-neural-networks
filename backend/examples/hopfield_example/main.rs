@@ -32,7 +32,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
     Ok(matrix)
 }
 
-fn test_hopfield_network<T: Graph<T=(usize, usize), U=f32>>(
+fn test_hopfield_network<T: Graph<K=(usize, usize), V=f32>>(
     patterns: &Vec<Vec<Vec<isize>>>,
     noise_level: f32,
     iterations: usize,
