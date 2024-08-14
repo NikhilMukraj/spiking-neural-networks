@@ -4,6 +4,15 @@ use std::{
     fs::File,
 };
 extern crate spiking_neural_networks;
+use spiking_neural_networks::{
+    neuron::{
+        iterate_and_spike::{ApproximateNeurotransmitter, NeurotransmitterType}, 
+        spike_train::{DeltaDiracRefractoriness, PresetSpikeTrain}, 
+        Lattice, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice
+    },
+    error::SpikingNeuralNetworksError, 
+};
+
 use crate::spiking_neural_networks::{
     neuron::{
         integrate_and_fire::IzhikevichNeuron,
@@ -150,6 +159,60 @@ fn test_isolated_stdp<T: IterateAndSpike>(
     }
 
     output_hashmap
+}
+
+pub fn test_stdp<N, T>(
+    firing_rates: &[f32],
+    postsynaptic_neuron: &T,
+    iterations: usize,
+    stdp_params: &STDP,
+    weight_params: &GaussianParameters,
+    electrical_synapse: bool,
+    chemical_synapse: bool,
+) -> Result<(), SpikingNeuralNetworksError>
+where
+    N: NeurotransmitterType,
+    T: IterateAndSpike<N=N>,
+{
+    type SpikeTrainType<N> = PresetSpikeTrain<N, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
+
+    let mut spike_train_lattice: SpikeTrainLattice<
+        N, 
+        SpikeTrainType<N>, 
+        SpikeTrainGridHistory,
+    > = SpikeTrainLattice::default();
+    let preset_spike_train = PresetSpikeTrain::default();
+    spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1);
+    spike_train_lattice.apply_given_position(
+        &(|pos: (usize, usize), spike_train: &mut SpikeTrainType<N>| { 
+            spike_train.firing_times = vec![firing_rates[pos.0]]; 
+        })
+    );
+    spike_train_lattice.update_grid_history = true;
+    spike_train_lattice.set_id(0);
+
+    let mut lattice = Lattice::default_impl();
+    lattice.populate(&postsynaptic_neuron.clone(), 1, 1);
+    lattice.plasticity = *stdp_params;
+    lattice.do_plasticity = true;
+    lattice.update_grid_history = true;
+    lattice.set_id(1);
+
+    let lattices = vec![lattice];
+    let spike_train_lattices = vec![spike_train_lattice];
+    let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+    network.connect(0, 1, &(|_, _| true), Some(&(|_, _| weight_params.get_random_number())))?;
+    network.update_connecting_graph_history = true;
+    network.electrical_synapse = electrical_synapse;
+    network.chemical_synapse = chemical_synapse;
+
+    network.run_lattices(iterations)?;
+
+    // track postsynaptic voltage over time
+    // track spike trains over time
+    // track weights over time
+
+    Ok(())
 }
 
 // - Generates a set of presynaptic neurons and a postsynaptic neuron (Izhikevich)
