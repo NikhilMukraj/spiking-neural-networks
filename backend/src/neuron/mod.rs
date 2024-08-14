@@ -29,7 +29,7 @@ use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron,
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
     aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
-    ApproximateNeurotransmitter, CurrentVoltage, GapConductance, IterateAndSpike, 
+    ApproximateNeurotransmitter, CurrentVoltage, IsSpiking, GapConductance, IterateAndSpike, 
     NeurotransmitterConcentrations, NeurotransmitterType, 
 };
 pub mod plasticity;
@@ -380,6 +380,56 @@ impl LatticeHistory for AverageVoltageHistory {
         let length = voltages.len() as f32;
         self.history.push(
             voltages.into_iter().sum::<f32>() / length
+        );
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
+    }
+}
+
+/// Stores history of spikes over time
+#[derive(Default, Debug, Clone)]
+pub struct SpikeHistory {
+    /// Spike history
+    pub history: Vec<Vec<Vec<bool>>>,
+}
+
+impl LatticeHistory for SpikeHistory {
+    fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
+        self.history.push(
+            state.iter()
+                .map(|i| {
+                    i.iter()
+                        .map(|j| j.is_spiking())
+                        .collect::<Vec<bool>>()
+                    })
+                .collect::<Vec<Vec<bool>>>()
+        );
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
+    }
+}
+
+/// Stores history of spikes over time for spike trains
+#[derive(Default, Debug, Clone)]
+pub struct SpikeTrainSpikeHistory {
+    /// Spike history
+    pub history: Vec<Vec<Vec<bool>>>,
+}
+
+impl SpikeTrain for SpikeHistory {
+    fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
+        self.history.push(
+            state.iter()
+                .map(|i| {
+                    i.iter()
+                        .map(|j| j.is_spiking())
+                        .collect::<Vec<bool>>()
+                    })
+                .collect::<Vec<Vec<bool>>>()
         );
     }
 
