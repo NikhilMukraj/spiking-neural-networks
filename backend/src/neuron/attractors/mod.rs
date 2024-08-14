@@ -49,7 +49,7 @@ impl DiscreteNeuron {
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
 /// 
-/// Example bipolar autoassociatve network execution
+/// Example discrete bipolar autoassociatve network execution:
 /// ```rust
 /// # use spiking_neural_networks::{
 /// #     neuron::attractors::{
@@ -67,8 +67,10 @@ impl DiscreteNeuron {
 ///     let (num_rows, num_cols) = (10, 10);
 ///     let noise_generation = 0.5;
 ///     let noise_level = 0.2;
+///     // initalize patterns
 ///     let patterns = generate_random_patterns(num_rows, num_cols, num_patterns, noise_generation);
 ///     
+///     // create network weights
 ///     let weights = generate_hopfield_network::<GraphType>(0, &patterns)?;
 ///     let mut discrete_lattice = DiscreteNeuronLattice::<GraphType>::generate_lattice_from_dimension(
 ///         num_rows, 
@@ -81,14 +83,17 @@ impl DiscreteNeuron {
 ///     
 ///         let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
 ///     
+///         // setup distorted pattern in lattice
 ///         discrete_lattice.input_pattern_into_discrete_grid(distorted_pattern);
 ///         hopfield_history.push(discrete_lattice.convert_to_numerics());
 ///     
+///         // execute lattice
 ///         for _ in 0..iterations {
 ///             discrete_lattice.iterate()?;
 ///             hopfield_history.push(discrete_lattice.convert_to_numerics());
 ///         }
 ///     
+///         // check if pattern matches now original
 ///         assert!(hopfield_history.last().unwrap() == pattern);
 ///     }
 /// 
