@@ -212,6 +212,49 @@ where
     // track spike trains over time
     // track weights over time
 
+    let mut output_hashmap: HashMap<String, Vec<f32>> = HashMap::new();
+    output_hashmap.insert(
+        String::from("postsynaptic_voltage"),
+        network.get_lattice(&1).unwrap().grid_history
+            .history
+            .iter()
+            .map(|i| i[0][0])
+            .collect(),
+    );
+    let spike_train_history = &network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+    for i in 0..firing_rates.len() {
+        output_hashmap
+            .entry(format!("presynaptic_voltage_{}", i))
+            .or_insert_with(Vec::new)
+            .extend(spike_train_history.iter().map(|step| step[0][i]).collect::<Vec<f32>>());
+    }
+
+    // return this hashmap above
+    // and write the weights to a seperate file
+
+    // let keys = generate_keys(firing_rates.len());
+
+    // let mut file = BufWriter::new(File::create("stdp.csv").expect("Could not create file"));
+
+    // for (n, i) in keys.iter().enumerate() {
+    //     if n != keys.len() - 1 {
+    //         write!(file, "{},", i).expect("Could not write to file");
+    //     } else {
+    //         writeln!(file, "{}", i).expect("Could not write to file");
+    //     }
+    // }
+    // for i in 0..iterations {
+    //     for (n, key) in keys_vector.iter().enumerate() {
+    //         if n != keys_vector.len() - 1 {
+    //             write!(file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+    //                 .expect("Could not write to file");
+    //         } else {
+    //             writeln!(file, "{}", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+    //                 .expect("Could not write to file");
+    //         }
+    //     }
+    // }
+
     Ok(())
 }
 
