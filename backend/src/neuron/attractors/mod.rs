@@ -48,6 +48,53 @@ impl DiscreteNeuron {
 }
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
+/// 
+/// Example bipolar autoassociatve network execution
+/// ```rust
+/// # use spiking_neural_networks::{
+/// #     neuron::attractors::{
+/// #         DiscreteNeuronLattice, generate_hopfield_network, generate_random_patterns, distort_pattern
+/// #     },
+/// #     graph::AdjacencyMatrix,
+/// #     error::SpikingNeuralNetworksError,
+/// # };
+/// 
+/// fn main() -> Result<(), SpikingNeuralNetworksError> {
+///     type GraphType = AdjacencyMatrix<(usize, usize), f32>;
+/// 
+///     let iterations = 10;
+///     let num_patterns = 3;
+///     let (num_rows, num_cols) = (10, 10);
+///     let noise_generation = 0.5;
+///     let noise_level = 0.2;
+///     let patterns = generate_random_patterns(num_rows, num_cols, num_patterns, noise_generation);
+///     
+///     let weights = generate_hopfield_network::<GraphType>(0, &patterns)?;
+///     let mut discrete_lattice = DiscreteNeuronLattice::<GraphType>::generate_lattice_from_dimension(
+///         num_rows, 
+///         num_cols,
+///     );
+///     discrete_lattice.graph = weights;
+///     
+///     for (n, pattern) in patterns.iter().enumerate() {
+///         let distorted_pattern = distort_pattern(&pattern, noise_level);
+///     
+///         let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
+///     
+///         discrete_lattice.input_pattern_into_discrete_grid(distorted_pattern);
+///         hopfield_history.push(discrete_lattice.convert_to_numerics());
+///     
+///         for _ in 0..iterations {
+///             discrete_lattice.iterate()?;
+///             hopfield_history.push(discrete_lattice.convert_to_numerics());
+///         }
+///     
+///         assert!(hopfield_history.last().unwrap() == pattern);
+///     }
+/// 
+///     Ok(())
+/// }
+/// ```
 pub struct DiscreteNeuronLattice<T: Graph<K=(usize, usize), V=f32>>{
     /// 2 dimensional grid of discrete neurons
     pub cell_grid: Vec<Vec<DiscreteNeuron>>,
