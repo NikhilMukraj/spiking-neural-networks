@@ -420,7 +420,7 @@ pub struct SpikeTrainSpikeHistory {
     pub history: Vec<Vec<Vec<bool>>>,
 }
 
-impl SpikeTrain for SpikeHistory {
+impl SpikeTrainLatticeHistory for SpikeTrainSpikeHistory {
     fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
         self.history.push(
             state.iter()
