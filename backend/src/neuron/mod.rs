@@ -367,6 +367,27 @@ impl LatticeHistory for GridVoltageHistory {
     }
 }
 
+/// Stores history as the average voltage over time
+#[derive(Default, Debug, Clone)]
+pub struct AverageVoltageHistory {
+    /// Voltage history
+    pub history: Vec<f32>,
+}
+
+impl LatticeHistory for AverageVoltageHistory {
+    fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>) {
+        let voltages: Vec<f32> = get_grid_voltages::<T>(state).into_iter().flatten().collect();
+        let length = voltages.len() as f32;
+        self.history.push(
+            voltages.into_iter().sum::<f32>() / length
+        );
+    }
+
+    fn reset(&mut self) {
+        self.history.clear();
+    }
+}
+
 macro_rules! impl_reset_timing  {
     () => {
         /// Resets the last firing time of the neurons to `None`
@@ -1323,10 +1344,10 @@ where
     }
 }
 
-impl<N, T> LatticeNetwork<
+impl<N, V, T> LatticeNetwork<
     T, 
     AdjacencyMatrix<(usize, usize), f32>, 
-    GridVoltageHistory, 
+    V, 
     PoissonNeuron<N, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
     SpikeTrainGridHistory, 
     AdjacencyMatrix<GraphPosition, f32>, 
@@ -1335,6 +1356,7 @@ impl<N, T> LatticeNetwork<
 >
 where
     T: IterateAndSpike<N=N>,
+    V: LatticeHistory,
     N: NeurotransmitterType,
 {
     // Generates a default lattice network implementation given a neuron and spike train type
@@ -1342,6 +1364,7 @@ where
         LatticeNetwork::default()
     }
 }
+
 impl<T, U, V, W, X, Y, Z, N> LatticeNetwork<T, U, V, W, X, Y, Z, N>
 where
     T: IterateAndSpike<N=N>,
