@@ -38,7 +38,7 @@
 /backend/examples/lattice_network_example/*.ipynb
 /backend/examples/lsm_architecture_example/*.ipynb
 /backend/examples/lsm_architecture_example/*.txt
-/backend/examples/interacting_pools_example/*
+/backend/examples/interacting_pools_example/*.csv
 /images/data/*
 /archive_interface/target
 /archive_interface/.venv
