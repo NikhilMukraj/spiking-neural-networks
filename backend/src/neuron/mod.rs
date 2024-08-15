@@ -2090,11 +2090,19 @@ where
                 .unwrap_or(Some(0.))
                 .unwrap();
 
-            current_lattice.plasticity.update_weight(
-                &mut current_weight,
-                &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
-                given_neuron,
-            );
+            if self.lattices.contains_key(&input_pos.id) {
+                current_lattice.plasticity.update_weight(
+                    &mut current_weight,
+                    &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+                    given_neuron,
+                );
+            } else {
+                current_lattice.plasticity.update_weight(
+                    &mut current_weight,
+                    &self.spike_train_lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+                    given_neuron,
+                );
+            }
                                         
             self.connecting_graph
                 .edit_weight(
@@ -4384,11 +4392,19 @@ where
 
             match connection {
                 RewardModulatedConnection::Weight(mut weight) => {
-                    current_lattice.plasticity.update_weight(
-                        &mut weight,
-                        &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
-                        given_neuron,
-                    );
+                    if self.lattices.contains_key(&input_pos.id) {
+                        current_lattice.plasticity.update_weight(
+                            &mut weight,
+                            &self.lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+                            given_neuron,
+                        );
+                    } else {
+                        current_lattice.plasticity.update_weight(
+                            &mut weight,
+                            &self.spike_train_lattices.get(&input_pos.id).unwrap().cell_grid[x_in][y_in], 
+                            given_neuron,
+                        );
+                    }
                                                 
                     self.connecting_graph
                         .edit_weight(
