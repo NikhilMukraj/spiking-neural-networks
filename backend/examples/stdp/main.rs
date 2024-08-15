@@ -6,24 +6,15 @@ use std::{
 extern crate spiking_neural_networks;
 use spiking_neural_networks::{
     neuron::{
-        iterate_and_spike::{ApproximateNeurotransmitter, NeurotransmitterType}, 
+        integrate_and_fire::IzhikevichNeuron,
+        iterate_and_spike::{
+            IterateAndSpike, GaussianParameters, 
+            ApproximateNeurotransmitter, NeurotransmitterType}, 
         spike_train::{DeltaDiracRefractoriness, PresetSpikeTrain}, 
+        plasticity::STDP,
         Lattice, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice
     },
     error::SpikingNeuralNetworksError, 
-};
-
-use crate::spiking_neural_networks::{
-    neuron::{
-        integrate_and_fire::IzhikevichNeuron,
-        iterate_and_spike::{
-            IterateAndSpike, GaussianParameters, NeurotransmitterConcentrations,
-            weight_neurotransmitter_concentration, aggregate_neurotransmitter_concentrations,
-        },
-        plasticity::{Plasticity, STDP},
-        gap_junction,
-    },
-    distribution::limited_distr,
 };
 
 
@@ -35,130 +26,8 @@ fn generate_keys(n: usize) -> Vec<String> {
         keys_vector.push(format!("presynaptic_voltage_{}", i))
     }
     keys_vector.push(String::from("postsynaptic_voltage"));
-    for i in 0..n {
-        keys_vector.push(format!("weight_{}", i));
-    }
 
     keys_vector
-}
-
-fn test_isolated_stdp<T: IterateAndSpike>(
-    presynaptic_neurons: &mut Vec<T>,
-    postsynaptic_neuron: &mut T,
-    stdp_params: &STDP,
-    iterations: usize,
-    input_current: f32,
-    input_current_deviation: f32,
-    weight_params: &GaussianParameters,
-    electrical_synapse: bool,
-    chemical_synapse: bool,
-) -> HashMap<String, Vec<f32>> {
-    let n = presynaptic_neurons.len();
-
-    let input_currents: Vec<f32> = (0..n).map(|_| 
-            input_current * limited_distr(1.0, input_current_deviation, 0., 2.)
-        )
-        .collect();
-
-    let mut weights: Vec<f32> = (0..n).map(|_| weight_params.get_random_number())
-        .collect();
-
-    let mut output_hashmap: HashMap<String, Vec<f32>> = HashMap::new();
-    let keys_vector = generate_keys(n);
-    for i in keys_vector.iter() {
-        output_hashmap.insert(String::from(i), vec![]);
-    }
-
-    for timestep in 0..iterations {
-        let calculated_current: f32 = if electrical_synapse { 
-            (0..n).map(
-                    |i| {
-                        let output = weights[i] * gap_junction(
-                            &presynaptic_neurons[i], 
-                            &*postsynaptic_neuron
-                        );
-
-                        output / (n as f32)
-                    }
-                ) 
-                .collect::<Vec<f32>>()
-                .iter()
-                .sum()
-            } else {
-                0.
-            };
-            
-        let presynaptic_neurotransmitters: NeurotransmitterConcentrations<T::N> = if chemical_synapse {
-            let neurotransmitters_vec = (0..n) 
-                .map(|i| {
-                    let mut presynaptic_neurotransmitter = presynaptic_neurons[i].get_neurotransmitter_concentrations();
-                    weight_neurotransmitter_concentration(&mut presynaptic_neurotransmitter, weights[i]);
-
-                    presynaptic_neurotransmitter
-                }
-            ).collect::<Vec<NeurotransmitterConcentrations<T::N>>>();
-
-            let mut neurotransmitters = aggregate_neurotransmitter_concentrations(&neurotransmitters_vec);
-
-            weight_neurotransmitter_concentration(&mut neurotransmitters, (1 / n) as f32); 
-
-            neurotransmitters
-        } else {
-            HashMap::new()
-        };
-        
-        let presynaptic_inputs: Vec<f32> = (0..n)
-            .map(|i| input_currents[i] * presynaptic_neurons[i].get_gaussian_factor())
-            .collect();
-        let is_spikings: Vec<bool> = presynaptic_neurons.iter_mut().zip(presynaptic_inputs.iter())
-            .map(|(presynaptic_neuron, input_value)| {
-                presynaptic_neuron.iterate_and_spike(*input_value)
-            })
-            .collect();
-        let is_spiking = postsynaptic_neuron.iterate_with_neurotransmitter_and_spike(
-            calculated_current,
-            &presynaptic_neurotransmitters,
-        );
-
-        for (n, i) in is_spikings.iter().enumerate() {
-            if *i {
-                presynaptic_neurons[n].set_last_firing_time(Some(timestep));
-                <STDP as Plasticity<T, T, f32>>::update_weight(
-                    stdp_params, 
-                    &mut weights[n],
-                    &presynaptic_neurons[n], 
-                    postsynaptic_neuron
-                );
-            }
-        }
-
-        if is_spiking {
-            postsynaptic_neuron.set_last_firing_time(Some(timestep));
-            for (n_neuron, i) in presynaptic_neurons.iter().enumerate() {
-                <STDP as Plasticity<T, T, f32>>::update_weight(
-                    stdp_params, 
-                    &mut weights[n_neuron],
-                    i, 
-                    postsynaptic_neuron
-                );
-            }
-        }
-
-        for (index, i) in presynaptic_neurons.iter().enumerate() {
-            output_hashmap.get_mut(&format!("presynaptic_voltage_{}", index))
-                .expect("Could not find hashmap value")
-                .push(i.get_current_voltage());
-        }
-        output_hashmap.get_mut("postsynaptic_voltage").expect("Could not find hashmap value")
-            .push(postsynaptic_neuron.get_current_voltage());
-        for (index, i) in weights.iter().enumerate() {
-            output_hashmap.get_mut(&format!("weight_{}", index))
-                .expect("Could not find hashmap value")
-                .push(*i);
-        }
-    }
-
-    output_hashmap
 }
 
 pub fn test_stdp<N, T>(
@@ -169,7 +38,7 @@ pub fn test_stdp<N, T>(
     weight_params: &GaussianParameters,
     electrical_synapse: bool,
     chemical_synapse: bool,
-) -> Result<(), SpikingNeuralNetworksError>
+) -> Result<(HashMap<String, Vec<f32>>, Vec<Vec<Vec<Option<f32>>>>), SpikingNeuralNetworksError>
 where
     N: NeurotransmitterType,
     T: IterateAndSpike<N=N>,
@@ -226,52 +95,24 @@ where
         output_hashmap
             .entry(format!("presynaptic_voltage_{}", i))
             .or_insert_with(Vec::new)
-            .extend(spike_train_history.iter().map(|step| step[0][i]).collect::<Vec<f32>>());
+            .extend(spike_train_history.iter().map(|step| step[i][0]).collect::<Vec<f32>>());
     }
 
-    // return this hashmap above
-    // and write the weights to a seperate file
-
-    // let keys = generate_keys(firing_rates.len());
-
-    // let mut file = BufWriter::new(File::create("stdp.csv").expect("Could not create file"));
-
-    // for (n, i) in keys.iter().enumerate() {
-    //     if n != keys.len() - 1 {
-    //         write!(file, "{},", i).expect("Could not write to file");
-    //     } else {
-    //         writeln!(file, "{}", i).expect("Could not write to file");
-    //     }
-    // }
-    // for i in 0..iterations {
-    //     for (n, key) in keys_vector.iter().enumerate() {
-    //         if n != keys_vector.len() - 1 {
-    //             write!(file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
-    //                 .expect("Could not write to file");
-    //         } else {
-    //             writeln!(file, "{}", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
-    //                 .expect("Could not write to file");
-    //         }
-    //     }
-    // }
-
-    Ok(())
+    Ok((output_hashmap, network.get_connecting_graph().history.clone()))
 }
 
 // - Generates a set of presynaptic neurons and a postsynaptic neuron (Izhikevich)
-// - Couples presynaptic and postsynaptic neurons
-// - Sets input to presynaptic neurons as a static current and input to postsynaptic neuron
-// as a weighted input from the presynaptic neurons
+// - Couples presynaptic and postsynaptic spike trains that fire regularly
 // - Updates weights based on spike time dependent plasticity when spiking occurs
 // - Writes the history of the simulation to working directory
-fn main() {
+fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut izhikevich_neuron = IzhikevichNeuron {
         c_m: 50.,
         gap_conductance: 1.,
         ..IzhikevichNeuron::default_impl()
     };
 
-    let mut presynaptic_neurons = vec![izhikevich_neuron.clone(), izhikevich_neuron.clone()];
+    let firing_times = vec![50., 60.];
 
     let iterations = 10000;
 
@@ -284,39 +125,56 @@ fn main() {
 
     let stdp_params = STDP::default();
 
-    let output_hashmap = test_isolated_stdp(
-        &mut presynaptic_neurons, 
+    let (output_hashmap, weight_history) = test_stdp(
+        &firing_times, 
         &mut izhikevich_neuron,
-        &stdp_params,
         iterations, 
-        30., 
-        0.1, 
+        &stdp_params,
         &weight_params, 
         true,
         false,
-    );
+    )?;
 
     // could have option to directly plot in terminal
 
-    let keys_vector = generate_keys(presynaptic_neurons.len());
-    let mut file = BufWriter::new(File::create("stdp.csv").expect("Could not create file"));
+    let keys_vector = generate_keys(firing_times.len());
+    let mut voltages_file = BufWriter::new(File::create("voltages.csv").expect("Could not create file"));
 
     for (n, i) in keys_vector.iter().enumerate() {
         if n != keys_vector.len() - 1 {
-            write!(file, "{},", i).expect("Could not write to file");
+            write!(voltages_file, "{},", i).expect("Could not write to file");
         } else {
-            writeln!(file, "{}", i).expect("Could not write to file");
+            writeln!(voltages_file, "{}", i).expect("Could not write to file");
         }
     }
     for i in 0..iterations {
         for (n, key) in keys_vector.iter().enumerate() {
             if n != keys_vector.len() - 1 {
-                write!(file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+                write!(voltages_file, "{},", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
                     .expect("Could not write to file");
             } else {
-                writeln!(file, "{}", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
+                writeln!(voltages_file, "{}", output_hashmap.get(key).expect("Cannot find hashmap value")[i])
                     .expect("Could not write to file");
             }
         }
     }
+
+    let mut weights_file = BufWriter::new(File::create("weights.txt").expect("Could not create file"));
+
+    for matrix in weight_history.iter() {
+        for row in matrix {
+            for value in row {
+                match value {
+                    Some(weight) => write!(weights_file, "{},", weight).expect("Could not write to file"),
+                    None => write!(weights_file, "0,").expect("Could not write to file"),
+                }
+            }
+            
+            writeln!(weights_file).expect("Could not write to file");
+        }
+
+        writeln!(weights_file, "-----").expect("Could not write to file");
+    }
+
+    Ok(())
 }
