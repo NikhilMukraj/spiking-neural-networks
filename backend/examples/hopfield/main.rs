@@ -86,7 +86,7 @@ fn test_hopfield_network<T: Graph<K=(usize, usize), V=f32>>(
 // - Bipolar patterns only have values -1 and 1 seperated by spaces and new lines
 // - (assumes user is in examples folder and working directory is examples folder) 
 // - (outputs will be written to working directory)
-// - cargo run --example hopfield_example examples/hopfield_example/pattern1.txt examples/hopfield_example/pattern2.txt
+// - cargo run --example hopfield examples/hopfield_example/pattern1.txt examples/hopfield_example/pattern2.txt
 fn main() -> Result<()> {
     let pattern_files: Vec<String> = args().skip(1).collect();
 
