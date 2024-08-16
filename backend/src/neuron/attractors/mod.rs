@@ -5,7 +5,7 @@
 //! ```rust
 //! # use spiking_neural_networks::{
 //! #     neuron::{
-//! #         integrate_and_fire::IzhikevichNeuron,
+//! #         integrate_and_fire::QuadraticIntegrateAndFireNeuron,
 //! #         plasticity::STDP,
 //! #         attractors::{generate_random_patterns, generate_hopfield_network, distort_pattern},
 //! #         Lattice, SpikeHistory,
@@ -16,9 +16,9 @@
 //! #
 //! fn main() -> Result<(), SpikingNeuralNetworksError> {
 //!     let (num_rows, num_cols) = (7, 7);
-//!     let base_neuron = IzhikevichNeuron {
-//!         gap_conductance: 5.,
-//!         ..IzhikevichNeuron::default_impl()
+//!     let base_neuron = QuadraticIntegrateAndFireNeuron {
+//!         gap_conductance: 20.,
+//!         ..QuadraticIntegrateAndFireNeuron::default_impl()
 //!     };
 //!     let mut lattice: Lattice<_, _, SpikeHistory, STDP, _> = Lattice::default();
 //!     lattice.parallel = true;
