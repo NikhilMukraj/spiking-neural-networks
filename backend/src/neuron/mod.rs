@@ -395,6 +395,36 @@ pub struct SpikeHistory {
     pub history: Vec<Vec<Vec<bool>>>,
 }
 
+impl SpikeHistory {
+    /// Aggregates the spikes into a vector representing the firing rate,
+    /// returns an empty vector if history is empty, also assumes grid is not ragged
+    pub fn aggregate(&self) -> Vec<Vec<isize>> {
+        let z_size = self.history.len();
+        let y_size = match self.history.get(0) {
+            Some(value) => value.len(),
+            None => { return Vec::new() },
+        };
+        let x_size = match self.history[0].get(0) {
+            Some(value) => value.len(),
+            None => { return Vec::new() },
+        };
+    
+        let mut aggregation = vec![vec![0; x_size]; y_size];
+    
+        for z in 0..z_size {
+            for y in 0..y_size {
+                for x in 0..x_size {
+                    if self.history[z][y][x] {
+                        aggregation[y][x] += 1;
+                    }
+                }
+            }
+        }
+    
+        aggregation
+    }
+}
+
 impl LatticeHistory for SpikeHistory {
     fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
         self.history.push(
@@ -618,6 +648,25 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     pub fn set_dt(&mut self, dt: f32) {
         self.apply(|neuron| neuron.set_dt(dt));
         self.plasticity.set_dt(dt);
+    }
+    
+    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after)
+    pub fn set_graph(&mut self, new_graph: U) -> Result<(), GraphError> {
+        let id = self.get_id();
+        for pos in new_graph.get_every_node_as_ref() {
+            match self.cell_grid.get(pos.0) {
+                Some(row) => match row.get(pos.1) {
+                    Some(_) => { continue },
+                    None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+                },
+                None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+            }
+        }
+    
+        self.graph = new_graph;
+        self.set_id(id);
+    
+        Ok(())
     }
 
     /// Calculates electrical input value from positions
