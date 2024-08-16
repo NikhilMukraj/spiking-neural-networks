@@ -1,8 +1,80 @@
 //! An set of tools to generate weights for attractors like a Hopfield network
 //! as well as a simplified neuron model for very basic testing of attractor dynamics.
+//! 
+//! Example bipolar autoassociative attractors:
+//! ```rust
+//! # use spiking_neural_networks::{
+//! #     neuron::{
+//! #         integrate_and_fire::IzhikevichNeuron,
+//! #         plasticity::STDP,
+//! #         attractors::{generate_random_patterns, generate_hopfield_network, distort_pattern},
+//! #         Lattice, SpikeHistory,
+//! #     },
+//! #     graph::AdjacencyMatrix,
+//! #     error::SpikingNeuralNetworksError,
+//! # };
+//! #
+//! fn main() -> Result<(), SpikingNeuralNetworksError> {
+//!     let (num_rows, num_cols) = (7, 7);
+//!     let base_neuron = IzhikevichNeuron {
+//!         gap_conductance: 5.,
+//!         ..IzhikevichNeuron::default_impl()
+//!     };
+//!     let mut lattice: Lattice<_, _, SpikeHistory, STDP, _> = Lattice::default();
+//!     lattice.parallel = true;
+//!     lattice.update_grid_history = true;
+//!     lattice.populate(&base_neuron, num_rows, num_cols);
+//!     let random_patterns = generate_random_patterns(num_rows, num_cols, 1, 0.5);
+//!     let bipolar_connections = generate_hopfield_network::<AdjacencyMatrix<(usize, usize), f32>>(
+//!         0,
+//!         &random_patterns,
+//!     )?;
+//!     lattice.set_graph(bipolar_connections)?;
+//! 
+//!     let pattern_index = 0;
+//!     let input_pattern = distort_pattern(&random_patterns[pattern_index], 0.1);
+//!     lattice.apply_given_position(|pos, neuron| {
+//!         if input_pattern[pos.0][pos.1] == 1 {
+//!             neuron.current_voltage = neuron.v_th;
+//!         } else {
+//!             neuron.current_voltage = neuron.v_init;
+//!         }
+//!     });
+//!     lattice.set_dt(1.);
+//! 
+//!     lattice.run_lattice(1000)?;
+//! 
+//!     let mut firing_rates = lattice.grid_history.aggregate();
+//!     let firing_threshold: isize = 5;
+//!     firing_rates.iter_mut()
+//!         .for_each(|row| {
+//!             row.iter_mut().for_each(|i| {
+//!                 if *i >= firing_threshold {
+//!                     *i = 1;
+//!                 } else {
+//!                     *i = -1;
+//!                 }
+//!             })
+//!         });
+//!     
+//!     let mut accuracy = 0.;
+//!     for (row1, row2) in firing_rates.iter().zip(random_patterns[pattern_index].iter()) {
+//!         for (item1, item2) in row1.iter().zip(row2.iter()) {
+//!             if item1 == item2 {
+//!                 accuracy += 1.;
+//!             }
+//!         }
+//!     }
+//!     
+//!     assert!(accuracy / (num_rows * num_cols) as f32 >= 0.95);
+//! 
+//!     Ok(())
+//! }
+//! ```
 
 use std::result;
 use rand::Rng;
+use rand_distr::{Binomial, Distribution};
 use crate::error::{GraphError, PatternError, SpikingNeuralNetworksError};
 use crate::graph::Graph;
 
@@ -209,7 +281,7 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
 pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
     graph_id: usize,
-    data: &Vec<Vec<Vec<isize>>>
+    data: &Vec<Vec<Vec<isize>>>,
 ) -> result::Result<T, SpikingNeuralNetworksError> {
     let num_rows = data.get(0).unwrap_or(&vec![]).len();
     let num_cols = data.get(0).unwrap_or(&vec![])
@@ -319,19 +391,25 @@ pub fn generate_random_patterns(
     num_rows: usize, 
     num_cols: usize, 
     num_patterns: usize, 
-    noise_level: f32
+    p_zero: f32
 ) -> Vec<Vec<Vec<isize>>> {
-    let base_pattern = (0..num_rows).map(|_| {
-        (0..num_cols)
-            .map(|_| {
-                -1
-            })
-            .collect::<Vec<isize>>()
-    })
-    .collect::<Vec<Vec<isize>>>();
+    let binomial = Binomial::new(1, p_zero.into()).expect("Could not create binomial distribution");
+    let mut rng = rand::thread_rng();
 
-    (0..num_patterns).map(|_| {
-        distort_pattern(&base_pattern, noise_level)
-    })
-    .collect()
+    (0..num_patterns)
+        .map(|_| {
+            let current_pattern: Vec<isize> = binomial.sample_iter(&mut rng).take(num_rows * num_cols).map(|i| {
+                let x = i as isize;
+                if x != 1 {
+                    -1
+                } else {
+                    1
+                }
+            }).collect();
+
+            current_pattern.chunks(num_cols)
+                .map(|chunk| chunk.to_vec())
+                .collect()
+        })
+        .collect::<Vec<Vec<Vec<isize>>>>()
 }
