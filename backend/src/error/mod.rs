@@ -104,6 +104,8 @@ impl_debug_default!(LatticeNetworkError);
 pub enum PatternError {
     /// Pattern is not bipolar (`-1` or `1`)
     PatternIsNotBipolar,
+    /// Pattern is not binary (`1` or `0`)
+    PatternIsNotBinary,
     /// Pattern does not have the same dimensions throughout
     PatternDimensionsAreNotEqual,
 }
@@ -112,6 +114,7 @@ impl Display for PatternError {
     fn fmt(&self, f: &mut Formatter) -> Result {
         let err_msg = match self {
             PatternError::PatternIsNotBipolar => "Pattern must be bipolar (-1 or 1)",
+            PatternError::PatternIsNotBinary => "Pattern must be binary (0 or 1)",
             PatternError::PatternDimensionsAreNotEqual => "Patterns must have the same dimensions",
         };
 
