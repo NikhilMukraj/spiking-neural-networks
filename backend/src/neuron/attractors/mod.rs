@@ -5,7 +5,7 @@
 //! ```rust
 //! # use spiking_neural_networks::{
 //! #     neuron::{
-//! #         integrate_and_fire::QuadraticIntegrateAndFireNeuron,
+//! #         integrate_and_fire::IzhikevichNeuron,
 //! #         plasticity::STDP,
 //! #         attractors::{generate_random_patterns, generate_hopfield_network, distort_pattern},
 //! #         Lattice, SpikeHistory,
@@ -16,14 +16,18 @@
 //! #
 //! fn main() -> Result<(), SpikingNeuralNetworksError> {
 //!     let (num_rows, num_cols) = (7, 7);
-//!     let base_neuron = QuadraticIntegrateAndFireNeuron {
-//!         gap_conductance: 20.,
-//!         ..QuadraticIntegrateAndFireNeuron::default_impl()
+//!     let base_neuron = IzhikevichNeuron {
+//!         gap_conductance: 5.,
+//!         ..IzhikevichNeuron::default_impl()
 //!     };
+//! 
 //!     let mut lattice: Lattice<_, _, SpikeHistory, STDP, _> = Lattice::default();
 //!     lattice.parallel = true;
 //!     lattice.update_grid_history = true;
 //!     lattice.populate(&base_neuron, num_rows, num_cols);
+//!     lattice.set_dt(1.);
+//! 
+//!     // generates random patterns and associated weights
 //!     let random_patterns = generate_random_patterns(num_rows, num_cols, 1, 0.5);
 //!     let bipolar_connections = generate_hopfield_network::<AdjacencyMatrix<(usize, usize), f32>>(
 //!         0,
@@ -31,6 +35,7 @@
 //!     )?;
 //!     lattice.set_graph(bipolar_connections)?;
 //! 
+//!     // initializes lattice with distorted pattern
 //!     let pattern_index = 0;
 //!     let input_pattern = distort_pattern(&random_patterns[pattern_index], 0.1);
 //!     lattice.apply_given_position(|pos, neuron| {
@@ -40,10 +45,10 @@
 //!             neuron.current_voltage = neuron.v_init;
 //!         }
 //!     });
-//!     lattice.set_dt(1.);
 //! 
 //!     lattice.run_lattice(1000)?;
 //! 
+//!     // associates each firing rate to a low and high state
 //!     let mut firing_rates = lattice.grid_history.aggregate();
 //!     let firing_threshold: isize = 5;
 //!     firing_rates.iter_mut()
@@ -57,6 +62,7 @@
 //!             })
 //!         });
 //!     
+//!     // checks accuracy of recall
 //!     let mut accuracy = 0.;
 //!     for (row1, row2) in firing_rates.iter().zip(random_patterns[pattern_index].iter()) {
 //!         for (item1, item2) in row1.iter().zip(row2.iter()) {
