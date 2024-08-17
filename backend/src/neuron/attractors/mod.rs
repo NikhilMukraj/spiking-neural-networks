@@ -174,7 +174,7 @@
 //!         }
 //!     }
 //!     
-//!     assert!(accuracy / (num_rows * num_cols) as f32 >= 0.8);
+//!     assert!(accuracy / (num_rows * num_cols) as f32 >= 0.9);
 //! 
 //!     Ok(())
 //! }
