@@ -1195,9 +1195,8 @@ fn main() -> Result<()> {
     // add that function to the struct impl
 
     // function declarations in separate space from on iteration and on spike
-
-    // error handling by matching individual blocks (matching every [x] [end] and seeing if 
-    // neuron matches, ion channels matches, or none match)
+    
+    // custom ligand gates implementation given a new neurotransmitter type set
 
     // refractory period (either if statements or separate block)
 
