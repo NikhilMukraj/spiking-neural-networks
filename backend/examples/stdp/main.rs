@@ -30,6 +30,9 @@ fn generate_keys(n: usize) -> Vec<String> {
     keys_vector
 }
 
+/// Tests STDP dynamics over time given a set of input firing rates to a postsynaptic neuron
+/// and updates the weights between the spike trains and given postsynaptic neuron, returns
+/// the voltage and weight history over tim
 pub fn test_stdp<N, T>(
     firing_rates: &[f32],
     postsynaptic_neuron: &T,
@@ -101,7 +104,7 @@ where
     Ok((output_hashmap, network.get_connecting_graph().history.clone()))
 }
 
-// - Generates a set of presynaptic neurons and a postsynaptic neuron (Izhikevich)
+// - Generates a set of presynaptic spike trains and a postsynaptic neuron (Izhikevich)
 // - Couples presynaptic and postsynaptic spike trains that fire regularly
 // - Updates weights based on spike time dependent plasticity when spiking occurs
 // - Writes the history of the simulation to working directory
