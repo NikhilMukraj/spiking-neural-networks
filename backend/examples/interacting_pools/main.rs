@@ -1,16 +1,14 @@
 extern crate spiking_neural_networks;
 use rand::Rng;
-use spiking_neural_networks::graph::AdjacencyMatrix;
-use spiking_neural_networks::neuron::plasticity::STDP;
-use spiking_neural_networks::neuron::AverageVoltageHistory;
-use std::io::{BufWriter, Write};
-use std::fs::File;
+use std::{fs::File, io::{BufWriter, Write}};
 use spiking_neural_networks::{
-    error::SpikingNeuralNetworksError, 
     neuron::{
         integrate_and_fire::IzhikevichNeuron, 
-        Lattice, LatticeNetwork
-    }
+        plasticity::STDP,
+        Lattice, LatticeNetwork, AverageVoltageHistory
+    },
+    graph::AdjacencyMatrix,
+    error::SpikingNeuralNetworksError, 
 };
 
 
