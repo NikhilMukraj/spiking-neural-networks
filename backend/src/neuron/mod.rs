@@ -4605,18 +4605,37 @@ where
                         }
                     },
                 RewardModulatedConnection::RewardModulatedWeight(mut weight) => {
-                    let input_neuron = if self.reward_modulated_lattices.contains_key(&input_pos.id) {
-                        &self.get_reward_modulated_lattice(&input_pos.id).unwrap().cell_grid[x_in][y_in]
-                    } else {
-                        &self.get_lattice(&input_pos.id).unwrap().cell_grid[x_in][y_in]
-                    };
+                    if self.reward_modulated_lattices.contains_key(&input_pos.id) {
+                        let input_neuron = &self.get_reward_modulated_lattice(&input_pos.id).unwrap()
+                            .cell_grid[x_in][y_in];
 
-                    current_lattice.reward_modulator
-                        .update_weight(
-                            &mut weight, 
-                            input_neuron, 
-                            given_neuron,
-                        );
+                        current_lattice.reward_modulator
+                            .update_weight(
+                                &mut weight, 
+                                input_neuron, 
+                                given_neuron,
+                            );
+                    } else if self.lattices.contains_key(&input_pos.id) {
+                        let input_neuron = &self.get_lattice(&input_pos.id).unwrap()
+                            .cell_grid[x_in][y_in];
+
+                        current_lattice.reward_modulator
+                            .update_weight(
+                                &mut weight, 
+                                input_neuron, 
+                                given_neuron,
+                            );
+                    } else {
+                        let input_neuron = &self.get_spike_train_lattice(&input_pos.id).unwrap()
+                            .cell_grid[x_in][y_in];
+
+                        current_lattice.reward_modulator
+                            .update_weight(
+                                &mut weight, 
+                                input_neuron, 
+                                given_neuron,
+                            );
+                    };
                     
                     self.connecting_graph
                         .edit_weight(
