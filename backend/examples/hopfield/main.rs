@@ -14,7 +14,7 @@ use crate::spiking_neural_networks::{
 };
 
 
-fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
+fn read_pattern(file_contents: &str) -> Result<Vec<Vec<bool>>> {
     let mut matrix = Vec::new();
 
     for line in file_contents.split("\n") {
@@ -26,14 +26,14 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<isize>>> {
             return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
         }
 
-        matrix.push(row);
+        matrix.push(row.iter().map(|i| if *i == 1 { true } else { false }).collect::<Vec<bool>>());
     }
 
     Ok(matrix)
 }
 
 fn test_hopfield_network<T: Graph<K=(usize, usize), V=f32>>(
-    patterns: &Vec<Vec<Vec<isize>>>,
+    patterns: &Vec<Vec<Vec<bool>>>,
     noise_level: f32,
     iterations: usize,
 ) -> result::Result<(), SpikingNeuralNetworksError> {
@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             abs_path.to_string_lossy().into_owned()
         })
         .collect();
-    let patterns: Vec<Vec<Vec<isize>>> = pattern_files.iter()
+    let patterns: Vec<Vec<Vec<bool>>> = pattern_files.iter()
         .map(|i| 
             read_pattern(
                 &(read_to_string(i).expect(&format!("Could not read file: {}", i)))
