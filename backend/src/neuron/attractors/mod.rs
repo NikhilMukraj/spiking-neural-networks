@@ -416,14 +416,6 @@ pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
         .len();
 
     for pattern in data {
-        // for row in pattern {
-        //     if row.iter().any(|i| *i != -1 && *i != 1) {
-        //         return Err(
-        //             SpikingNeuralNetworksError::from(PatternError::PatternIsNotBipolar)
-        //         )
-        //     }
-        // }
-
         if pattern.len() != num_rows {
             return Err(
                 SpikingNeuralNetworksError::from(PatternError::PatternDimensionsAreNotEqual)
@@ -521,14 +513,6 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
         .len();
 
     for pattern in data {
-        // for row in pattern {
-        //     if row.iter().any(|i| *i != 1 && *i != 0) {
-        //         return Err(
-        //             SpikingNeuralNetworksError::from(PatternError::PatternIsNotBinary)
-        //         )
-        //     }
-        // }
-
         if pattern.len() != num_rows {
             return Err(
                 SpikingNeuralNetworksError::from(PatternError::PatternDimensionsAreNotEqual)
