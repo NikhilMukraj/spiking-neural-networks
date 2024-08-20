@@ -164,7 +164,9 @@ where
     let lattices = vec![lattice];
     let spike_train_lattices = vec![spike_train_lattice];
     let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
-    network.connect(0, 1, &(|_, _| true), Some(&(|_, _| weight_params.get_random_number())))?;
+    network.connect(
+        0, 1, &(|_, _| true), Some(&(|_, _| weight_params.get_random_number()))
+    )?;
     network.update_connecting_graph_history = true;
     network.electrical_synapse = electrical_synapse;
     network.chemical_synapse = chemical_synapse;
@@ -184,7 +186,8 @@ where
             .map(|i| i[0][0])
             .collect(),
     );
-    let spike_train_history = &network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+    let spike_train_history = &network.get_spike_train_lattice(&0).unwrap()
+        .grid_history.history;
     for i in 0..firing_rates.len() {
         output_hashmap
             .entry(format!("presynaptic_voltage_{}", i))
@@ -524,6 +527,7 @@ macro_rules! impl_exp_decay_receptor_default {
         }
     };
 }
+
 impl_exp_decay_receptor_default!(Default, default);
 impl_exp_decay_receptor_default!(AMPADefault, ampa_default);
 impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
