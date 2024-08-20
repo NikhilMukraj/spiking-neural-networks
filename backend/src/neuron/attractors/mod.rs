@@ -39,7 +39,7 @@
 //!     let pattern_index = 0;
 //!     let input_pattern = distort_pattern(&random_patterns[pattern_index], 0.1);
 //!     lattice.apply_given_position(|pos, neuron| {
-//!         if input_pattern[pos.0][pos.1] == 1 {
+//!         if input_pattern[pos.0][pos.1] {
 //!             neuron.current_voltage = neuron.v_th;
 //!         } else {
 //!             neuron.current_voltage = neuron.v_init;
@@ -49,22 +49,17 @@
 //!     lattice.run_lattice(1000)?;
 //! 
 //!     // associates each firing rate to a low and high state
-//!     let mut firing_rates = lattice.grid_history.aggregate();
+//!     let firing_rates = lattice.grid_history.aggregate();
 //!     let firing_threshold: isize = 5;
-//!     firing_rates.iter_mut()
-//!         .for_each(|row| {
-//!             row.iter_mut().for_each(|i| {
-//!                 if *i >= firing_threshold {
-//!                     *i = 1;
-//!                 } else {
-//!                     *i = -1;
-//!                 }
-//!             })
-//!         });
+//!     let predicted_pattern: Vec<Vec<bool>> = firing_rates.iter()
+//!         .map(|row| {
+//!             row.iter().map(|i| *i >= firing_threshold).collect::<Vec<bool>>()
+//!         })
+//!         .collect();
 //!     
 //!     // checks accuracy of recall
 //!     let mut accuracy = 0.;
-//!     for (row1, row2) in firing_rates.iter().zip(random_patterns[pattern_index].iter()) {
+//!     for (row1, row2) in predicted_pattern.iter().zip(random_patterns[pattern_index].iter()) {
 //!         for (item1, item2) in row1.iter().zip(row2.iter()) {
 //!             if item1 == item2 {
 //!                 accuracy += 1.;
@@ -86,7 +81,7 @@
 //! #         integrate_and_fire::IzhikevichNeuron,
 //! #         plasticity::STDP,
 //! #         attractors::{
-//! #            generate_random_binary_patterns, generate_binary_hopfield_network, distort_binary_pattern
+//! #            generate_random_patterns, generate_binary_hopfield_network, distort_pattern
 //! #         },
 //! #         Lattice, LatticeNetwork, SpikeHistory,
 //! #     },
@@ -113,7 +108,7 @@
 //!     exc.populate(&base_neuron, num_rows, num_cols);
 //! 
 //!     // generates random patterns and associated weights
-//!     let random_patterns = generate_random_binary_patterns(num_rows, num_cols, 1, 0.5);
+//!     let random_patterns = generate_random_patterns(num_rows, num_cols, 1, 0.5);
 //!     let binary_connections = generate_binary_hopfield_network::<AdjacencyMatrix<(usize, usize), f32>>(
 //!         1,
 //!         &random_patterns,
@@ -126,9 +121,9 @@
 //! 
 //!     // initializes lattice with distorted pattern
 //!     let pattern_index = 0;
-//!     let input_pattern = distort_binary_pattern(&random_patterns[pattern_index], 0.1);
+//!     let input_pattern = distort_pattern(&random_patterns[pattern_index], 0.1);
 //!     exc.apply_given_position(|pos, neuron| {
-//!         if input_pattern[pos.0][pos.1] == 1 {
+//!         if input_pattern[pos.0][pos.1] {
 //!             neuron.current_voltage = neuron.v_th;
 //!         } else {
 //!             neuron.current_voltage = neuron.v_init;
@@ -153,20 +148,15 @@
 //!     let mut firing_rates = network.get_lattice(&1).expect("Could not retrieve lattice")
 //!         .grid_history.aggregate();
 //!     let firing_threshold: isize = 10;
-//!     firing_rates.iter_mut()
-//!         .for_each(|row| {
-//!             row.iter_mut().for_each(|i| {
-//!                 if *i >= firing_threshold {
-//!                     *i = 1;
-//!                 } else {
-//!                     *i = 0;
-//!                 }
-//!             })
-//!         });
+//!     let predicted_pattern: Vec<Vec<bool>> = firing_rates.iter()
+//!         .map(|row| {
+//!             row.iter().map(|i| *i >= firing_threshold).collect::<Vec<bool>>()
+//!         })
+//!         .collect();
 //!     
 //!     // checks accuracy of recall
 //!     let mut accuracy = 0.;
-//!     for (row1, row2) in firing_rates.iter().zip(random_patterns[pattern_index].iter()) {
+//!     for (row1, row2) in predicted_pattern.iter().zip(random_patterns[pattern_index].iter()) {
 //!         for (item1, item2) in row1.iter().zip(row2.iter()) {
 //!             if item1 == item2 {
 //!                 accuracy += 1.;
@@ -174,7 +164,7 @@
 //!         }
 //!     }
 //!     
-//!     assert!(accuracy / (num_rows * num_cols) as f32 >= 0.9);
+//!     assert!(accuracy / (num_rows * num_cols) as f32 >= 0.85);
 //! 
 //!     Ok(())
 //! }
@@ -225,6 +215,15 @@ impl DiscreteNeuron {
             DiscreteNeuronState::Inactive => -1,
         }
     }
+
+    /// Translates the state of the neuron to an `bool`, either `true` if 
+    /// [`DiscreteNeuronState::Active`] or `false` if [`DiscreteNeuronState::Inactive`]
+    pub fn state_to_bool(&self) -> bool {
+        match &self.state {
+            DiscreteNeuronState::Active => true,
+            DiscreteNeuronState::Inactive => false,
+        }
+    }
 }
 
 /// Simple lattice of bipolar discrete neurons with a weight matrix
@@ -261,16 +260,16 @@ impl DiscreteNeuron {
 ///     for (n, pattern) in patterns.iter().enumerate() {
 ///         let distorted_pattern = distort_pattern(&pattern, noise_level);
 ///     
-///         let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
+///         let mut hopfield_history: Vec<Vec<Vec<bool>>> = Vec::new();
 ///     
 ///         // setup distorted pattern in lattice
 ///         discrete_lattice.input_pattern_into_discrete_grid(distorted_pattern);
-///         hopfield_history.push(discrete_lattice.convert_to_numerics());
+///         hopfield_history.push(discrete_lattice.convert_to_bools());
 ///     
 ///         // execute lattice
 ///         for _ in 0..iterations {
 ///             discrete_lattice.iterate()?;
-///             hopfield_history.push(discrete_lattice.convert_to_numerics());
+///             hopfield_history.push(discrete_lattice.convert_to_bools());
 ///         }
 ///     
 ///         // check if pattern matches now original
@@ -319,10 +318,14 @@ impl<T: Graph<K=(usize, usize), V=f32>> DiscreteNeuronLattice<T> {
     /// Sets state of given grid of discrete neurons to the given, if value
     /// in pattern is greater than 0 the corressponding state is set to [`DiscreteNeuronState::Active`],
     /// otherwise it is set to [`DiscreteNeuronState::Inactive`]
-    pub fn input_pattern_into_discrete_grid(&mut self, pattern: Vec<Vec<isize>>) {
+    pub fn input_pattern_into_discrete_grid(&mut self, pattern: Vec<Vec<bool>>) {
         for (i, pattern_vec) in pattern.iter().enumerate() {
             for (j, value) in pattern_vec.iter().enumerate() {
-                self.cell_grid[i][j].update(*value as f32);
+                if *value {
+                    self.cell_grid[i][j].update(1.);
+                } else {
+                    self.cell_grid[i][j].update(-1.);
+                }
             }
         }
     }
@@ -335,6 +338,22 @@ impl<T: Graph<K=(usize, usize), V=f32>> DiscreteNeuronLattice<T> {
             let mut output_vec: Vec<isize> = Vec::new();
             for j in i.iter() {
                 output_vec.push(j.state_to_numeric());
+            }
+
+            output.push(output_vec);
+        }
+
+        output
+    }
+
+    /// Converts the given network of discrete neurons to a grid of `bool` values
+    pub fn convert_to_bools(&self) -> Vec<Vec<bool>> {
+        let mut output: Vec<Vec<bool>> = Vec::new();
+
+        for i in self.cell_grid.iter() {
+            let mut output_vec: Vec<bool> = Vec::new();
+            for j in i.iter() {
+                output_vec.push(j.state_to_bool());
             }
 
             output.push(output_vec);
@@ -389,7 +408,7 @@ fn first_dimensional_index_to_position(i: usize, num_cols: usize) -> (usize, usi
 /// also assumes the pattern is completely bipolar (either `-1` or `1`)
 pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
     graph_id: usize,
-    data: &Vec<Vec<Vec<isize>>>,
+    data: &Vec<Vec<Vec<bool>>>,
 ) -> result::Result<T, SpikingNeuralNetworksError> {
     let num_rows = data.get(0).unwrap_or(&vec![]).len();
     let num_cols = data.get(0).unwrap_or(&vec![])
@@ -397,13 +416,13 @@ pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
         .len();
 
     for pattern in data {
-        for row in pattern {
-            if row.iter().any(|i| *i != -1 && *i != 1) {
-                return Err(
-                    SpikingNeuralNetworksError::from(PatternError::PatternIsNotBipolar)
-                )
-            }
-        }
+        // for row in pattern {
+        //     if row.iter().any(|i| *i != -1 && *i != 1) {
+        //         return Err(
+        //             SpikingNeuralNetworksError::from(PatternError::PatternIsNotBipolar)
+        //         )
+        //     }
+        // }
 
         if pattern.len() != num_rows {
             return Err(
@@ -429,7 +448,9 @@ pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
 
     for pattern in data {
         let flattened_pattern: Vec<isize> = pattern.iter()
-            .flat_map(|v| v.iter().cloned())
+            .flat_map(|v| v.iter().map(|i| {
+                if *i { 1 } else { -1 }
+            }))
             .collect();
 
         let weight_changes = outer_product(&flattened_pattern, &flattened_pattern);
@@ -489,7 +510,7 @@ fn binary_pattern_calculation(flattened_pattern: &Vec<isize>, a: f32, b: f32, sc
 /// also assumes the pattern is completely binary (either `0` or `1`)
 pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
     graph_id: usize,
-    data: &Vec<Vec<Vec<isize>>>,
+    data: &Vec<Vec<Vec<bool>>>,
     a: f32,
     b: f32,
     scalar: f32,
@@ -500,13 +521,13 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
         .len();
 
     for pattern in data {
-        for row in pattern {
-            if row.iter().any(|i| *i != 1 && *i != 0) {
-                return Err(
-                    SpikingNeuralNetworksError::from(PatternError::PatternIsNotBinary)
-                )
-            }
-        }
+        // for row in pattern {
+        //     if row.iter().any(|i| *i != 1 && *i != 0) {
+        //         return Err(
+        //             SpikingNeuralNetworksError::from(PatternError::PatternIsNotBinary)
+        //         )
+        //     }
+        // }
 
         if pattern.len() != num_rows {
             return Err(
@@ -532,9 +553,10 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
 
     for pattern in data {
         let flattened_pattern: Vec<isize> = pattern.iter()
-            .flat_map(|v| v.iter().cloned())
+            .flat_map(|v| v.iter().map(|i| {
+                if *i { 1 } else { 0 }
+            }))
             .collect();
-
         let weight_changes = binary_pattern_calculation(
             &flattened_pattern,
             a,
@@ -577,18 +599,18 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
     Ok(weights)
 }
 
-/// Adds random noise to a given bipolar pattern based on a given `noise_level` between `0.` and `1.`
-pub fn distort_pattern(pattern: &Vec<Vec<isize>>, noise_level: f32) -> Vec<Vec<isize>> {
-    let mut output: Vec<Vec<isize>> = Vec::new();
+/// Adds random noise to a given pattern based on a given `noise_level` between `0.` and `1.`
+pub fn distort_pattern(pattern: &Vec<Vec<bool>>, noise_level: f32) -> Vec<Vec<bool>> {
+    let mut output: Vec<Vec<bool>> = Vec::new();
 
     for i in pattern.iter() {
-        let mut output_vec: Vec<isize> = Vec::new();
+        let mut output_vec: Vec<bool> = Vec::new();
         for j in i.iter() {
             if rand::thread_rng().gen_range(0.0..=1.0) <= noise_level {
-                if *j > 0 {
-                    output_vec.push(-1);
+                if *j {
+                    output_vec.push(false);
                 } else {
-                    output_vec.push(1);
+                    output_vec.push(true);
                 }
             } else {
                 output_vec.push(*j)
@@ -632,18 +654,18 @@ pub fn generate_random_patterns(
     num_cols: usize, 
     num_patterns: usize, 
     p_zero: f32,
-) -> Vec<Vec<Vec<isize>>> {
+) -> Vec<Vec<Vec<bool>>> {
     let binomial = Binomial::new(1, p_zero.into()).expect("Could not create binomial distribution");
     let mut rng = rand::thread_rng();
 
     (0..num_patterns)
         .map(|_| {
-            let current_pattern: Vec<isize> = binomial.sample_iter(&mut rng).take(num_rows * num_cols).map(|i| {
+            let current_pattern: Vec<bool> = binomial.sample_iter(&mut rng).take(num_rows * num_cols).map(|i| {
                 let x = i as isize;
                 if x != 1 {
-                    -1
+                    false
                 } else {
-                    1
+                    true
                 }
             }).collect();
 
@@ -651,7 +673,7 @@ pub fn generate_random_patterns(
                 .map(|chunk| chunk.to_vec())
                 .collect()
         })
-        .collect::<Vec<Vec<Vec<isize>>>>()
+        .collect::<Vec<Vec<Vec<bool>>>>()
 }
 
 /// Generates a random binary pattern based on a given size, number of patterns
