@@ -623,31 +623,7 @@ pub fn distort_pattern(pattern: &Vec<Vec<bool>>, noise_level: f32) -> Vec<Vec<bo
     output
 }
 
-/// Adds random noise to a given binary pattern based on a given `noise_level` between `0.` and `1.`
-pub fn distort_binary_pattern(pattern: &Vec<Vec<isize>>, noise_level: f32) -> Vec<Vec<isize>> {
-    let mut output: Vec<Vec<isize>> = Vec::new();
-
-    for i in pattern.iter() {
-        let mut output_vec: Vec<isize> = Vec::new();
-        for j in i.iter() {
-            if rand::thread_rng().gen_range(0.0..=1.0) <= noise_level {
-                if *j > 0 {
-                    output_vec.push(0);
-                } else {
-                    output_vec.push(1);
-                }
-            } else {
-                output_vec.push(*j)
-            }
-        }
-
-        output.push(output_vec);
-    }
-
-    output
-}
-
-/// Generates a random bipolar pattern based on a given size, number of patterns
+/// Generates a set of random patterns based on a given size, number of patterns
 /// and degree of noise to use when generating the pattern
 pub fn generate_random_patterns(
     num_rows: usize, 
@@ -674,28 +650,4 @@ pub fn generate_random_patterns(
                 .collect()
         })
         .collect::<Vec<Vec<Vec<bool>>>>()
-}
-
-/// Generates a random binary pattern based on a given size, number of patterns
-/// and degree of noise to use when generating the pattern
-pub fn generate_random_binary_patterns(
-    num_rows: usize, 
-    num_cols: usize, 
-    num_patterns: usize, 
-    p_zero: f32,
-) -> Vec<Vec<Vec<isize>>> {
-    let binomial = Binomial::new(1, p_zero.into()).expect("Could not create binomial distribution");
-    let mut rng = rand::thread_rng();
-
-    (0..num_patterns)
-        .map(|_| {
-            let current_pattern: Vec<isize> = binomial.sample_iter(&mut rng).take(num_rows * num_cols).map(|i| {
-                i as isize
-            }).collect();
-
-            current_pattern.chunks(num_cols)
-                .map(|chunk| chunk.to_vec())
-                .collect()
-        })
-        .collect::<Vec<Vec<Vec<isize>>>>()
 }
