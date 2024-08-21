@@ -169,6 +169,68 @@
 //!     Ok(())
 //! }
 //! ```
+//! 
+//! Example simple ring attractor:
+//! ```rust
+//! # use rand::Rng;
+//! # use spiking_neural_networks::{
+//! #     neuron::{
+//! #         integrate_and_fire::IzhikevichNeuron,
+//! #         spike_train::PoissonNeuron,
+//! #         plasticity::STDP,
+//! #         Lattice, LatticeNetwork, SpikeHistory,
+//! #     },
+//! #     graph::AdjacencyMatrix,
+//! #     error::SpikingNeuralNetworksError,
+//! # };
+//! #
+//! fn main() -> Result<(), SpikingNeuralNetworksError> {
+//!     // setup spike train
+//!     let poisson = PoissonNeuron { chance_of_firing : 0.005, ..PoissonNeuron::default_impl() };
+//!     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+//!     spike_train_lattice.populate(&poisson, 1, 1);
+//!     spike_train_lattice.set_id(0);
+//! 
+//!     // ring attractor parameters
+//!     let n_neurons = 120;
+//!     let preferred_direction = n_neurons / 2;
+//! 
+//!     // ring attractor lattice
+//!     let mut lattice: Lattice<_, AdjacencyMatrix<_, _>, SpikeHistory, STDP, _> = Lattice::default();
+//!     lattice.populate(&IzhikevichNeuron::default_impl(), n_neurons, 1);
+//!     // inhibit far neurons, excite close ones
+//!     lattice.connect(
+//!         &(|x, y| x != y),
+//!         Some(&(|x, y| (-2. * (x.0 - y.0).powf(2.) / (n_neurons * 10.)).exp() - 0.3)),
+//!     );
+//!     lattice.apply(&(|neuron| {
+//!         neuron.current_voltage =  rand::thread_rng().gen_range(neuron.v_init..=neuron.v_th)
+//!     });
+//!     lattice.update_grid_history = true;
+//!     lattice.set_id(1);
+//! 
+//!     let mut ring_attractor = LatticeNetwork::default_impl();
+//!     ring_attractor.add_lattice(lattice)?;
+//!     ring_attractor.add_spike_train_lattice(spike_train_lattice)?;
+//!     ring_attractor.connect(
+//!         0, 
+//!         1, 
+//!         &(|_, _| true),
+//!         Some(&(|x, y| 5 * (-2. * (preferred_direction - y.0).powf(2.) / (n_neurons * 10.)).exp() - 0.3)),
+//!     );
+//!     ring_attractor.set_dt(1.);
+//! 
+//!     // run ring attractor
+//!     ring_attractor.run_lattices(1_000)?;
+//!     
+//!     let firing_rates = ring_attractor.get_lattice(&1).expect("Could not retrieve lattice")
+//!         .grid_history.aggregate();
+//!     let maximal_firing_rate = firing_rates[0].max();
+//!     
+//!     // check if neuron at preferred direction is one of high firing neurons
+//!     assert!(firing_rates[0][preferred_direction] >= maximal_firing_rates * 0.9);
+//! }
+//! ```
 
 use std::result;
 use rand::Rng;
