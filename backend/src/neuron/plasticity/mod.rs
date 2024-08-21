@@ -69,6 +69,50 @@ where
     }
 }
 
+// /// Handles activity values for BCM rule
+// pub trait BCMActivity {
+//     /// Gets activity value
+//     fn get_activity(&self) -> f32;
+//     /// Gets averaged activity over time
+//     fn get_averaged_activity(&self) -> f32;
+//     /// Updates averaged activity over time
+//     fn update_averaged_activity(&mut self);
+//     // activity/dt = smoothing_factor * (current_activity - averaged_activity)
+//     // activity could just be input current + receptor current
+// }
+
+// /// Bienenstock, Cooper, and Munro (BCM) plasticity rule
+// #[derive(Debug, Clone, Copy, Timestep)]
+// pub struct BCM {
+//     /// Weight decay value
+//     pub decay: f32,
+//     /// Timestep value
+//     pub dt: f32,
+// }
+
+// impl Default for BCM {
+//     fn default() -> Self {
+//         BCM { decay: 0.1, dt: 0.1 }
+//     }
+// }
+
+// impl<T, U> Plasticity<T, U, f32> for BCM 
+// where
+//     T: IterateAndSpike + BCMActivity,
+//     U: IterateAndSpike + BCMActivity,
+// {
+//     fn update_weight(&self, weight: &mut f32, presynaptic: &T, postsynaptic: &U) {
+//         let sliding_threshold = postsynaptic.get_averaged_activity().powf(2.);
+//         let activity_term = postsynaptic.get_activity() * (postsynaptic.get_activity() - sliding_threshold);
+//         let weight_decay = self.decay * *weight;
+//         *weight += (activity_term * presynaptic.get_activity() - weight_decay) * self.dt;
+//     }
+
+//     fn do_update(&self, neuron: &U) -> bool {
+//         neuron.is_spiking()
+//     }
+// }
+
 /// A weight that can be reward modulated
 pub trait RewardModulatedWeight: Send + Sync + std::fmt::Debug + Clone + Copy {
     /// Get synaptic coupling factor
