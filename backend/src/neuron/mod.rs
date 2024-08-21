@@ -2620,6 +2620,25 @@ where
         self.graph.set_id(id);
     }
 
+    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after)
+    pub fn set_graph(&mut self, new_graph: U) -> Result<(), GraphError> {
+        let id = self.get_id();
+        for pos in new_graph.get_every_node_as_ref() {
+            match self.cell_grid.get(pos.0) {
+                Some(row) => match row.get(pos.1) {
+                    Some(_) => { continue },
+                    None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+                },
+                None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+            }
+        }
+    
+        self.graph = new_graph;
+        self.set_id(id);
+    
+        Ok(())
+    }
+
     /// Sets the timestep variable of each neuron and reward modulator to dt
     pub fn set_dt(&mut self, dt: f32) {
         self.apply(|neuron| neuron.set_dt(dt));
