@@ -650,7 +650,8 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         self.plasticity.set_dt(dt);
     }
     
-    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after)
+    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
+    /// also verifies if graph is valid
     pub fn set_graph(&mut self, new_graph: U) -> Result<(), GraphError> {
         let id = self.get_id();
         for pos in new_graph.get_every_node_as_ref() {
@@ -1649,7 +1650,8 @@ where
         ids
     }
 
-    /// Sets the connecting graph to a new graph, (id remains the same before and after)
+    /// Sets the connecting graph to a new graph, (id remains the same before and after),
+    /// also verifies if graph is valid
     pub fn set_connecting_graph(&mut self, new_graph: Y) -> Result<(), SpikingNeuralNetworksError> {
         let id = self.connecting_graph.get_id();
 
@@ -2661,7 +2663,8 @@ where
         self.graph.set_id(id);
     }
 
-    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after)
+    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
+    /// also verifies if graph is valid
     pub fn set_graph(&mut self, new_graph: U) -> Result<(), GraphError> {
         let id = self.get_id();
         for pos in new_graph.get_every_node_as_ref() {
@@ -3534,7 +3537,8 @@ where
         &self.connecting_graph
     }
 
-    /// Sets the connecting graph to a new graph, (id remains the same before and after)
+    /// Sets the connecting graph to a new graph, (id remains the same before and after),
+    /// also verifies if graph is valid
     pub fn set_connecting_graph(&mut self, new_graph: Y) -> Result<(), SpikingNeuralNetworksError> {
         let id = self.connecting_graph.get_id();
 
