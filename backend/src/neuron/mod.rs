@@ -41,7 +41,7 @@ use plasticity::{
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
 }
-use crate::error::{AgentError, GraphError, LatticeNetworkError};
+use crate::error::{AgentError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
 use crate::interactable::{Agent, UnsupervisedAgent};
 
@@ -1308,6 +1308,25 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
     }
 }
 
+
+fn check_position<T>(
+    cell_grid: &Vec<Vec<T>>,
+    graph_pos: &GraphPosition,
+) -> Result<(), SpikingNeuralNetworksError> {
+    if let Some(row) = cell_grid.get(graph_pos.pos.0) {
+        if row.get(graph_pos.pos.1).is_none() {
+            return Err(SpikingNeuralNetworksError::from(
+                GraphError::PositionNotFound(format!("{:#?}", graph_pos)),
+            ));
+        }
+    } else {
+        return Err(SpikingNeuralNetworksError::from(
+            GraphError::PositionNotFound(format!("{:#?}", graph_pos)),
+        ));
+    }
+    Ok(())
+}
+
 /// [`LatticeNetwork`] represents a series of lattices interconnected by a [`Graph`], each lattice
 /// is associated to a unique identifier, [`Lattice`]s and [`SpikeTrainLattice`]s cannot have
 /// the same identifiers, [`SpikeTrainLattice`]s cannot be postsynaptic because the spike trains
@@ -1628,6 +1647,28 @@ where
             .for_each(|i| { ids.insert(*i); });
 
         ids
+    }
+
+    /// Sets the connecting graph to a new graph, (id remains the same before and after)
+    pub fn set_connecting_graph(&mut self, new_graph: Y) -> Result<(), SpikingNeuralNetworksError> {
+        let id = self.connecting_graph.get_id();
+
+        for graph_pos in new_graph.get_every_node_as_ref() {
+            if let Some(lattice) = self.lattices.get(&graph_pos.id) {
+                check_position(&lattice.cell_grid, &graph_pos)?;
+            } else if let Some(spike_train_lattice) = self.spike_train_lattices.get(&graph_pos.id) {
+                check_position(&spike_train_lattice.cell_grid, &graph_pos)?;
+            } else {
+                return Err(SpikingNeuralNetworksError::from(
+                    LatticeNetworkError::IDNotFoundInLattices(graph_pos.id),
+                ));
+            }
+        }
+    
+        self.connecting_graph = new_graph;
+        self.connecting_graph.set_id(id);
+    
+        Ok(())
     }
 
     /// Connects the neurons in lattices together given a function to determine
@@ -3491,6 +3532,30 @@ where
     /// Returns an immutable reference to the connecting graph
     pub fn get_connecting_graph(&self) -> &Y {
         &self.connecting_graph
+    }
+
+    /// Sets the connecting graph to a new graph, (id remains the same before and after)
+    pub fn set_connecting_graph(&mut self, new_graph: Y) -> Result<(), SpikingNeuralNetworksError> {
+        let id = self.connecting_graph.get_id();
+
+        for graph_pos in new_graph.get_every_node_as_ref() {
+            if let Some(lattice) = self.lattices.get(&graph_pos.id) {
+                check_position(&lattice.cell_grid, &graph_pos)?;
+            } else if let Some(spike_train_lattice) = self.spike_train_lattices.get(&graph_pos.id) {
+                check_position(&spike_train_lattice.cell_grid, &graph_pos)?;
+            } else if let Some(reward_modulated_lattice) = self.reward_modulated_lattices.get(&graph_pos.id) {
+                check_position(&reward_modulated_lattice.cell_grid, &graph_pos)?;
+            } else {
+                return Err(SpikingNeuralNetworksError::from(
+                    LatticeNetworkError::IDNotFoundInLattices(graph_pos.id),
+                ));
+            }
+        }
+    
+        self.connecting_graph = new_graph;
+        self.connecting_graph.set_id(id);
+    
+        Ok(())
     }
 
     /// Returns a hashset of all the ids
