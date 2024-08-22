@@ -178,12 +178,12 @@
 //! #         integrate_and_fire::IzhikevichNeuron,
 //! #         spike_train::PoissonNeuron,
 //! #         plasticity::STDP,
-//! #         Lattice, LatticeNetwork, SpikeHistory,
+//! #         Lattice, SpikeTrainLattice, LatticeNetwork, SpikeHistory,
 //! #     },
 //! #     graph::AdjacencyMatrix,
 //! #     error::SpikingNeuralNetworksError,
 //! # };
-//! #
+//! # 
 //! fn main() -> Result<(), SpikingNeuralNetworksError> {
 //!     // setup spike train
 //!     let poisson = PoissonNeuron { chance_of_firing : 0.005, ..PoissonNeuron::default_impl() };
@@ -199,13 +199,19 @@
 //!     let mut lattice: Lattice<_, AdjacencyMatrix<_, _>, SpikeHistory, STDP, _> = Lattice::default();
 //!     lattice.populate(&IzhikevichNeuron::default_impl(), n_neurons, 1);
 //!     // inhibit far neurons, excite close ones
+//!     let ring_distance = |x: isize, y: isize| -> f32 { 
+//!         (x - y).abs().min(n_neurons as isize - (x - y).abs()) as f32 
+//!     };
 //!     lattice.connect(
 //!         &(|x, y| x != y),
-//!         Some(&(|x, y| (-2. * (x.0 - y.0).powf(2.) / (n_neurons * 10.)).exp() - 0.3)),
+//!         Some(&(|x, y| 
+//!             (-2. * ring_distance(x.0 as isize, y.0 as isize).powf(2.) / 
+//!             (n_neurons as f32 * 10.)).exp() - 0.3)
+//!         ),
 //!     );
-//!     lattice.apply(&(|neuron| {
-//!         neuron.current_voltage =  rand::thread_rng().gen_range(neuron.v_init..=neuron.v_th)
-//!     });
+//!     lattice.apply(|neuron|
+//!         neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_init..=neuron.v_th)
+//!     );
 //!     lattice.update_grid_history = true;
 //!     lattice.set_id(1);
 //! 
@@ -216,8 +222,14 @@
 //!         0, 
 //!         1, 
 //!         &(|_, _| true),
-//!         Some(&(|x, y| 5 * (-2. * (preferred_direction - y.0).powf(2.) / (n_neurons * 10.)).exp() - 0.3)),
-//!     );
+//!         Some(&(|_, y| 
+//!             5. * (-2. * 
+//!                 (preferred_direction as isize - y.0 as isize).pow(2) as f32 / 
+//!                 (n_neurons as f32 * 10.)).exp() - 0.3
+//!             )
+//!         ),
+//!     )?;
+//!     ring_attractor.parallel = true;
 //!     ring_attractor.set_dt(1.);
 //! 
 //!     // run ring attractor
@@ -225,10 +237,13 @@
 //!     
 //!     let firing_rates = ring_attractor.get_lattice(&1).expect("Could not retrieve lattice")
 //!         .grid_history.aggregate();
-//!     let maximal_firing_rate = firing_rates[0].max();
+//!     let maximal_firing_rate = firing_rates.iter().map(|i| i[0])
+//!         .max().unwrap_or(0);
 //!     
 //!     // check if neuron at preferred direction is one of high firing neurons
-//!     assert!(firing_rates[0][preferred_direction] >= maximal_firing_rates * 0.9);
+//!     assert!(firing_rates[preferred_direction][0] as f32 >= maximal_firing_rate as f32 * 0.9);
+//! 
+//!     Ok(())
 //! }
 //! ```
 
