@@ -4,8 +4,12 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
+    ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, 
+    GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, 
+    IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
+    NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
+use super::plasticity::BCMActivity;
 
 
 /// Takes in a static current as an input and iterates the given
@@ -801,3 +805,144 @@ impl_iterate_and_spike!(
     izhikevich_get_dw_change,
     izhikevich_handle_spiking
 );
+
+/// A BCM compatible Izhikevich neuron
+#[derive(Debug, Clone, IterateAndSpikeBase)]
+pub struct BCMIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
+    /// Membrane potential (mV)
+    pub current_voltage: f32, 
+    /// Voltage threshold (mV)
+    pub v_th: f32,
+    /// Voltage initialization value (mV) 
+    pub v_init: f32, 
+    /// Controls speed
+    pub a: f32, 
+    /// Controls sensitivity to adaptive value
+    pub b: f32,
+    /// After spike reset value for voltage 
+    pub c: f32,
+    /// After spike reset value for adaptive value 
+    pub d: f32, 
+    /// Adaptive value
+    pub w_value: f32, 
+    /// Adaptive value initialization
+    pub w_init: f32, 
+    /// Controls conductance of input gap junctions
+    pub gap_conductance: f32, 
+    /// Membrane time constant (ms)
+    pub tau_m: f32, 
+    /// Membrane capacitance (nF)
+    pub c_m: f32, 
+    /// Time step (ms)
+    pub dt: f32, 
+    /// Whether the neuron is spiking
+    pub is_spiking: bool,
+    /// Last timestep the neuron has spiked
+    pub last_firing_time: Option<usize>,
+    pub average_activity: f32,
+    /// Current activity
+    pub current_activity: f32,
+    /// Smoothing factor for updating activity
+    pub bcm_smoothing_factor: f32,
+    /// Parameters used in generating noise
+    pub gaussian_params: GaussianParameters,
+    /// Postsynaptic neurotransmitters in cleft
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
+    /// Ionotropic receptor ligand gated channels
+    pub ligand_gates: LigandGatedChannels<R>,
+}
+
+impl_default_impl_integrate_and_fire!(BCMIzhikevichNeuron);
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for BCMIzhikevichNeuron<T, R> {
+    fn default() -> Self {
+        BCMIzhikevichNeuron {
+            current_voltage: -65., 
+            gap_conductance: 7.,
+            w_value: 30.,
+            a: 0.02,
+            b: 0.2,
+            c: -55.0,
+            d: 8.0,
+            v_th: 30., // spike threshold (mV)
+            tau_m: 1., // membrane time constant (ms)
+            c_m: 100., // membrane capacitance (nF)
+            v_init: -65., // initial potential (mV)
+            w_init: 30., // initial w value
+            dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
+            last_firing_time: None,
+            average_activity: 0.,
+            current_activity: 0.,
+            bcm_smoothing_factor: 0.1,
+            gaussian_params: GaussianParameters::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            ligand_gates: LigandGatedChannels::default(),
+        }
+    }
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BCMIzhikevichNeuron<T, R> {
+    impl_izhikevich_default_methods!();
+
+    /// Calculates the change in voltage given an input current
+    pub fn izhikevich_get_dv_change(&self, i: f32) -> f32 {
+        let dv = (
+            0.04 * self.current_voltage.powf(2.0) + 
+            5. * self.current_voltage + 140. - self.w_value + i
+        ) * (self.dt / self.c_m);
+
+        dv
+    }
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIzhikevichNeuron<T, R> {
+    impl_default_neurotransmitter_methods!();
+
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool {
+        let dv = self.izhikevich_get_dv_change(input_current);
+        let dw = self.izhikevich_get_dw_change();
+        self.current_voltage += dv;
+        self.w_value += dw;
+
+        self.current_activity = input_current;
+        self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+
+        self.izhikevich_handle_spiking()
+    }
+
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f32, 
+        t_total: &NeurotransmitterConcentrations<Self::N>,
+    ) -> bool {
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+
+        let dv = self.izhikevich_get_dv_change(input_current);
+        let dw = self.izhikevich_get_dw_change();
+        let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+
+        self.current_activity = input_current + neurotransmitter_dv;
+        self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+
+        self.current_voltage += dv + neurotransmitter_dv;
+        self.w_value += dw;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+
+        self.izhikevich_handle_spiking()
+    }
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BCMActivity for BCMIzhikevichNeuron<T, R> {
+    fn get_activity(&self) -> f32 {
+        self.current_activity
+    }
+    
+    fn get_averaged_activity(&self) -> f32 {
+        self.average_activity
+    }
+}
