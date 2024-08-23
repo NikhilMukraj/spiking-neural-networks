@@ -3,9 +3,12 @@
 
 use rand::Rng;
 use super::iterate_and_spike::{
-    ApproximateNeurotransmitter, CurrentVoltage, IonotropicNeurotransmitterType, IsSpiking, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, Timestep
+    ApproximateNeurotransmitter, CurrentVoltage, IonotropicNeurotransmitterType, 
+    IsSpiking, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics,
+    NeurotransmitterType, Neurotransmitters, Timestep,
 };
 use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
+use super::plasticity::BCMActivity;
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
 /// of the simulation (neural refractoriness function), when the spike train spikes
@@ -291,4 +294,124 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
     }
 
     impl_default_spike_train_methods!();
+}
+
+/// A BCM compatible Poisson neuron
+#[derive(Debug, Clone, SpikeTrainBase)]
+pub struct BCMPoissonNeuron<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
+    /// Membrane potential (mV)
+    pub current_voltage: f32,
+    /// Maximum voltage (mV)
+    pub v_th: f32,
+    /// Minimum voltage (mV)
+    pub v_resting: f32,
+    /// Whether the spike train is currently spiking
+    pub is_spiking: bool,
+    /// Last firing time
+    pub last_firing_time: Option<usize>,
+    /// Average activity
+    pub average_activity: f32,
+    /// Current activity
+    pub current_activity: f32,
+    /// Smoothing factor for updating activity
+    pub bcm_smoothing_factor: f32,
+    /// Postsynaptic eurotransmitters in cleft
+    pub synaptic_neurotransmitters: Neurotransmitters<N, T>,
+    /// Neural refactoriness dynamics
+    pub neural_refractoriness: U,
+    /// Chance of neuron firing at a given timestep
+    pub chance_of_firing: f32,
+    /// Timestep for refractoriness (ms)
+    pub dt: f32,
+}
+
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for BCMPoissonNeuron<N, T, U> {
+    fn default() -> Self {
+        BCMPoissonNeuron {
+            current_voltage: 0.,
+            v_th: 30.,
+            v_resting: 0.,
+            is_spiking: false,
+            last_firing_time: None,
+            average_activity: 0.,
+            current_activity: 0.,
+            bcm_smoothing_factor: 0.1,
+            synaptic_neurotransmitters: Neurotransmitters::<N, T>::default(),
+            neural_refractoriness: U::default(),
+            chance_of_firing: 0.,
+            dt: 0.1,
+        }
+    }
+}
+
+impl BCMPoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+    /// Returns the default implementation of the spike train
+    pub fn default_impl() -> Self {
+        BCMPoissonNeuron::default()
+    }
+
+    /// Returns the default implementation of the spike train given a firing rate
+    pub fn default_impl_from_firing_rate(hertz: f32, dt: f32) -> Self {
+        BCMPoissonNeuron::from_firing_rate(hertz, dt)
+    }
+}
+
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> BCMPoissonNeuron<N, T, U> {
+    /// Generates Poisson neuron with appropriate chance of firing based
+    /// on the given hertz (Hz) and a given refractoriness timestep (ms)
+    pub fn from_firing_rate(hertz: f32, dt: f32) -> Self {
+        let mut poisson_neuron = BCMPoissonNeuron::<N, T, U>::default();
+
+        poisson_neuron.dt = dt;
+        poisson_neuron.chance_of_firing = 1. / ((1000. / poisson_neuron.dt) / hertz);
+
+        poisson_neuron
+    }
+}
+
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> Timestep for BCMPoissonNeuron<N, T, U> {
+    fn get_dt(&self) -> f32 {
+        self.dt
+    }
+
+    fn set_dt(&mut self, dt: f32) {
+        let scalar = dt / self.dt;
+        self.chance_of_firing *= scalar;
+        self.dt = dt;
+    }
+}
+
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for BCMPoissonNeuron<N, T, U> {
+    fn iterate(&mut self) -> bool {
+        let is_spiking = if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
+            self.current_activity = self.v_th - self.current_voltage;
+            self.current_voltage = self.v_th;
+
+            true
+        } else {
+            self.current_activity = self.current_activity - self.v_resting;
+            self.current_voltage = self.v_resting;
+
+            false
+        };
+        self.is_spiking = is_spiking;
+
+        self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+
+        is_spiking
+    }
+
+    impl_default_spike_train_methods!();
+}
+
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> BCMActivity for BCMPoissonNeuron<N, T, U> {
+    fn get_activity(&self) -> f32 {
+        self.current_activity
+    }
+    
+    fn get_averaged_activity(&self) -> f32 {
+        self.average_activity
+    }
 }
