@@ -14,16 +14,6 @@ use regex::Regex;
 pub struct ASTParser;
 
 lazy_static::lazy_static! {
-    // static ref PRATT_PARSER: PrattParser<Rule> = {
-    //     use pest::pratt_parser::{Assoc::*, Op};
-    //     use Rule::*;
-
-    //     PrattParser::new()
-    //         .op(Op::infix(add, Left) | Op::infix(subtract, Left))
-    //         .op(Op::infix(multiply, Left) | Op::infix(divide, Left) | Op::infix(power, Left))
-    //         .op(Op::prefix(unary_minus))
-    // };
-
     static ref PRATT_PARSER: PrattParser<Rule> = {
         use pest::pratt_parser::{Assoc::*, Op};
         use Rule::*;
