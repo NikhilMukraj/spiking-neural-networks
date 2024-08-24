@@ -16,7 +16,8 @@ function = { name ~ ("(" ~ args ~ ")") }
 unary_minus = { "-" }
 primary = _{ struct_call | function | number | name | "(" ~ expr ~ ")" }
 
-atom = _{ not_operator? ~ unary_minus? ~ primary }
+// atom = _{ not_operator? ~ unary_minus? ~ primary }
+atom = _{ (not_operator ~ primary) | (unary_minus ~ primary) | primary  }
 
 // bin_op = _{ add | subtract | multiply | divide | power }
 // 	add = { "+" }
