@@ -94,7 +94,7 @@ impl Default for BCM {
 
 impl<T, U> Plasticity<T, U, f32> for BCM 
 where
-    T: IterateAndSpike + BCMActivity,
+    T: BCMActivity,
     U: IterateAndSpike + BCMActivity,
 {
     fn update_weight(&self, weight: &mut f32, presynaptic: &T, postsynaptic: &U) {
