@@ -512,6 +512,7 @@ impl ReceptorKinetics for ExponentialDecayReceptor {
         self.r = r;
     }
 }
+
 // automatically generate defaults so `LigandGatedChannels`
 // can use default receptor settings in construction
 macro_rules! impl_exp_decay_receptor_default {
