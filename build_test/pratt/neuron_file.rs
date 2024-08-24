@@ -115,21 +115,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for IonCh
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct TestLeak {
-	pub e: f32,
-	pub g: f32,
-	pub current: f32,
-}
-
-impl TimestepIndependentIonChannel for TestLeak {
-	fn update_current(&mut self, voltage: f32) {
-		self.current = (self.g * (self.current_voltage - self.e));
-	}
-
-	fn get_current(&self) -> f32 { self.current }
-}
-
-#[derive(Debug, Clone, Copy)]
 pub struct TestChannel {
 	pub e: f32,
 	pub g: f32,
@@ -140,6 +125,21 @@ pub struct TestChannel {
 impl TimestepIndependentIonChannel for TestChannel {
 	fn update_current(&mut self, voltage: f32) {
 		self.current = ((self.g * self.n.state) * (self.current_voltage - self.e));
+	}
+
+	fn get_current(&self) -> f32 { self.current }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct TestLeak {
+	pub e: f32,
+	pub g: f32,
+	pub current: f32,
+}
+
+impl TimestepIndependentIonChannel for TestLeak {
+	fn update_current(&mut self, voltage: f32) {
+		self.current = (self.g * (self.current_voltage - self.e));
 	}
 
 	fn get_current(&self) -> f32 { self.current }
