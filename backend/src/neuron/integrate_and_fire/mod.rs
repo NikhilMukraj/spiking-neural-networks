@@ -899,13 +899,15 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BCMIzhikevichNeuron<T, R>
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIzhikevichNeuron<T, R> {
     impl_default_neurotransmitter_methods!();
 
+    // activity measured as current voltage - last voltage
+
     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.current_activity = input_current;
+        self.current_activity = dv;
         self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
