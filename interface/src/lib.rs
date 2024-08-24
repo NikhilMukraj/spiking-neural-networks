@@ -1118,6 +1118,8 @@ impl PyGraphPosition {
     }
 }
 
+impl_repr!(PyGraphPosition, graph_position);
+
 macro_rules! impl_network {
     (
         $network_kind:ident, $lattice_kind:ident, $spike_train_lattice_kind:ident,
@@ -2476,6 +2478,7 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyNeuron>()?;
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
+    m.add_class::<PyGraphPosition>()?;
 
     // option to use adjacency list instead of matrix
 
