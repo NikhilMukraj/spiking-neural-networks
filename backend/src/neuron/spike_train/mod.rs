@@ -382,6 +382,8 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 }
 
 impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for BCMPoissonNeuron<N, T, U> {
+    // activity measured as current voltage - last voltage
+    
     fn iterate(&mut self) -> bool {
         let is_spiking = if rand::thread_rng().gen_range(0.0..=1.0) <= self.chance_of_firing {
             self.current_activity = self.v_th - self.current_voltage;
@@ -389,7 +391,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 
             true
         } else {
-            self.current_activity = self.current_activity - self.v_resting;
+            self.current_activity = self.v_resting - self.current_voltage;
             self.current_voltage = self.v_resting;
 
             false
