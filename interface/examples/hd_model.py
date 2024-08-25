@@ -130,4 +130,5 @@ for key, value in firing_rates.items():
 
 # graphs the path over time
 plt.polar(np.deg2rad(np.array(thetas) * (360 / n)), range(0, iterations, window))
+plt.title('Path over Time')
 plt.show()
