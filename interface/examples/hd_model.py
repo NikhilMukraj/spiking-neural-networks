@@ -87,7 +87,9 @@ head_direction_attractor.connect(2, 1, lambda x, y: True, hd_to_shift_weight)
 head_direction_attractor.set_dt(1)
 head_direction_attractor.parallel = True
 
-for _ in tqdm(range(1_000)):
+iterations = 1_000
+
+for _ in tqdm(range(iterations)):
     head_direction_attractor.run_lattices(1)
 
 peak_threshold = 20
@@ -96,9 +98,27 @@ hist = head_direction_attractor.get_lattice(2).history
 data = [i.flatten() for i in np.array(hist)]
 peaks = [find_peaks_above_threshold([j[i] for j in data], peak_threshold) for i in range(len(data[0]))]
 
+# calculates the center of mass on a ring
+def center_of_mass_ring(arr):
+    length = len(arr)
+    indices = np.arange(length)
+    angles = 2 * np.pi * indices / length
+    
+    x_components = np.sum(np.cos(angles) * arr)
+    y_components = np.sum(np.sin(angles) * arr)
+    
+    angle_of_com = np.arctan2(y_components, x_components)
+
+    if angle_of_com < 0:
+        angle_of_com += 2 * np.pi
+
+    center_of_mass_index = (angle_of_com * length) / (2 * np.pi)
+    
+    return center_of_mass_index
+
 window = 100
 firing_rates = {}
-for i in range(0, 1_000, window):
+for i in range(0, iterations, window):
     firing_rates[i] = {}
     for n, peak_array in enumerate(peaks):
         firing_rates[i][n] = len([j for j in peak_array if j <= i and j > i - window])
@@ -106,15 +126,8 @@ for i in range(0, 1_000, window):
 thetas = []
 
 for key, value in firing_rates.items():
-    arg_max = 0
-    max_value = 0
-    for inner_key, inner_value in value.items():
-        if inner_value >= max_value:
-            max_value = inner_value
-            arg_max = inner_key
+    thetas.append(center_of_mass_ring(np.array(list(value.values()))))
 
-    thetas.append(arg_max)
-
-# graphs path over time
-plt.polar(-np.cumsum(np.array(thetas) * (360 / n)), range(0, 1_000, window))
+# graphs the path over time
+plt.polar(np.deg2rad(np.array(thetas) * (360 / n)), range(0, iterations, window))
 plt.show()
