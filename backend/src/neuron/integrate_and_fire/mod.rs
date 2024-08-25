@@ -839,11 +839,18 @@ pub struct BCMIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Average activity
     pub average_activity: f32,
     /// Current activity
     pub current_activity: f32,
     /// Smoothing factor for updating activity
     pub bcm_smoothing_factor: f32,
+    /// Current number of spikes in the firing window
+    pub num_spikes: usize,
+    /// Clock for firing rate calculation
+    pub firing_rate_clock: f32,
+    /// Current window for firing rate
+    pub firing_rate_window: f32,
     /// Parameters used in generating noise
     pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
@@ -875,6 +882,9 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for BCMIzhikevich
             average_activity: 0.,
             current_activity: 0.,
             bcm_smoothing_factor: 0.1,
+            num_spikes: 0,
+            firing_rate_clock: 0.,
+            firing_rate_window: 100.,
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
@@ -902,13 +912,20 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
     // activity measured as current voltage - last voltage
 
     fn iterate_and_spike(&mut self, input_current: f32) -> bool {
+        if self.is_spiking {
+            self.num_spikes += 1;
+        }
+        self.firing_rate_clock += self.dt;
+        if self.firing_rate_clock >= self.firing_rate_window {
+            self.firing_rate_clock = 0.;
+            self.current_activity = self.num_spikes as f32 / self.firing_rate_window;
+            self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+        }
+
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
         self.current_voltage += dv;
         self.w_value += dw;
-
-        self.current_activity = dv;
-        self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
 
         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
@@ -920,15 +937,22 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
+        if self.is_spiking {
+            self.num_spikes += 1;
+        }
+        self.firing_rate_clock += self.dt;
+        if self.firing_rate_clock >= self.firing_rate_window {
+            self.firing_rate_clock = 0.;
+            self.current_activity = self.num_spikes as f32 / self.firing_rate_window;
+            self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+        }
+
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
         let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
-
-        self.current_activity = input_current + neurotransmitter_dv;
-        self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
 
         self.current_voltage += dv + neurotransmitter_dv;
         self.w_value += dw;
