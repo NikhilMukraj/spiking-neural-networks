@@ -918,7 +918,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
         self.firing_rate_clock += self.dt;
         if self.firing_rate_clock >= self.firing_rate_window {
             self.firing_rate_clock = 0.;
-            self.current_activity = self.num_spikes as f32 / self.firing_rate_window;
+            self.current_activity = self.num_spikes as f32 / (self.firing_rate_window * self.dt);
             self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
         }
 
