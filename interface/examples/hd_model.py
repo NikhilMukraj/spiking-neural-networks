@@ -61,11 +61,6 @@ shift_left.populate(ln.IzhikevichNeuron(), n, 1)
 shift_left.apply(setup_neuron)
 shift_left.update_grid_history = True
 
-turning_cells = ln.PoissonLattice(3)
-turning_cells.populate(ln.PoissonNeuron(), 2, 1)
-turning_cells.apply_given_position(setup_poisson_given_direction(0))
-turning_cells.update_grid_history = True
-
 shift_right = ln.IzhikevichLattice(1)
 shift_right.populate(ln.IzhikevichNeuron(), n, 1)
 shift_right.apply(setup_neuron)
@@ -76,6 +71,11 @@ hd.populate(ln.IzhikevichNeuron(), n, 1)
 hd.connect(lambda x, y: True, hd_weight)
 hd.apply(setup_neuron)
 hd.update_grid_history = True
+
+turning_cells = ln.PoissonLattice(3)
+turning_cells.populate(ln.PoissonNeuron(), 2, 1)
+turning_cells.apply_given_position(setup_poisson_given_direction(0))
+turning_cells.update_grid_history = True
 
 head_direction_attractor = ln.IzhikevichNetwork.generate_network([shift_left, shift_right, hd], [turning_cells])
 head_direction_attractor.connect(3, 0, lambda x, y: True, lambda x, y: 10)
