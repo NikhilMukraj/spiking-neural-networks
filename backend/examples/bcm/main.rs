@@ -115,7 +115,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         ..BCMIzhikevichNeuron::default_impl()
     };
 
-    let firing_times = vec![0.005, 0.0025];
+    let firing_times = vec![0.0025, 0.00125];
 
     let iterations = 10000;
 
