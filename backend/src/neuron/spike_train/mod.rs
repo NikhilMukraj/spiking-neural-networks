@@ -315,6 +315,12 @@ pub struct BCMPoissonNeuron<N: NeurotransmitterType, T: NeurotransmitterKinetics
     pub current_activity: f32,
     /// Smoothing factor for updating activity
     pub bcm_smoothing_factor: f32,
+    /// Current number of spikes in the firing window
+    pub num_spikes: usize,
+    /// Clock for firing rate calculation
+    pub firing_rate_clock: f32,
+    /// Current window for firing rate
+    pub firing_rate_window: f32,
     /// Postsynaptic eurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<N, T>,
     /// Neural refactoriness dynamics
@@ -336,6 +342,9 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
             average_activity: 0.,
             current_activity: 0.,
             bcm_smoothing_factor: 0.1,
+            num_spikes: 0,
+            firing_rate_clock: 0.,
+            firing_rate_window: 100.,
             synaptic_neurotransmitters: Neurotransmitters::<N, T>::default(),
             neural_refractoriness: U::default(),
             chance_of_firing: 0.,
@@ -396,6 +405,17 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 
             false
         };
+
+        if is_spiking {
+            self.num_spikes += 1;
+        }
+        self.firing_rate_clock += self.dt;
+        if self.firing_rate_clock >= self.firing_rate_window {
+            self.firing_rate_clock = 0.;
+            self.current_activity = self.num_spikes as f32 / self.firing_rate_window;
+            self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
+        }
+
         self.is_spiking = is_spiking;
 
         self.average_activity += (self.bcm_smoothing_factor * (self.current_activity - self.average_activity)) * self.dt;
