@@ -42,7 +42,7 @@ pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
 }
 use crate::error::{AgentError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError};
-use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition};
+use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition, Position};
 use crate::interactable::{Agent, UnsupervisedAgent};
 
 
@@ -398,6 +398,7 @@ pub struct SpikeHistory {
 impl SpikeHistory {
     /// Aggregates the spikes into a vector representing the firing rate,
     /// returns an empty vector if history is empty, also assumes grid is not ragged
+    #[allow(clippy::needless_range_loop)]
     pub fn aggregate(&self) -> Vec<Vec<isize>> {
         let z_size = self.history.len();
         let y_size = match self.history.first() {
@@ -451,7 +452,7 @@ pub struct SpikeTrainSpikeHistory {
 }
 
 impl SpikeTrainLatticeHistory for SpikeTrainSpikeHistory {
-    fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
+    fn update<T: IsSpiking>(&mut self, state: &[Vec<T>]) {
         self.history.push(
             state.iter()
                 .map(|i| {
@@ -513,6 +514,12 @@ macro_rules! impl_apply {
         }
     };
 }
+
+/// Electrical inputs for internal calculations
+pub type InternalElectricalInputs = HashMap<(usize, usize), f32>;
+
+/// Chemical inputs for internal calculations
+pub type InternalChemicalInputs<N> = HashMap<(usize, usize), NeurotransmitterConcentrations<N>>;
 
 /// Lattice of [`IterateAndSpike`] neurons, each lattice has a corresponding [`Graph`] that
 /// details the internal connections of the lattice, a grid of neurons stored as a 2
@@ -770,8 +777,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     }
 
     /// Gets all internal chemical inputs in parallel
-    fn par_get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
+    fn par_get_internal_neurotransmitter_inputs(&self) -> InternalChemicalInputs<N> {
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|&pos| {
@@ -789,8 +795,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     }
 
     /// Gets all internal neurotransmitter inputs 
-    fn get_internal_neurotransmitter_inputs(&self) -> 
-    HashMap<(usize, usize), NeurotransmitterConcentrations<N>> {
+    fn get_internal_neurotransmitter_inputs(&self) -> InternalChemicalInputs<N> {
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|&pos| {
@@ -798,7 +803,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
                     .expect("Cannot find position");
 
                 let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -809,7 +814,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
 
     /// Gets all internal electrical and neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
+    (InternalElectricalInputs, InternalChemicalInputs<N>) {
         let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
@@ -819,7 +824,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
 
     /// Gets all internal electrical and neurotransmitter inputs in parallel
     fn par_get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
+    (InternalElectricalInputs, InternalChemicalInputs<N>) {
         let neurotransmitter_inputs = self.par_get_internal_neurotransmitter_inputs();
 
         let inputs = self.par_get_internal_electrical_inputs();
@@ -1120,8 +1125,8 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     /// assumes lattice is already populated using the `populate` method
     pub fn connect(
         &mut self, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
     ) {
         self.graph.get_every_node()
             .iter()
@@ -1151,8 +1156,8 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     /// assumes lattice is already populated using the `populate` method
     pub fn falliable_connect(
         &mut self, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
     ) -> Result<(), LatticeNetworkError> {
         let output: Result<Vec<_>, LatticeNetworkError> = self.graph.get_every_node()
             .iter()
@@ -1195,7 +1200,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
 /// Handles history of a spike train lattice
 pub trait SpikeTrainLatticeHistory: Default + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
-    fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>);
+    fn update<T: SpikeTrain>(&mut self, state: &[Vec<T>]);
     /// Resets history
     fn reset(&mut self);
 }
@@ -1208,8 +1213,8 @@ pub struct SpikeTrainGridHistory {
 }
 
 impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
-    fn update<T: SpikeTrain>(&mut self, state: &Vec<Vec<T>>) {
-        self.history.push(get_grid_voltages::<T>(&state));
+    fn update<T: SpikeTrain>(&mut self, state: &[Vec<T>]) {
+        self.history.push(get_grid_voltages::<T>(state));
     }
 
     fn reset(&mut self) {
@@ -1311,7 +1316,7 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
 
 
 fn check_position<T>(
-    cell_grid: &Vec<Vec<T>>,
+    cell_grid: &[Vec<T>],
     graph_pos: &GraphPosition,
 ) -> Result<(), SpikingNeuralNetworksError> {
     if let Some(row) = cell_grid.get(graph_pos.pos.0) {
@@ -1588,11 +1593,6 @@ where
         self.connecting_graph.reset_history();
     }
 
-    /// Returns an immutable reference to all the lattice hashmaps
-    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z, N>>, &HashMap<usize, SpikeTrainLattice<N, W, X>>) {
-        (&self.lattices, &self.spike_train_lattices)
-    }
-
     /// Returns the set of [`Lattice`]s in the hashmap of lattices
     pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values()
@@ -1657,9 +1657,9 @@ where
 
         for graph_pos in new_graph.get_every_node_as_ref() {
             if let Some(lattice) = self.lattices.get(&graph_pos.id) {
-                check_position(&lattice.cell_grid, &graph_pos)?;
+                check_position(&lattice.cell_grid, graph_pos)?;
             } else if let Some(spike_train_lattice) = self.spike_train_lattices.get(&graph_pos.id) {
-                check_position(&spike_train_lattice.cell_grid, &graph_pos)?;
+                check_position(&spike_train_lattice.cell_grid, graph_pos)?;
             } else {
                 return Err(SpikingNeuralNetworksError::from(
                     LatticeNetworkError::IDNotFoundInLattices(graph_pos.id),
@@ -1687,8 +1687,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -1784,8 +1784,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -1891,8 +1891,8 @@ where
     pub fn connect_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -1912,8 +1912,8 @@ where
     pub fn falliable_connect_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -1982,7 +1982,7 @@ where
                 };
 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
-                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                    self.connecting_graph.lookup_weight(input_position, postsynaptic_position)
                         .unwrap_or(Some(0.))
                         .unwrap()
                 } else {
@@ -2003,7 +2003,7 @@ where
 
         input_val /= input_positions.len() as f32;
 
-        return input_val;
+        input_val
     }
 
     fn calculate_neurotransmitter_input_from_positions(
@@ -2025,21 +2025,21 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    let final_input = input_cell.get_neurotransmitter_concentrations();
+                    
 
-                    final_input
+                    input_cell.get_neurotransmitter_concentrations()
                 } else {
                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    let final_input = input_cell.get_neurotransmitter_concentrations();
+                    
 
-                    final_input
+                    input_cell.get_neurotransmitter_concentrations()
                 };
                 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
-                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                    self.connecting_graph.lookup_weight(input_position, postsynaptic_position)
                         .unwrap_or(Some(0.))
                         .unwrap()
                 } else {
@@ -2070,7 +2070,7 @@ where
             (1 / input_positions.len()) as f32
         );
 
-        return input_val;
+        input_val
     }
 
     fn get_every_node(&self) -> HashSet<GraphPosition> {
@@ -2094,7 +2094,7 @@ where
                 let input_positions = self.get_all_input_positions(*pos);
 
                 let input = self.calculate_electrical_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2109,7 +2109,7 @@ where
             .iter()
             .map(|pos| {
                 let input = self.calculate_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &self.get_all_input_positions(*pos),
                 );
 
@@ -2125,7 +2125,7 @@ where
                 let input_positions = self.get_all_input_positions(*pos);
 
                 let input = self.calculate_electrical_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2140,7 +2140,7 @@ where
             .par_iter()
             .map(|pos| {
                 let input = self.calculate_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &self.get_all_input_positions(*pos),
                 );
 
@@ -2171,11 +2171,11 @@ where
         let current_lattice = &self.lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
-        for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
+        for input_pos in self.connecting_graph.get_incoming_connections(pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos.pos;
 
             let mut current_weight: f32 = self.connecting_graph
-                .lookup_weight(&input_pos, &pos)
+                .lookup_weight(&input_pos, pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
@@ -2196,17 +2196,17 @@ where
             self.connecting_graph
                 .edit_weight(
                     &input_pos, 
-                    &pos, 
+                    pos, 
                     Some(current_weight)
                 )?;
         }
 
-        for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
+        for output_pos in self.connecting_graph.get_outgoing_connections(pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos.pos;
             let output_lattice = self.lattices.get(&output_pos.id).unwrap();
 
             let mut current_weight: f32 = self.connecting_graph
-                .lookup_weight(&pos, &output_pos)
+                .lookup_weight(pos, &output_pos)
                 .unwrap_or(Some(0.))
                 .unwrap();
 
@@ -2218,7 +2218,7 @@ where
                                         
             self.connecting_graph
                 .edit_weight(
-                    &pos, 
+                    pos, 
                     &output_pos, 
                     Some(current_weight)
                 )?;
@@ -2231,7 +2231,7 @@ where
         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
-        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos;
 
             let mut current_weight: f32 = current_lattice.graph
@@ -2253,7 +2253,7 @@ where
                 )?;
         }
 
-        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos;
 
             let mut current_weight: f32 = current_lattice.graph
@@ -2289,7 +2289,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
@@ -2350,7 +2350,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let input_neurotransmitter = inputs.get(&graph_pos).unwrap();
 
@@ -2362,10 +2362,8 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -2410,7 +2408,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
@@ -2701,7 +2699,7 @@ where
 
                 let final_input = gap_junction(input_cell, postsynaptic_neuron);
                 
-                final_input * self.graph.lookup_weight(&input_position, position)
+                final_input * self.graph.lookup_weight(input_position, position)
                     .unwrap().unwrap().get_weight()
             })
             .sum();
@@ -2712,7 +2710,7 @@ where
 
         input_val /= input_positions.len() as f32;
 
-        return input_val;
+        input_val
     }
 
     /// Calculates neurotransmitter input value from positions
@@ -2728,7 +2726,7 @@ where
                 let input_cell = &self.cell_grid[*pos_x][*pos_y];
 
                 let mut final_input = input_cell.get_neurotransmitter_concentrations();
-                let trace = self.graph.lookup_weight(&input_position, position).unwrap().unwrap();
+                let trace = self.graph.lookup_weight(input_position, position).unwrap().unwrap();
                 
                 weight_neurotransmitter_concentration(&mut final_input, trace.get_weight());
 
@@ -2745,7 +2743,7 @@ where
 
         weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
 
-        return input_val;
+        input_val
     }
 
     /// Gets all internal electrical inputs 
@@ -2753,11 +2751,11 @@ where
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let input = self.calculate_internal_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2772,11 +2770,11 @@ where
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|&pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2787,7 +2785,7 @@ where
 
     /// Gets all internal electrical and neurotransmitter inputs 
     fn get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
+    (InternalElectricalInputs, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
         let neurotransmitter_inputs = self.get_internal_neurotransmitter_inputs();
 
         let inputs = self.get_internal_electrical_inputs();
@@ -2800,11 +2798,11 @@ where
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let input = self.calculate_internal_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2819,11 +2817,11 @@ where
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|&pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -2833,8 +2831,7 @@ where
     }
 
     /// Gets all internal electrical and neurotransmitter inputs in parallel
-    fn par_get_internal_electrical_and_neurotransmitter_inputs(&self) -> 
-    (HashMap<(usize, usize), f32>, HashMap<(usize, usize), NeurotransmitterConcentrations<N>>) {
+    fn par_get_internal_electrical_and_neurotransmitter_inputs(&self) -> (InternalElectricalInputs, InternalChemicalInputs<N>) {
         let neurotransmitter_inputs = self.par_get_internal_neurotransmitter_inputs();
 
         let inputs = self.par_get_internal_electrical_inputs();
@@ -2846,29 +2843,29 @@ where
     fn update_weights_from_neurons(&mut self, x: usize, y: usize, pos: &(usize, usize)) -> Result<(), GraphError> {
         let given_neuron = &self.cell_grid[x][y];
         
-        let input_positions = self.graph.get_incoming_connections(&pos)?;
+        let input_positions = self.graph.get_incoming_connections(pos)?;
 
         for i in input_positions {
             let (x_in, y_in) = i;
-            let mut current_weight = self.graph.lookup_weight(&i, &pos)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(&i, pos)?.unwrap();
             self.reward_modulator.update_weight(&mut current_weight, &self.cell_grid[x_in][y_in], given_neuron);
                                         
             self.graph.edit_weight(
                 &i, 
-                &pos, 
+                pos, 
                 Some(current_weight)
             )?;
         }
 
-        let out_going_connections = self.graph.get_outgoing_connections(&pos)?;
+        let out_going_connections = self.graph.get_outgoing_connections(pos)?;
 
         for i in out_going_connections {
             let (x_out, y_out) = i;
-            let mut current_weight = self.graph.lookup_weight(&pos, &i)?.unwrap();
+            let mut current_weight = self.graph.lookup_weight(pos, &i)?.unwrap();
             self.reward_modulator.update_weight(&mut current_weight, given_neuron, &self.cell_grid[x_out][y_out]);
 
             self.graph.edit_weight(
-                &pos, 
+                pos, 
                 &i, 
                 Some(current_weight)
             )?; 
@@ -3462,11 +3459,6 @@ where
         self.connecting_graph.reset_history();
     }
 
-    /// Returns an immutable reference to all the lattice hashmaps
-    pub fn get_lattices(&self) -> (&HashMap<usize, Lattice<T, U, V, Z, N>>, &HashMap<usize, SpikeTrainLattice<N, W, X>>) {
-        (&self.lattices, &self.spike_train_lattices)
-    }
-
     /// Returns the set of [`Lattice`]s in the hashmap of lattices
     pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Z, N>> {
         self.lattices.values()
@@ -3539,11 +3531,11 @@ where
 
         for graph_pos in new_graph.get_every_node_as_ref() {
             if let Some(lattice) = self.lattices.get(&graph_pos.id) {
-                check_position(&lattice.cell_grid, &graph_pos)?;
+                check_position(&lattice.cell_grid, graph_pos)?;
             } else if let Some(spike_train_lattice) = self.spike_train_lattices.get(&graph_pos.id) {
-                check_position(&spike_train_lattice.cell_grid, &graph_pos)?;
+                check_position(&spike_train_lattice.cell_grid, graph_pos)?;
             } else if let Some(reward_modulated_lattice) = self.reward_modulated_lattices.get(&graph_pos.id) {
-                check_position(&reward_modulated_lattice.cell_grid, &graph_pos)?;
+                check_position(&reward_modulated_lattice.cell_grid, graph_pos)?;
             } else {
                 return Err(SpikingNeuralNetworksError::from(
                     LatticeNetworkError::IDNotFoundInLattices(graph_pos.id),
@@ -3585,8 +3577,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -3698,8 +3690,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -3825,8 +3817,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> RewardModulatedConnection<S>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: &dyn Fn(Position, Position) -> RewardModulatedConnection<S>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -3960,8 +3952,8 @@ where
         &mut self, 
         presynaptic_id: usize, 
         postsynaptic_id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> Result<RewardModulatedConnection<S>, LatticeNetworkError>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: &dyn Fn(Position, Position) -> Result<RewardModulatedConnection<S>, LatticeNetworkError>,
     ) -> Result<(), LatticeNetworkError> {
         if self.spike_train_lattices.contains_key(&postsynaptic_id) {
             return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
@@ -4100,8 +4092,8 @@ where
     pub fn connect_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> f32>,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -4121,8 +4113,8 @@ where
     pub fn falliable_connect_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: Option<&dyn Fn((usize, usize), (usize, usize)) -> Result<f32, LatticeNetworkError>>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -4141,8 +4133,8 @@ where
     pub fn connect_reward_modulated_lattice_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> S,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: &dyn Fn(Position, Position) -> S,
     ) -> Result<(), LatticeNetworkError> {
         if !self.reward_modulated_lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
@@ -4194,11 +4186,8 @@ where
                 .collect()
         };
 
-        match self.connecting_graph.get_incoming_connections(&pos) {
-            Ok(value) => {
-                input_positions.extend(value)
-            },
-            Err(_) => {}
+        if let Ok(value) = self.connecting_graph.get_incoming_connections(&pos) {
+            input_positions.extend(value)
         };
     
         input_positions
@@ -4261,7 +4250,7 @@ where
                 };
 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
-                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                    self.connecting_graph.lookup_weight(input_position, postsynaptic_position)
                         .unwrap()
                         .unwrap()
                         .get_weight()
@@ -4299,7 +4288,7 @@ where
 
         input_val /= averager;
 
-        return input_val;
+        input_val
     }
 
     fn calculate_neurotransmitter_input_from_positions(
@@ -4329,29 +4318,29 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    let final_input = input_cell.get_neurotransmitter_concentrations();
+                    
 
-                    final_input
+                    input_cell.get_neurotransmitter_concentrations()
                 } else if self.reward_modulated_lattices.contains_key(&input_position.id) {
                     let input_cell = &self.reward_modulated_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    let final_input = input_cell.get_neurotransmitter_concentrations();
+                    
 
-                    final_input
+                    input_cell.get_neurotransmitter_concentrations()
                 } else {
                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    let final_input = input_cell.get_neurotransmitter_concentrations();
+                    
 
-                    final_input
+                    input_cell.get_neurotransmitter_concentrations()
                 };
                 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
-                    self.connecting_graph.lookup_weight(&input_position, postsynaptic_position)
+                    self.connecting_graph.lookup_weight(input_position, postsynaptic_position)
                         .unwrap()
                         .unwrap()
                         .get_weight()
@@ -4385,13 +4374,11 @@ where
                     postsynaptic_neuron.get_gaussian_factor()
                 );
             }
-        } else {
-            if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-                weight_neurotransmitter_concentration(
-                    &mut input_val, 
-                    postsynaptic_neuron.get_gaussian_factor()
-                );
-            }
+        } else if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+            weight_neurotransmitter_concentration(
+                &mut input_val, 
+                postsynaptic_neuron.get_gaussian_factor()
+            );
         }
 
         weight_neurotransmitter_concentration(
@@ -4399,7 +4386,7 @@ where
             (1 / input_positions.len()) as f32
         );
 
-        return input_val;
+        input_val
     }
 
     fn get_every_node(&self) -> HashSet<GraphPosition> {
@@ -4431,7 +4418,7 @@ where
                 let input_positions = self.get_all_input_positions(*pos);
 
                 let input = self.calculate_electrical_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -4446,7 +4433,7 @@ where
             .iter()
             .map(|pos| {
                 let input = self.calculate_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &self.get_all_input_positions(*pos),
                 );
 
@@ -4471,7 +4458,7 @@ where
                 let input_positions = self.get_all_input_positions(*pos);
 
                 let input = self.calculate_electrical_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -4486,7 +4473,7 @@ where
             .par_iter()
             .map(|pos| {
                 let input = self.calculate_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &self.get_all_input_positions(*pos),
                 );
 
@@ -4508,11 +4495,11 @@ where
         let current_lattice = &self.lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
-        for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
+        for input_pos in self.connecting_graph.get_incoming_connections(pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos.pos;
 
             let connection = self.connecting_graph
-                .lookup_weight(&input_pos, &pos)
+                .lookup_weight(&input_pos, pos)
                 .unwrap()
                 .unwrap();
 
@@ -4535,7 +4522,7 @@ where
                     self.connecting_graph
                         .edit_weight(
                             &input_pos, 
-                            &pos, 
+                            pos, 
                             Some(RewardModulatedConnection::Weight(weight)),
                         )?;
                 },
@@ -4550,18 +4537,18 @@ where
                     self.connecting_graph
                         .edit_weight(
                             &input_pos, 
-                            &pos, 
+                            pos, 
                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
                         )?;
                 }
             }
         }
 
-        for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
+        for output_pos in self.connecting_graph.get_outgoing_connections(pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos.pos;
 
             let connection = self.connecting_graph
-                .lookup_weight(&output_pos, &pos)
+                .lookup_weight(&output_pos, pos)
                 .unwrap()
                 .unwrap();
 
@@ -4575,7 +4562,7 @@ where
                                                 
                     self.connecting_graph
                         .edit_weight(
-                            &pos, 
+                            pos, 
                             &output_pos, 
                             Some(RewardModulatedConnection::Weight(weight)),
                         )?;
@@ -4590,7 +4577,7 @@ where
                     
                     self.connecting_graph
                         .edit_weight(
-                            &pos, 
+                            pos, 
                             &output_pos, 
                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
                         )?;
@@ -4605,7 +4592,7 @@ where
         let current_lattice = self.lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
-        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos;
 
             let mut current_weight: f32 = current_lattice.graph
@@ -4627,7 +4614,7 @@ where
                 )?;
         }
 
-        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos;
 
             let mut current_weight: f32 = current_lattice.graph
@@ -4717,18 +4704,18 @@ where
                     self.connecting_graph
                         .edit_weight(
                             &input_pos, 
-                            &pos, 
+                            pos, 
                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
                         )?;
                 }
             }
         }
 
-        for output_pos in self.connecting_graph.get_outgoing_connections(&pos).unwrap_or(HashSet::new()) {
+        for output_pos in self.connecting_graph.get_outgoing_connections(pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos.pos;
 
             let connection = self.connecting_graph
-                .lookup_weight(&output_pos, &pos)
+                .lookup_weight(&output_pos, pos)
                 .unwrap()
                 .unwrap();
 
@@ -4743,7 +4730,7 @@ where
                                                     
                         self.connecting_graph
                             .edit_weight(
-                                &pos, 
+                                pos, 
                                 &output_pos, 
                                 Some(RewardModulatedConnection::Weight(weight)),
                             )?;
@@ -4765,7 +4752,7 @@ where
                     
                     self.connecting_graph
                         .edit_weight(
-                            &pos, 
+                            pos, 
                             &output_pos, 
                             Some(RewardModulatedConnection::RewardModulatedWeight(weight)),
                         )?;
@@ -4780,7 +4767,7 @@ where
         let current_lattice = self.reward_modulated_lattices.get_mut(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
         
-        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for input_pos in current_lattice.graph.get_incoming_connections(&pos.pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos;
 
             let mut current_weight = current_lattice.graph
@@ -4802,7 +4789,7 @@ where
                 )?;
         }
 
-        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or(HashSet::new()) {
+        for output_pos in current_lattice.graph.get_outgoing_connections(&pos.pos).unwrap_or_default() {
             let (x_out, y_out) = output_pos;
 
             let mut current_weight = current_lattice.graph
@@ -4833,13 +4820,13 @@ where
         positions_to_update_with_reward_modulation: &[(usize, usize, GraphPosition)],
     ) -> Result<(), GraphError> {
         for (x, y, pos) in positions_to_update {
-            self.update_weights_from_neurons_across_lattices(*x, *y, &pos)?;
-            self.update_weights_from_neurons_within_lattices(*x, *y, &pos)?;
+            self.update_weights_from_neurons_across_lattices(*x, *y, pos)?;
+            self.update_weights_from_neurons_within_lattices(*x, *y, pos)?;
         }
 
         for (x, y, pos) in positions_to_update_with_reward_modulation {
-            self.update_weights_from_neurons_across_reward_lattices(*x, *y, &pos)?;
-            self.update_weights_from_neurons_within_reward_lattices(*x, *y, &pos)?;
+            self.update_weights_from_neurons_across_reward_lattices(*x, *y, pos)?;
+            self.update_weights_from_neurons_within_reward_lattices(*x, *y, pos)?;
         }
 
         if self.update_connecting_graph_history {
@@ -4870,7 +4857,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
@@ -4880,10 +4867,8 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -4900,7 +4885,7 @@ where
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos };
 
                 let input_value = *inputs.get(&graph_pos).unwrap();
 
@@ -4912,10 +4897,8 @@ where
     
                 if <R as RewardModulator<T, T, S>>::do_update(
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
-                ) {
-                    if reward_modulated_lattice.do_modulation {
-                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
-                    }
+                ) && reward_modulated_lattice.do_modulation {
+                    positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                 }
             }
     
@@ -4942,7 +4925,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let neurotransmitter_input = neurotransmitter_inputs.get(&graph_pos).unwrap();
 
@@ -4954,10 +4937,8 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -4974,7 +4955,7 @@ where
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos };
 
                 let neurotransmitter_input = neurotransmitter_inputs.get(&graph_pos).unwrap();
 
@@ -4988,10 +4969,8 @@ where
     
                 if <R as RewardModulator<T, T, S>>::do_update(
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
-                ) {
-                    if reward_modulated_lattice.do_modulation {
-                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
-                    }
+                ) && reward_modulated_lattice.do_modulation {
+                    positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                 }
             }
     
@@ -5019,7 +4998,7 @@ where
         for lattice in self.lattices.values_mut() {
             for pos in lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: lattice.get_id(), pos };
 
                 let input = inputs.get(&graph_pos).unwrap();
                 let neurotransmitter_input = neurotransmitter_inputs.get(&graph_pos).unwrap();
@@ -5032,10 +5011,8 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -5052,7 +5029,7 @@ where
         for reward_modulated_lattice in self.reward_modulated_lattices.values_mut() {
             for pos in reward_modulated_lattice.graph.get_every_node() {
                 let (x, y) = pos;
-                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos: pos };
+                let graph_pos = GraphPosition { id: reward_modulated_lattice.get_id(), pos };
 
                 let input = inputs.get(&graph_pos).unwrap();
                 let neurotransmitter_input = neurotransmitter_inputs.get(&graph_pos).unwrap();
@@ -5067,10 +5044,8 @@ where
     
                 if <R as RewardModulator<T, T, S>>::do_update(
                     &reward_modulated_lattice.reward_modulator, &reward_modulated_lattice.cell_grid[x][y]
-                ) {
-                    if reward_modulated_lattice.do_modulation {
-                        positions_to_update_with_reward_modulation.push((x, y, graph_pos));
-                    }
+                ) && reward_modulated_lattice.do_modulation {
+                    positions_to_update_with_reward_modulation.push((x, y, graph_pos));
                 }
             }
     
