@@ -874,7 +874,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for BCMIzhikevich
             period: 3,
             num_spikes: 0,
             firing_rate_clock: 0.,
-            firing_rate_window: 100.,
+            firing_rate_window: 500.,
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
