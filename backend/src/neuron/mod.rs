@@ -501,10 +501,10 @@ macro_rules! impl_apply {
         }
 
         /// Applies a function across the entire cell grid to each neuron
-        /// given the position of the neuron and the neuron itself
+        /// given the position, `(usize, usize)`, of the neuron and the neuron itself
         pub fn apply_given_position<F>(&mut self, f: F)
         where
-            F: Fn((usize, usize), &mut T),
+            F: Fn(Position, &mut T),
         {
             for (i, row) in self.cell_grid.iter_mut().enumerate() {
                 for (j, neuron) in row.iter_mut().enumerate() {
@@ -3123,8 +3123,8 @@ where
     /// assumes lattice is already populated using the `populate` method
     pub fn connect(
         &mut self, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> bool,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> S,
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: &dyn Fn(Position, Position) -> S,
     ) {
         self.graph.get_every_node()
             .iter()
@@ -3145,8 +3145,8 @@ where
     /// assumes lattice is already populated using the `populate` method
     pub fn falliable_connect(
         &mut self, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> Result<S, LatticeNetworkError>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: &dyn Fn(Position, Position) -> Result<S, LatticeNetworkError>,
     ) -> Result<(), LatticeNetworkError> {
         let output: Result<Vec<_>, LatticeNetworkError> = self.graph.get_every_node()
             .iter()
@@ -4155,8 +4155,8 @@ where
     pub fn falliable_connect_reward_modulated_lattice_interally(
         &mut self, 
         id: usize, 
-        connecting_conditional: &dyn Fn((usize, usize), (usize, usize)) -> Result<bool, LatticeNetworkError>,
-        weight_logic: &dyn Fn((usize, usize), (usize, usize)) -> Result<S, LatticeNetworkError>,
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: &dyn Fn(Position, Position) -> Result<S, LatticeNetworkError>,
     ) -> Result<(), LatticeNetworkError> {
         if !self.reward_modulated_lattices.contains_key(&id) {
             return Err(LatticeNetworkError::IDNotFoundInLattices(id));
