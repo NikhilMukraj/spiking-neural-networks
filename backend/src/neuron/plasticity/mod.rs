@@ -82,13 +82,15 @@ pub trait BCMActivity {
 pub struct BCM {
     /// Weight decay value
     pub decay: f32,
+    /// Value to scale postsynaptic output by
+    pub average_scalar: f32,
     /// Timestep value
     pub dt: f32,
 }
 
 impl Default for BCM {
     fn default() -> Self {
-        BCM { decay: 0.1, dt: 0.1 }
+        BCM { decay: 0.1, average_scalar: 0.1, dt: 0.1 }
     }
 }
 
@@ -98,7 +100,7 @@ where
     U: IterateAndSpike + BCMActivity,
 {
     fn update_weight(&self, weight: &mut f32, presynaptic: &T, postsynaptic: &U) {
-        let sliding_threshold = postsynaptic.get_averaged_activity().powf(2.);
+        let sliding_threshold = postsynaptic.get_averaged_activity() / self.average_scalar;
         let activity_term = postsynaptic.get_activity() * (postsynaptic.get_activity() - sliding_threshold);
         let weight_decay = self.decay * *weight;
         *weight += (activity_term * presynaptic.get_activity() - weight_decay) * self.dt;
