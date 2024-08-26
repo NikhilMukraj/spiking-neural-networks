@@ -36,13 +36,13 @@ pub fn get_power_density(x: Vec<f32>, dt: f32, total_time: f32) -> (Array1<f32>,
     let sxx_positive = sxx.slice(s![0..(x.len() / 2)]);
     let sxx_positive = sxx_positive.mapv(|val| val.re);
 
-    let df: f32 = 1.0 / total_time as f32;
+    let df: f32 = 1.0 / total_time;
 
     let fnq: f32 = 1.0 / (2.0 * dt);
 
     let faxis: Array1<f32> = Array1::range(0.0, fnq, df);
 
-    return (faxis, sxx_positive.to_owned())
+    (faxis, sxx_positive.to_owned())
 }
 
 fn find_max(arr: &Array1<f32>) -> Option<&f32> {
@@ -63,8 +63,8 @@ pub fn power_density_comparison(sxx1: &Array1<f32>, sxx2: &Array1<f32>) -> Resul
     let u_values = Array1::from(values.clone());
     let v_values = Array1::from(values);
 
-    let u_max = find_max(&sxx1).expect("Cannot find maximum");
-    let v_max = find_max(&sxx2).expect("Cannot find maximum");
+    let u_max = find_max(sxx1).expect("Cannot find maximum");
+    let v_max = find_max(sxx2).expect("Cannot find maximum");
 
     let u_weights = sxx1.map(|x| x / u_max);
     let v_weights = sxx2.map(|x| x / v_max);

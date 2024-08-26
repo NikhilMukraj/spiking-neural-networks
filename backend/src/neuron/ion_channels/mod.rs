@@ -133,7 +133,7 @@ pub trait IonChannelBoxClone {
     fn clone_box(&self) -> Box<dyn IonChannel>;
 }
 
-impl<T: ?Sized> IonChannelBoxClone for T
+impl<T> IonChannelBoxClone for T
 where
     T: 'static + IonChannel + Clone,
 {
@@ -153,7 +153,7 @@ pub trait TimestepIndependentIonChannelBoxClone {
     fn clone_box(&self) -> Box<dyn TimestepIndependentIonChannel>;
 }
 
-impl<T: ?Sized> TimestepIndependentIonChannelBoxClone for T
+impl<T> TimestepIndependentIonChannelBoxClone for T
 where
     T: 'static + TimestepIndependentIonChannel + Clone,
 {

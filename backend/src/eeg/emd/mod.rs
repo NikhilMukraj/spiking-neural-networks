@@ -29,15 +29,13 @@ fn searchsorted(a: &ArrayView1<f32>, v: &ArrayView1<f32>) -> Array1<usize> {
 fn cumsum(array: &Array1<f32>) -> Array1<f32> {
     let mut running_sum = 0.0;
 
-    let result = array.map(|&x| {
+    array.map(|&x| {
         running_sum += x;
         running_sum
-    });
-
-    result
+    })
 }
 
-fn get_cdf(weights: &Array1<f32>, sorter: &Vec<usize>, indices: &Array1<usize>) -> Vec<f32> {
+fn get_cdf(weights: &Array1<f32>, sorter: &[usize], indices: &Array1<usize>) -> Vec<f32> {
     let sorted_cum_weights = concatenate![
         Axis(0), 
         Array1::from_vec(vec![0.]),
@@ -47,12 +45,13 @@ fn get_cdf(weights: &Array1<f32>, sorter: &Vec<usize>, indices: &Array1<usize>) 
     sorted_cum_weights.select(Axis(0), indices.to_vec().as_slice())
         .map(|x| x / sorted_cum_weights.last().expect("Cannot get last weight"))
         .iter()
-        .map(|x| *x)
+        .copied()
         .collect::<Vec<f32>>()
 }
 
 // https://github.com/scipy/scipy/blob/v1.11.3/scipy/stats/_stats_py.py#L9896
 // made in reference to scipy implementation
+#[allow(clippy::unnecessary_cast)]
 pub fn earth_moving_distance(
     u_values: Array1<f32>,
     v_values: Array1<f32>,
@@ -85,8 +84,8 @@ pub fn earth_moving_distance(
     // v_cdf_indices = v_values[v_sorter].searchsorted(all_values[:-1], 'right')
 
     let all_values_sliced = &all_values.slice(s![0 as isize .. -1 as isize]);
-    let u_cdf_indices = searchsorted(&u_values.select(Axis(0), &u_sorter).view(), all_values_sliced.into());
-    let v_cdf_indices = searchsorted(&v_values.select(Axis(0), &v_sorter).view(), all_values_sliced.into());
+    let u_cdf_indices = searchsorted(&u_values.select(Axis(0), &u_sorter).view(), all_values_sliced);
+    let v_cdf_indices = searchsorted(&v_values.select(Axis(0), &v_sorter).view(), all_values_sliced);
 
     // # Calculate the CDFs of u and v using their weights, if specified.
     // if u_weights is None:

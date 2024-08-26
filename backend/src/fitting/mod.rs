@@ -15,7 +15,7 @@ use crate::neuron::{
 use crate::ga::{BitString, decode, genetic_algo, GeneticAlgorithmParameters};
 
 
-fn diff<T: Sub<Output = T> + Copy>(x: &Vec<T>) -> Vec<T> {
+fn diff<T: Sub<Output = T> + Copy>(x: &[T]) -> Vec<T> {
     (1..x.len()).map(|i| x[i] - x[i-1])
         .collect()
 }
@@ -38,10 +38,10 @@ pub struct ActionPotentialSummary {
 /// and a list of times where the neurons have spiked, `spike_amplitude_default`
 /// refers to the default voltage to be used if no peaks are found
 pub fn get_summary(
-    pre_voltages: &Vec<f32>, 
-    post_voltages: &Vec<f32>, 
-    pre_peaks: &Vec<usize>,
-    post_peaks: &Vec<usize>,
+    pre_voltages: &[f32], 
+    post_voltages: &[f32], 
+    pre_peaks: &[usize],
+    post_peaks: &[usize],
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     if pre_voltages.len() != post_voltages.len() {
         return Err(
@@ -51,15 +51,15 @@ pub fn get_summary(
         );
     }
 
-    let average_pre_spike_difference: f32 = if pre_peaks.len() != 0 {
-        diff(&pre_peaks).iter()
+    let average_pre_spike_difference: f32 = if !pre_peaks.is_empty() {
+        diff(pre_peaks).iter()
             .sum::<usize>() as f32 / (pre_peaks.len() as f32)
     } else {
         0.
     };
 
-    let average_post_spike_difference: f32 = if post_peaks.len() != 0 {
-        diff(&post_peaks).iter()
+    let average_post_spike_difference: f32 = if !post_peaks.is_empty() {
+        diff(post_peaks).iter()
             .sum::<usize>() as f32 / (post_peaks.len() as f32)
     } else {
         0.
@@ -105,7 +105,7 @@ pub struct SummaryScalingFactors {
     pub num_peaks_scale: f32,
 }
 
-fn get_f32_max(x: &Vec<f32>) -> Option<&f32> {
+fn get_f32_max(x: &[f32]) -> Option<&f32> {
     x.iter()
         .max_by(|a, b| a.total_cmp(b))
 }
@@ -147,8 +147,8 @@ pub fn get_reference_scale(
     };
 
     let scaling_factors = SummaryScalingFactors {
-        time_difference_scale: time_difference_scale,
-        num_peaks_scale: num_peaks_scale,
+        time_difference_scale,
+        num_peaks_scale,
     };
 
     (scaled_reference, scaling_factors)
@@ -239,10 +239,8 @@ pub fn get_reference_summary<
         post_voltages.push(postsynaptic_neuron.get_current_voltage());
     }
 
-    Ok(
-        get_summary(
-            &pre_voltages, &post_voltages, &pre_peaks, &post_peaks,
-        )?
+    get_summary(
+        &pre_voltages, &post_voltages, &pre_peaks, &post_peaks,
     )
 }
 
@@ -338,7 +336,7 @@ fn fitting_objective<
     N: NeurotransmitterType,
 >(
     bitstring: &BitString, 
-    bounds: &Vec<(f32, f32)>, 
+    bounds: &[(f32, f32)], 
     n_bits: usize, 
     settings: &HashMap<&str, FittingSettings<T, U, N>>
 ) -> result::Result<f32, GeneticAlgorithmError> {
@@ -363,7 +361,7 @@ fn fitting_objective<
         .collect::<Vec<result::Result<ActionPotentialSummary, GeneticAlgorithmError>>>();
 
     for result in summaries_results.iter() {
-        if let Err(_) = result {
+        if result.is_err() {
             return Err(
                 GeneticAlgorithmError::ObjectiveFunctionFailure(
                     String::from("Summary calculation could not be completed")
@@ -394,34 +392,32 @@ fn fitting_objective<
 /// - `reference_neuron` : neuron to reference as a target to meet
 /// 
 /// - `converter` : function to use to take decoded values and translate them to a neuron, number of values
-/// passed the converter within the vector is equal to the length of `bounds` in `genetic_algo_parameters`
+///     passed the converter within the vector is equal to the length of `bounds` in `genetic_algo_parameters`
 /// 
 /// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
-/// use `None` to not scale summaries during fitting
+///     use `None` to not scale summaries during fitting
 /// 
 /// - `iterations` : number of iterations to run each simulation for
 /// 
 /// - `input_spike_trains` : a set of preset spike trains to use when simulating each neuron, essentially
-/// a set of conditions to observe the neurons over in order to ensure the models are fit
+///     a set of conditions to observe the neurons over in order to ensure the models are fit
 /// 
 /// - `genetic_algo_parameters` : a set of hyperparameters for the genetic algorithm that fits
-/// the neurons to use
+///     the neurons to use
 /// 
-/// - `reference_electrical_synapse` : use `true` to update neurons based on electrical gap junctions for
-/// the reference neuron
+/// - `reference_neuron_synapses` : use `true` for the first element to update neurons based on electrical 
+///     gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
+///     based on neurotransmitter input during the simulation for the neuron to fit
 /// 
-/// - `reference_chemical_synapse` : use `true` to update receptor gating values of 
-/// the neurons based on neurotransmitter input during the simulation for the reference neuron
-/// 
-/// - `neuron_to_fit_electrical_synapse` : use `true` to update neurons based on electrical gap junctions for
-/// the neuron to fit
-/// 
-/// - `neuron_to_fit_chemical_synapse` : use `true` to update receptor gating values of 
-/// the neurons based on neurotransmitter input during the simulation for the neuron to fit
+/// - `neuron_to_fit_synapses` : use `true` for the first element to update neurons based on electrical 
+///     gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
+///     based on neurotransmitter input during the simulation for the neuron to fit
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 /// 
 /// - `verbose` : use `true` to print extra information
+#[allow(clippy::too_many_arguments)]
+#[allow(clippy::type_complexity)]
 pub fn fit_neuron_to_neuron<
     T: IterateAndSpike<N=N>,
     U: IterateAndSpike<N=N>,
@@ -433,12 +429,10 @@ pub fn fit_neuron_to_neuron<
     converter: fn(&Vec<f32>) -> T,
     scaling_defaults: Option<SummaryScalingDefaults>,
     iterations: usize,
-    input_spike_trains: &Vec<V>,
+    input_spike_trains: &[V],
     genetic_algo_params: &GeneticAlgorithmParameters,
-    reference_electrical_synapse: bool,
-    reference_chemical_synapse: bool,
-    neuron_to_fit_electrical_synapse: bool,
-    neuron_to_fit_chemical_synapse: bool,
+    reference_neuron_synapses: (bool, bool),
+    neuron_to_fit_synapses: (bool, bool),
     gaussian: bool,
     verbose: bool,
 ) -> result::Result<
@@ -450,6 +444,9 @@ pub fn fit_neuron_to_neuron<
     ),
     GeneticAlgorithmError
 > {
+    let (reference_electrical_synapse, reference_chemical_synapse) = reference_neuron_synapses;
+    let (neuron_to_fit_electrical_synapse, neuron_to_fit_chemical_synapse) = neuron_to_fit_synapses;
+
     let (reference_summaries, scaling_factors) = match scaling_defaults {
         Some(scaling_defaults_values) => {
             let mut reference_summaries: Vec<ActionPotentialSummary> = vec![];
@@ -498,14 +495,14 @@ pub fn fit_neuron_to_neuron<
 
     let fitting_settings = FittingSettings {
         neuron_to_fit: neuron_to_fit.clone(),
-        action_potential_summary: &reference_summaries.as_slice(),
-        scaling_factors: &scaling_factors.as_slice(),
-        spike_trains: input_spike_trains.clone(),
-        iterations: iterations,
-        gaussian: gaussian,
+        action_potential_summary: reference_summaries.as_slice(),
+        scaling_factors: scaling_factors.as_slice(),
+        spike_trains: input_spike_trains.to_vec().clone(),
+        iterations,
+        gaussian,
         electrical_synapse: neuron_to_fit_electrical_synapse,
         chemical_synapse: neuron_to_fit_chemical_synapse,
-        converter: converter,
+        converter,
     };
 
     let mut fitting_settings_map: HashMap<&str, FittingSettings<T, V, N>> = HashMap::new();

@@ -30,6 +30,9 @@ fn generate_keys(n: usize) -> Vec<String> {
     keys_vector
 }
 
+type VoltageHashMap = HashMap<String, Vec<f32>>;
+type Matrix = Vec<Vec<Vec<Option<f32>>>>;
+
 /// Tests BCM dynamics over time given a set of input firing rates to a postsynaptic neuron
 /// and updates the weights between the spike trains and given postsynaptic neuron, returns
 /// the voltage and weight history over tim
@@ -41,7 +44,7 @@ pub fn test_bcm<N, T>(
     weight_params: &GaussianParameters,
     electrical_synapse: bool,
     chemical_synapse: bool,
-) -> Result<(HashMap<String, Vec<f32>>, Vec<Vec<Vec<Option<f32>>>>), SpikingNeuralNetworksError>
+) -> Result<(VoltageHashMap, Matrix), SpikingNeuralNetworksError>
 where
     N: NeurotransmitterType,
     T: IterateAndSpike<N=N> + BCMActivity,
@@ -56,9 +59,9 @@ where
     let preset_spike_train = BCMPoissonNeuron::default();
     spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1);
     spike_train_lattice.apply_given_position(
-        &(|pos: (usize, usize), spike_train: &mut SpikeTrainType<N>| { 
+        |pos: (usize, usize), spike_train: &mut SpikeTrainType<N>| { 
             spike_train.chance_of_firing = firing_rates[pos.0]; 
-        })
+        }
     );
     spike_train_lattice.update_grid_history = true;
     spike_train_lattice.set_id(0);
@@ -97,7 +100,7 @@ where
     for i in 0..firing_rates.len() {
         output_hashmap
             .entry(format!("presynaptic_voltage_{}", i))
-            .or_insert_with(Vec::new)
+            .or_default()
             .extend(spike_train_history.iter().map(|step| step[i][0]).collect::<Vec<f32>>());
     }
 
@@ -109,7 +112,7 @@ where
 // - Updates weights based on spike time dependent plasticity when spiking occurs
 // - Writes the history of the simulation to working directory
 fn main() -> Result<(), SpikingNeuralNetworksError> {
-    let mut izhikevich_neuron = BCMIzhikevichNeuron {
+    let izhikevich_neuron = BCMIzhikevichNeuron {
         c_m: 50.,
         gap_conductance: 1.,
         ..BCMIzhikevichNeuron::default_impl()
@@ -130,7 +133,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let (output_hashmap, weight_history) = test_bcm(
         &firing_times, 
-        &mut izhikevich_neuron,
+        &izhikevich_neuron,
         iterations, 
         &bcm_params,
         &weight_params, 

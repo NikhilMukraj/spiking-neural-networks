@@ -21,7 +21,7 @@ use spiking_neural_networks::{
 
 // connect neurons within a radius of 2 with an 80% chance of connection
 fn sparse_connect(x: (usize, usize), y: (usize, usize)) -> bool {
-    (((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)) as f64).sqrt() <= 4. && 
+    ((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)).sqrt() <= 4. && 
     rand::thread_rng().gen_range(0.0..=1.0) <= 0.4 &&
     x != y
 }

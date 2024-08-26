@@ -29,7 +29,7 @@ fn main() {
         .expect("Could not create file"));
 
     writeln!(file, "voltages").expect("Could not write to file");
-    for i in 0..iterations {
-        writeln!(file, "{}", voltages[i]).expect("Could not write to file");
+    for i in voltages {
+        writeln!(file, "{}", i).expect("Could not write to file");
     }
 }

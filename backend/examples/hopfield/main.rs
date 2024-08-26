@@ -26,7 +26,7 @@ fn read_pattern(file_contents: &str) -> Result<Vec<Vec<bool>>> {
             return Err(Error::new(ErrorKind::InvalidData, "Pattern must be bipolar (-1 or 1)"))
         }
 
-        matrix.push(row.iter().map(|i| if *i == 1 { true } else { false }).collect::<Vec<bool>>());
+        matrix.push(row.iter().map(|i| *i == 1).collect::<Vec<bool>>());
     }
 
     Ok(matrix)
@@ -40,12 +40,12 @@ fn test_hopfield_network<T: Graph<K=(usize, usize), V=f32>>(
     let num_rows = patterns[0].len();
     let num_cols = patterns[0][0].len();
 
-    let weights = generate_hopfield_network::<T>(0, &patterns)?;
+    let weights = generate_hopfield_network::<T>(0, patterns)?;
     let mut discrete_lattice = DiscreteNeuronLattice::<T>::generate_lattice_from_dimension(num_rows, num_cols);
     discrete_lattice.graph = weights;
 
     for (n, pattern) in patterns.iter().enumerate() {
-        let distorted_pattern = distort_pattern(&pattern, noise_level);
+        let distorted_pattern = distort_pattern(pattern, noise_level);
 
         let mut hopfield_history: Vec<Vec<Vec<isize>>> = Vec::new();
 
@@ -108,7 +108,7 @@ fn main() -> Result<()> {
     let patterns: Vec<Vec<Vec<bool>>> = pattern_files.iter()
         .map(|i| 
             read_pattern(
-                &(read_to_string(i).expect(&format!("Could not read file: {}", i)))
+                &(read_to_string(i).unwrap_or_else(|_| panic!("Could not read file: {}", i)))
             ).expect("Pattern could not be read, must be bipolar (-1 or 1 for every value)")
         )
         .collect();

@@ -387,7 +387,7 @@ impl<T: Graph<K=(usize, usize), V=f32>> DiscreteNeuronLattice<T> {
             .collect::<Vec<Vec<DiscreteNeuron>>>();
 
         DiscreteNeuronLattice {
-            cell_grid: cell_grid,
+            cell_grid,
             graph: T::default(),
         }
     }
@@ -448,7 +448,7 @@ impl<T: Graph<K=(usize, usize), V=f32>> DiscreteNeuronLattice<T> {
                 .map(|graph_pos| {
                         let (pos_i, pos_j) = graph_pos;
 
-                        self.graph.lookup_weight(&graph_pos, &current_pos).unwrap().unwrap() 
+                        self.graph.lookup_weight(graph_pos, &current_pos).unwrap().unwrap() 
                         * self.cell_grid[*pos_i][*pos_j].state_to_numeric() as f32
                     }
                 )
@@ -487,9 +487,9 @@ pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
     graph_id: usize,
     data: &Vec<Vec<Vec<bool>>>,
 ) -> result::Result<T, SpikingNeuralNetworksError> {
-    let num_rows = data.get(0).unwrap_or(&vec![]).len();
-    let num_cols = data.get(0).unwrap_or(&vec![])
-        .get(0).unwrap_or(&vec![])
+    let num_rows = data.first().unwrap_or(&vec![]).len();
+    let num_cols = data.first().unwrap_or(&vec![]).first()
+        .unwrap_or(&vec![])
         .len();
 
     for pattern in data {
@@ -546,10 +546,7 @@ pub fn generate_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Default>(
                     continue;
                 }
 
-                let current_weight = match weights.lookup_weight(&coming, &going)? {
-                    Some(w) => w,
-                    None => 0.,
-                };
+                let current_weight = (weights.lookup_weight(&coming, &going)?).unwrap_or(0.);
 
                 weights.edit_weight(&coming, &going, Some(current_weight + *value as f32))?;
             }
@@ -584,9 +581,8 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
     b: f32,
     scalar: f32,
 ) -> result::Result<T, SpikingNeuralNetworksError> {
-    let num_rows = data.get(0).unwrap_or(&vec![]).len();
-    let num_cols = data.get(0).unwrap_or(&vec![])
-        .get(0).unwrap_or(&vec![])
+    let num_rows = data.first().unwrap_or(&vec![]).len();
+    let num_cols = data.first().unwrap_or(&vec![]).first().unwrap_or(&vec![])
         .len();
 
     for pattern in data {
@@ -647,10 +643,7 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
                     continue;
                 }
 
-                let current_weight = match weights.lookup_weight(&coming, &going)? {
-                    Some(w) => w,
-                    None => 0.,
-                };
+                let current_weight = (weights.lookup_weight(&coming, &going)?).unwrap_or(0.);
 
                 weights.edit_weight(&coming, &going, Some(current_weight + *value))?;
             }
@@ -661,7 +654,7 @@ pub fn generate_binary_hopfield_network<T: Graph<K=(usize, usize), V=f32> + Defa
 }
 
 /// Adds random noise to a given pattern based on a given `noise_level` between `0.` and `1.`
-pub fn distort_pattern(pattern: &Vec<Vec<bool>>, noise_level: f32) -> Vec<Vec<bool>> {
+pub fn distort_pattern(pattern: &[Vec<bool>], noise_level: f32) -> Vec<Vec<bool>> {
     let mut output: Vec<Vec<bool>> = Vec::new();
 
     for i in pattern.iter() {
@@ -699,11 +692,7 @@ pub fn generate_random_patterns(
         .map(|_| {
             let current_pattern: Vec<bool> = binomial.sample_iter(&mut rng).take(num_rows * num_cols).map(|i| {
                 let x = i as isize;
-                if x != 1 {
-                    false
-                } else {
-                    true
-                }
+                x == 1
             }).collect();
 
             current_pattern.chunks(num_cols)

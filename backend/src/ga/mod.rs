@@ -33,13 +33,13 @@ impl BitString {
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     fn set(&mut self, new_string: String) -> Result<(), GeneticAlgorithmError> {
         self.string = new_string;
 
-        return self.check();
+        self.check()
     }
 
     /// Returns the length of the bit string
@@ -63,7 +63,7 @@ fn crossover(parent1: &BitString, parent2: &BitString, r_cross: f32) -> (BitStri
         clone2.set(string2).expect("Error setting bitstring");
     }
 
-    return (clone1, clone2);
+    (clone1, clone2)
 }
 
 fn mutate(bitstring: &mut BitString, r_mut: f32) {
@@ -80,13 +80,12 @@ fn mutate(bitstring: &mut BitString, r_mut: f32) {
     }
 }
 
-fn selection(pop: &Vec<BitString>, scores: &Vec<f32>, k: usize) -> BitString {
+fn selection(pop: &[BitString], scores: &[f32], k: usize) -> BitString {
     // default should be 3
     let mut rng_thread = rand::thread_rng(); 
     let mut selection_index = rng_thread.gen_range(1..pop.len());
 
     let indices = (0..k-1)
-        .into_iter()
         .map(|_x| rng_thread.gen_range(1..pop.len()));
 
     // performs tournament selection to select parents
@@ -96,7 +95,7 @@ fn selection(pop: &Vec<BitString>, scores: &Vec<f32>, k: usize) -> BitString {
         }
     }
 
-    return pop[selection_index].clone();
+    pop[selection_index].clone()
 }
 
 /// Decodes the given [`BitString`] given the number of bits in each bit substring and scales 
@@ -104,8 +103,8 @@ fn selection(pop: &Vec<BitString>, scores: &Vec<f32>, k: usize) -> BitString {
 /// of substrings in the [`BitString`], `bounds` should be a vector of tuples where the first item is the 
 /// minimum value for scaling and the second item is the maximal value for scaling
 pub fn decode(
-    bitstring: 
-    &BitString, bounds: &Vec<(f32, f32)>, 
+    bitstring: &BitString,
+    bounds: &[(f32, f32)], 
     n_bits: usize
 ) -> Result<Vec<f32>, GeneticAlgorithmError> {
     // decode for non variable length
@@ -136,7 +135,7 @@ pub fn decode(
         decoded_vec[i] = value;
     }
 
-    return Ok(decoded_vec);
+    Ok(decoded_vec)
 }
 
 fn create_random_string(length: usize) -> BitString {
@@ -150,7 +149,7 @@ fn create_random_string(length: usize) -> BitString {
         }
     }
 
-    return BitString {string: random_string};
+    BitString {string: random_string}
 }
 
 /// Parameter set for genetic algorithm functionality
@@ -193,15 +192,16 @@ impl Default for GeneticAlgorithmParameters {
 /// [`BitString`], and a vector of vectors containing the scores for each [`BitString`] over time
 /// 
 /// - `f` : the objective function to minimize the output of, should take in the [`BitString`], bounds,
-/// number of bits per bit substring, and a hashmap of any necessary parameters as arguments
+///     number of bits per bit substring, and a hashmap of any necessary parameters as arguments
 /// 
 /// - `params` : a set of genetic algorithm parameters
 ///
 /// - `settings` : any additional parameters necessary in the objective function
 /// 
 /// - `verbose` : use `true` to print extra information
+#[allow(clippy::type_complexity)]
 pub fn genetic_algo<T: Sync>(
-    f: fn(&BitString, &Vec<(f32, f32)>, usize, &HashMap<&str, T>) -> Result<f32, GeneticAlgorithmError>, 
+    f: fn(&BitString, &[(f32, f32)], usize, &HashMap<&str, T>) -> Result<f32, GeneticAlgorithmError>, 
     params: &GeneticAlgorithmParameters,
     settings: &HashMap<&str, T>,
     verbose: bool,
@@ -215,7 +215,7 @@ pub fn genetic_algo<T: Sync>(
         .collect();
 
     let mut best = pop[0].clone();
-    let mut best_eval = match f(&pop[0], &params.bounds, params.n_bits, &settings) {
+    let mut best_eval = match f(&pop[0], &params.bounds, params.n_bits, settings) {
         Ok(best_eval_result) => best_eval_result,
         Err(e) => return Err(e),
     };
@@ -229,7 +229,7 @@ pub fn genetic_algo<T: Sync>(
 
         let scores_results: &Result<Vec<f32>, GeneticAlgorithmError> = &pop
             .par_iter() 
-            .map(|p| f(p, &params.bounds, params.n_bits, &settings))
+            .map(|p| f(p, &params.bounds, params.n_bits, settings))
             .collect(); 
         
         // check if objective failed anywhere
@@ -252,7 +252,7 @@ pub fn genetic_algo<T: Sync>(
 
         let selected: Vec<BitString> = (0..params.n_pop)
             .into_par_iter()
-            .map(|_| selection(&pop, &scores, params.k))
+            .map(|_| selection(&pop, scores, params.k))
             .collect();
 
         let children = (0..params.n_pop)
@@ -271,5 +271,5 @@ pub fn genetic_algo<T: Sync>(
         pop = children;
     }
 
-    return Ok((best, best_eval, all_scores));
+    Ok((best, best_eval, all_scores))
 }

@@ -320,7 +320,7 @@ impl<
         }
 
         self.incoming_connections.entry(position)
-            .or_insert_with(HashMap::new);
+            .or_default();
     }
 
     fn get_every_node(&self) -> HashSet<T> {
@@ -357,22 +357,22 @@ impl<
         match weight {
             Some(value) => {
                 self.incoming_connections.entry(*postsynaptic)
-                    .or_insert_with(HashMap::new)
+                    .or_default()
                     .insert(*presynaptic, value);
     
-                if let Some(vector) = self.outgoing_connections.get_mut(&presynaptic) {
+                if let Some(vector) = self.outgoing_connections.get_mut(presynaptic) {
                     vector.insert(*postsynaptic);
                 } else {
                     self.outgoing_connections.insert(*presynaptic, HashSet::from([*postsynaptic]));
                 }
             },
             None => {
-                if let Some(inner_map) = self.incoming_connections.get_mut(&postsynaptic) {
-                    inner_map.remove(&presynaptic);
+                if let Some(inner_map) = self.incoming_connections.get_mut(postsynaptic) {
+                    inner_map.remove(presynaptic);
                 }
-                if let Some(connections) = self.outgoing_connections.get_mut(&presynaptic) {
-                    if connections.contains(&postsynaptic) {
-                        connections.remove(&postsynaptic);
+                if let Some(connections) = self.outgoing_connections.get_mut(presynaptic) {
+                    if connections.contains(postsynaptic) {
+                        connections.remove(postsynaptic);
                     }
                 }
             },

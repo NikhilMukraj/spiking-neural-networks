@@ -68,7 +68,7 @@ pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
 /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
 /// 
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
-/// the neurons based on neurotransmitter input during the simulation
+///     the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
@@ -143,7 +143,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 ) -> f32 {
     let (v_max, v_resting) = presynaptic_neuron.get_height();
 
-    if let None = presynaptic_neuron.get_last_firing_time() {
+    if presynaptic_neuron.get_last_firing_time().is_none() {
         return v_resting;
     }
 
@@ -173,7 +173,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
 /// 
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
-/// the neurons based on neurotransmitter input during the simulation
+///     the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
@@ -290,7 +290,7 @@ where
 /// Handles history of a lattice
 pub trait LatticeHistory: Default + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
-    fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>);
+    fn update<T: IterateAndSpike>(&mut self, state: &[Vec<T>]);
     /// Resets history
     fn reset(&mut self);
 }
@@ -319,7 +319,7 @@ impl Default for EEGHistory {
     }
 }
 
-fn get_grid_voltages<T: CurrentVoltage>(grid: &Vec<Vec<T>>) -> Vec<Vec<f32>> {
+fn get_grid_voltages<T: CurrentVoltage>(grid: &[Vec<T>]) -> Vec<Vec<f32>> {
     grid.iter()
         .map(|i| {
             i.iter()
@@ -330,7 +330,7 @@ fn get_grid_voltages<T: CurrentVoltage>(grid: &Vec<Vec<T>>) -> Vec<Vec<f32>> {
 }
 
 impl LatticeHistory for EEGHistory {
-    fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>) {
+    fn update<T: IterateAndSpike>(&mut self, state: &[Vec<T>]) {
         let mut total_current = 0.;
         let voltages = get_grid_voltages(state);
 
@@ -358,7 +358,7 @@ pub struct GridVoltageHistory {
 }
 
 impl LatticeHistory for GridVoltageHistory {
-    fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>) {
+    fn update<T: IterateAndSpike>(&mut self, state: &[Vec<T>]) {
         self.history.push(get_grid_voltages::<T>(state));
     }
 
@@ -375,7 +375,7 @@ pub struct AverageVoltageHistory {
 }
 
 impl LatticeHistory for AverageVoltageHistory {
-    fn update<T: IterateAndSpike>(&mut self, state: &Vec<Vec<T>>) {
+    fn update<T: IterateAndSpike>(&mut self, state: &[Vec<T>]) {
         let voltages: Vec<f32> = get_grid_voltages::<T>(state).into_iter().flatten().collect();
         let length = voltages.len() as f32;
         self.history.push(
@@ -400,11 +400,11 @@ impl SpikeHistory {
     /// returns an empty vector if history is empty, also assumes grid is not ragged
     pub fn aggregate(&self) -> Vec<Vec<isize>> {
         let z_size = self.history.len();
-        let y_size = match self.history.get(0) {
+        let y_size = match self.history.first() {
             Some(value) => value.len(),
             None => { return Vec::new() },
         };
-        let x_size = match self.history[0].get(0) {
+        let x_size = match self.history[0].first() {
             Some(value) => value.len(),
             None => { return Vec::new() },
         };
@@ -426,7 +426,7 @@ impl SpikeHistory {
 }
 
 impl LatticeHistory for SpikeHistory {
-    fn update<T: IsSpiking>(&mut self, state: &Vec<Vec<T>>) {
+    fn update<T: IsSpiking>(&mut self, state: &[Vec<T>]) {
         self.history.push(
             state.iter()
                 .map(|i| {
@@ -738,11 +738,11 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         self.graph.get_every_node_as_ref()
             .iter()
             .map(|pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let input = self.calculate_internal_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -756,11 +756,11 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         self.graph.get_every_node_as_ref()
             .par_iter()
             .map(|pos| {
-                let input_positions = self.graph.get_incoming_connections(&pos)
+                let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
                 let input = self.calculate_internal_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -779,7 +779,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
                     .expect("Cannot find position");
 
                 let neurotransmitter_input = self.calculate_internal_neurotransmitter_input_from_positions(
-                    &pos,
+                    pos,
                     &input_positions,
                 );
 
@@ -1932,11 +1932,8 @@ where
             .map(|i| GraphPosition { id: pos.id, pos: *i})
             .collect();
 
-        match self.connecting_graph.get_incoming_connections(&pos) {
-            Ok(value) => {
-                input_positions.extend(value)
-            },
-            Err(_) => {}
+        if let Ok(value) = self.connecting_graph.get_incoming_connections(&pos) {
+            input_positions.extend(value)
         };
     
         input_positions
@@ -2306,10 +2303,9 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && 
+                lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -2424,10 +2420,9 @@ where
                     lattice.cell_grid[x][y].set_last_firing_time(Some(self.internal_clock));
                 }
     
-                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) {
-                    if lattice.do_plasticity {
-                        positions_to_update.push((x, y, graph_pos));
-                    }
+                if <Z as Plasticity<T, T, f32>>::do_update(&lattice.plasticity, &lattice.cell_grid[x][y]) && 
+                lattice.do_plasticity {
+                    positions_to_update.push((x, y, graph_pos));
                 }
             }
     
@@ -4270,21 +4265,19 @@ where
                         .unwrap()
                         .unwrap()
                         .get_weight()
+                } else if self.lattices.contains_key(&input_position.id) {
+                    self.lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
                 } else {
-                    if self.lattices.contains_key(&input_position.id) {
-                        self.lattices.get(&input_position.id).unwrap()
-                            .graph
-                            .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
-                            .unwrap_or(Some(0.))
-                            .unwrap()
-                    } else {
-                        self.reward_modulated_lattices.get(&input_position.id).unwrap()
-                            .graph
-                            .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
-                            .unwrap()
-                            .unwrap()
-                            .get_weight()
-                    }
+                    self.reward_modulated_lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap()
+                        .unwrap()
+                        .get_weight()
                 };
 
                 final_input * weight
@@ -4295,10 +4288,8 @@ where
             if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
                 input_val *= postsynaptic_neuron.get_gaussian_factor();
             }
-        } else {
-            if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-                input_val *= postsynaptic_neuron.get_gaussian_factor();
-            }
+        } else if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
+            input_val *= postsynaptic_neuron.get_gaussian_factor();
         }
 
         let averager = match input_positions.len() {
@@ -4364,21 +4355,19 @@ where
                         .unwrap()
                         .unwrap()
                         .get_weight()
+                } else if self.lattices.contains_key(&input_position.id) {
+                    self.lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap_or(Some(0.))
+                        .unwrap()
                 } else {
-                    if self.lattices.contains_key(&input_position.id) {
-                        self.lattices.get(&input_position.id).unwrap()
-                            .graph
-                            .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
-                            .unwrap_or(Some(0.))
-                            .unwrap()
-                    } else {
-                        self.reward_modulated_lattices.get(&input_position.id).unwrap()
-                            .graph
-                            .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
-                            .unwrap()
-                            .unwrap()
-                            .get_weight()
-                    }
+                    self.reward_modulated_lattices.get(&input_position.id).unwrap()
+                        .graph
+                        .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                        .unwrap()
+                        .unwrap()
+                        .get_weight()
                 };
 
                 weight_neurotransmitter_concentration(&mut neurotransmitter_input, weight);
@@ -4667,11 +4656,11 @@ where
         let current_lattice = &self.reward_modulated_lattices.get(&pos.id).unwrap();
         let given_neuron = &current_lattice.cell_grid[x][y];
 
-        for input_pos in self.connecting_graph.get_incoming_connections(&pos).unwrap_or(HashSet::new()) {
+        for input_pos in self.connecting_graph.get_incoming_connections(pos).unwrap_or_default() {
             let (x_in, y_in) = input_pos.pos;
 
             let connection = self.connecting_graph
-                .lookup_weight(&input_pos, &pos)
+                .lookup_weight(&input_pos, pos)
                 .unwrap()
                 .unwrap();
 
@@ -4687,7 +4676,7 @@ where
                             self.connecting_graph
                                 .edit_weight(
                                     &input_pos, 
-                                    &pos, 
+                                    pos, 
                                     Some(RewardModulatedConnection::Weight(weight)),
                                 )?;
                         }

@@ -13,7 +13,7 @@ mod tests {
     };
 
     fn sparse_connection(x: (usize, usize), y: (usize, usize)) -> bool {
-        (((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.))).sqrt() <= 3. && 
+        ((x.0 as f32 - y.0 as f32).powf(2.) + (x.1 as f32 - y.1 as f32).powf(2.)).sqrt() <= 3. && 
         x != y
     }
 

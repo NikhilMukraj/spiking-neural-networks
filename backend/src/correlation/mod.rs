@@ -4,11 +4,11 @@ use std::result::Result;
 use crate::error::TimeSeriesProcessingError;
 
 
-fn mean(values: &Vec<f32>) -> f32 {
+fn mean(values: &[f32]) -> f32 {
     values.iter().sum::<f32>() / values.len() as f32
 }
 
-fn std(values: &Vec<f32>, values_mean: f32) -> f32 {
+fn std(values: &[f32], values_mean: f32) -> f32 {
     values.iter()
         .map(|i| (i - values_mean).powf(2.0))
         .sum()
@@ -16,7 +16,7 @@ fn std(values: &Vec<f32>, values_mean: f32) -> f32 {
 
 /// Calculates the Pearson correlation coefficient given two vectors of the same length (if standard
 /// deviation of either of the vectors is 0, `f32::NAN` is returned)
-pub fn pearsonr(x: &Vec<f32>, y: &Vec<f32>) -> Result<f32, TimeSeriesProcessingError> {
+pub fn pearsonr(x: &[f32], y: &[f32]) -> Result<f32, TimeSeriesProcessingError> {
     if x.len() != y.len() {
         return Err(
             TimeSeriesProcessingError::SeriesAreNotSameLength
