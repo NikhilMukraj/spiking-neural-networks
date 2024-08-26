@@ -344,7 +344,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
             period: 3,
             num_spikes: 0,
             firing_rate_clock: 0.,
-            firing_rate_window: 100.,
+            firing_rate_window: 500.,
             synaptic_neurotransmitters: Neurotransmitters::<N, T>::default(),
             neural_refractoriness: U::default(),
             chance_of_firing: 0.,
