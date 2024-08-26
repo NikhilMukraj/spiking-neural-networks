@@ -51,6 +51,7 @@ where
 {
     type SpikeTrainType<N> = BCMPoissonNeuron<N, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
+    // setup presynaptic inputs
     let mut spike_train_lattice: SpikeTrainLattice<
         N, 
         SpikeTrainType<N>, 
@@ -66,6 +67,7 @@ where
     spike_train_lattice.update_grid_history = true;
     spike_train_lattice.set_id(0);
 
+    // setup postsynaptic neuron
     let mut lattice: Lattice<T, AdjacencyMatrix<_, _>, GridVoltageHistory, BCM, N> = Lattice::default();
     lattice.populate(&postsynaptic_neuron.clone(), 1, 1);
     lattice.plasticity = *bcm_params;
@@ -81,6 +83,7 @@ where
     network.electrical_synapse = electrical_synapse;
     network.chemical_synapse = chemical_synapse;
 
+    // run plasticity test
     network.run_lattices(iterations)?;
 
     // track postsynaptic voltage over time
@@ -114,7 +117,7 @@ where
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let izhikevich_neuron = BCMIzhikevichNeuron {
         c_m: 50.,
-        gap_conductance: 1.,
+        gap_conductance: 5.,
         ..BCMIzhikevichNeuron::default_impl()
     };
 
