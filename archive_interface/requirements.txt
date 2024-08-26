@@ -1,4 +1,0 @@
-maturin==0.15.3
-patchelf==0.17.2.1
-matplotlib==3.5.1
-seaborn==0.12.2

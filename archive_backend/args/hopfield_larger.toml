@@ -1,5 +1,0 @@
-[hopfield_network]
-patterns = ["args/large_pattern1.txt", "args/large_pattern2.txt"]
-noise_level = 0.25
-iterations = 10
-tag = "output/test_larger"

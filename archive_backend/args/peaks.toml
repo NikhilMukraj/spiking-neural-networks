@@ -1,6 +1,0 @@
-[hodgkin_huxley_peaks]
-iterations = 10000
-tolerance = 0.025
-filename = "output/hodgkin_huxley_peaks.csv"
-dt = 0.01
-input_current = 40.0

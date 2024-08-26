@@ -1,6 +1,0 @@
-[static_input_test]
-if_type = "izhikevich"
-filename = "output/static_test_output.csv"
-input_current = 40.0
-iterations = 10000
-bayesian = false
