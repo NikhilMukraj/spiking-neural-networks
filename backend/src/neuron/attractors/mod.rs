@@ -224,7 +224,7 @@
 //!         &(|_, _| true),
 //!         Some(&(|_, y| 
 //!             5. * (-2. * 
-//!                 (preferred_direction as isize - y.0 as isize).pow(2) as f32 / 
+//!                 ring_distance(preferred_direction as isize, y.0 as isize).powf(2.) / 
 //!                 (n_neurons as f32 * 10.)).exp() - 0.3
 //!             )
 //!         ),
