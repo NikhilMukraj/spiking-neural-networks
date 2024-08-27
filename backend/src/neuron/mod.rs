@@ -1638,6 +1638,16 @@ where
         &self.connecting_graph
     }
 
+    /// Returns a hashset of each [`Lattice`] id
+    pub fn get_all_lattice_ids(&self) -> HashSet<usize> {
+        self.lattices.keys().cloned().collect()
+    }
+
+    /// Returns a hashset of each [`SpikeTrainLattice`] id
+    pub fn get_all_spike_train_lattice_ids(&self) -> HashSet<usize> {
+        self.spike_train_lattices.keys().cloned().collect()
+    } 
+
     /// Returns a hashset of all the ids
     pub fn get_all_ids(&self) -> HashSet<usize> {
         let mut ids = HashSet::new();
@@ -3548,6 +3558,21 @@ where
     
         Ok(())
     }
+
+    /// Returns a hashset of each [`Lattice`] id
+    pub fn get_all_lattice_ids(&self) -> HashSet<usize> {
+        self.lattices.keys().cloned().collect()
+    }
+
+    /// Returns a hashset of each [`RewardModulatedLattice`] id
+    pub fn get_all_reward_modulated_lattice_ids(&self) -> HashSet<usize> {
+        self.reward_modulated_lattices.keys().cloned().collect()
+    }
+
+    /// Returns a hashset of each [`SpikeTrainLattice`] id
+    pub fn get_all_spike_train_lattice_ids(&self) -> HashSet<usize> {
+        self.spike_train_lattices.keys().cloned().collect()
+    } 
 
     /// Returns a hashset of all the ids
     pub fn get_all_ids(&self) -> HashSet<usize> {
