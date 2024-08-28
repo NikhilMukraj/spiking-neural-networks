@@ -57,3 +57,4 @@
 /interface/generate_methods.py
 /build_test/pratt/target
 /build_test/other_ast/target
+/gpu_impl/opencl/graph_test/target
