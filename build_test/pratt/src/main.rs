@@ -100,7 +100,7 @@ pub enum Op {
 }
 
 impl AST {
-    pub fn to_string(&self) -> String {
+    pub fn generate(&self) -> String {
         match self {
             AST::Number(n) => n.to_string(),
             AST::Name(name) => {
@@ -112,23 +112,23 @@ impl AST {
                     format!("self.{}", name)
                 }
             },
-            AST::UnaryMinus(expr) => format!("-{}", expr.to_string()),
-            AST::NotOperator(expr) => format!("!{}", expr.to_string()),
+            AST::UnaryMinus(expr) => format!("-{}", expr.generate()),
+            AST::NotOperator(expr) => format!("!{}", expr.generate()),
             AST::BinOp { lhs, op, rhs } => {
                 match op {
-                    Op::Add => format!("({} + {})", lhs.to_string(), rhs.to_string()),
-                    Op::Subtract => format!("({} - {})", lhs.to_string(), rhs.to_string()),
-                    Op::Multiply => format!("({} * {})", lhs.to_string(), rhs.to_string()),
-                    Op::Divide => format!("({} / {})", lhs.to_string(), rhs.to_string()),
-                    Op::Power => format!("({}.powf({}))", lhs.to_string(), rhs.to_string()),
-                    Op::Equal => format!("{} == {}", lhs.to_string(), rhs.to_string()),
-                    Op::NotEqual => format!("{} != {}", lhs.to_string(), rhs.to_string()),
-                    Op::GreaterThan => format!("{} > {}", lhs.to_string(), rhs.to_string()),
-                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.to_string(), rhs.to_string()),
-                    Op::LessThan => format!("{} < {}", lhs.to_string(), rhs.to_string()),
-                    Op::LessThanOrEqual => format!("{} <= {}", lhs.to_string(), rhs.to_string()),
-                    Op::And => format!("{} && {}", lhs.to_string(), rhs.to_string()),
-                    Op::Or => format!("{} || {}", lhs.to_string(), rhs.to_string()),
+                    Op::Add => format!("({} + {})", lhs.generate(), rhs.generate()),
+                    Op::Subtract => format!("({} - {})", lhs.generate(), rhs.generate()),
+                    Op::Multiply => format!("({} * {})", lhs.generate(), rhs.generate()),
+                    Op::Divide => format!("({} / {})", lhs.generate(), rhs.generate()),
+                    Op::Power => format!("({}.powf({}))", lhs.generate(), rhs.generate()),
+                    Op::Equal => format!("{} == {}", lhs.generate(), rhs.generate()),
+                    Op::NotEqual => format!("{} != {}", lhs.generate(), rhs.generate()),
+                    Op::GreaterThan => format!("{} > {}", lhs.generate(), rhs.generate()),
+                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.generate(), rhs.generate()),
+                    Op::LessThan => format!("{} < {}", lhs.generate(), rhs.generate()),
+                    Op::LessThanOrEqual => format!("{} <= {}", lhs.generate(), rhs.generate()),
+                    Op::And => format!("{} && {}", lhs.generate(), rhs.generate()),
+                    Op::Or => format!("{} || {}", lhs.generate(), rhs.generate()),
                 }
             }
             AST::Function { name, args } => {
@@ -136,7 +136,7 @@ impl AST {
                     "{}({})",
                     name, 
                     args.iter()
-                        .map(|i| i.to_string())
+                        .map(|i| i.generate())
                         .collect::<Vec<String>>()
                         .join(", ")
                     )
@@ -149,7 +149,7 @@ impl AST {
                     match args {
                         Some(args) => {
                             args.iter()
-                                .map(|i| i.to_string())
+                                .map(|i| i.generate())
                                 .collect::<Vec<String>>()
                                 .join(", ")
                         },
@@ -164,10 +164,10 @@ impl AST {
                     format!("self.{}", name)
                 };
 
-                format!("{} = {};", name, expr.to_string())
+                format!("{} = {};", name, expr.generate())
             },
             AST::DiffEqAssignment { name, expr } => {
-                format!("let d{} = ({}) * self.dt;", name, expr.to_string())
+                format!("let d{} = ({}) * self.dt;", name, expr.generate())
             },
             AST::FunctionAssignment{ name, args, expr } =>{
                 format!(
@@ -177,23 +177,23 @@ impl AST {
                         .map(|i| i.to_string())
                         .collect::<Vec<String>>()
                         .join(", "),
-                    expr.to_string(),
+                    expr.generate(),
                 )
             },
             AST::TypeDefinition(string) => string.clone(),
             AST::OnSpike(assignments) => {
                 assignments.iter()
-                    .map(|i| i.to_string())
+                    .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n")
             },
             AST::OnIteration(assignments) => {
                 assignments.iter()
-                    .map(|i| i.to_string())
+                    .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n\t\t")
             },
-            AST::SpikeDetection(expr) => { expr.to_string() },
+            AST::SpikeDetection(expr) => { expr.generate() },
             AST::GatingVariables(vars) => {
                 format!("gating_vars: {}", vars.join(", "))
             },
@@ -207,7 +207,7 @@ impl AST {
             },
             AST::VariablesAssignments(assignments) => {
                 let assignments_string = assignments.iter()
-                    .map(|i| i.to_string())
+                    .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n\t");
 
@@ -218,7 +218,7 @@ impl AST {
             },
             AST::StructAssignments(assignments) => {
                 let assignments_string = assignments.iter()
-                    .map(|i| i.to_string())
+                    .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n\t");
 
@@ -279,7 +279,7 @@ impl NeuronDefinition {
         let macros = "#[derive(Debug, Clone, IterateAndSpikeBase)]";
         let header = format!(
             "pub struct {}<T: NeurotransmitterKinetics, R: ReceptorKinetics> {{", 
-            self.type_name.to_string(),
+            self.type_name.generate(),
         );
 
         let mut fields = match &self.vars {
@@ -347,15 +347,15 @@ impl NeuronDefinition {
         let handle_spiking_function = match &self.on_spike {
             Some(value) => {
                 let handle_spiking_check = "\tif self.is_spiking {";
-                let handle_spiking_function = format!("\t\t{}", value.to_string());
+                let handle_spiking_function = format!("\t\t{}", value.generate());
 
                 format!("{}\n{}\n\t}}", handle_spiking_check, handle_spiking_function)
             },
             None => String::from(""),
         };
 
-        let handle_spiking = if self.spike_detection.to_string() != "continuous()" {
-            let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.to_string());
+        let handle_spiking = if self.spike_detection.generate() != "continuous()" {
+            let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.generate());
     
             format!(
                 "{}\n{}\n{}\n\n\tself.is_spiking\n}}", 
@@ -364,12 +364,12 @@ impl NeuronDefinition {
                 handle_spiking_function,
             )
         } else {
-            let handle_is_spiking_calc = vec![
+            let handle_is_spiking_calc = [
                 "let increasing_right_now = last_voltage < self.current_voltage;",
                 "let threshold_crossed = self.current_voltage > self.v_th;",
                 "let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;",
                 "self.is_spiking = is_spiking;",
-                "self.was_increasing = increasing_right_now;",
+                "self.was_increasing = increasing_right_now;"
             ];
             let handle_is_spiking_calc = add_indents(&handle_is_spiking_calc.join("\n"), "\t");
 
@@ -381,24 +381,21 @@ impl NeuronDefinition {
             )
         };
 
-        let on_iteration_assignments = self.on_iteration.to_string();
+        let on_iteration_assignments = self.on_iteration.generate();
 
         let changes = match &self.on_iteration {
             AST::OnIteration(assignments) => {
                 let mut assignments_strings = vec![];
 
                 for i in assignments {
-                    match i.as_ref() {
-                        AST::DiffEqAssignment { name, .. } => {
-                            let change_string = if name == "v" {
-                                format!("self.current_voltage += dv;")
-                            } else {
-                                format!("self.{} += d{}", name, name)
-                            };
+                    if let AST::DiffEqAssignment { name, .. } =  i.as_ref() {
+                        let change_string = if name == "v" {
+                            "self.current_voltage += dv;".to_string()
+                        } else {
+                            format!("self.{} += d{}", name, name)
+                        };
 
-                            assignments_strings.push(change_string);
-                        }
-                        _ => {}
+                        assignments_strings.push(change_string);
                     }
                 }
 
@@ -448,14 +445,14 @@ impl NeuronDefinition {
 
         let impl_header = format!(
             "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> {}<T, R> {{", 
-            self.type_name.to_string()
+            self.type_name.generate()
         );
         let impl_body = add_indents(&handle_spiking, "\t");
         let impl_functions = format!("{}\n{}\n}}", impl_header, impl_body);
 
         let impl_header_iterate_and_spike = format!(
             "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for {}<T, R> {{", 
-            self.type_name.to_string()
+            self.type_name.generate()
         );
         let impl_iterate_and_spike_body = format!(
             "{}\n\n{}\n\n{}\n",
@@ -471,7 +468,7 @@ impl NeuronDefinition {
         );
 
         (
-            vec![String::from(kinetics_import)],
+            vec![kinetics_import],
             format!(
                 "{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
                 macros, 
@@ -637,9 +634,8 @@ impl IonChannelDefinition {
                 let mut use_timestep = false;
 
                 for i in assignments {
-                    match i.as_ref() {
-                        AST::DiffEqAssignment { .. } => { use_timestep = true },
-                        _ => {},
+                    if let AST::DiffEqAssignment { .. } = i.as_ref() {
+                        use_timestep = true;
                     }
                 }
 
@@ -655,7 +651,7 @@ impl IonChannelDefinition {
 
         let header = format!(
             "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
-            self.type_name.to_string(),
+            self.type_name.generate(),
         );
         
         let mut fields = match &self.vars {
@@ -707,7 +703,7 @@ impl IonChannelDefinition {
 
         let update_current = if use_timestep {
             let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
-            let on_iteration = &self.on_iteration.to_string();
+            let on_iteration = &self.on_iteration.generate();
 
             let mut lines: Vec<&str> = on_iteration.split('\n').collect();
             let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"));
@@ -724,11 +720,8 @@ impl IonChannelDefinition {
                     let mut assignments_strings = vec![];
     
                     for i in assignments {
-                        match i.as_ref() {
-                            AST::DiffEqAssignment { name, .. } => {
-                                assignments_strings.push(format!("self.{} += d{}", name, name));
-                            }
-                            _ => {}
+                        if let AST::DiffEqAssignment { name, .. } = i.as_ref() {
+                            assignments_strings.push(format!("self.{} += d{}", name, name));
                         }
                     }
     
@@ -748,16 +741,16 @@ impl IonChannelDefinition {
             )
         } else {
             let update_current_header = "fn update_current(&mut self, voltage: f32) {";
-            let update_current_body = add_indents(&self.on_iteration.to_string(), "\t");
+            let update_current_body = add_indents(&self.on_iteration.generate(), "\t");
             format!("{}\n{}\n}}", update_current_header, update_current_body)
         };
         
         // if use timestep then header is ionchannel
         // otherwise header is timestepindenpendentionchannel
         let impl_header = if use_timestep {
-            format!("impl IonChannel for {} {{", self.type_name.to_string())
+            format!("impl IonChannel for {} {{", self.type_name.generate())
         } else {
-            format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.to_string())
+            format!("impl TimestepIndependentIonChannel for {} {{", self.type_name.generate())
         };
 
         if use_timestep {
@@ -777,7 +770,7 @@ impl IonChannelDefinition {
         // code may need to be updated if current is assigned using 
 
         let update_current = add_indents(&update_current, "\t");
-        let get_current = add_indents(&get_current, "\t");
+        let get_current = add_indents(get_current, "\t");
 
         (
             imports, 
@@ -923,18 +916,13 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
                         .expect("Could not get attribute").as_str()
                 );
 
-                let args: Option<Vec<Box<AST>>> = match inner_rules.next() {
-                    Some(value) => {
-                        Some(
-                            value.into_inner()
-                            .map(|i| Box::new(parse_expr(i.into_inner())))
-                            .collect()
-                        )
-                    },
-                    None => None,
-                };
+                let args: Option<Vec<Box<AST>>> = inner_rules.next()
+                    .map(|value| value.into_inner()
+                        .map(|i| Box::new(parse_expr(i.into_inner())))
+                        .collect()
+                    );
                 
-                AST::StructCall { name: name, attribute: attribute, args: args }
+                AST::StructCall { name, attribute, args }
             }
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
@@ -950,7 +938,7 @@ pub fn parse_expr(pairs: Pairs<Rule>) -> AST {
                     .map(|i| Box::new(parse_expr(i.into_inner())))
                     .collect();
                 
-                AST::Function { name: name, args: args }
+                AST::Function { name, args }
             },
             rule => unreachable!("AST::parse expected atom, found {:?}", rule),
         })
@@ -995,18 +983,13 @@ pub fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
                         .expect("Could not get attribute").as_str()
                 );
 
-                let args: Option<Vec<Box<AST>>> = match inner_rules.next() {
-                    Some(value) => {
-                        Some(
-                            value.into_inner()
-                            .map(|i| Box::new(parse_bool_expr(i.into_inner())))
-                            .collect()
-                        )
-                    },
-                    None => None,
-                };
+                let args: Option<Vec<Box<AST>>> = inner_rules.next()
+                    .map(|value| value.into_inner()
+                        .map(|i| Box::new(parse_bool_expr(i.into_inner())))
+                        .collect()
+                    );
                 
-                AST::StructCall { name: name, attribute: attribute, args: args }
+                AST::StructCall { name, attribute, args }
             },
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
@@ -1021,7 +1004,7 @@ pub fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
                     .map(|i| Box::new(parse_bool_expr(i.into_inner())))
                     .collect();
                 
-                AST::Function { name: name, args: args }
+                AST::Function { name, args }
             },
             rule => unreachable!("AST::parse expected atom, found {:?}", rule),
         })
@@ -1073,7 +1056,7 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
                 )
             );
 
-            AST::DiffEqAssignment { name: name, expr: expr }
+            AST::DiffEqAssignment { name, expr }
         },
         Rule::eq_declaration => {
             let mut inner_rules = pair.into_inner();
@@ -1090,7 +1073,7 @@ pub fn parse_declaration(pair: Pair<Rule>) -> AST {
                 )
             );
 
-            AST::EqAssignment { name: name, expr: expr }
+            AST::EqAssignment { name, expr }
         },
         Rule::func_declaration => {
             let mut inner_rules = pair.into_inner();
@@ -1149,7 +1132,7 @@ fn main() -> Result<()> {
         }
     }
 
-    if filename == "" {
+    if filename.is_empty() {
         return Ok(())
     }
 
@@ -1225,7 +1208,7 @@ fn main() -> Result<()> {
     // handling plasticity
 
     let output_file_name = format!(
-        "{}.rs", filename.as_str().split(".").collect::<Vec<&str>>()[0]
+        "{}.rs", filename.as_str().split('.').collect::<Vec<&str>>()[0]
     );
 
     // collect import statements at the top
@@ -1236,11 +1219,11 @@ fn main() -> Result<()> {
     // maybe add get_imports() method
 
     let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
-    let neuron_necessary_imports = vec![
+    let neuron_necessary_imports = [
         "CurrentVoltage", "GapConductance", "GaussianFactor", "LastFiringTime", "IsSpiking",
         "IterateAndSpike", "GaussianParameters", "LigandGatedChannels", 
         "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
-        "NeurotransmitterConcentrations",
+        "NeurotransmitterConcentrations"
     ];
     let neuron_necessary_imports = format!(
         "use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};",
@@ -1268,10 +1251,10 @@ fn main() -> Result<()> {
                             imports.push(neuron_imports[0].clone());
                         }
     
-                        let neuron_type_name = neuron_definition.type_name.to_string();
+                        let neuron_type_name = neuron_definition.type_name.generate();
     
                         let neuron_code_map = code.entry(String::from("neuron"))
-                            .or_insert_with(HashMap::new);
+                            .or_default();
                         
                         neuron_code_map.insert(neuron_type_name, neuron_code);
                     },
@@ -1287,10 +1270,10 @@ fn main() -> Result<()> {
                             }
                         }
     
-                        let ion_channel_type_name = ion_channel.type_name.to_string();
+                        let ion_channel_type_name = ion_channel.type_name.generate();
                         
                         let ion_channel_code_map = code.entry(String::from("ion_channel"))
-                            .or_insert_with(HashMap::new);
+                            .or_default();
     
                         ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
                     },
@@ -1322,7 +1305,7 @@ fn main() -> Result<()> {
                 for i in neuron_code_map.values_mut() {
                     for (ion_channel_name, is_timestep_independent) in &ion_channel_data {
                         if i.contains(ion_channel_name) {
-                            let names = extract_name_from_pattern(i, &ion_channel_name);
+                            let names = extract_name_from_pattern(i, ion_channel_name);
 
                             for name in names {
                                 let to_insert = if *is_timestep_independent {
@@ -1400,7 +1383,7 @@ fn main() -> Result<()> {
             let mut functions_to_add = Vec::new();
 
             let mut all_code = code.values()
-                .map(|i| i.values().map(|i| i.clone()).collect::<Vec<String>>().join("\n"))
+                .map(|i| i.values().cloned().collect::<Vec<String>>().join("\n"))
                 .collect::<Vec<String>>()
                 .join("\n");
 
@@ -1418,7 +1401,7 @@ fn main() -> Result<()> {
                 all_code
             };
 
-            let mut file = File::create(&output_file_name)?;
+            let mut file = File::create(output_file_name)?;
             file.write_all(imports.join("\n").as_bytes())?;
             file.write_all("\n\n\n".as_bytes())?;
             file.write_all(all_code.as_bytes())?;
