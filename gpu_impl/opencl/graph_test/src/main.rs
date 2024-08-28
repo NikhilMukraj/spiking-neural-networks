@@ -36,6 +36,11 @@ const KERNEL_NAME: &str = "colwise_sum";
 // }
 
 fn main()  -> Result<()> {
+    // try colwise sum on gpu
+    // then move to getting incoming connections on a basic graph
+    // then move to calculating input values given basic graph, voltages, and gap conductance kernel
+    // then move to a more advanced graph with a seperate key set
+
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
         .expect("No GPU found");
