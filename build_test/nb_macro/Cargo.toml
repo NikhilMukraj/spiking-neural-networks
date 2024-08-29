@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+spiking_neural_networks = "0.23.3"
+
 quote = "1.0"
 syn = { version = "1.0", features = ["full"] }
 proc-macro2 = "1.0"
