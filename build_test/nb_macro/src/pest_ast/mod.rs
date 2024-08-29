@@ -1,8 +1,6 @@
-#[cfg(feature = "neuron_builder")]
 use pest::pratt_parser::PrattParser;
 
 
-#[cfg(feature = "neuron_builder")]
 #[derive(pest_derive::Parser)]
 #[grammar_inline = r#"
 integer = @{ ASCII_DIGIT+ }
