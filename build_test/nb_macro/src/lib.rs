@@ -1180,34 +1180,12 @@ fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> String
 
 #[proc_macro]
 pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
-    // handle variables
-    // handle continous detection
-    // try code generation (assume default ligands)
-
-    // handle ion channels
-    // handle gating variables
-
-    // update ion channel is called before other neuron
-    // current could then be extracted and used in iteration
-
-    // CHANGE SO ASSIGNMENTS EVALUATED IN ORDER
-    // for now have all eq assignments last (after change is applied)
-    // or changes applied after consecutive diff eq assignments end
-    // next set of changes applied when next set of diff eqs assigned
+    // block based seperation
 
     // test creating default impl
+    // default values for build in values, (gap conductance, dt, v)
 
-    // handle comments
-
-    // allow 
-    // on_spike: expr
-    // and
-    // on_spike:
-    //     expr
-
-    // default functions like max, min, exp, floor, ciel, heaviside
-    // if function in same space as on iteration and on spike
-    // add that function to the struct impl
+    // handle comments by stripping comments with regex
 
     // function declarations in separate space from on iteration and on spike
     
@@ -1216,12 +1194,6 @@ pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
     // refractory period (either if statements or separate block)
 
     // runge kutta and import integrators
-
-    // check for syntax errors
-    // could check to see if number of defintions matches
-    // number of blocks ([item]-[end])
-    // if not get each block and try individually parsing to see if
-    // that returns the correct error
 
     // neuron def may need to be handled differently if voltage is not updated with dv/dt
     // if neuron is assigned with v =, similar to ion channels
