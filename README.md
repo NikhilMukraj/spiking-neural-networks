@@ -173,8 +173,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [Another relevant model](https://www.princeton.edu/~adame/papers/coupled-attractor/coupled-attractor)
   - Head direction cells should likely receive input based on rotational velocity, input would then only be necessary when changes in position occur
   - Angular velocity should be translated into either a direct increase in input current or an increase in spikes, that should be given as input to ring attractor
-  - **Negative angular velocity could be inhibitory spike train while positive velocity could be excitatory spike train**
-    - Two Poisson neurons could carry this information (one for each sign)
+  - Three ring head attractor could be seperated out into layers that are excitatory and inhbitory to comply with Dale's principle
   - [Graph eigenvalues](https://youtu.be/uTUVhsxdGS8?si=1QYUdWrongUZnh-P)
 - Could also try a similar mechanism but expanded for (hexagonal and toroidial) grid cells (axial coordinates) (again based on some kind of velocity input) or with place cells/fields
 - **Test effect of neurotransmitter on stability of attractor**
