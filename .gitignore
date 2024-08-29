@@ -58,4 +58,5 @@
 /build_test/pratt/target
 /build_test/other_ast/target
 /build_test/nb_macro/target
+/gpu_impl/opencl/colwise_test/target
 /gpu_impl/opencl/graph_test/target
