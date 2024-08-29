@@ -54,6 +54,7 @@
 /interface/windows_venv/*
 /interface/notebooks/*.ipynb
 /interface/notebooks/.ipynb_checkpoints
+/interface/notebooks/*.gif
 /interface/generate_methods.py
 /build_test/pratt/target
 /build_test/other_ast/target
