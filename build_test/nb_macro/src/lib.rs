@@ -8,58 +8,61 @@ use regex::Regex;
 mod pest_ast;
 use pest_ast::{ASTParser, Rule, PRATT_PARSER};
 
-use syn::LitStr;
-use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenTree};
+use syn::{LitStr, parse_macro_input};
+use proc_macro::{
+    Delimiter, Group, Ident, Literal, Punct, 
+    Spacing, Span, TokenTree, TokenStream
+};
 
 
 #[derive(Debug)]
-enum AST {
+enum Ast {
     Number(f32),
     Name(String),
-    UnaryMinus(Box<AST>),
-    NotOperator(Box<AST>),
+    UnaryMinus(Box<Ast>),
+    NotOperator(Box<Ast>),
     BinOp {
-        lhs: Box<AST>,
+        lhs: Box<Ast>,
         op: Op,
-        rhs: Box<AST>,
+        rhs: Box<Ast>,
     },
     Function {
         name: String,
-        args: Vec<Box<AST>>
+        args: Vec<Ast>
     },
     StructCall {
         name: String,
         attribute: String,
-        args: Option<Vec<Box<AST>>>,
+        args: Option<Vec<Ast>>,
     },
     StructAssignment {
         name: String,
         type_name: String,
     },
-    StructAssignments(Vec<Box<AST>>),
+    StructAssignments(Vec<Ast>),
     EqAssignment {
         name: String,
-        expr: Box<AST>,
+        expr: Box<Ast>,
     },
     DiffEqAssignment {
         name: String,
-        expr: Box<AST>,
+        expr: Box<Ast>,
     },
     FunctionAssignment {
         name: String,
         args: Vec<String>,
-        expr: Box<AST>,
+        expr: Box<Ast>,
     },
     TypeDefinition(String),
-    OnSpike(Vec<Box<AST>>),
-    OnIteration(Vec<Box<AST>>),
-    SpikeDetection(Box<AST>),
+    OnSpike(Vec<Ast>),
+    OnIteration(Vec<Ast>),
+    SpikeDetection(Box<Ast>),
     GatingVariables(Vec<String>),
     VariableAssignment {
         name: String,
         value: Option<f32>,
     },
-    VariablesAssignments(Vec<Box<AST>>),
+    VariablesAssignments(Vec<Ast>),
 }
 
 #[derive(Debug)]
@@ -79,11 +82,11 @@ enum Op {
     Or,
 }
 
-impl AST {
+impl Ast {
     fn generate(&self) -> String {
         match self {
-            AST::Number(n) => n.to_string(),
-            AST::Name(name) => {
+            Ast::Number(n) => n.to_string(),
+            Ast::Name(name) => {
                 if name == "v" {
                     String::from("self.current_voltage")
                 } else if name == "i" {
@@ -92,9 +95,9 @@ impl AST {
                     format!("self.{}", name)
                 }
             },
-            AST::UnaryMinus(expr) => format!("-{}", expr.generate()),
-            AST::NotOperator(expr) => format!("!{}", expr.generate()),
-            AST::BinOp { lhs, op, rhs } => {
+            Ast::UnaryMinus(expr) => format!("-{}", expr.generate()),
+            Ast::NotOperator(expr) => format!("!{}", expr.generate()),
+            Ast::BinOp { lhs, op, rhs } => {
                 match op {
                     Op::Add => format!("({} + {})", lhs.generate(), rhs.generate()),
                     Op::Subtract => format!("({} - {})", lhs.generate(), rhs.generate()),
@@ -111,7 +114,7 @@ impl AST {
                     Op::Or => format!("{} || {}", lhs.generate(), rhs.generate()),
                 }
             }
-            AST::Function { name, args } => {
+            Ast::Function { name, args } => {
                 format!(
                     "{}({})",
                     name, 
@@ -121,7 +124,7 @@ impl AST {
                         .join(", ")
                     )
             },
-            AST::StructCall { name, attribute, args } => {
+            Ast::StructCall { name, attribute, args } => {
                 format!(
                     "self.{}.{}{}", 
                     name, 
@@ -137,7 +140,7 @@ impl AST {
                     }
                 )
             }
-            AST::EqAssignment { name, expr } => {
+            Ast::EqAssignment { name, expr } => {
                 let name = if name == "v" {
                     String::from("self.current_voltage")
                 } else {
@@ -146,10 +149,10 @@ impl AST {
 
                 format!("{} = {};", name, expr.generate())
             },
-            AST::DiffEqAssignment { name, expr } => {
+            Ast::DiffEqAssignment { name, expr } => {
                 format!("let d{} = ({}) * self.dt;", name, expr.generate())
             },
-            AST::FunctionAssignment{ name, args, expr } =>{
+            Ast::FunctionAssignment{ name, args, expr } =>{
                 format!(
                     "{}({}) = {}",
                     name, 
@@ -160,24 +163,24 @@ impl AST {
                     expr.generate(),
                 )
             },
-            AST::TypeDefinition(string) => string.clone(),
-            AST::OnSpike(assignments) => {
+            Ast::TypeDefinition(string) => string.clone(),
+            Ast::OnSpike(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n")
             },
-            AST::OnIteration(assignments) => {
+            Ast::OnIteration(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate())
                     .collect::<Vec<String>>()
                     .join("\n\t\t")
             },
-            AST::SpikeDetection(expr) => { expr.generate() },
-            AST::GatingVariables(vars) => {
+            Ast::SpikeDetection(expr) => { expr.generate() },
+            Ast::GatingVariables(vars) => {
                 format!("gating_vars: {}", vars.join(", "))
             },
-            AST::VariableAssignment { name, value } => {
+            Ast::VariableAssignment { name, value } => {
                 let value = match value {
                     Some(x) => x.to_string(),
                     None => String::from("None"),
@@ -185,7 +188,7 @@ impl AST {
 
                 format!("{} = {}", name, value)
             },
-            AST::VariablesAssignments(assignments) => {
+            Ast::VariablesAssignments(assignments) => {
                 let assignments_string = assignments.iter()
                     .map(|i| i.generate())
                     .collect::<Vec<String>>()
@@ -193,10 +196,10 @@ impl AST {
 
                 format!("vars:\n\t{}", assignments_string)
             },
-            AST::StructAssignment { name, type_name } => {
+            Ast::StructAssignment { name, type_name } => {
                 format!("{} = {}", name, type_name)
             },
-            AST::StructAssignments(assignments) => {
+            Ast::StructAssignments(assignments) => {
                 let assignments_string = assignments.iter()
                     .map(|i| i.generate())
                     .collect::<Vec<String>>()
@@ -216,12 +219,12 @@ fn add_indents(input: &str, indent: &str) -> String {
 }
 
 struct NeuronDefinition {
-    type_name: AST,
-    vars: AST,
-    on_spike: Option<AST>,
-    on_iteration: AST,
-    spike_detection: AST,
-    ion_channels: Option<AST>,
+    type_name: Ast,
+    vars: Ast,
+    on_spike: Option<Ast>,
+    on_iteration: Ast,
+    spike_detection: Ast,
+    ion_channels: Option<Ast>,
 }
 
 const ITERATION_HEADER: &str = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
@@ -271,12 +274,12 @@ impl NeuronDefinition {
         );
 
         let mut fields = match &self.vars {
-            AST::VariablesAssignments(variables) => {
+            Ast::VariablesAssignments(variables) => {
                 variables
                     .iter()
                     .map(|i| {
-                        let var_name = match i.as_ref() {
-                            AST::VariableAssignment { name, .. } => name,
+                        let var_name = match i {
+                            Ast::VariableAssignment { name, .. } => name,
                             _ => unreachable!(),
                         };
 
@@ -302,16 +305,12 @@ impl NeuronDefinition {
         fields.push(dt_field);
         fields.push(c_m_field);
 
-        for i in fields {
-
-        }
-
         let ion_channels = match &self.ion_channels {
-            Some(AST::StructAssignments(variables)) => {
+            Some(Ast::StructAssignments(variables)) => {
                 variables.iter()
                     .map(|i| {
-                        let (var_name, type_name) = match i.as_ref() {
-                            AST::StructAssignment { name, type_name } => (name, type_name),
+                        let (var_name, type_name) = match i {
+                            Ast::StructAssignment { name, type_name } => (name, type_name),
                             _ => unreachable!(),
                         };
 
@@ -376,11 +375,11 @@ impl NeuronDefinition {
         let on_iteration_assignments = self.on_iteration.generate();
 
         let changes = match &self.on_iteration {
-            AST::OnIteration(assignments) => {
+            Ast::OnIteration(assignments) => {
                 let mut assignments_strings = vec![];
 
                 for i in assignments {
-                    if let AST::DiffEqAssignment { name, .. } =  i.as_ref() {
+                    if let Ast::DiffEqAssignment { name, .. } =  i {
                         let change_string = if name == "v" {
                             "self.current_voltage += dv;".to_string()
                         } else {
@@ -475,14 +474,14 @@ impl NeuronDefinition {
 }
 
 fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
-    let mut definitions: HashMap<String, AST> = HashMap::new();
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
 
     for pair in pairs {
         let (key, current_ast) = match pair.as_rule() {
             Rule::type_def => {
                 (
                     String::from("type"), 
-                    AST::TypeDefinition(
+                    Ast::TypeDefinition(
                         String::from(pair.into_inner().next().unwrap().as_str())
                     )
                 )
@@ -492,10 +491,10 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
 
                 (
                     String::from("on_iteration"),
-                    AST::OnIteration(
+                    Ast::OnIteration(
                         inner_rules
-                        .map(|i| Box::new(parse_declaration(i)))
-                        .collect::<Vec<Box<AST>>>()
+                        .map(|i| parse_declaration(i))
+                        .collect::<Vec<Ast>>()
                     )
                 )
             },
@@ -504,17 +503,17 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
 
                 (
                     String::from("on_spike"),
-                    AST::OnSpike(
+                    Ast::OnSpike(
                         inner_rules
-                        .map(|i| Box::new(parse_declaration(i)))
-                        .collect::<Vec<Box<AST>>>()
+                        .map(|i| parse_declaration(i))
+                        .collect::<Vec<Ast>>()
                     )
                 )
             },
             Rule::spike_detection_def => {
                 (
                     String::from("spike_detection"),
-                    AST::SpikeDetection(Box::new(parse_bool_expr(pair.into_inner())))
+                    Ast::SpikeDetection(Box::new(parse_bool_expr(pair.into_inner())))
                 )
             }
             Rule::vars_def => {
@@ -522,16 +521,16 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                 // in order to prevent duplicate, key should be "vars"
                 let inner_rules = pair.into_inner();
 
-                let assignments: Vec<Box<AST>> = inner_rules
-                    .map(|i| Box::new(AST::VariableAssignment { 
+                let assignments: Vec<Ast> = inner_rules
+                    .map(|i| Ast::VariableAssignment { 
                         name: String::from(i.as_str()), 
                         value: None,
-                    }))
+                    })
                     .collect();
 
                 (
                     String::from("vars"),
-                    AST::VariablesAssignments(assignments)
+                    Ast::VariablesAssignments(assignments)
                 )
             },
             Rule::vars_with_default_def => {
@@ -540,11 +539,11 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
 
                 let inner_rules = pair.into_inner();
 
-                let assignments: Vec<Box<AST>> = inner_rules 
+                let assignments: Vec<Ast> = inner_rules 
                     .map(|i| {
                         let mut nested_rule = i.into_inner();
 
-                        Box::new(AST::VariableAssignment { 
+                        Ast::VariableAssignment { 
                             name: String::from(nested_rule.next().unwrap().as_str()), 
                             value: Some(
                                 nested_rule.next()
@@ -553,36 +552,36 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                                     .parse::<f32>()
                                     .unwrap()
                                 ), 
-                        })
+                        }
                     })
                     .collect(); 
 
                 (
                     String::from("vars"),
-                    AST::VariablesAssignments(assignments)
+                    Ast::VariablesAssignments(assignments)
                 )
             },
             Rule::ion_channels_def => {
                 let inner_rules = pair.into_inner();
 
-                let assignments: Vec<Box<AST>> = inner_rules 
+                let assignments: Vec<Ast> = inner_rules 
                     .map(|i| {
                         let mut nested_rule = i.into_inner();
 
-                        Box::new(AST::StructAssignment { 
+                        Ast::StructAssignment { 
                             name: String::from(nested_rule.next().unwrap().as_str()), 
                             type_name: String::from(
                                 nested_rule.next()
                                     .unwrap()
                                     .as_str()
                             )
-                        })
+                        }
                     })
                     .collect(); 
 
                 (
                     String::from("ion_channels"),
-                    AST::StructAssignments(assignments)
+                    Ast::StructAssignments(assignments)
                 )
             },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
@@ -612,20 +611,20 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
 }
 
 struct IonChannelDefinition {
-    type_name: AST,
-    vars: AST,
-    gating_vars: Option<AST>,
-    on_iteration: AST,
+    type_name: Ast,
+    vars: Ast,
+    gating_vars: Option<Ast>,
+    on_iteration: Ast,
 }
 
 impl IonChannelDefinition {
     fn get_use_timestep(&self) -> bool {
         match &self.on_iteration {
-            AST::OnIteration(assignments) => {
+            Ast::OnIteration(assignments) => {
                 let mut use_timestep = false;
 
                 for i in assignments {
-                    if let AST::DiffEqAssignment { .. } = i.as_ref() {
+                    if let Ast::DiffEqAssignment { .. } = i {
                         use_timestep = true;
                     }
                 }
@@ -645,12 +644,12 @@ impl IonChannelDefinition {
         );
         
         let mut fields = match &self.vars {
-            AST::VariablesAssignments(variables) => {
+            Ast::VariablesAssignments(variables) => {
                 variables
                     .iter()
                     .map(|i| {
-                        let var_name = match i.as_ref() {
-                            AST::VariableAssignment { name, .. } => name,
+                        let var_name = match i {
+                            Ast::VariableAssignment { name, .. } => name,
                             _ => unreachable!(),
                         };
 
@@ -662,7 +661,7 @@ impl IonChannelDefinition {
         };
 
         let gating_variables = match &self.gating_vars {
-            Some(AST::GatingVariables(variables)) => {
+            Some(Ast::GatingVariables(variables)) => {
                 imports.push(
                     String::from(
                         "use spiking_neural_networks::neuron::ion_channels::BasicGatingVariable;"
@@ -706,11 +705,11 @@ impl IonChannelDefinition {
             let update_current_body = add_indents(&lines.join("\n"), "\t");
 
             let changes = match &self.on_iteration {
-                AST::OnIteration(assignments) => {
+                Ast::OnIteration(assignments) => {
                     let mut assignments_strings = vec![];
     
                     for i in assignments {
-                        if let AST::DiffEqAssignment { name, .. } = i.as_ref() {
+                        if let Ast::DiffEqAssignment { name, .. } = i {
                             assignments_strings.push(format!("self.{} += d{}", name, name));
                         }
                     }
@@ -777,14 +776,14 @@ impl IonChannelDefinition {
 }
 
 fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
-    let mut definitions: HashMap<String, AST> = HashMap::new();
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
 
     for pair in pairs {
         let (key, current_ast) = match pair.as_rule() {
             Rule::type_def => {
                 (
                     String::from("type"), 
-                    AST::TypeDefinition(
+                    Ast::TypeDefinition(
                         String::from(pair.into_inner().next().unwrap().as_str())
                     )
                 )
@@ -794,10 +793,10 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
 
                 (
                     String::from("on_iteration"),
-                    AST::OnIteration(
+                    Ast::OnIteration(
                         inner_rules
-                        .map(|i| Box::new(parse_declaration(i)))
-                        .collect::<Vec<Box<AST>>>()
+                        .map(|i| parse_declaration(i))
+                        .collect::<Vec<Ast>>()
                     )
                 )
             },
@@ -806,16 +805,16 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
                 // in order to prevent duplicate, key should be "vars"
                 let inner_rules = pair.into_inner();
 
-                let assignments: Vec<Box<AST>> = inner_rules
-                    .map(|i| Box::new(AST::VariableAssignment { 
+                let assignments: Vec<Ast> = inner_rules
+                    .map(|i| Ast::VariableAssignment { 
                         name: String::from(i.as_str()), 
                         value: None,
-                    }))
+                    })
                     .collect();
 
                 (
                     String::from("vars"),
-                    AST::VariablesAssignments(assignments)
+                    Ast::VariablesAssignments(assignments)
                 )
             },
             Rule::vars_with_default_def => {
@@ -824,11 +823,11 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
 
                 let inner_rules = pair.into_inner();
 
-                let assignments: Vec<Box<AST>> = inner_rules 
+                let assignments: Vec<Ast> = inner_rules 
                     .map(|i| {
                         let mut nested_rule = i.into_inner();
 
-                        Box::new(AST::VariableAssignment { 
+                        Ast::VariableAssignment { 
                             name: String::from(nested_rule.next().unwrap().as_str()), 
                             value: Some(
                                 nested_rule.next()
@@ -837,13 +836,13 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
                                     .parse::<f32>()
                                     .unwrap()
                                 ), 
-                        })
+                        }
                     })
                     .collect(); 
 
                 (
                     String::from("vars"),
-                    AST::VariablesAssignments(assignments)
+                    Ast::VariablesAssignments(assignments)
                 )
             },
             Rule::gating_variables_def => {
@@ -857,7 +856,7 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
 
                 (
                     String::from("gating_vars"),
-                    AST::GatingVariables(assignments)
+                    Ast::GatingVariables(assignments)
                 )
             },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
@@ -884,11 +883,11 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     Ok(ion_channel)
 }
 
-fn parse_expr(pairs: Pairs<Rule>) -> AST {
+fn parse_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
-            Rule::name => AST::Name(String::from(primary.as_str())),
+            Rule::number => Ast::Number(primary.as_str().parse::<f32>().unwrap()),
+            Rule::name => Ast::Name(String::from(primary.as_str())),
             Rule::expr => parse_expr(primary.into_inner()),
             Rule::struct_call => {
                 let mut inner_rules = primary.into_inner();
@@ -903,13 +902,13 @@ fn parse_expr(pairs: Pairs<Rule>) -> AST {
                         .expect("Could not get attribute").as_str()
                 );
 
-                let args: Option<Vec<Box<AST>>> = inner_rules.next()
+                let args: Option<Vec<Ast>> = inner_rules.next()
                     .map(|value| value.into_inner()
-                        .map(|i| Box::new(parse_expr(i.into_inner())))
+                        .map(|i| parse_expr(i.into_inner()))
                         .collect()
                     );
                 
-                AST::StructCall { name, attribute, args }
+                Ast::StructCall { name, attribute, args }
             }
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
@@ -919,13 +918,13 @@ fn parse_expr(pairs: Pairs<Rule>) -> AST {
                         .expect("Could not get function name").as_str()
                 );
 
-                let args: Vec<Box<AST>> = inner_rules.next()
+                let args: Vec<Ast> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(parse_expr(i.into_inner())))
+                    .map(|i| parse_expr(i.into_inner()))
                     .collect();
                 
-                AST::Function { name, args }
+                Ast::Function { name, args }
             },
             rule => unreachable!("AST::parse expected atom, found {:?}", rule),
         })
@@ -938,24 +937,24 @@ fn parse_expr(pairs: Pairs<Rule>) -> AST {
                 Rule::power => Op::Power,
                 rule => unreachable!("AST::parse expected (non boolean) infix operation, found {:?}", rule),
             };
-            AST::BinOp {
+            Ast::BinOp {
                 lhs: Box::new(lhs),
                 op,
                 rhs: Box::new(rhs),
             }
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::unary_minus => AST::UnaryMinus(Box::new(rhs)),
+            Rule::unary_minus => Ast::UnaryMinus(Box::new(rhs)),
             _ => unreachable!(),
         })
         .parse(pairs)
 }
 
-fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
+fn parse_bool_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
-            Rule::number => AST::Number(primary.as_str().parse::<f32>().unwrap()),
-            Rule::name => AST::Name(String::from(primary.as_str())),
+            Rule::number => Ast::Number(primary.as_str().parse::<f32>().unwrap()),
+            Rule::name => Ast::Name(String::from(primary.as_str())),
             Rule::expr => parse_bool_expr(primary.into_inner()),
             Rule::struct_call => {
                 let mut inner_rules = primary.into_inner();
@@ -970,13 +969,13 @@ fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
                         .expect("Could not get attribute").as_str()
                 );
 
-                let args: Option<Vec<Box<AST>>> = inner_rules.next()
+                let args: Option<Vec<Ast>> = inner_rules.next()
                     .map(|value| value.into_inner()
-                        .map(|i| Box::new(parse_bool_expr(i.into_inner())))
+                        .map(|i| parse_bool_expr(i.into_inner()))
                         .collect()
                     );
                 
-                AST::StructCall { name, attribute, args }
+                Ast::StructCall { name, attribute, args }
             },
             Rule::function => {
                 let mut inner_rules = primary.into_inner();
@@ -985,13 +984,13 @@ fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
                     .expect("Could not get function name").as_str()
                 );
 
-                let args: Vec<Box<AST>> = inner_rules.next()
+                let args: Vec<Ast> = inner_rules.next()
                     .expect("No arguments found")
                     .into_inner()
-                    .map(|i| Box::new(parse_bool_expr(i.into_inner())))
+                    .map(|i| parse_bool_expr(i.into_inner()))
                     .collect();
                 
-                AST::Function { name, args }
+                Ast::Function { name, args }
             },
             rule => unreachable!("AST::parse expected atom, found {:?}", rule),
         })
@@ -1012,21 +1011,21 @@ fn parse_bool_expr(pairs: Pairs<Rule>) -> AST {
                 Rule::or_operator => Op::Or,
                 rule => unreachable!("AST::parse expected infix operation, found {:?}", rule),
             };
-            AST::BinOp {
+            Ast::BinOp {
                 lhs: Box::new(lhs),
                 op,
                 rhs: Box::new(rhs),
             }
         })
         .map_prefix(|op, rhs| match op.as_rule() {
-            Rule::unary_minus => AST::UnaryMinus(Box::new(rhs)),
-            Rule::not_operator => AST::NotOperator(Box::new(rhs)),
+            Rule::unary_minus => Ast::UnaryMinus(Box::new(rhs)),
+            Rule::not_operator => Ast::NotOperator(Box::new(rhs)),
             _ => unreachable!(),
         })
         .parse(pairs)
 }
 
-fn parse_declaration(pair: Pair<Rule>) -> AST {
+fn parse_declaration(pair: Pair<Rule>) -> Ast {
     match pair.as_rule() {
         Rule::diff_eq_declaration => {
             let mut inner_rules = pair.into_inner();
@@ -1035,7 +1034,7 @@ fn parse_declaration(pair: Pair<Rule>) -> AST {
                 .expect("Could not get function name").as_str()
             );
 
-            let expr: Box<AST> = Box::new(
+            let expr: Box<Ast> = Box::new(
                 parse_expr(
                     inner_rules.next()
                         .expect("No arguments found")
@@ -1043,7 +1042,7 @@ fn parse_declaration(pair: Pair<Rule>) -> AST {
                 )
             );
 
-            AST::DiffEqAssignment { name, expr }
+            Ast::DiffEqAssignment { name, expr }
         },
         Rule::eq_declaration => {
             let mut inner_rules = pair.into_inner();
@@ -1052,7 +1051,7 @@ fn parse_declaration(pair: Pair<Rule>) -> AST {
                 .expect("Could not get function name").as_str()
             );
 
-            let expr: Box<AST> = Box::new(
+            let expr: Box<Ast> = Box::new(
                 parse_expr(
                     inner_rules.next()
                         .expect("No arguments found")
@@ -1060,7 +1059,7 @@ fn parse_declaration(pair: Pair<Rule>) -> AST {
                 )
             );
 
-            AST::EqAssignment { name, expr }
+            Ast::EqAssignment { name, expr }
         },
         Rule::func_declaration => {
             let mut inner_rules = pair.into_inner();
@@ -1073,7 +1072,7 @@ fn parse_declaration(pair: Pair<Rule>) -> AST {
 
             let expr = Box::new(parse_expr(inner_rules.next().unwrap().into_inner()));
 
-            AST::FunctionAssignment {
+            Ast::FunctionAssignment {
                 name,
                 args,
                 expr,
@@ -1221,7 +1220,7 @@ pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
                             imports.push(neuron_necessary_imports.clone());
                         }
                         for i in &neuron_imports {
-                            if !imports.contains(&i) {
+                            if !imports.contains(i) {
                                 imports.push(i.clone());
                             }
                         }
