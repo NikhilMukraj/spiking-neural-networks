@@ -290,6 +290,26 @@ impl NeuronDefinition {
             _ => unreachable!()
         };
 
+        let mut defaults = match &self.vars {
+            Ast::VariablesAssignments(variables) => {
+                variables
+                    .iter()
+                    .filter_map(|i| {
+                        if let Ast::VariableAssignment { name, value: Some(x) } = i {
+                            if x % 1. == 0. {
+                                Some(format!("{}: {}.", name, x))
+                            } else {
+                                Some(format!("{}: {}", name, x))
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<String>>()
+            },
+            _ => unreachable!(),
+        };
+
         let current_voltage_field = String::from("pub current_voltage: f32");
         let dt_field = String::from("pub dt: f32");
         let c_m_field = String::from("pub c_m: f32");
@@ -332,6 +352,54 @@ impl NeuronDefinition {
         fields.push(ligand_gates_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
+
+        let impl_default = if !defaults.is_empty() {
+            defaults.push(String::from("current_voltage: 0."));
+            defaults.push(String::from("dt: 0.1"));
+            defaults.push(String::from("c_m: 1."));
+            defaults.push(String::from("gap_conductance: 10."));
+
+            let default_ion_channels = match &self.ion_channels {
+                Some(Ast::StructAssignments(variables)) => {
+                    variables.iter()
+                        .map(|i| {
+                            let (var_name, type_name) = match i {
+                                Ast::StructAssignment { name, type_name } => (name, type_name),
+                                _ => unreachable!(),
+                            };
+    
+                            format!("{}: {}::default()", var_name, type_name)
+                        })
+                        .collect::<Vec<String>>()
+                },
+                None => vec![],
+                _ => unreachable!()
+            };
+
+            defaults.extend(default_ion_channels);
+            defaults.push(String::from("is_spiking: false"));
+            defaults.push(String::from("last_firing_time: None"));
+            defaults.push(String::from("gaussian_params: GaussianParameters::default()"));
+            defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
+            defaults.push(String::from("ligand_gates: LigandGatedChannels::<R>::default()"));
+
+            let default_fields = defaults.join(",\n\t");
+            
+            let default_function = format!(
+                "fn default() -> Self {{ {} {{\n\t{}\n}}", 
+                self.type_name.generate(),
+                default_fields,
+            );
+            let default_function = add_indents(&default_function, "\t");
+
+            format!(
+                "\nimpl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for {}<T, R> {{\n\t{}\n}}\n}}\n",
+                self.type_name.generate(),
+                default_function,
+            )
+        } else {
+            String::from("")
+        };
 
         let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
 
@@ -462,12 +530,13 @@ impl NeuronDefinition {
         (
             kinetics_import,
             format!(
-                "{}\n{}\n{}\n}}\n\n{}\n\n{}\n", 
+                "{}\n{}\n{}\n}}\n\n{}\n\n{}\n{}", 
                 macros, 
                 header, 
                 fields, 
                 impl_functions, 
                 impl_iterate_and_spike,
+                impl_default,
             )
         )
     }
