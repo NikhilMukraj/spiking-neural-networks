@@ -1,0 +1,17 @@
+[package]
+name = "nb_macro"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quote = "1.0"
+syn = { version = "1.0", features = ["full"] }
+proc-macro2 = "1.0"
+
+lazy_static = "1.4.0"
+pest = "2.6"
+pest_derive = "2.6"
+regex = "1.10.6"
+
+[lib]
+proc-macro = true
