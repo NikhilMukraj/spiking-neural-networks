@@ -14,5 +14,5 @@ neuron_builder!(r#"
 "#);
 
 fn main() {
-
+    let _: BasicIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> = BasicIntegrateAndFire::default();
 }
