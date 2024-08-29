@@ -106,7 +106,6 @@ full = _{
 "#]
 pub struct ASTParser;
 
-#[cfg(feature = "neuron_builder")]
 lazy_static::lazy_static! {
     pub static ref PRATT_PARSER: PrattParser<Rule> = {
         use pest::pratt_parser::{Assoc::*, Op};
