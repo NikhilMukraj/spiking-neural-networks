@@ -10,4 +10,7 @@
   - [ ] Electrical synapses
   - [ ] Chemical synapses
 - [ ] GPU spike train iteration
+- [ ] GPU history tracking
 - [ ] GPU plasticity
+- [ ] Reward modulation interfacing
+  - Specialized readout layer to read for reward calculation that sends data back to the CPU
