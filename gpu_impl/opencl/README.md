@@ -6,3 +6,4 @@
 - [ ] then move to calculating input values given basic graph, voltages, and gap conductance kernel
 - [ ] then move to a more advanced graph with a seperate key set
 - [ ] benchmark calculation of inputs
+- [ ] gpu iterate and spike kernels
