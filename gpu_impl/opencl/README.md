@@ -14,3 +14,5 @@
 - [ ] GPU plasticity
 - [ ] Reward modulation interfacing
   - Specialized readout layer to read for reward calculation that sends data back to the CPU
+  - Similarly, a specialized input layer (probably for Poisson neurons), needs to be generated
+- [ ] Automatic GPU and CPU code generation given the differential equations
