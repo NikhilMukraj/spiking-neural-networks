@@ -1,9 +1,13 @@
 # TODO
 
-- [x] try colwise sum on gpu
-  - [x] benchmark cpu v gpu
-- [ ] then move to getting incoming connections on a basic graph
-- [ ] then move to calculating input values given basic graph, voltages, and gap conductance kernel
-- [ ] then move to a more advanced graph with a seperate key set
-- [ ] benchmark calculation of inputs
-- [ ] gpu iterate and spike kernels
+- [x] Try colwise sum on GPU
+  - [x] Benchmark CPU v GPU
+- [ ] Then move to getting incoming connections on a basic graph
+- [ ] Then move to calculating input values given basic graph, voltages, and gap conductance kernel
+- [ ] Then move to a more advanced graph with a seperate key set
+- [ ] Benchmark calculation of inputs
+- [ ] GPU iterate and spike kernels
+  - [ ] Electrical synapses
+  - [ ] Chemical synapses
+- [ ] GPU spike train iteration
+- [ ] GPU plasticity
