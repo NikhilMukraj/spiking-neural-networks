@@ -66,6 +66,8 @@ fn main()  -> Result<()> {
 
     let sums: [cl_float; M] = [0.0; M];
 
+    let gpu_load_and_execute_start = Instant::now();
+
     let mut matrix_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, FULL_SIZE, ptr::null_mut())?
     };
@@ -104,6 +106,8 @@ fn main()  -> Result<()> {
 
     results_read_event.wait()?;
 
+    let gpu_load_duration = gpu_load_and_execute_start.elapsed();
+
     println!("results front: {}", results[0]);
     println!("results back: {}", results[M - 1]);
 
@@ -119,6 +123,8 @@ fn main()  -> Result<()> {
     let duration = end_time - start_time;
     println!("kernel execution duration (ns): {}", duration);
     println!("cpu execution duration (ns): {}", cpu_duration.as_nanos());
+
+    println!("gpu load and execution (ns): {}", gpu_load_duration.as_nanos());
     
     Ok(())
 }
