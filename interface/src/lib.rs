@@ -2,17 +2,22 @@ use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash,
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
-    hodgkin_huxley::HodgkinHuxleyNeuron, integrate_and_fire::IzhikevichNeuron, ion_channels::{BasicGatingVariable, IonChannel, 
+    hodgkin_huxley::HodgkinHuxleyNeuron, 
+    integrate_and_fire::IzhikevichNeuron, 
+    ion_channels::{BasicGatingVariable, IonChannel, 
         KIonChannel, KLeakChannel, NaIonChannel, TimestepIndependentIonChannel
     }, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, DestexheNeurotransmitter, 
         DestexheReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LastFiringTime, 
         LigandGatedChannel, LigandGatedChannels, 
         NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
-        NeurotransmitterType, Neurotransmitters, ReceptorKinetics 
-    }, plasticity::STDP, spike_train::{
+        IonotropicNeurotransmitterType, Neurotransmitters, ReceptorKinetics 
+    }, 
+    spike_train::{
         DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
-    }, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
+    },
+    plasticity::STDP, 
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -28,30 +33,28 @@ macro_rules! impl_repr {
 }
 
 #[pyclass]
-#[pyo3(name = "NeurotransmitterType")]
+#[pyo3(name = "IonotropicNeurotransmitterTypeNeurotransmitterType")]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-pub enum PyNeurotransmitterType {
-    Basic,
+pub enum PyIonotropicNeurotransmitterType {
     AMPA,
     GABAa,
     GABAb,
     NMDA,
 }
 
-impl PyNeurotransmitterType {
-    pub fn convert_type(&self) -> NeurotransmitterType {
+impl PyIonotropicNeurotransmitterType {
+    pub fn convert_type(&self) -> IonotropicNeurotransmitterType {
         match self {
-            PyNeurotransmitterType::Basic => NeurotransmitterType::Basic,
-            PyNeurotransmitterType::AMPA => NeurotransmitterType::AMPA,
-            PyNeurotransmitterType::GABAa => NeurotransmitterType::GABAa,
-            PyNeurotransmitterType::GABAb => NeurotransmitterType::GABAb,
-            PyNeurotransmitterType::NMDA => NeurotransmitterType::NMDA,
+            PyIonotropicNeurotransmitterType::AMPA => IonotropicNeurotransmitterType::AMPA,
+            PyIonotropicNeurotransmitterType::GABAa => IonotropicNeurotransmitterType::GABAa,
+            PyIonotropicNeurotransmitterType::GABAb => IonotropicNeurotransmitterType::GABAb,
+            PyIonotropicNeurotransmitterType::NMDA => IonotropicNeurotransmitterType::NMDA,
         }
     }
 }
 
 #[pymethods]
-impl PyNeurotransmitterType {
+impl PyIonotropicNeurotransmitterType {
     fn __hash__(&self) -> u64 {
         let mut hasher = DefaultHasher::new();
         self.hash(&mut hasher);
@@ -139,7 +142,7 @@ impl_repr!(PyApproximateNeurotransmitter, neurotransmitter);
 #[pyo3(name = "ApproximateNeurotransmitters")]
 #[derive(Clone)]
 pub struct PyApproximateNeurotransmitters {
-    neurotransmitters: Neurotransmitters<ApproximateNeurotransmitter>
+    neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>
 }
 
 impl_repr!(PyApproximateNeurotransmitters, neurotransmitters);
@@ -149,17 +152,16 @@ impl PyApproximateNeurotransmitters {
     #[new]
     #[pyo3(signature = (neurotransmitter_types=None))]
     fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
-        let mut neurotransmitters: HashMap<NeurotransmitterType, ApproximateNeurotransmitter> = HashMap::new();
+        let mut neurotransmitters: HashMap<IonotropicNeurotransmitterType, ApproximateNeurotransmitter> = HashMap::new();
 
         if let Some(values) = neurotransmitter_types {
             for i in values.iter() {
-                let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                let current_type = i.extract::<PyIonotropicNeurotransmitterType>()?.convert_type();
                 let neurotransmitter = match current_type {
-                    NeurotransmitterType::Basic => ApproximateNeurotransmitter::default(),
-                    NeurotransmitterType::AMPA => ApproximateNeurotransmitter::ampa_default(),
-                    NeurotransmitterType::GABAa => ApproximateNeurotransmitter::gabaa_default(),
-                    NeurotransmitterType::GABAb => ApproximateNeurotransmitter::gabab_default(),
-                    NeurotransmitterType::NMDA => ApproximateNeurotransmitter::nmda_default(),
+                    IonotropicNeurotransmitterType::AMPA => ApproximateNeurotransmitter::ampa_default(),
+                    IonotropicNeurotransmitterType::GABAa => ApproximateNeurotransmitter::gabaa_default(),
+                    IonotropicNeurotransmitterType::GABAb => ApproximateNeurotransmitter::gabab_default(),
+                    IonotropicNeurotransmitterType::NMDA => ApproximateNeurotransmitter::nmda_default(),
                 };
     
                 neurotransmitters.insert(current_type, neurotransmitter);
@@ -173,7 +175,7 @@ impl PyApproximateNeurotransmitters {
         )
     }
 
-    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyApproximateNeurotransmitter> {
+    fn __getitem__(&self, neurotransmitter_type: PyIonotropicNeurotransmitterType) -> PyResult<PyApproximateNeurotransmitter> {
         if let Some(value) = self.neurotransmitters.get(&neurotransmitter_type.convert_type()) {
             Ok(
                 PyApproximateNeurotransmitter { 
@@ -186,7 +188,7 @@ impl PyApproximateNeurotransmitters {
     }
 
     fn set_neurotransmitter(
-        &mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter
+        &mut self, neurotransmitter_type: PyIonotropicNeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter
     ) {
         self.neurotransmitters.neurotransmitters.insert(
             neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
@@ -248,14 +250,12 @@ impl_repr!(PyApproximateLigandGatedChannel, ligand_gate);
 #[pymethods]
 impl PyApproximateLigandGatedChannel {
     #[new]
-    #[pyo3(signature = (receptor_type=PyNeurotransmitterType::Basic))]
-    fn new(receptor_type: PyNeurotransmitterType) -> Self {
+    fn new(receptor_type: PyIonotropicNeurotransmitterType) -> Self {
         let ligand_gate = match receptor_type.convert_type() {
-            NeurotransmitterType::Basic => LigandGatedChannel::default(),
-            NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
-            NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
-            NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-            NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+            IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+            IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+            IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
         };
 
         PyApproximateLigandGatedChannel {
@@ -272,11 +272,11 @@ impl PyApproximateLigandGatedChannel {
     }
 }
 
-fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<NeurotransmitterConcentrations> {
-    let mut neurotransmitter_concs: HashMap<NeurotransmitterType, f32> = HashMap::new();
+fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<NeurotransmitterConcentrations<IonotropicNeurotransmitterType>> {
+    let mut neurotransmitter_concs: HashMap<IonotropicNeurotransmitterType, f32> = HashMap::new();
 
     for (key, value) in dict.iter() {
-        let current_type = key.extract::<PyNeurotransmitterType>()?.convert_type();
+        let current_type = key.extract::<PyIonotropicNeurotransmitterType>()?.convert_type();
         let conc = value.extract::<f32>()?;
 
         neurotransmitter_concs.insert(current_type, conc);
@@ -302,17 +302,16 @@ impl PyApproximateLigandGatedChannels {
     #[new]
     #[pyo3(signature = (neurotransmitter_types=None))]
     fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
-        let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<ApproximateReceptor>> = HashMap::new();
+        let mut ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<ApproximateReceptor>> = HashMap::new();
 
         if let Some(values) = neurotransmitter_types {
             for i in values.iter() {
-                let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                let current_type = i.extract::<PyIonotropicNeurotransmitterType>()?.convert_type();
                 let neurotransmitter = match current_type {
-                    NeurotransmitterType::Basic => LigandGatedChannel::default(),
-                    NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
-                    NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
-                    NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-                    NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+                    IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+                    IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
                 };
     
                 ligand_gates.insert(current_type, neurotransmitter);
@@ -326,7 +325,7 @@ impl PyApproximateLigandGatedChannels {
         )
     }
 
-    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyApproximateLigandGatedChannel> {
+    fn __getitem__(&self, neurotransmitter_type: PyIonotropicNeurotransmitterType) -> PyResult<PyApproximateLigandGatedChannel> {
         if let Some(value) = self.ligand_gates.get(&neurotransmitter_type.convert_type()) {
             Ok(
                 PyApproximateLigandGatedChannel { 
@@ -339,7 +338,7 @@ impl PyApproximateLigandGatedChannels {
     }
 
     fn set_ligand_gate(
-        &mut self, neurotransmitter_type: PyNeurotransmitterType, ligand_gate: PyApproximateLigandGatedChannel
+        &mut self, neurotransmitter_type: PyIonotropicNeurotransmitterType, ligand_gate: PyApproximateLigandGatedChannel
     ) {
         self.ligand_gates.ligand_gates.insert(
             neurotransmitter_type.convert_type(), ligand_gate.ligand_gate
@@ -454,7 +453,7 @@ impl PyIzhikevichNeuron {
         a=0.02, b=0.2, c=-55., d=8., v_th=30., dt=0.1, current_voltage=-65., 
         v_init=-65., w_value=30., w_init=30., gap_conductance=10., tau_m=1., c_m=100.,
         synaptic_neurotransmitters=PyApproximateNeurotransmitters { 
-            neurotransmitters: Neurotransmitters::<ApproximateNeurotransmitter>::default() 
+            neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>::default() 
         },
         ligand_gates=PyApproximateLigandGatedChannels {
             ligand_gates: LigandGatedChannels::<ApproximateReceptor>::default()
@@ -519,7 +518,7 @@ impl PyDeltaDiracRefractoriness {
 #[pyo3(name = "PoissonNeuron")]
 #[derive(Clone)]
 pub struct PyPoissonNeuron {
-    model: PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+    model: PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
 }
 
 implement_basic_getter_and_setter!(
@@ -775,20 +774,6 @@ macro_rules! impl_lattice {
                 }
             }
 
-            fn run_lattice_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
-                match self.lattice.run_lattice_chemical_synapses_only(iterations) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-                }
-            }
-
-            fn run_lattice_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
-                match self.lattice.run_lattice_with_electrical_and_chemical_synapses(iterations) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-                }
-            }
-
             #[getter]
             fn get_plasticity(&self) -> $plasticity_kind {
                 $plasticity_kind { plasticity: self.lattice.plasticity }
@@ -822,6 +807,26 @@ macro_rules! impl_lattice {
             #[setter]
             fn set_parallel(&mut self, flag: bool) {
                 self.lattice.parallel = flag;
+            }
+
+            #[getter]
+            fn get_electrical_synapse(&self) -> bool {
+                self.lattice.electrical_synapse
+            }
+
+            #[setter]
+            fn set_electrical_synapse(&mut self, flag: bool) {
+                self.lattice.electrical_synapse = flag;
+            }
+
+            #[getter]
+            fn get_chemical_synapse(&self) -> bool {
+                self.lattice.chemical_synapse
+            }
+
+            #[setter]
+            fn set_chemical_synapse(&mut self, flag: bool) {
+                self.lattice.chemical_synapse = flag;
             }
 
             #[getter]
@@ -923,20 +928,22 @@ pub struct PyIzhikevichLattice {
         LatticeAdjacencyMatrix,
         GridVoltageHistory,
         STDP,
+        IonotropicNeurotransmitterType,
     >
 }
 
 impl_lattice!(PyIzhikevichLattice, PyIzhikevichNeuron, "IzhikevichLattice", PySTDP);
 
-type LatticeSpikeTrain = PoissonNeuron<ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
+type LatticeSpikeTrain = PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
 #[pyclass]
 #[pyo3(name = "PoissonLattice")]
 #[derive(Clone)]
 pub struct PyPoissonLattice {
     lattice: SpikeTrainLattice<
+        IonotropicNeurotransmitterType,
         LatticeSpikeTrain,
-        SpikeTrainGridHistory
+        SpikeTrainGridHistory,
     >
 }
 
@@ -1725,6 +1732,26 @@ macro_rules! impl_network {
                 self.network.parallel = flag;
             }
 
+            #[getter]
+            fn get_electrical_synapse(&self) -> bool {
+                self.network.electrical_synapse
+            }
+
+            #[setter]
+            fn set_electrical_synapse(&mut self, flag: bool) {
+                self.network.electrical_synapse = flag;
+            }
+
+            #[getter]
+            fn get_chemical_synapse(&self) -> bool {
+                self.network.chemical_synapse
+            }
+
+            #[setter]
+            fn set_chemical_synapse(&mut self, flag: bool) {
+                self.network.chemical_synapse = flag;
+            }
+
             fn apply_lattice(&mut self, py: Python, id: usize, function: &PyAny) -> PyResult<()> {
                 let py_callable = function.to_object(py);
 
@@ -1808,20 +1835,6 @@ macro_rules! impl_network {
                 }
             }
 
-            fn run_lattices_chemical_synapses_only(&mut self, iterations: usize) -> PyResult<()> {
-                match self.network.run_lattices_chemical_synapses_only(iterations) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-                }
-            }
-
-            fn run_lattices_chemical_and_electrical_synapses(&mut self, iterations: usize) -> PyResult<()> {
-                match self.network.run_lattices_with_electrical_and_chemical_synapses(iterations) {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(PyKeyError::new_err(format!("Graph error occured in execution: {:#?}", e)))
-                }
-            }
-
             fn __repr__(&self) -> PyResult<String> {
                 let lattice_strings = self.network.lattices_values()
                     .map(|i| {
@@ -1878,6 +1891,7 @@ pub struct PyIzhikevichNetwork {
         SpikeTrainGridHistory,
         ConnectingAdjacencyMatrix,
         STDP,
+        IonotropicNeurotransmitterType,
     >
 }
 
@@ -1928,7 +1942,7 @@ impl_repr!(PyDestexheNeurotransmitter, neurotransmitter);
 #[pyo3(name = "DestexheNeurotransmitters")]
 #[derive(Clone)]
 pub struct PyDestexheNeurotransmitters {
-    neurotransmitters: Neurotransmitters<DestexheNeurotransmitter>
+    neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, DestexheNeurotransmitter>
 }
 
 impl_repr!(PyDestexheNeurotransmitters, neurotransmitters);
@@ -1938,17 +1952,16 @@ impl PyDestexheNeurotransmitters {
     #[new]
     #[pyo3(signature = (neurotransmitter_types=None))]
     fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
-        let mut neurotransmitters: HashMap<NeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
+        let mut neurotransmitters: HashMap<IonotropicNeurotransmitterType, DestexheNeurotransmitter> = HashMap::new();
 
         if let Some(values) = neurotransmitter_types {
             for i in values.iter() {
-                let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                let current_type = i.extract::<PyIonotropicNeurotransmitterType>()?.convert_type();
                 let neurotransmitter = match current_type {
-                    NeurotransmitterType::Basic => DestexheNeurotransmitter::default(),
-                    NeurotransmitterType::AMPA => DestexheNeurotransmitter::ampa_default(),
-                    NeurotransmitterType::GABAa => DestexheNeurotransmitter::gabaa_default(),
-                    NeurotransmitterType::GABAb => DestexheNeurotransmitter::gabab_default(),
-                    NeurotransmitterType::NMDA => DestexheNeurotransmitter::nmda_default(),
+                    IonotropicNeurotransmitterType::AMPA => DestexheNeurotransmitter::ampa_default(),
+                    IonotropicNeurotransmitterType::GABAa => DestexheNeurotransmitter::gabaa_default(),
+                    IonotropicNeurotransmitterType::GABAb => DestexheNeurotransmitter::gabab_default(),
+                    IonotropicNeurotransmitterType::NMDA => DestexheNeurotransmitter::nmda_default(),
                 };
     
                 neurotransmitters.insert(current_type, neurotransmitter);
@@ -1962,7 +1975,7 @@ impl PyDestexheNeurotransmitters {
         )
     }
 
-    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyDestexheNeurotransmitter> {
+    fn __getitem__(&self, neurotransmitter_type: PyIonotropicNeurotransmitterType) -> PyResult<PyDestexheNeurotransmitter> {
         if let Some(value) = self.neurotransmitters.get(&neurotransmitter_type.convert_type()) {
             Ok(
                 PyDestexheNeurotransmitter { 
@@ -1975,7 +1988,7 @@ impl PyDestexheNeurotransmitters {
     }
 
     fn set_neurotransmitter(
-        &mut self, neurotransmitter_type: PyNeurotransmitterType, neurotransmitter: PyDestexheNeurotransmitter
+        &mut self, neurotransmitter_type: PyIonotropicNeurotransmitterType, neurotransmitter: PyDestexheNeurotransmitter
     ) {
         self.neurotransmitters.neurotransmitters.insert(
             neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
@@ -2050,17 +2063,16 @@ impl PyDestexheLigandGatedChannels {
     #[new]
     #[pyo3(signature = (neurotransmitter_types=None))]
     fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
-        let mut ligand_gates: HashMap<NeurotransmitterType, LigandGatedChannel<DestexheReceptor>> = HashMap::new();
+        let mut ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<DestexheReceptor>> = HashMap::new();
 
         if let Some(values) = neurotransmitter_types {
             for i in values.iter() {
-                let current_type = i.extract::<PyNeurotransmitterType>()?.convert_type();
+                let current_type = i.extract::<PyIonotropicNeurotransmitterType>()?.convert_type();
                 let neurotransmitter = match current_type {
-                    NeurotransmitterType::Basic => LigandGatedChannel::default(),
-                    NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
-                    NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
-                    NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-                    NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+                    IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+                    IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
                 };
     
                 ligand_gates.insert(current_type, neurotransmitter);
@@ -2074,7 +2086,7 @@ impl PyDestexheLigandGatedChannels {
         )
     }
 
-    fn __getitem__(&self, neurotransmitter_type: PyNeurotransmitterType) -> PyResult<PyDestexheLigandGatedChannel> {
+    fn __getitem__(&self, neurotransmitter_type: PyIonotropicNeurotransmitterType) -> PyResult<PyDestexheLigandGatedChannel> {
         if let Some(value) = self.ligand_gates.get(&neurotransmitter_type.convert_type()) {
             Ok(
                 PyDestexheLigandGatedChannel { 
@@ -2087,7 +2099,7 @@ impl PyDestexheLigandGatedChannels {
     }
 
     fn set_ligand_gate(
-        &mut self, neurotransmitter_type: PyNeurotransmitterType, ligand_gate: PyDestexheLigandGatedChannel
+        &mut self, neurotransmitter_type: PyIonotropicNeurotransmitterType, ligand_gate: PyDestexheLigandGatedChannel
     ) {
         self.ligand_gates.ligand_gates.insert(
             neurotransmitter_type.convert_type(), ligand_gate.ligand_gate
@@ -2106,14 +2118,12 @@ impl PyDestexheLigandGatedChannels {
 #[pymethods]
 impl PyDestexheLigandGatedChannel {
     #[new]
-    #[pyo3(signature = (receptor_type=PyNeurotransmitterType::Basic))]
-    fn new(receptor_type: PyNeurotransmitterType) -> Self {
+    fn new(receptor_type: PyIonotropicNeurotransmitterType) -> Self {
         let ligand_gate = match receptor_type.convert_type() {
-            NeurotransmitterType::Basic => LigandGatedChannel::default(),
-            NeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
-            NeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
-            NeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-            NeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+            IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
+            IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
+            IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
+            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
         };
 
         PyDestexheLigandGatedChannel {
@@ -2349,7 +2359,7 @@ impl PyHodgkinHuxleyNeuron {
         k_channel=PyKIonChannel { ion_channel: KIonChannel::default() },
         k_leak_channel=PyKLeakChannel { ion_channel: KLeakChannel::default() },
         synaptic_neurotransmitters=PyDestexheNeurotransmitters { 
-            neurotransmitters: Neurotransmitters::<DestexheNeurotransmitter>::default() 
+            neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, DestexheNeurotransmitter>::default() 
         },
         ligand_gates=PyDestexheLigandGatedChannels {
             ligand_gates: LigandGatedChannels::<DestexheReceptor>::default()
@@ -2421,6 +2431,7 @@ pub struct PyHodgkinHuxleyLattice {
         LatticeAdjacencyMatrix,
         GridVoltageHistory,
         STDP,
+        IonotropicNeurotransmitterType,
     >
 }
 
@@ -2438,6 +2449,7 @@ pub struct PyHodgkinHuxleyNetwork {
         SpikeTrainGridHistory,
         ConnectingAdjacencyMatrix,
         STDP,
+        IonotropicNeurotransmitterType,
     >
 }
 
@@ -2448,7 +2460,7 @@ impl_network!(
 
 #[pymodule]
 fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
-    m.add_class::<PyNeurotransmitterType>()?;
+    m.add_class::<PyIonotropicNeurotransmitterType>()?;
     m.add_class::<PyApproximateNeurotransmitter>()?;
     m.add_class::<PyApproximateNeurotransmitters>()?;
     m.add_class::<PyDestexheNeurotransmitter>()?;
