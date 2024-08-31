@@ -54,6 +54,7 @@ fn main() -> Result<()> {
     // create two matrices
     // boolean matrix (is connecting or not)
     // weight matrix (value of weight if connecting)
+    // calculate gap junction (insert gap junction kernel at runtime if possible)
 
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
