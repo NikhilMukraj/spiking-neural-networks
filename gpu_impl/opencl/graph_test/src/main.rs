@@ -21,8 +21,8 @@ __kernel void incoming_connections_sum(
 
     float sum = 0.0f;
     for (int i = 0; i < n; i++) {
-        if (adjacency_matrix[i * m + gid] != 0) {
-            sum += weights[i * m + gid];
+        if (adjacency_matrix[i * n + gid] != 0) {
+            sum += weights[i * n + gid];
         }
     }
     
