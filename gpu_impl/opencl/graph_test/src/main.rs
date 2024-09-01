@@ -56,6 +56,10 @@ fn main() -> Result<()> {
     // weight matrix (value of weight if connecting)
     // calculate gap junction (insert gap junction kernel at runtime if possible)
 
+    // array where index corresponds to a position in cell grid
+    // index in graph can that be associated with cell grid positions
+    // assume non-ragged for now
+
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
         .expect("No GPU found");
@@ -87,7 +91,7 @@ fn main() -> Result<()> {
     //         .set_arg(&sums_buffer)
     //         .set_arg(&m_cl)
     //         .set_arg(&n_cl)
-    //         .set_global_work_size(FULL_SIZE)
+    //         .set_global_work_size(N)
     //         .set_wait_event(&sums_write_event)
     //         .enqueue_nd_range(&queue)?
     // };
