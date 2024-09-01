@@ -78,7 +78,6 @@ fn main()  -> Result<()> {
     let _matrix_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut matrix_buffer, CL_BLOCKING, 0, &matrix, &[])? 
     };
-
     let sums_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums, &[])? 
     };
