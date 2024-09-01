@@ -20,21 +20,18 @@ fn main() {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
     presynaptic_neuron.ligand_gates
         .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
-    if let Some(ligand_gate) = presynaptic_neuron.ligand_gates.get_mut(&IonotropicNeurotransmitterType::AMPA) {
-        // offset since model is offset in voltage, more positive modifier leads to longer time between spikes
-        ligand_gate.reversal = -60.; 
-    }
     presynaptic_neuron.synaptic_neurotransmitters
         .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
 
     let mut postsynaptic_neuron = presynaptic_neuron.clone();
 
     let iterations = 10000;
-    let input_current = 50.;
+    let input_current = 30.;
     let electrical_synapse = false;
     let chemical_synapse = true;
     let gaussian = false;
 
+    let mut presynaptic_voltages: Vec<f32> = Vec::new();
     let mut postsynaptic_voltages: Vec<f32> = Vec::new();
     let mut presynaptic_neurotransmitter_concs: Vec<f32> = Vec::new();
     let mut receptor_values: Vec<f32> = Vec::new();
@@ -49,6 +46,7 @@ fn main() {
             gaussian
         );
 
+        presynaptic_voltages.push(presynaptic_neuron.current_voltage);
         postsynaptic_voltages.push(postsynaptic_neuron.current_voltage);
         presynaptic_neurotransmitter_concs.push(
             *presynaptic_neuron.get_neurotransmitter_concentrations().get(&IonotropicNeurotransmitterType::AMPA)
@@ -65,11 +63,12 @@ fn main() {
     let mut file = BufWriter::new(File::create("coupled_hodgkin_huxley.csv")
         .expect("Could not create file"));
 
-    writeln!(file, "voltages,Ts,rs").expect("Could not write to file");
+    writeln!(file, "presynaptic_voltages,postsynaptic_voltages,Ts,rs").expect("Could not write to file");
     for i in 0..iterations {
         writeln!(
             file, 
-            "{},{},{}", 
+            "{},{},{},{}", 
+            presynaptic_voltages[i],
             postsynaptic_voltages[i], 
             presynaptic_neurotransmitter_concs[i],
             receptor_values[i],
