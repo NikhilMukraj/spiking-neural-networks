@@ -237,7 +237,7 @@ impl Default for NaIonChannel {
     fn default() -> Self {    
         NaIonChannel {
             g_na: 120., 
-            e_na: 115., 
+            e_na: 50., 
             m: BasicGatingVariable::default(),
             h: BasicGatingVariable::default(),
             current: 0.,
@@ -248,10 +248,10 @@ impl Default for NaIonChannel {
 impl NaIonChannel {
     /// Updates the state of the gating variable based on voltage
     fn update_gate_states(&mut self, voltage: f32) {
-        self.m.alpha = 0.1 * ((25. - voltage) / (((25. - voltage) / 10.).exp() - 1.));
-        self.m.beta = 4. * (-voltage / 18.).exp();
-        self.h.alpha = 0.07 * (-voltage / 20.).exp();
-        self.h.beta = 1. / (((30. - voltage) / 10.).exp() + 1.);
+        self.m.alpha = 0.1 * ((voltage + 40.) / (1. - (-(voltage + 40.) / 10.).exp()));
+        self.m.beta = 4. * (-(voltage + 65.) / 18.).exp();
+        self.h.alpha = 0.07 * (-(voltage + 65.) / 20.).exp();
+        self.h.beta = 1. / ((-(voltage + 35.) / 10.).exp() + 1.);
     }
 }
 
@@ -287,7 +287,7 @@ impl Default for KIonChannel {
     fn default() -> Self {
         KIonChannel {
             g_k: 36., 
-            e_k: -12., 
+            e_k: -77., 
             n: BasicGatingVariable::default(),
             current: 0.,
         }
@@ -297,8 +297,8 @@ impl Default for KIonChannel {
 impl KIonChannel {
     /// Updates the state of the gating variable based on voltage
     fn update_gate_states(&mut self, voltage: f32) {
-        self.n.alpha = 0.01 * (10. - voltage) / (((10. - voltage) / 10.).exp() - 1.);
-        self.n.beta = 0.125 * (-voltage / 80.).exp();
+        self.n.alpha = 0.01 * (voltage + 55.) / (1. - (-(voltage + 55.) / 10.).exp());
+        self.n.beta = 0.125 * (-(voltage + 65.) / 80.).exp();
     }
 }
 
@@ -331,7 +331,7 @@ impl Default for KLeakChannel {
     fn default() -> Self {
         KLeakChannel {
             g_k_leak: 0.3, 
-            e_k_leak: 10.6, 
+            e_k_leak: -55., 
             current: 0.,
         }
     }
