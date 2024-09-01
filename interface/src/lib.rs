@@ -33,7 +33,7 @@ macro_rules! impl_repr {
 }
 
 #[pyclass]
-#[pyo3(name = "IonotropicNeurotransmitterTypeNeurotransmitterType")]
+#[pyo3(name = "IonotropicNeurotransmitterType")]
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
 pub enum PyIonotropicNeurotransmitterType {
     AMPA,
