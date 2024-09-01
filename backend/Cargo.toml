@@ -35,8 +35,5 @@ iterate_and_spike_traits = { path = "src/neuron/iterate_and_spike_traits", versi
 name = "spiking_neural_networks"
 path = "src/lib.rs"
 
-[features]
-neuron_builder = ["iterate_and_spike_traits/neuron_builder"]
-
 [package.metadata.docs.rs]
 cargo-args = ["-Zunstable-options", "-Zrustdoc-scrape-examples"]
