@@ -156,8 +156,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 
         let i_ligand_gates = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
-        let i_sum = input_current - (i_na + i_k + i_k_leak) + i_ligand_gates;
-        self.current_voltage += self.dt * i_sum / self.c_m;
+        let i_sum = input_current - (i_na + i_k + i_k_leak);
+        self.current_voltage += self.dt * i_sum / self.c_m + i_ligand_gates;
     }
 
     /// Updates neurotransmitter concentrations based on membrane potential
