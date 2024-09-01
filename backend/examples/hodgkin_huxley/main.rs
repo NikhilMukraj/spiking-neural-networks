@@ -21,7 +21,7 @@ fn main() {
     presynaptic_neuron.ligand_gates
         .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
     if let Some(ligand_gate) = presynaptic_neuron.ligand_gates.get_mut(&IonotropicNeurotransmitterType::AMPA) {
-        ligand_gate.reversal = -60.; // offset since model is offset in voltage
+        ligand_gate.reversal = -10.; // offset since model is offset in voltage
     }
     presynaptic_neuron.synaptic_neurotransmitters
         .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
