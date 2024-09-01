@@ -20,6 +20,9 @@ fn main() {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
     presynaptic_neuron.ligand_gates
         .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
+    if let Some(ligand_gate) = presynaptic_neuron.ligand_gates.get_mut(&IonotropicNeurotransmitterType::AMPA) {
+        ligand_gate.reversal = -60.; // offset since model is offset in voltage
+    }
     presynaptic_neuron.synaptic_neurotransmitters
         .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
 
@@ -27,7 +30,7 @@ fn main() {
 
     let iterations = 10000;
     let input_current = 50.;
-    let electrical_synapse = true;
+    let electrical_synapse = false;
     let chemical_synapse = true;
     let gaussian = false;
 
