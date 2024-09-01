@@ -76,14 +76,14 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
     fn default() -> Self {
         HodgkinHuxleyNeuron { 
-            current_voltage: 0.,
+            current_voltage: -65.,
             gap_conductance: 7.,
             dt: 0.01,
             c_m: 1., 
             na_channel: NaIonChannel::default(),
             k_channel: KIonChannel::default(),
             k_leak_channel: KLeakChannel::default(),
-            v_th: 60.,
+            v_th: 0.,
             last_firing_time: None,
             is_spiking: false,
             was_increasing: false,
@@ -157,7 +157,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         let i_ligand_gates = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         let i_sum = input_current - (i_na + i_k + i_k_leak);
-        self.current_voltage += self.dt * i_sum / self.c_m + i_ligand_gates;
+        self.current_voltage += self.dt * i_sum / self.c_m - i_ligand_gates;
     }
 
     /// Updates neurotransmitter concentrations based on membrane potential
