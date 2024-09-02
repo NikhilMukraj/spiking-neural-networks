@@ -4,15 +4,16 @@ use opencl3::device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU};
 use opencl3::kernel::{Kernel, ExecuteKernel};
 use opencl3::memory::{Buffer, CL_MEM_READ_ONLY}; // CL_MEM_WRITE_ONLY
 use opencl3::program::Program;
-use opencl3::types::{cl_bool, cl_float, cl_uint, cl_event, CL_BLOCKING, CL_NON_BLOCKING};
+use opencl3::types::{cl_float, cl_uint, cl_event, CL_BLOCKING, CL_NON_BLOCKING};
 use opencl3::Result;
 use std::ptr;
+use std::time::Instant;
 use rand::Rng;
 
 
 const PROGRAM_SOURCE: &str = r#"
 __kernel void incoming_connections_sum(
-    __global const bool *connections, 
+    __global const uint *connections, 
     __global const float *weights, 
     uint n, 
     __global float *res
@@ -21,7 +22,7 @@ __kernel void incoming_connections_sum(
 
     float sum = 0.0f;
     for (int i = 0; i < n; i++) {
-        if (connections[i * n + gid] != 0) {
+        if (connections[i * n + gid] == 1) {
             sum += weights[i * n + gid];
         }
     }
@@ -50,6 +51,46 @@ fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound
     (connections, weights)
 }
 
+fn cpu_incoming_connections_sum(connections: &[bool], weights: &[f32], n: usize) -> Vec<f32> {
+    let connections: Vec<Vec<bool>> = connections.chunks(n)
+        .map(|chunk| chunk.to_vec())
+        .collect();
+
+    let weights: Vec<Vec<f32>> = weights.chunks(n)
+        .map(|chunk| chunk.to_vec())
+        .collect();
+
+    let mut result = Vec::new();
+
+    for i in 0..n {
+        let sum: f32 = connections.iter()
+                .enumerate()
+                .filter_map(|(j, row)| {
+                    if row[i] { 
+                        Some(weights[j][i]) 
+                    } else { 
+                        None 
+                    }
+                })
+                .sum();
+
+        result.push(sum);
+    }
+
+    result
+}
+
+fn assert_vec_almost_eq(a: &[f32], b: &[f32], tolerance: f32) {
+    assert_eq!(a.len(), b.len(), "Vectors must have the same length");
+    for (i, (&ai, &bi)) in a.iter().zip(b.iter()).enumerate() {
+        assert!(
+            (ai - bi).abs() <= tolerance,
+            "Assertion failed at index {}: (left == right) (left: `{}`, right: `{}`, tolerance: `{}`)",
+            i, ai, bi, tolerance
+        );
+    }
+}
+
 fn main() -> Result<()> {
     // create two matrices
     // boolean matrix (is connecting or not)
@@ -59,6 +100,9 @@ fn main() -> Result<()> {
     // array where index corresponds to a position in cell grid
     // index in graph can that be associated with cell grid positions
     // assume non-ragged for now
+
+    // note that using cl_bool resulted in incorrect computation
+    // switching to cl_uint fixed this
 
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
@@ -83,7 +127,12 @@ fn main() -> Result<()> {
     const N: usize = 100;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
-    let mut connections_array: [cl_bool; N * N] = [0; N * N];
+
+    let start = Instant::now();
+    let cpu_results = cpu_incoming_connections_sum(&connections, &weights, N);
+    let cpu_duration = start.elapsed().as_nanos();
+
+    let mut connections_array: [cl_uint; N * N] = [0; N * N];
     let mut weights_array: [cl_float; N * N] = [0.; N * N];
     let sums_array: [cl_float; N] = [0.; N];
 
@@ -93,7 +142,7 @@ fn main() -> Result<()> {
     }
 
     let mut connections_buffer = unsafe {
-        Buffer::<cl_bool>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
+        Buffer::<cl_uint>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
     };
     let mut weights_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
@@ -137,9 +186,12 @@ fn main() -> Result<()> {
     
     let start_time = kernel_event.profiling_command_start()?;
     let end_time = kernel_event.profiling_command_end()?;
-    let duration = end_time - start_time;
+    let gpu_duration = end_time - start_time;
 
-    println!("Graph execution time (ns): {}", duration);
+    println!("Graph execution time (ns): {}", gpu_duration);
+    println!("CPU execution time (ns): {}", cpu_duration);
+
+    assert_vec_almost_eq(&cpu_results, &results, 0.01);
 
     Ok(())
 }
