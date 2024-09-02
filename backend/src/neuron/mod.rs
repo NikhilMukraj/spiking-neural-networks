@@ -678,7 +678,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     }
 
     /// Calculates electrical input value from positions
-    fn calculate_internal_input_from_positions(
+    fn calculate_internal_electrical_input_from_positions(
         &self,
         position: &(usize, usize),
         input_positions: &HashSet<(usize, usize)>, 
@@ -702,7 +702,12 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
         }
 
-        input_val /= input_positions.len() as f32;
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => input_positions.len() as f32,
+        };
+
+        input_val /= averager;
 
         input_val
     }
@@ -735,7 +740,12 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
 
-        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => 1. / input_positions.len() as f32,
+        };
+
+        weight_neurotransmitter_concentration(&mut input_val, averager);
 
         input_val
     }
@@ -748,7 +758,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
                 let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
-                let input = self.calculate_internal_input_from_positions(
+                let input = self.calculate_internal_electrical_input_from_positions(
                     pos,
                     &input_positions,
                 );
@@ -766,7 +776,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
                 let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
-                let input = self.calculate_internal_input_from_positions(
+                let input = self.calculate_internal_electrical_input_from_positions(
                     pos,
                     &input_positions,
                 );
@@ -2011,7 +2021,12 @@ where
             input_val *= postsynaptic_neuron.get_gaussian_factor();
         }
 
-        input_val /= input_positions.len() as f32;
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => input_positions.len() as f32,
+        };
+
+        input_val /= averager;
 
         input_val
     }
@@ -2033,17 +2048,13 @@ where
                 let mut neurotransmitter_input = if self.lattices.contains_key(&input_position.id) {
                     let input_cell = &self.lattices.get(&input_position.id)
                         .unwrap()
-                        .cell_grid[pos_x][pos_y];
-
-                    
+                        .cell_grid[pos_x][pos_y]; 
 
                     input_cell.get_neurotransmitter_concentrations()
                 } else {
                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
-
-                    
 
                     input_cell.get_neurotransmitter_concentrations()
                 };
@@ -2075,9 +2086,14 @@ where
             );
         }
 
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => 1. / input_positions.len() as f32,
+        };
+
         weight_neurotransmitter_concentration(
             &mut input_val, 
-            (1 / input_positions.len()) as f32
+            averager,
         );
 
         input_val
@@ -2693,7 +2709,7 @@ where
     }
 
     /// Calculates electrical input value from positions
-    fn calculate_internal_input_from_positions(
+    fn calculate_internal_electrical_input_from_positions(
         &self,
         position: &(usize, usize),
         input_positions: &HashSet<(usize, usize)>, 
@@ -2718,7 +2734,12 @@ where
             input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
         }
 
-        input_val /= input_positions.len() as f32;
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => input_positions.len() as f32,
+        };
+
+        input_val /= averager;
 
         input_val
     }
@@ -2751,7 +2772,12 @@ where
             weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
 
-        weight_neurotransmitter_concentration(&mut input_val, (1 / input_positions.len()) as f32);
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => 1. / input_positions.len() as f32,
+        };
+
+        weight_neurotransmitter_concentration(&mut input_val, averager);
 
         input_val
     }
@@ -2764,7 +2790,7 @@ where
                 let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
-                let input = self.calculate_internal_input_from_positions(
+                let input = self.calculate_internal_electrical_input_from_positions(
                     pos,
                     &input_positions,
                 );
@@ -2811,7 +2837,7 @@ where
                 let input_positions = self.graph.get_incoming_connections(pos)
                     .expect("Cannot find position");
 
-                let input = self.calculate_internal_input_from_positions(
+                let input = self.calculate_internal_electrical_input_from_positions(
                     pos,
                     &input_positions,
                 );
@@ -4406,9 +4432,14 @@ where
             );
         }
 
+        let averager = match input_positions.len() {
+            0 => 1.,
+            _ => 1. / input_positions.len() as f32,
+        };
+
         weight_neurotransmitter_concentration(
             &mut input_val, 
-            (1 / input_positions.len()) as f32
+            averager
         );
 
         input_val
