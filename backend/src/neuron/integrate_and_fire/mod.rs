@@ -187,7 +187,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.leaky_get_dv_change(input_current);
-        let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
 
@@ -224,7 +224,7 @@ macro_rules! impl_iterate_and_spike {
 
                 let dv = self.$dv_method(input_current);
                 let dw = self.$dw_method();
-                let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+                let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
                 self.current_voltage += dv + neurotransmitter_dv;
                 self.w_value += dw;
@@ -335,7 +335,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.quadratic_get_dv_change(input_current);
-        let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
 
@@ -942,7 +942,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
 
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
-        let neurotransmitter_dv = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
         self.w_value += dw;
