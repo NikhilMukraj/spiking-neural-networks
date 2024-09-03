@@ -2,7 +2,7 @@ use opencl3::command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_S
 use opencl3::context::Context;
 use opencl3::device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU};
 use opencl3::kernel::{Kernel, ExecuteKernel};
-use opencl3::memory::{Buffer, CL_MEM_READ_ONLY}; // CL_MEM_WRITE_ONLY
+use opencl3::memory::{Buffer, CL_MEM_READ_ONLY, CL_MEM_WRITE_ONLY};
 use opencl3::program::Program;
 use opencl3::types::{cl_float, cl_uint, cl_event, CL_BLOCKING, CL_NON_BLOCKING};
 use opencl3::Result;
@@ -20,58 +20,58 @@ use rand::Rng;
 // if connection count is 0, return 0
 // otherwise average input
 
-const PROGRAM_SOURCE: &str = r#"
-__kernel void incoming_connections_sum(
-    __global const uint *connections, 
-    __global const float *weights, 
-    uint n, 
-    __global float *res
-) {
-    int gid = get_global_id(0);
-
-    float sum = 0.0f;
-    for (int i = 0; i < n; i++) {
-        if (connections[i * n + gid] == 1) {
-            sum += weights[i * n + gid];
-        }
-    }
-    
-    res[gid] = sum;
-}
-"#;
-
-const KERNEL_NAME: &str = "incoming_connections_sum";
-
 // const PROGRAM_SOURCE: &str = r#"
-// __kernel void calculate_internal_electrical_inputs(
+// __kernel void incoming_connections_sum(
 //     __global const uint *connections, 
 //     __global const float *weights, 
-//     __global const float *gap_conductances,
-//     __global const float *voltages,
 //     uint n, 
 //     __global float *res
 // ) {
 //     int gid = get_global_id(0);
 
 //     float sum = 0.0f;
-//     int count = 0;
 //     for (int i = 0; i < n; i++) {
 //         if (connections[i * n + gid] == 1) {
-//             float gap_junction = gap_conductances[gid] * (voltages[i] - voltages[gid]);
-//             sum += weights[i * n + gid] * gap_junction;
-//             count++;
+//             sum += weights[i * n + gid];
 //         }
 //     }
     
-//     if (count != 0) {
-//         res[gid] = sum / count;
-//     } else {
-//         res[gif] = 0;
-//     }
+//     res[gid] = sum;
 // }
 // "#;
 
-// const KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
+// const KERNEL_NAME: &str = "incoming_connections_sum";
+
+const PROGRAM_SOURCE: &str = r#"
+__kernel void calculate_internal_electrical_inputs(
+    __global const uint *connections, 
+    __global const float *weights, 
+    __global const float *gap_conductances,
+    __global const float *voltages,
+    uint n, 
+    __global float *res
+) {
+    int gid = get_global_id(0);
+
+    float sum = 0.0f;
+    uint count = 0;
+    for (int i = 0; i < n; i++) {
+        if (connections[i * n + gid] == 1) {
+            float gap_junction = gap_conductances[gid] * (voltages[i] - voltages[gid]);
+            sum += weights[i * n + gid] * gap_junction;
+            count++;
+        }
+    }
+    
+    if (count != 0) {
+        res[gid] = sum / count;
+    } else {
+        res[gid] = 0;
+    }
+}
+"#;
+
+const KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
 fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound: f32) -> (Vec<bool>, Vec<f32>) {
     let full_size = size * size;
@@ -91,7 +91,42 @@ fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound
     (connections, weights)
 }
 
-fn cpu_incoming_connections_sum(connections: &[bool], weights: &[f32], n: usize) -> Vec<f32> {
+// fn cpu_incoming_connections_sum(connections: &[bool], weights: &[f32], n: usize) -> Vec<f32> {
+//     let connections: Vec<Vec<bool>> = connections.chunks(n)
+//         .map(|chunk| chunk.to_vec())
+//         .collect();
+
+//     let weights: Vec<Vec<f32>> = weights.chunks(n)
+//         .map(|chunk| chunk.to_vec())
+//         .collect();
+
+//     let mut result = Vec::new();
+
+//     for i in 0..n {
+//         let sum: f32 = connections.iter()
+//                 .enumerate()
+//                 .filter_map(|(j, row)| {
+//                     if row[i] { 
+//                         Some(weights[j][i]) 
+//                     } else { 
+//                         None 
+//                     }
+//                 })
+//                 .sum();
+
+//         result.push(sum);
+//     }
+
+//     result
+// }
+
+fn cpu_electrical_inputs(
+    connections: &[bool], 
+    weights: &[f32], 
+    n: usize, 
+    gap_conductances: &[f32], 
+    voltages: &[f32]
+) -> Vec<f32> {
     let connections: Vec<Vec<bool>> = connections.chunks(n)
         .map(|chunk| chunk.to_vec())
         .collect();
@@ -103,16 +138,21 @@ fn cpu_incoming_connections_sum(connections: &[bool], weights: &[f32], n: usize)
     let mut result = Vec::new();
 
     for i in 0..n {
-        let sum: f32 = connections.iter()
-                .enumerate()
-                .filter_map(|(j, row)| {
-                    if row[i] { 
-                        Some(weights[j][i]) 
-                    } else { 
-                        None 
-                    }
-                })
-                .sum();
+        let mut sum: f32 = 0.;
+        let mut counter: usize = 0;
+    
+        for (j, row) in connections.iter().enumerate() {
+            if row[i] { 
+                sum += weights[j][i] * gap_conductances[i] * (voltages[j] - voltages[i]);
+                counter += 1;
+            }
+        }
+
+        if counter != 0 {
+            sum /= counter as f32;
+        } else {
+            sum = 0.;
+        }
 
         result.push(sum);
     }
@@ -176,9 +216,12 @@ fn main() -> Result<()> {
     const N: usize = 1000;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
+    let voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-65.0..30.)).collect();
+    let gap_conductances: Vec<f32> = (0..N).map(|_| 10.).collect();
 
     let start = Instant::now();
-    let cpu_results = cpu_incoming_connections_sum(&connections, &weights, N);
+    // let cpu_results = cpu_incoming_connections_sum(&connections, &weights, N);
+    let cpu_results = cpu_electrical_inputs(&connections, &weights, N, &gap_conductances, &voltages);
     let cpu_duration = start.elapsed().as_nanos();
 
     let mut connections_array: Vec<cl_uint> = vec![0; N * N];
@@ -196,8 +239,14 @@ fn main() -> Result<()> {
     let mut weights_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
     };
-    let mut sums_buffer = unsafe {
+    let mut gap_conductances_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N, ptr::null_mut())?
+    };
+    let mut voltages_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N, ptr::null_mut())?
+    };
+    let mut sums_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_WRITE_ONLY, N, ptr::null_mut())?
     };
 
     let _connections_write_event = unsafe { 
@@ -205,6 +254,12 @@ fn main() -> Result<()> {
     };
     let _weights_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights_array, &[])? 
+    };
+    let _gap_conductances_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut gap_conductances_buffer, CL_BLOCKING, 0, &gap_conductances, &[])? 
+    };
+    let _voltages_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut voltages_buffer, CL_BLOCKING, 0, &voltages, &[])? 
     };
     let sums_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums_array, &[])? 
@@ -217,6 +272,8 @@ fn main() -> Result<()> {
         ExecuteKernel::new(&kernel)
             .set_arg(&connections_buffer)
             .set_arg(&weights_buffer)
+            .set_arg(&gap_conductances_buffer)
+            .set_arg(&voltages_buffer)
             .set_arg(&n_cl)
             .set_arg(&sums_buffer)
             .set_global_work_size(N) // number of threads executing in parallel
