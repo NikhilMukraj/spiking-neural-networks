@@ -208,7 +208,7 @@ macro_rules! impl_approximate_neurotransmitter_default {
                     t_max: $t_max,
                     t: 0.,
                     v_th: 25.,
-                    clearance_constant: 0.1,
+                    clearance_constant: 0.01,
                 }
             }
         }
