@@ -10,9 +10,11 @@
   - Test kernel alone and then lattice execution
 - [ ] Then move to a more advanced graph with a seperate key set
 - [ ] Benchmark calculation of inputs
-- [ ] GPU iterate and spike kernels in crate (trait that returns the compiled kernel, not the string, with a `fn` or `lazy_static`)
+- [ ] GPU iterate and spike kernels in crate (trait that returns the compiled kernel, not the string, with a `fn` or `lazy_static`) (should be integrated as optional feature)
   - [ ] Electrical synapses
   - [ ] Chemical synapses
+    - Neurotransmitter concentraions represented as flattened 2D array, outermost array corresponds to what neuron it is input to, inner array represents the individual concentrations
+    - Ligand gates have on and off flags to determine whether to iterate those gates
 - [ ] GPU history tracking
 - [ ] Executing simulation timestep multiple times over
   - If executing multiple kernels seperately takes too long, combine into single kernel that takes in a number of iterations to execute for
