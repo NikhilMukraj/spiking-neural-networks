@@ -1,71 +1,71 @@
-// use opencl3::command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE};
-// use opencl3::context::Context;
-// use opencl3::device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU};
-// use opencl3::kernel::{Kernel, ExecuteKernel};
-// use opencl3::memory::{Buffer, CL_MEM_READ_ONLY, CL_MEM_WRITE_ONLY};
-// use opencl3::program::Program;
-// use opencl3::types::{cl_float, cl_uint, cl_event, CL_BLOCKING, CL_NON_BLOCKING};
-// use opencl3::Result;
-// use std::ptr;
+use opencl3::command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE};
+use opencl3::context::Context;
+use opencl3::device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU};
+use opencl3::kernel::{Kernel, ExecuteKernel};
+use opencl3::memory::{Buffer, CL_MEM_READ_ONLY, CL_MEM_WRITE_ONLY};
+use opencl3::program::Program;
+use opencl3::types::{cl_float, cl_uint, CL_BLOCKING, CL_NON_BLOCKING}; // cl_event
+use opencl3::Result;
+use std::ptr;
 // use std::time::Instant;
-// use rand::Rng;
+use rand::Rng;
 
 
-// const INPUTS_KERNEL: &str = r#"
-// __kernel void calculate_internal_electrical_inputs(
-//     __global const uint *connections, 
-//     __global const float *weights, 
-//     __global const float *gap_conductances,
-//     __global const float *voltages,
-//     uint n, 
-//     __global float *res
-// ) {
-//     int gid = get_global_id(0);
+const INPUTS_KERNEL: &str = r#"
+__kernel void calculate_internal_electrical_inputs(
+    __global const uint *connections, 
+    __global const float *weights, 
+    __global const float *gap_conductances,
+    __global const float *voltages,
+    uint n, 
+    __global float *res
+) {
+    int gid = get_global_id(0);
 
-//     float sum = 0.0f;
-//     uint count = 0;
-//     for (int i = 0; i < n; i++) {
-//         if (connections[i * n + gid] == 1) {
-//             float gap_junction = gap_conductances[gid] * (voltages[i] - voltages[gid]);
-//             sum += weights[i * n + gid] * gap_junction;
-//             count++;
-//         }
-//     }
+    float sum = 0.0f;
+    uint count = 0;
+    for (int i = 0; i < n; i++) {
+        if (connections[i * n + gid] == 1) {
+            float gap_junction = gap_conductances[gid] * (voltages[i] - voltages[gid]);
+            sum += weights[i * n + gid] * gap_junction;
+            count++;
+        }
+    }
     
-//     if (count != 0) {
-//         res[gid] = sum / count;
-//     } else {
-//         res[gid] = 0;
-//     }
-// }
-// "#;
+    if (count != 0) {
+        res[gid] = sum / count;
+    } else {
+        res[gid] = 0;
+    }
+}
+"#;
 
-// const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
+const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
-// const ITERATE_AND_SPIKE_KERNEL: &str = r#"
-// __kernel void iterate_and_spike(
-//     __global const float *inputs,
-//     __global float *v,
-//     __global float *g,
-//     __global float *e,
-//     __global float *v_th,
-//     __global float *v_reset,
-//     __global uint *is_spiking,
-//     __global float *dt,
-// ) {
-//     int gid = get_global_id(0);
+const ITERATE_AND_SPIKE_KERNEL: &str = r#"
+__kernel void iterate_and_spike(
+    __global const float *inputs,
+    __global float *v,
+    __global float *g,
+    __global float *e,
+    __global float *v_th,
+    __global float *v_reset,
+    __global uint *is_spiking,
+    __global float *dt
+) {
+    int gid = get_global_id(0);
 
-//     v[gid] += (g[gid] * (v[gid] - e[gid]) + inputs[gid]) * dt[gid];
-//     if (v[gid] >= v_th[gid]) {
-//         v[gid] = v_reset[gid];
-//         is_spiking[gid] = 1;
-//     } else {
-//         is_spiking[gid] = 0;
-//     }
-// }
-// "#;
+    v[gid] += (g[gid] * (v[gid] - e[gid]) + inputs[gid]) * dt[gid];
+    if (v[gid] >= v_th[gid]) {
+        v[gid] = v_reset[gid];
+        is_spiking[gid] = 1;
+    } else {
+        is_spiking[gid] = 0;
+    }
+}
+"#;
 
-// const ITERATE_AND_SPIKE_KERNEL_NAME: &str = "iterate_and_spike";
+const ITERATE_AND_SPIKE_KERNEL_NAME: &str = "iterate_and_spike";
 
 // #[allow(clippy::too_many_arguments)]
 // fn cpu_iterate_and_spike(
@@ -89,23 +89,6 @@
 //     }
 // }
 
-// fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound: f32) -> (Vec<bool>, Vec<f32>) {
-//     let full_size = size * size;
-    
-//     let mut connections = vec![false; full_size];
-//     let mut weights = vec![0.; full_size];
-
-//     let mut rng = rand::thread_rng();
-
-//     for i in 0..(full_size) {
-//         connections[i] = rng.gen_bool(0.5);
-//         if connections[i] {
-//             weights[i] = rng.gen_range(lower_bound..=upper_bound);
-//         }
-//     }
-
-//     (connections, weights)
-// }
 
 // fn cpu_electrical_inputs(
 //     connections: &[bool], 
@@ -147,6 +130,24 @@
 //     result
 // }
 
+fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound: f32) -> (Vec<bool>, Vec<f32>) {
+    let full_size = size * size;
+    
+    let mut connections = vec![false; full_size];
+    let mut weights = vec![0.; full_size];
+
+    let mut rng = rand::thread_rng();
+
+    for i in 0..(full_size) {
+        connections[i] = rng.gen_bool(0.5);
+        if connections[i] {
+            weights[i] = rng.gen_range(lower_bound..=upper_bound);
+        }
+    }
+
+    (connections, weights)
+}
+
 // fn assert_vec_almost_eq(a: &[f32], b: &[f32], tolerance: f32) {
 //     assert_eq!(a.len(), b.len(), "Vectors must have the same length");
 //     for (i, (&ai, &bi)) in a.iter().zip(b.iter()).enumerate() {
@@ -158,11 +159,181 @@
 //     }
 // }
 
-fn main() {
+macro_rules! create_cl_float_buffer {
+    ($name:ident, $context:expr, $num:ident) => {
+        let mut $name = unsafe {
+            Buffer::<cl_float>::create($context, CL_MEM_READ_ONLY, $num, ptr::null_mut())?
+        };
+    };
+}
+
+fn main() -> Result<()> {
     // move relevant data to gpu
     // for n in iterations
         // execute inputs kernel
         // execute iterate kernel
 
+    // check against cpu calculation
+        // potential issues: 
+            // conversion between rust and opencl types
+            // kernel waits not being correct
+            
     // benchmark on cpu
+
+    let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
+        .first()
+        .expect("No GPU found");
+    let device = Device::new(device_id);
+
+    let context = Context::from_device(&device).expect("Context::from_device failed");
+
+    let queue = CommandQueue::create_default_with_properties(
+            &context, 
+            CL_QUEUE_PROFILING_ENABLE,
+            CL_QUEUE_SIZE,
+        )
+        .expect("CommandQueue::create_default failed");
+
+    let incoming_connections_program = Program::create_and_build_from_source(&context, INPUTS_KERNEL, "")
+        .expect("Program::create_and_build_from_source failed");
+    let incoming_connections_kernel = Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME)
+        .expect("Kernel::create failed");
+
+    let iterate_and_spike_program = Program::create_and_build_from_source(&context, ITERATE_AND_SPIKE_KERNEL, "")
+        .expect("Program::create_and_build_from_source failed");
+    let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
+        .expect("Kernel::create failed");
+
+    const N: usize = 10;
+    const NUM_ITERATIONS: usize = 10;
+
+    let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
+    let connections: Vec<u32> = connections.iter().map(|i| if *i { 1 } else { 0 } ).collect();
+    let voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
+    let gs: Vec<f32> = (0..N).map(|_| 1.).collect();
+    let es: Vec<f32> = (0..N).map(|_| 0.).collect();
+    let v_ths: Vec<f32> = (0..N).map(|_| -55.).collect();
+    let v_resets: Vec<f32> = (0..N).map(|_| -75.).collect();
+    let is_spikings: Vec<u32> = (0..N).map(|_| 0).collect();
+    let dts: Vec<f32> = (0..N).map(|_| 0.1).collect();
+    let gap_conductances: Vec<f32> = (0..N).map(|_| 10.).collect();
+    let sums: Vec<f32> = (0..N).map(|_| 0.).collect();
+
+    // let mut connections_array: Vec<cl_uint> = vec![0; N * N];
+    // let mut weights_array: Vec<cl_float> = vec![0.; N * N];
+    // let sums_array: Vec<cl_float> = vec![0.; N];
+    // let mut gap_conductances_array: Vec<cl_float> = vec![0., N];
+    // let mut voltages_array: Vec<cl_float> = vec![0.; N];
+    // let mut gs_array: Vec<cl_float> = vec![0.; N];
+    // let mut es_array: Vec<cl_float> = vec![0.; N];
+    // let mut v_ths_array: Vec<cl_float> = vec![0.; N];
+    // let mut v_resets_array: Vec<cl_float> = vec![0.; N];
+    // let mut is_spikings_array: Vec<cl_uint> = vec![0; N];
+    // let mut dts_array: Vec<cl_float> = vec![0.; N];
+
+    // for i in 0..N {
+    //     voltages_array[i] = voltages[i];
+    //     gap_conductances_array[i] = gap_conductances[i];
+    //     gs_array[i] = gs[i];
+    //     es_array[i] = es[i];
+    //     v_ths_array[i] = v_ths[i];
+    //     v_resets_array[i] = v_resets[i];
+    //     is_spikings_array[i] = is_spikings[i];
+    //     dts_array[i] = dts[i];
+    // }
+
+    let mut connections_buffer = unsafe {
+        Buffer::<cl_uint>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
+    };
+    let mut weights_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
+    };
+    let mut sums_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_WRITE_ONLY, N, ptr::null_mut())?
+    };
+
+    let mut is_spikings_buffer = unsafe {
+        Buffer::<cl_uint>::create(&context, CL_MEM_WRITE_ONLY, N, ptr::null_mut())?
+    };
+
+    create_cl_float_buffer!(voltages_buffer, &context, N);
+    create_cl_float_buffer!(gap_conductances_buffer, &context, N);
+    create_cl_float_buffer!(gs_buffer, &context, N);
+    create_cl_float_buffer!(es_buffer, &context, N);
+    create_cl_float_buffer!(v_ths_buffer, &context, N);
+    create_cl_float_buffer!(v_resets_buffer, &context, N);
+    create_cl_float_buffer!(dts_buffer, &context, N);
+
+    let mut cl_float_buffers: Vec<(&mut Buffer<cl_float>, &Vec<f32>)> = vec![
+        (&mut voltages_buffer, &voltages),
+        (&mut gap_conductances_buffer, &gap_conductances),
+        (&mut gs_buffer, &gs),
+        (&mut es_buffer, &es),
+        (&mut v_ths_buffer, &v_ths),
+        (&mut v_resets_buffer, &v_resets),
+        (&mut dts_buffer, &dts),
+    ];
+
+    for (buffer, array) in cl_float_buffers.iter_mut() {
+        let _ = unsafe { 
+            queue.enqueue_write_buffer(buffer, CL_BLOCKING, 0, array, &[])? 
+        };
+    }
+
+    let _is_spiking_event = unsafe {
+        queue.enqueue_write_buffer(&mut is_spikings_buffer, CL_BLOCKING, 0, &is_spikings, &[])?
+    };
+
+    let _connections_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut connections_buffer, CL_BLOCKING, 0, &connections, &[])? 
+    };
+    let _weights_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights, &[])? 
+    };
+
+    let sums_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums, &[])? 
+    };
+
+    sums_write_event.wait()?;
+
+    let n_cl: cl_uint = N as u32;
+
+    for _ in 0..NUM_ITERATIONS {
+        let gap_junctions_event = unsafe {
+            ExecuteKernel::new(&incoming_connections_kernel)
+                .set_arg(&connections_buffer)
+                .set_arg(&weights_buffer)
+                .set_arg(&gap_conductances_buffer)
+                .set_arg(&voltages_buffer)
+                .set_arg(&n_cl)
+                .set_arg(&sums_buffer)
+                .set_global_work_size(N) // number of threads executing in parallel
+                // .set_wait_event(&sums_write_event)
+                .enqueue_nd_range(&queue)?
+        };
+
+        // gap_junctions_event.wait()?;
+
+        let iterate_and_spike_event = unsafe {
+            ExecuteKernel::new(&iterate_and_spike_kernel)
+                .set_arg(&sums_buffer)
+                .set_arg(&voltages_buffer)
+                .set_arg(&gs_buffer)
+                .set_arg(&es_buffer)
+                .set_arg(&v_ths_buffer)
+                .set_arg(&v_resets_buffer)
+                .set_arg(&is_spikings_buffer)
+                .set_arg(&dts_buffer)
+                .set_global_work_size(N) // number of threads executing in parallel
+                .set_wait_event(&gap_junctions_event)
+                .enqueue_nd_range(&queue)?
+        };
+
+        iterate_and_spike_event.wait()?;
+    }
+
+    // let events: Vec<cl_event> = vec![kernel_event.get()];
+
+    Ok(())
 }
