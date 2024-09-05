@@ -19,9 +19,11 @@
 - [ ] Executing simulation timestep multiple times over
   - If executing multiple kernels seperately takes too long, combine into single kernel that takes in a number of iterations to execute for
   - Add verbose option with a progress bar (and to CPU version)
-- [ ] Integrating into main crate
+- [ ] Integrating into main crate (as optional feature)
+  - To gpu lattice function, eventually a conversion back when all features added, remove gaussian params from neuron model
 - [ ] GPU spike train iteration
 - [ ] GPU plasticity
+  - Plasticity should be updated by first updating every incoming connection for neurons to update, then outgoing connections
 - [ ] Reward modulation interfacing
   - Specialized readout layer to read for reward calculation that sends data back to the CPU
   - Similarly, a specialized input layer (probably for Poisson neurons), needs to be generated
