@@ -204,8 +204,8 @@ fn main() -> Result<()> {
     let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
         .expect("Kernel::create failed");
 
-    const N: usize = 100;
-    const NUM_ITERATIONS: usize = 1000;
+    const N: usize = 1000;
+    const NUM_ITERATIONS: usize = 10;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
     let connections: Vec<u32> = connections.iter().map(|i| if *i { 1 } else { 0 } ).collect();
@@ -344,11 +344,9 @@ fn main() -> Result<()> {
 
     results_read_event.wait()?;
 
-    // let events: Vec<cl_event> = vec![kernel_event.get()];
-
     let start = Instant::now();
 
-    for _ in 0..1 {
+    for _ in 0..NUM_ITERATIONS {
         let inputs = cpu_electrical_inputs(&connections, &weights, N, &gap_conductances, &voltages);
         cpu_iterate_and_spike(
             &inputs, 
