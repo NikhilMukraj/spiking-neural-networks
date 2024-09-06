@@ -7,6 +7,7 @@ use opencl3::program::Program;
 use opencl3::types::{cl_float, cl_uint, CL_BLOCKING, CL_NON_BLOCKING}; // cl_event
 use opencl3::Result;
 use std::ptr;
+use std::time::Instant;
 // use std::time::Instant;
 use rand::Rng;
 
@@ -67,68 +68,67 @@ __kernel void iterate_and_spike(
 
 const ITERATE_AND_SPIKE_KERNEL_NAME: &str = "iterate_and_spike";
 
-// #[allow(clippy::too_many_arguments)]
-// fn cpu_iterate_and_spike(
-//     inputs: &[f32], 
-//     v: &mut [f32], 
-//     g: &mut [f32],
-//     e: &mut [f32],
-//     v_th: &mut [f32],
-//     v_reset: &mut [f32],
-//     is_spiking: &mut [bool],
-//     dt: &mut [f32],
-// ) {
-//     for (n, i) in inputs.iter().enumerate() {
-//         v[n] += (g[n] * (v[n] - e[n]) + i) * dt[n];
-//         if v[n] >= v_th[n] {
-//             v[n] = v_reset[n];
-//             is_spiking[n] = true;
-//         } else {
-//             is_spiking[n] = false;
-//         }
-//     }
-// }
+#[allow(clippy::too_many_arguments)]
+fn cpu_iterate_and_spike(
+    inputs: &[f32], 
+    v: &mut [f32], 
+    g: &mut [f32],
+    e: &mut [f32],
+    v_th: &mut [f32],
+    v_reset: &mut [f32],
+    is_spiking: &mut [u32],
+    dt: &mut [f32],
+) {
+    for (n, i) in inputs.iter().enumerate() {
+        v[n] += (g[n] * (v[n] - e[n]) + i) * dt[n];
+        if v[n] >= v_th[n] {
+            v[n] = v_reset[n];
+            is_spiking[n] = 1;
+        } else {
+            is_spiking[n] = 0;
+        }
+    }
+}
 
+fn cpu_electrical_inputs(
+    connections: &[u32], 
+    weights: &[f32], 
+    n: usize, 
+    gap_conductances: &[f32], 
+    voltages: &[f32]
+) -> Vec<f32> {
+    let connections: Vec<Vec<u32>> = connections.chunks(n)
+        .map(|chunk| chunk.to_vec())
+        .collect();
 
-// fn cpu_electrical_inputs(
-//     connections: &[bool], 
-//     weights: &[f32], 
-//     n: usize, 
-//     gap_conductances: &[f32], 
-//     voltages: &[f32]
-// ) -> Vec<f32> {
-//     let connections: Vec<Vec<bool>> = connections.chunks(n)
-//         .map(|chunk| chunk.to_vec())
-//         .collect();
+    let weights: Vec<Vec<f32>> = weights.chunks(n)
+        .map(|chunk| chunk.to_vec())
+        .collect();
 
-//     let weights: Vec<Vec<f32>> = weights.chunks(n)
-//         .map(|chunk| chunk.to_vec())
-//         .collect();
+    let mut result = Vec::new();
 
-//     let mut result = Vec::new();
-
-//     for i in 0..n {
-//         let mut sum: f32 = 0.;
-//         let mut counter: usize = 0;
+    for i in 0..n {
+        let mut sum: f32 = 0.;
+        let mut counter: usize = 0;
     
-//         for (j, row) in connections.iter().enumerate() {
-//             if row[i] { 
-//                 sum += weights[j][i] * gap_conductances[i] * (voltages[j] - voltages[i]);
-//                 counter += 1;
-//             }
-//         }
+        for (j, row) in connections.iter().enumerate() {
+            if row[i] == 1 { 
+                sum += weights[j][i] * gap_conductances[i] * (voltages[j] - voltages[i]);
+                counter += 1;
+            }
+        }
 
-//         if counter != 0 {
-//             sum /= counter as f32;
-//         } else {
-//             sum = 0.;
-//         }
+        if counter != 0 {
+            sum /= counter as f32;
+        } else {
+            sum = 0.;
+        }
 
-//         result.push(sum);
-//     }
+        result.push(sum);
+    }
 
-//     result
-// }
+    result
+}
 
 fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound: f32) -> (Vec<bool>, Vec<f32>) {
     let full_size = size * size;
@@ -148,16 +148,16 @@ fn create_random_flattened_adj_matrix(size: usize, lower_bound: f32, upper_bound
     (connections, weights)
 }
 
-// fn assert_vec_almost_eq(a: &[f32], b: &[f32], tolerance: f32) {
-//     assert_eq!(a.len(), b.len(), "Vectors must have the same length");
-//     for (i, (&ai, &bi)) in a.iter().zip(b.iter()).enumerate() {
-//         assert!(
-//             (ai - bi).abs() <= tolerance,
-//             "Assertion failed at index {}: (left == right) (left: `{}`, right: `{}`, tolerance: `{}`)",
-//             i, ai, bi, tolerance
-//         );
-//     }
-// }
+fn assert_vec_eq_with_tolerance(a: &[f32], b: &[f32], tolerance: f32) {
+    assert_eq!(a.len(), b.len(), "Vectors must have the same length");
+    for (i, (&ai, &bi)) in a.iter().zip(b.iter()).enumerate() {
+        assert!(
+            (ai - bi).abs() <= tolerance,
+            "Assertion failed at index {}: (left == right) (left: `{}`, right: `{}`, tolerance: `{}`)",
+            i, ai, bi, tolerance
+        );
+    }
+}
 
 macro_rules! create_cl_float_buffer {
     ($name:ident, $context:expr, $num:ident) => {
@@ -204,18 +204,18 @@ fn main() -> Result<()> {
     let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
         .expect("Kernel::create failed");
 
-    const N: usize = 10;
-    const NUM_ITERATIONS: usize = 10;
+    const N: usize = 100;
+    const NUM_ITERATIONS: usize = 1000;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
     let connections: Vec<u32> = connections.iter().map(|i| if *i { 1 } else { 0 } ).collect();
-    let voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
-    let gs: Vec<f32> = (0..N).map(|_| 1.).collect();
-    let es: Vec<f32> = (0..N).map(|_| 0.).collect();
-    let v_ths: Vec<f32> = (0..N).map(|_| -55.).collect();
-    let v_resets: Vec<f32> = (0..N).map(|_| -75.).collect();
-    let is_spikings: Vec<u32> = (0..N).map(|_| 0).collect();
-    let dts: Vec<f32> = (0..N).map(|_| 0.1).collect();
+    let mut voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
+    let mut gs: Vec<f32> = (0..N).map(|_| -0.1).collect();
+    let mut es: Vec<f32> = (0..N).map(|_| 0.).collect();
+    let mut v_ths: Vec<f32> = (0..N).map(|_| -55.).collect();
+    let mut v_resets: Vec<f32> = (0..N).map(|_| -75.).collect();
+    let mut is_spikings: Vec<u32> = (0..N).map(|_| 0).collect();
+    let mut dts: Vec<f32> = (0..N).map(|_| 0.1).collect();
     let gap_conductances: Vec<f32> = (0..N).map(|_| 10.).collect();
     let sums: Vec<f32> = (0..N).map(|_| 0.).collect();
 
@@ -299,6 +299,8 @@ fn main() -> Result<()> {
 
     let n_cl: cl_uint = N as u32;
 
+    let start = Instant::now();
+
     for _ in 0..NUM_ITERATIONS {
         let gap_junctions_event = unsafe {
             ExecuteKernel::new(&incoming_connections_kernel)
@@ -333,7 +335,39 @@ fn main() -> Result<()> {
         iterate_and_spike_event.wait()?;
     }
 
+    let gpu_duration = start.elapsed().as_nanos();
+
+    let mut results: [cl_float; N] = [0.0; N];
+    let results_read_event = unsafe {
+        queue.enqueue_read_buffer(&voltages_buffer, CL_NON_BLOCKING, 0, &mut results, &[])?
+    };
+
+    results_read_event.wait()?;
+
     // let events: Vec<cl_event> = vec![kernel_event.get()];
 
+    let start = Instant::now();
+
+    for _ in 0..1 {
+        let inputs = cpu_electrical_inputs(&connections, &weights, N, &gap_conductances, &voltages);
+        cpu_iterate_and_spike(
+            &inputs, 
+            &mut voltages, 
+            &mut gs, 
+            &mut es, 
+            &mut v_ths, 
+            &mut v_resets, 
+            &mut is_spikings, 
+            &mut dts,
+        );
+    }
+
+    let cpu_duration = start.elapsed().as_nanos();
+
+    assert_vec_eq_with_tolerance(&results, &voltages, 1.);
+
+    println!("CPU execution (ns): {}", cpu_duration);
+    println!("GPU execution (ns): {}", gpu_duration);
+    
     Ok(())
 }
