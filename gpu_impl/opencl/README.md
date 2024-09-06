@@ -6,7 +6,7 @@
   - [x] Benchmark CPU v GPU
 - [x] Then move to getting incoming connections on a basic graph
 - [x] Then move to calculating electrical input values given basic graph, voltages, and gap conductance kernel
-- [ ] GPU leaky integrate and fire kernel
+- [x] GPU leaky integrate and fire kernel
   - Test kernel alone and then lattice execution
 - [ ] Then move to a more advanced graph with a seperate key set
 - [ ] Benchmark calculation of inputs
