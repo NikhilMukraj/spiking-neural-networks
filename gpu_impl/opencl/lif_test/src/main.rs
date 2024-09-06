@@ -180,6 +180,8 @@ fn main() -> Result<()> {
             
     // benchmark on cpu
 
+    // seperate key set associating indexes to positions
+
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
         .expect("No GPU found");
