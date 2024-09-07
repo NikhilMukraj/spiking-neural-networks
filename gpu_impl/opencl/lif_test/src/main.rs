@@ -16,6 +16,7 @@ const INPUTS_KERNEL: &str = r#"
 __kernel void calculate_internal_electrical_inputs(
     __global const uint *connections, 
     __global const float *weights, 
+    __global const uint *index_to_position,
     __global const float *gap_conductances,
     __global const float *voltages,
     uint n, 
@@ -27,7 +28,9 @@ __kernel void calculate_internal_electrical_inputs(
     uint count = 0;
     for (int i = 0; i < n; i++) {
         if (connections[i * n + gid] == 1) {
-            float gap_junction = gap_conductances[gid] * (voltages[i] - voltages[gid]);
+            int presynaptic_index = index_to_position[i];
+            int postsynaptic_index = index_to_position[gid];
+            float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
             sum += weights[i * n + gid] * gap_junction;
             count++;
         }
@@ -46,6 +49,7 @@ const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 const ITERATE_AND_SPIKE_KERNEL: &str = r#"
 __kernel void iterate_and_spike(
     __global const float *inputs,
+    __global const uint *index_to_position,
     __global float *v,
     __global float *g,
     __global float *e,
@@ -55,13 +59,14 @@ __kernel void iterate_and_spike(
     __global float *dt
 ) {
     int gid = get_global_id(0);
+    int index = index_to_position[gid];
 
-    v[gid] += (g[gid] * (v[gid] - e[gid]) + inputs[gid]) * dt[gid];
-    if (v[gid] >= v_th[gid]) {
-        v[gid] = v_reset[gid];
-        is_spiking[gid] = 1;
+    v[index] += (g[index] * (v[index] - e[index]) + inputs[index]) * dt[index];
+    if (v[index] >= v_th[index]) {
+        v[index] = v_reset[index];
+        is_spiking[index] = 1;
     } else {
-        is_spiking[gid] = 0;
+        is_spiking[index] = 0;
     }
 }
 "#;
@@ -71,6 +76,7 @@ const ITERATE_AND_SPIKE_KERNEL_NAME: &str = "iterate_and_spike";
 #[allow(clippy::too_many_arguments)]
 fn cpu_iterate_and_spike(
     inputs: &[f32], 
+    index_to_position: &[u32],
     v: &mut [f32], 
     g: &mut [f32],
     e: &mut [f32],
@@ -80,12 +86,14 @@ fn cpu_iterate_and_spike(
     dt: &mut [f32],
 ) {
     for (n, i) in inputs.iter().enumerate() {
-        v[n] += (g[n] * (v[n] - e[n]) + i) * dt[n];
-        if v[n] >= v_th[n] {
-            v[n] = v_reset[n];
-            is_spiking[n] = 1;
+        let index = index_to_position[n] as usize;
+
+        v[index] += (g[index] * (v[index] - e[index]) + i) * dt[index];
+        if v[index] >= v_th[index] {
+            v[index] = v_reset[index];
+            is_spiking[index] = 1;
         } else {
-            is_spiking[n] = 0;
+            is_spiking[index] = 0;
         }
     }
 }
@@ -93,6 +101,7 @@ fn cpu_iterate_and_spike(
 fn cpu_electrical_inputs(
     connections: &[u32], 
     weights: &[f32], 
+    index_to_position: &[u32],
     n: usize, 
     gap_conductances: &[f32], 
     voltages: &[f32]
@@ -113,7 +122,10 @@ fn cpu_electrical_inputs(
     
         for (j, row) in connections.iter().enumerate() {
             if row[i] == 1 { 
-                sum += weights[j][i] * gap_conductances[i] * (voltages[j] - voltages[i]);
+                let presynaptic_index = index_to_position[j] as usize;
+                let postsynaptic_index = index_to_position[i] as usize;
+                sum += weights[j][i] * gap_conductances[postsynaptic_index] * 
+                (voltages[presynaptic_index] - voltages[postsynaptic_index]);
                 counter += 1;
             }
         }
@@ -211,6 +223,9 @@ fn main() -> Result<()> {
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
     let connections: Vec<u32> = connections.iter().map(|i| if *i { 1 } else { 0 } ).collect();
+
+    let index_to_position: Vec<u32> = (0..N).map(|i| i as u32).collect();
+
     let mut voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
     let mut gs: Vec<f32> = (0..N).map(|_| -0.1).collect();
     let mut es: Vec<f32> = (0..N).map(|_| 0.).collect();
@@ -249,6 +264,9 @@ fn main() -> Result<()> {
     };
     let mut weights_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, N * N, ptr::null_mut())?
+    };
+    let mut index_to_position_buffer = unsafe {
+        Buffer::<cl_uint>::create(&context, CL_MEM_READ_ONLY, N, ptr::null_mut())?
     };
     let mut sums_buffer = unsafe {
         Buffer::<cl_float>::create(&context, CL_MEM_WRITE_ONLY, N, ptr::null_mut())?
@@ -292,6 +310,9 @@ fn main() -> Result<()> {
     let _weights_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights, &[])? 
     };
+    let _index_to_position_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut index_to_position_buffer, CL_BLOCKING, 0, &index_to_position, &[])? 
+    };
 
     let sums_write_event = unsafe { 
         queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums, &[])? 
@@ -308,6 +329,7 @@ fn main() -> Result<()> {
             ExecuteKernel::new(&incoming_connections_kernel)
                 .set_arg(&connections_buffer)
                 .set_arg(&weights_buffer)
+                .set_arg(&index_to_position_buffer)
                 .set_arg(&gap_conductances_buffer)
                 .set_arg(&voltages_buffer)
                 .set_arg(&n_cl)
@@ -322,6 +344,7 @@ fn main() -> Result<()> {
         let iterate_and_spike_event = unsafe {
             ExecuteKernel::new(&iterate_and_spike_kernel)
                 .set_arg(&sums_buffer)
+                .set_arg(&index_to_position_buffer)
                 .set_arg(&voltages_buffer)
                 .set_arg(&gs_buffer)
                 .set_arg(&es_buffer)
@@ -349,9 +372,18 @@ fn main() -> Result<()> {
     let start = Instant::now();
 
     for _ in 0..NUM_ITERATIONS {
-        let inputs = cpu_electrical_inputs(&connections, &weights, N, &gap_conductances, &voltages);
+        let inputs = cpu_electrical_inputs(
+            &connections, 
+            &weights,
+            &index_to_position,
+            N, 
+            &gap_conductances, 
+            &voltages
+        );
+
         cpu_iterate_and_spike(
             &inputs, 
+            &index_to_position,
             &mut voltages, 
             &mut gs, 
             &mut es, 
