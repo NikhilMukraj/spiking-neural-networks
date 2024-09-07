@@ -8,8 +8,8 @@
 - [x] Then move to calculating electrical input values given basic graph, voltages, and gap conductance kernel
 - [x] GPU leaky integrate and fire kernel
   - Test kernel alone and then lattice execution
-- [ ] Then move to a more advanced graph with a seperate key set
-- [ ] Benchmark calculation of inputs
+- [x] Then move to a more advanced graph with a seperate key set
+- [x] Benchmark calculation of inputs
 - [ ] GPU iterate and spike kernels in crate (trait that returns the compiled kernel, not the string, with a `fn` or `lazy_static`) (should be integrated as optional feature)
   - [ ] Electrical synapses
   - [ ] Chemical synapses
