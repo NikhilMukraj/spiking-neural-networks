@@ -204,8 +204,7 @@ where
 ```rust
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
-    GaussianFactor, GaussianParameters, IsSpiking, Timestep,
-    CurrentVoltage, GapConductance, IterateAndSpike, 
+    GaussianParameters, IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -338,8 +337,6 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub was_increasing: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
