@@ -28,12 +28,6 @@ pub fn derive_iterate_and_spike_traits(input: TokenStream) -> TokenStream {
             }
         }
 
-        impl #impl_generics GaussianFactor for #name #ty_generics #where_clause {
-            fn get_gaussian_factor(&self) -> f32 {
-                self.gaussian_params.get_random_number()
-            }
-        }
-
         impl #impl_generics Timestep for #name #ty_generics #where_clause {
             fn get_dt(&self) -> f32 {
                 self.dt
