@@ -28,9 +28,7 @@ pub mod spike_train;
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
-    ApproximateNeurotransmitter, CurrentVoltage, IsSpiking, GapConductance, IterateAndSpike, 
-    NeurotransmitterConcentrations, NeurotransmitterType, 
+    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, ApproximateNeurotransmitter, CurrentVoltage, GapConductance, GaussianParameters, IsSpiking, IterateAndSpike, NeurotransmitterConcentrations, NeurotransmitterType 
 };
 pub mod plasticity;
 use plasticity::{
@@ -70,57 +68,34 @@ pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
 ///     the neurons based on neurotransmitter input during the simulation
 /// 
-/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
+/// - `gaussian` : use `Some(GaussianParameters)` to add randomly distributed normal noise to the input
+///     of the presynaptic neuron
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
     input_current: f32,
     electrical_synapse: bool,
     chemical_synapse: bool,
-    gaussian: bool,
+    gaussian: Option<GaussianParameters>,
 ) -> (bool, bool) {
-    let (t_total, post_current, input_current) = if gaussian {
-        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
-        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
+    let input_current = match gaussian {
+        Some(params) => input_current * params.get_random_number(),
+        None => input_current,
+    };
 
-        let input_current = input_current * pre_gaussian_factor;
-
-        let post_current = if electrical_synapse {
-            gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            ) * post_gaussian_factor
-        } else {
-            0.
-        };
-
-        let t_total = if chemical_synapse {
-            let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
-
-            t
-        } else {
-            HashMap::new()
-        };
-
-        (t_total, post_current, input_current)
+    let post_current = if electrical_synapse {
+        gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        )
     } else {
-        let post_current = if electrical_synapse {
-            gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            )
-        } else {
-            0.
-        };
+        0.
+    };
 
-        let t_total = if chemical_synapse {
-            presynaptic_neuron.get_neurotransmitter_concentrations()
-        } else {
-            HashMap::new()
-        };
-
-        (t_total, post_current, input_current)
+    let t_total = if chemical_synapse {
+        presynaptic_neuron.get_neurotransmitter_concentrations()
+    } else {
+        HashMap::new()
     };
 
     let pre_spiking = presynaptic_neuron.iterate_and_spike(input_current);
@@ -174,8 +149,6 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 /// 
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
 ///     the neurons based on neurotransmitter input during the simulation
-/// 
-/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
 pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
     spike_train: &mut T,
     presynaptic_neuron: &mut U, 
@@ -183,84 +156,39 @@ pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
     timestep: usize,
     electrical_synapse: bool,
     chemical_synapse: bool,
-    gaussian: bool,
 ) -> (bool, bool, bool) 
 where
     T: SpikeTrain<N=N>,
     U: IterateAndSpike<N=N>,
     N: NeurotransmitterType,
 {
-    let (pre_t_total, post_t_total, pre_current, post_current) = if gaussian {
-        let pre_gaussian_factor = presynaptic_neuron.get_gaussian_factor();
-        let post_gaussian_factor = postsynaptic_neuron.get_gaussian_factor();
-
-        let pre_t_total = if chemical_synapse {
-            let mut t = spike_train.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, pre_gaussian_factor);
-
-            t
-        } else {
-            HashMap::new()
-        };
-
-        let (pre_current, post_current) = if electrical_synapse {
-            let pre_current = spike_train_gap_juncton(
-                spike_train, 
-                presynaptic_neuron, 
-                timestep
-            ) * pre_gaussian_factor;
-
-            let post_current = gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            ) * post_gaussian_factor;
-
-            (pre_current, post_current)
-        } else {
-            (0., 0.)
-        };
-
-        let post_t_total = if chemical_synapse {
-            let mut t = presynaptic_neuron.get_neurotransmitter_concentrations();
-            weight_neurotransmitter_concentration(&mut t, post_gaussian_factor);
-
-            t
-        } else {
-            HashMap::new()
-        };
-
-        (pre_t_total, post_t_total, pre_current, post_current)
+    let pre_t_total = if chemical_synapse {
+        spike_train.get_neurotransmitter_concentrations()
     } else {
-        let pre_t_total = if chemical_synapse {
-            spike_train.get_neurotransmitter_concentrations()
-        } else {
-            HashMap::new()
-        };
+        HashMap::new()
+    };
 
-        let (pre_current, current) = if electrical_synapse {
-            let pre_current = spike_train_gap_juncton(
-                spike_train, 
-                presynaptic_neuron, 
-                timestep
-            );
+    let (pre_current, post_current) = if electrical_synapse {
+        let pre_current = spike_train_gap_juncton(
+            spike_train, 
+            presynaptic_neuron, 
+            timestep
+        );
 
-            let current = gap_junction(
-                &*presynaptic_neuron,
-                &*postsynaptic_neuron,
-            );
+        let post_current = gap_junction(
+            &*presynaptic_neuron,
+            &*postsynaptic_neuron,
+        );
 
-            (pre_current, current)
-        } else {
-            (0., 0.)
-        };
+        (pre_current, post_current)
+    } else {
+        (0., 0.)
+    };
 
-        let post_t_total = if chemical_synapse {
-            presynaptic_neuron.get_neurotransmitter_concentrations()
-        } else {
-            HashMap::new()
-        };
-
-        (pre_t_total, post_t_total, pre_current, current)
+    let post_t_total = if chemical_synapse {
+        presynaptic_neuron.get_neurotransmitter_concentrations()
+    } else {
+        HashMap::new()
     };
 
     let spike_train_spiking = spike_train.iterate();   
@@ -603,8 +531,6 @@ pub struct Lattice<
     pub plasticity: W,
     /// Whether to update weights with based on plasticity when iterating
     pub do_plasticity: bool,
-    /// Whether to add normally distributed random noise
-    pub gaussian: bool,
     /// Whether to calculate inputs in parallel
     pub parallel: bool,
     /// Internal clock keeping track of what timestep the lattice is at
@@ -623,7 +549,6 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             chemical_synapse: false,
             do_plasticity: false,
             plasticity: W::default(),
-            gaussian: false,
             parallel: false,
             internal_clock: 0,
         }
@@ -698,10 +623,6 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             })
             .sum();
 
-        if self.gaussian {
-            input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
-        }
-
         let averager = match input_positions.len() {
             0 => 1.,
             _ => input_positions.len() as f32,
@@ -733,12 +654,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
-        let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
-
-        if self.gaussian {
-            let (x, y) = position;
-            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
-        }
+        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
         input_val
     }
@@ -2010,10 +1926,6 @@ where
             })
             .sum::<f32>();
 
-        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            input_val *= postsynaptic_neuron.get_gaussian_factor();
-        }
-
         let averager = match input_positions.len() {
             0 => 1.,
             _ => input_positions.len() as f32,
@@ -2029,10 +1941,6 @@ where
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> NeurotransmitterConcentrations<N> {
-        let postsynaptic_neuron: &T = &self.lattices.get(&postsynaptic_position.id)
-            .unwrap()
-            .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1];
-
         let input_vals: Vec<NeurotransmitterConcentrations<N>> = input_positions
             .iter()
             .map(|input_position| {
@@ -2070,14 +1978,7 @@ where
             })
             .collect();
 
-        let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
-
-        if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            weight_neurotransmitter_concentration(
-                &mut input_val, 
-                postsynaptic_neuron.get_gaussian_factor()
-            );
-        }
+        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
         input_val
     }
@@ -2603,8 +2504,6 @@ pub struct RewardModulatedLattice<
     pub reward_modulator: W,
     /// Whether to calculate inputs in parallel
     pub parallel: bool,
-    /// Whether to add normally distributed random noise
-    pub gaussian: bool,
     /// Internal clock keeping track of what timestep the lattice is at
     pub internal_clock: usize,
 }
@@ -2630,7 +2529,6 @@ where
             do_modulation: true, 
             reward_modulator: W::default(), 
             parallel: false,
-            gaussian: false, 
             internal_clock: 0,
         }
     }
@@ -2713,10 +2611,6 @@ where
             })
             .sum();
 
-        if self.gaussian {
-            input_val *= self.cell_grid[*x][*y].get_gaussian_factor();
-        }
-
         let averager = match input_positions.len() {
             0 => 1.,
             _ => input_positions.len() as f32,
@@ -2748,12 +2642,7 @@ where
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
-        let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
-
-        if self.gaussian {
-            let (x, y) = position;
-            weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
-        }
+        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
         input_val
     }
@@ -4300,14 +4189,6 @@ where
             })
             .sum::<f32>();
 
-        if is_not_reward_modulated {
-            if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-                input_val *= postsynaptic_neuron.get_gaussian_factor();
-            }
-        } else if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            input_val *= postsynaptic_neuron.get_gaussian_factor();
-        }
-
         let averager = match input_positions.len() {
             0 => 1.,
             _ => input_positions.len() as f32,
@@ -4323,18 +4204,6 @@ where
         postsynaptic_position: &GraphPosition,
         input_positions: &HashSet<GraphPosition>
     ) -> NeurotransmitterConcentrations<N> {
-        let is_not_reward_modulated = self.lattices.contains_key(&postsynaptic_position.id);
-
-        let postsynaptic_neuron: &T = if is_not_reward_modulated {
-            &self.lattices.get(&postsynaptic_position.id)
-                .unwrap()
-                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
-        } else {
-            &self.reward_modulated_lattices.get(&postsynaptic_position.id)
-                .unwrap()
-                .cell_grid[postsynaptic_position.pos.0][postsynaptic_position.pos.1]
-        };
-
         let input_vals: Vec<NeurotransmitterConcentrations<N>> = input_positions
             .iter()
             .map(|input_position| {
@@ -4345,23 +4214,17 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    
-
                     input_cell.get_neurotransmitter_concentrations()
                 } else if self.reward_modulated_lattices.contains_key(&input_position.id) {
                     let input_cell = &self.reward_modulated_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    
-
                     input_cell.get_neurotransmitter_concentrations()
                 } else {
                     let input_cell = &self.spike_train_lattices.get(&input_position.id)
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
-
-                    
 
                     input_cell.get_neurotransmitter_concentrations()
                 };
@@ -4392,21 +4255,7 @@ where
             })
             .collect();
 
-        let mut input_val = aggregate_neurotransmitter_concentrations(&input_vals);
-
-        if is_not_reward_modulated {
-            if self.lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-                weight_neurotransmitter_concentration(
-                    &mut input_val, 
-                    postsynaptic_neuron.get_gaussian_factor()
-                );
-            }
-        } else if self.reward_modulated_lattices.get(&postsynaptic_position.id).unwrap().gaussian {
-            weight_neurotransmitter_concentration(
-                &mut input_val, 
-                postsynaptic_neuron.get_gaussian_factor()
-            );
-        }
+        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
 
         input_val
     }
