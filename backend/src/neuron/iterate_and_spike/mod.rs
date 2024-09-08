@@ -1041,8 +1041,7 @@ pub trait Timestep {
 /// } 
 /// ```
 pub trait IterateAndSpike: 
-    CurrentVoltage + Timestep + GapConductance + GaussianFactor + IsSpiking + 
-    LastFiringTime + Clone + Send + Sync 
+    CurrentVoltage + Timestep + GapConductance + IsSpiking + LastFiringTime + Clone + Send + Sync 
 {
     /// Type of neurotransmitter to use
     type N: NeurotransmitterType;
@@ -1061,3 +1060,21 @@ pub trait IterateAndSpike:
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool;
 }
+
+// // set args on the fly using a for loop
+// // for n in x { kernel.set_arg(&n); }
+// // could use lazy static for kernel compilation
+// // edit last firing time every kernel execution, -1 is considered none
+// // create chemical kernels after electrical ones
+// pub trait IterateAndSpikeGPU: IterateAndSpike {
+//     fn iterate_and_spike_electircal_kernel(&self) -> Kernel;
+//     // fn iterate_and_spike_chemical_kernel(&self) -> Kernel;
+//     // fn iterate_and_spike_electrochemical_kernel(&self) -> Kernel;
+//     fn convert_to_gpu(cell_grid: &[Vec<Self>]) -> (Vec<Buffer<cl_float>>, Vec<Buffer<cl_uint>>);
+//     fn convert_to_cpu(
+//         float_buffers: Vec<Buffer<cl_float>>, 
+//         uint_buffers: Vec<Buffer<cl_uint>>,
+//         rows: usize,
+//         cols: usize,
+//     ) -> Vec<Vec<Self>>;
+// }
