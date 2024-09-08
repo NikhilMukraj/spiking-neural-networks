@@ -202,8 +202,7 @@ pub fn get_reference_summary<
     input_spike_train: &U, 
     iterations: usize,
     electrical_synapse: bool,
-    chemical_synapse: bool,
-    gaussian: bool, 
+    chemical_synapse: bool, 
 ) -> result::Result<ActionPotentialSummary, GeneticAlgorithmError> {
     let mut current_spike_train = input_spike_train.clone();
 
@@ -224,7 +223,6 @@ pub fn get_reference_summary<
             timestep,
             electrical_synapse,
             chemical_synapse,
-            gaussian, 
         );
 
         if pre_spiking {
@@ -263,8 +261,6 @@ pub struct FittingSettings<
     pub scaling_factors: &'a [Option<SummaryScalingFactors>],
     /// Number of iterations to run simulation for
     pub iterations: usize,
-    /// Use `true` to add normally distributed random noise to inputs of simulation
-    pub gaussian: bool,
     /// Use `true` to neurons based on electrical gap junction input,
     pub electrical_synapse: bool,
     /// Use `true` to update receptor gating values of neurons based on neurotransmitter input,
@@ -302,7 +298,6 @@ fn get_summary_given_settings<
             timestep,
             settings.electrical_synapse,
             settings.chemical_synapse,
-            settings.gaussian, 
         );
 
         if pre_spiking {
@@ -413,8 +408,6 @@ fn fitting_objective<
 ///     gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
 ///     based on neurotransmitter input during the simulation for the neuron to fit
 /// 
-/// - `gaussian` : use `true` to add normally distributed random noise to inputs of simulations
-/// 
 /// - `verbose` : use `true` to print extra information
 #[allow(clippy::too_many_arguments)]
 #[allow(clippy::type_complexity)]
@@ -433,7 +426,6 @@ pub fn fit_neuron_to_neuron<
     genetic_algo_params: &GeneticAlgorithmParameters,
     reference_neuron_synapses: (bool, bool),
     neuron_to_fit_synapses: (bool, bool),
-    gaussian: bool,
     verbose: bool,
 ) -> result::Result<
     (
@@ -459,7 +451,6 @@ pub fn fit_neuron_to_neuron<
                     iterations,
                     reference_electrical_synapse,
                     reference_chemical_synapse,
-                    gaussian, 
                 )?;
 
                 let (reference_summary, scaling_factors) = get_reference_scale(
@@ -483,7 +474,6 @@ pub fn fit_neuron_to_neuron<
                     iterations,
                     reference_electrical_synapse,
                     reference_chemical_synapse,
-                    gaussian, 
                 )?;
 
                 reference_summaries.push(reference_summary);
@@ -499,7 +489,6 @@ pub fn fit_neuron_to_neuron<
         scaling_factors: scaling_factors.as_slice(),
         spike_trains: input_spike_trains.to_vec().clone(),
         iterations,
-        gaussian,
         electrical_synapse: neuron_to_fit_electrical_synapse,
         chemical_synapse: neuron_to_fit_chemical_synapse,
         converter,
