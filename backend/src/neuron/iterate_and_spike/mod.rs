@@ -798,15 +798,24 @@ pub fn weight_neurotransmitter_concentration<N: NeurotransmitterType>(
     neurotransmitter_hashmap.values_mut().for_each(|value| *value *= weight);
 }
 
-/// Sums the neurotransmitter concentrations together
+/// Sums the neurotransmitter concentrations together, and averages each neurotransmitter
+/// concentration individually
 pub fn aggregate_neurotransmitter_concentrations<N: NeurotransmitterType>(
     neurotransmitter_hashmaps: &Vec<NeurotransmitterConcentrations<N>>
 ) -> NeurotransmitterConcentrations<N> {
     let mut cumulative_map: NeurotransmitterConcentrations<N> = HashMap::new();
+    let mut scalar_map: HashMap<N, usize> = HashMap::new();
 
     for map in neurotransmitter_hashmaps {
         for (key, value) in map {
             *cumulative_map.entry(*key).or_insert(0.0) += value;
+            *scalar_map.entry(*key).or_insert(0) += 1;
+        }
+    }
+
+    for (key, value) in scalar_map {
+        if let Some(neurotransmitter) = cumulative_map.get_mut(&key) {
+            *neurotransmitter /= value as f32;
         }
     }
 
