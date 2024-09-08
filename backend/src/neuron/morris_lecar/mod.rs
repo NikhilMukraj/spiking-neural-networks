@@ -2,7 +2,10 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
+    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, 
+    IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
+    LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, 
+    ReceptorKinetics, Timestep
 };
 use super::ion_channels::{
     TimestepIndependentIonChannel, IonChannel, ReducedCalciumChannel, 
@@ -36,8 +39,6 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub was_increasing: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -59,7 +60,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             is_spiking: false,
             was_increasing: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::<R>::default(),
         }

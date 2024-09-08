@@ -5,7 +5,7 @@
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, 
-    GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, 
+    GapConductance, GaussianParameters, IonotropicNeurotransmitterType, 
     IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
     NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
@@ -18,17 +18,16 @@ use super::plasticity::BCMActivity;
 /// returns the voltages from the neuron over time
 pub fn run_static_input_integrate_and_fire<T: IterateAndSpike>(
     cell: &mut T, 
-    input: f32, 
-    gaussian: bool, 
-    iterations: usize
+    input_current: f32, 
+    gaussian: Option<GaussianParameters>, 
+    iterations: usize,
 ) -> Vec<f32> {
     let mut voltages: Vec<f32> = vec![];
 
     for _ in 0..iterations {
-        let _is_spiking = if gaussian {
-            cell.iterate_and_spike(cell.get_gaussian_factor() * input)
-        } else {
-            cell.iterate_and_spike(input)
+        let _is_spiking = match gaussian {
+            Some(ref params) => cell.iterate_and_spike(params.get_random_number() * input_current),
+            None => cell.iterate_and_spike(input_current),
         };
 
         voltages.push(cell.get_current_voltage());
@@ -269,8 +268,6 @@ pub struct QuadraticIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: Recep
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -297,7 +294,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for QuadraticInte
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -388,8 +384,6 @@ pub struct AdaptiveLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: R
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -421,7 +415,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveLeaky
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -527,8 +520,6 @@ pub struct AdaptiveExpLeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -561,7 +552,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for AdaptiveExpLe
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -622,8 +612,6 @@ pub struct IzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -650,7 +638,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for IzhikevichNeu
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -740,8 +727,6 @@ pub struct LeakyIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetic
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -769,7 +754,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIzhikevi
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -841,8 +825,6 @@ pub struct BCMIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     pub firing_rate_clock: f32,
     /// Current window for firing rate
     pub firing_rate_window: f32,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -875,7 +857,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for BCMIzhikevich
             num_spikes: 0,
             firing_rate_clock: 0.,
             firing_rate_window: 500.,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }

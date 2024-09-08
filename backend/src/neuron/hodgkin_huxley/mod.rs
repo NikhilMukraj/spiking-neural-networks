@@ -7,7 +7,10 @@ use std::{
 };
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, GaussianFactor, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
+    CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, 
+    GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, 
+    LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
+    Neurotransmitters, ReceptorKinetics, Timestep
 };
 use super::ion_channels::{
     NaIonChannel, KIonChannel, KLeakChannel, IonChannel, TimestepIndependentIonChannel
@@ -245,9 +248,9 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Hodgk
 /// `"m"`, `"n"`, and `"h"`
 pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorKinetics>(
     hodgkin_huxley_neuron: &mut HodgkinHuxleyNeuron<T, R>,
-    input: f32,
-    gaussian: bool,
+    input_current: f32,
     iterations: usize,
+    gaussian: Option<GaussianParameters>,
 ) -> HashMap<String, Vec<f32>> {
     let mut state_output = HashMap::new();
     state_output.insert("current_voltage".to_string(), vec![]);
@@ -256,13 +259,10 @@ pub fn run_static_input_hodgkin_huxley<T: NeurotransmitterKinetics, R: ReceptorK
     state_output.insert("h".to_string(), vec![]);
 
     for _ in 0..iterations {
-        let current_input = if gaussian {
-            input * hodgkin_huxley_neuron.get_gaussian_factor()
-        } else {
-            input
+        let _is_spiking = match gaussian {
+            Some(ref params) => hodgkin_huxley_neuron.iterate_and_spike(params.get_random_number() * input_current),
+            None => hodgkin_huxley_neuron.iterate_and_spike(input_current),
         };
-
-        let _is_spiking = hodgkin_huxley_neuron.iterate_and_spike(current_input);
 
         if let Some(val) = state_output.get_mut("current_voltage") { val.push(hodgkin_huxley_neuron.current_voltage) }
         if let Some(val) = state_output.get_mut("m") { val.push(hodgkin_huxley_neuron.na_channel.m.state) }
