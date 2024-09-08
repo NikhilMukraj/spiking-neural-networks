@@ -894,11 +894,6 @@ pub trait GapConductance {
     fn get_gap_conductance(&self) -> f32;
 }
 
-/// Gets the noise factor for the neuron
-pub trait GaussianFactor {
-    fn get_gaussian_factor(&self) -> f32;
-}
-
 /// Gets whether the neuron is spiking
 pub trait IsSpiking {
     fn is_spiking(&self) -> bool;
@@ -968,8 +963,6 @@ pub trait Timestep {
 ///     pub is_spiking: bool,
 ///     /// Last timestep the neuron has spiked
 ///     pub last_firing_time: Option<usize>,
-///     /// Parameters used in generating noise
-///     pub gaussian_params: GaussianParameters,
 ///     /// Postsynaptic neurotransmitters in cleft
 ///     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
 ///     /// Ionotropic receptor ligand gated channels
