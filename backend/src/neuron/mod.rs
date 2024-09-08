@@ -740,13 +740,6 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
 
-        let averager = match input_positions.len() {
-            0 => 1.,
-            _ => 1. / input_positions.len() as f32,
-        };
-
-        weight_neurotransmitter_concentration(&mut input_val, averager);
-
         input_val
     }
 
@@ -2086,16 +2079,6 @@ where
             );
         }
 
-        let averager = match input_positions.len() {
-            0 => 1.,
-            _ => 1. / input_positions.len() as f32,
-        };
-
-        weight_neurotransmitter_concentration(
-            &mut input_val, 
-            averager,
-        );
-
         input_val
     }
 
@@ -2771,13 +2754,6 @@ where
             let (x, y) = position;
             weight_neurotransmitter_concentration(&mut input_val, self.cell_grid[*x][*y].get_gaussian_factor());
         }
-
-        let averager = match input_positions.len() {
-            0 => 1.,
-            _ => 1. / input_positions.len() as f32,
-        };
-
-        weight_neurotransmitter_concentration(&mut input_val, averager);
 
         input_val
     }
@@ -4431,16 +4407,6 @@ where
                 postsynaptic_neuron.get_gaussian_factor()
             );
         }
-
-        let averager = match input_positions.len() {
-            0 => 1.,
-            _ => 1. / input_positions.len() as f32,
-        };
-
-        weight_neurotransmitter_concentration(
-            &mut input_val, 
-            averager
-        );
 
         input_val
     }
