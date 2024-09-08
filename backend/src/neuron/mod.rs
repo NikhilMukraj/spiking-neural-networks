@@ -28,7 +28,9 @@ pub mod spike_train;
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
-    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, ApproximateNeurotransmitter, CurrentVoltage, GapConductance, GaussianParameters, IsSpiking, IterateAndSpike, NeurotransmitterConcentrations, NeurotransmitterType 
+    aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
+    ApproximateNeurotransmitter, CurrentVoltage, GapConductance, GaussianParameters, 
+    IsSpiking, IterateAndSpike, NeurotransmitterConcentrations, NeurotransmitterType 
 };
 pub mod plasticity;
 use plasticity::{
@@ -654,9 +656,9 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
-        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+        
 
-        input_val
+        aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
     /// Gets all internal electrical inputs 
@@ -1978,9 +1980,9 @@ where
             })
             .collect();
 
-        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+        
 
-        input_val
+        aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
     fn get_every_node(&self) -> HashSet<GraphPosition> {
@@ -2642,9 +2644,9 @@ where
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
-        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
+        
 
-        input_val
+        aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
     /// Gets all internal electrical inputs 
@@ -4255,9 +4257,7 @@ where
             })
             .collect();
 
-        let input_val = aggregate_neurotransmitter_concentrations(&input_vals);
-
-        input_val
+        aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
     fn get_every_node(&self) -> HashSet<GraphPosition> {
