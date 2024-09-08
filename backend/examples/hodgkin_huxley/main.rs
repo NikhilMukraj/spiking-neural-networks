@@ -29,7 +29,6 @@ fn main() {
     let input_current = 30.;
     let electrical_synapse = false;
     let chemical_synapse = true;
-    let gaussian = false;
 
     let mut presynaptic_voltages: Vec<f32> = Vec::new();
     let mut postsynaptic_voltages: Vec<f32> = Vec::new();
@@ -43,7 +42,7 @@ fn main() {
             input_current, 
             electrical_synapse,
             chemical_synapse, 
-            gaussian
+            None,
         );
 
         presynaptic_voltages.push(presynaptic_neuron.current_voltage);
