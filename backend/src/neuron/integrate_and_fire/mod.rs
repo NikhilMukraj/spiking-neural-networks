@@ -9,6 +9,19 @@ use super::iterate_and_spike::{
     IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
     NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
+// #[cfg(feature = "gpu")]
+use super::iterate_and_spike::{
+    IterateAndSpikeGPU, BufferGPU, KernelFunction,
+};
+// #[cfg(feature = "gpu")]
+use opencl3::{
+    context::Context, kernel::Kernel, program::Program, 
+    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint},
+};
+// #[cfg(feature = "gpu")]
+use std::collections::HashMap;
+// #[cfg(feature = "gpu")]
+use std::ptr;
 use super::plasticity::BCMActivity;
 
 
@@ -340,6 +353,110 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         self.handle_spiking()
     }
 } 
+
+
+// #[cfg(feature = "gpu")]
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
+    fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction {
+        let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
+        let argument_names = vec![
+            String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
+            String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
+            String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
+            String::from("v_th"), String::from("is_spiking"),
+        ];
+
+        let program_source = String::from(r#"
+            __kernel void quadratic_integrate_and_fire_iterate_and_spike(
+                __global const float *inputs,
+                __global const uint *index_to_position,
+                __global float *current_voltage,
+                __global float *alpha,
+                __global float *v_reset,
+                __global float *v_c,
+                __global float *integration_constant,
+                __global float *dt,
+                __global float *tau_m,
+                __global float *v_th,
+                __global uint *is_spiking
+            ) {
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
+
+                v[index] += (
+                    alpha[index] * (current_voltage[index] - v_reset[index]) * 
+                    (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
+                    ) 
+                    * dt[index];
+                if (v[index] >= v_th[index]) {
+                    v[index] = v_reset[index];
+                    is_spiking[index] = 1;
+                } else {
+                    is_spiking[index] = 0;
+                }
+            }
+        "#);
+
+        let iterate_and_spike_program = Program::create_and_build_from_source(context, &program_source, "")
+            .expect("Program::create_and_build_from_source failed");
+        let kernel = Kernel::create(&iterate_and_spike_program, &kernel_name)
+            .expect("Kernel::create failed");
+
+        KernelFunction { 
+            kernel, 
+            program_source, 
+            kernel_name, 
+            argument_names, 
+        }
+    }
+    
+    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context) -> HashMap<String, BufferGPU> {
+        let mut buffers = HashMap::new();
+
+        let argument_names = vec![
+            "inputs", "index_to_position", "current_voltage", "alpha", 
+            "v_reset", "v_c", "integration_constant", "dt", "tau_m",
+            "v_th", "is_spiking",
+        ];
+
+        let n = cell_grid.len() * cell_grid.first().map_or(0, |v| v.len());
+
+        for name in argument_names {
+            let buffer = match name {
+                "inputs" | "current_voltage" | "alpha" | "v_reset" | "v_c" 
+                | "integration_constant" | "dt" | "tau_m" | "v_th" => {
+                    unsafe {
+                        BufferGPU::Float(
+                            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
+                                .expect("Buffer creation failed")
+                        )
+                    }
+                },
+                "index_to_position" | "is_spiking" => {
+                    unsafe {
+                        BufferGPU::UInt(
+                            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
+                                .expect("Buffer creation failed")
+                        )
+                    }
+                }
+                _ => continue,
+            };
+            buffers.insert(name.to_string(), buffer);
+        }
+
+        buffers
+    }
+
+    fn convert_to_cpu(
+        _buffers: HashMap<String, BufferGPU>,
+        _rows: usize,
+        _cols: usize,
+    ) -> Vec<Vec<Self>> {
+        todo!()
+    }
+}
+
 
 /// An adaptive leaky integrate and fire neuron
 #[derive(Debug, Clone, IterateAndSpikeBase)]
