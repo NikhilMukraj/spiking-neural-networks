@@ -7,6 +7,8 @@ use std::{
     fmt::Debug,
     hash::Hash,
 };
+// #[cfg(feature = "gpu")]
+use opencl3::{kernel::Kernel, context::Context, memory::Buffer, types::{cl_float, cl_uint}};
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -922,8 +924,7 @@ pub trait Timestep {
 /// ```rust
 /// use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 /// use spiking_neural_networks::neuron::iterate_and_spike::{
-///     GaussianFactor, GaussianParameters, IsSpiking, Timestep,
-///     CurrentVoltage, GapConductance, IterateAndSpike, 
+///     IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
 ///     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
 ///     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
@@ -1054,20 +1055,44 @@ pub trait IterateAndSpike:
     ) -> bool;
 }
 
-// // set args on the fly using a for loop
-// // for n in x { kernel.set_arg(&n); }
-// // could use lazy static for kernel compilation
-// // edit last firing time every kernel execution, -1 is considered none
-// // create chemical kernels after electrical ones
-// pub trait IterateAndSpikeGPU: IterateAndSpike {
-//     fn iterate_and_spike_electircal_kernel(&self) -> Kernel;
-//     // fn iterate_and_spike_chemical_kernel(&self) -> Kernel;
-//     // fn iterate_and_spike_electrochemical_kernel(&self) -> Kernel;
-//     fn convert_to_gpu(cell_grid: &[Vec<Self>]) -> (Vec<Buffer<cl_float>>, Vec<Buffer<cl_uint>>);
-//     fn convert_to_cpu(
-//         float_buffers: Vec<Buffer<cl_float>>, 
-//         uint_buffers: Vec<Buffer<cl_uint>>,
-//         rows: usize,
-//         cols: usize,
-//     ) -> Vec<Vec<Self>>;
-// }
+// #[cfg(feature = "gpu")]
+/// An encapsulation of necessary data for GPU kernels
+pub struct KernelFunction {
+    pub kernel: Kernel,
+    pub program_source: String,
+    pub kernel_name: String,
+    pub argument_names: Vec<String>,
+}
+
+// #[cfg(feature = "gpu")]
+/// An encapsulation of a float or unsigned integer buffer for the GPU
+pub enum BufferGPU {
+    Float(Buffer<cl_float>),
+    UInt(Buffer<cl_uint>),
+}
+
+// set args on the fly using a for loop
+// for n in x { kernel.set_arg(&n); } // modify this to use names instead
+// could use lazy static for kernel compilation
+// edit last firing time every kernel execution, -1 is considered none
+// create chemical kernels after electrical ones
+// should have seperate convert to electrical and convert to chemical
+// that way ligand gates arent generated when not in use
+// conversions should be falliable
+// #[cfg(feature = "gpu")]
+pub trait IterateAndSpikeGPU: IterateAndSpike {
+    /// Returns the compiled kernel for electrical inputs
+    fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction;
+    // /// Returns the compiled kernel for chemical inputs
+    // fn iterate_and_spike_chemical_kernel(&self) -> KernelFunction;
+    // /// Returns the compiled kernel for electirlca and chemical inputs
+    // fn iterate_and_spike_electrochemical_kernel(&self) -> KernelFunction;
+    /// Converts a grid of the neuron type to a vector of buffers
+    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context) -> HashMap<String, BufferGPU>;
+    /// Converts buffers back to a grid of neurons
+    fn convert_to_cpu(
+        buffers: HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+    ) -> Vec<Vec<Self>>;
+}
