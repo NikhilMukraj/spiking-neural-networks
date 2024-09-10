@@ -7,8 +7,11 @@ use std::{
     fmt::Debug,
     hash::Hash,
 };
-// #[cfg(feature = "gpu")]
-use opencl3::{kernel::Kernel, context::Context, memory::Buffer, types::{cl_float, cl_uint}};
+#[cfg(feature = "gpu")]
+use opencl3::{
+    kernel::Kernel, context::Context, command_queue::CommandQueue,
+    memory::Buffer, types::{cl_float, cl_uint}
+};
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -1055,7 +1058,7 @@ pub trait IterateAndSpike:
     ) -> bool;
 }
 
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 /// An encapsulation of necessary data for GPU kernels
 pub struct KernelFunction {
     pub kernel: Kernel,
@@ -1064,7 +1067,7 @@ pub struct KernelFunction {
     pub argument_names: Vec<String>,
 }
 
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 /// An encapsulation of a float or unsigned integer buffer for the GPU
 pub enum BufferGPU {
     Float(Buffer<cl_float>),
@@ -1079,7 +1082,7 @@ pub enum BufferGPU {
 // should have seperate convert to electrical and convert to chemical
 // that way ligand gates arent generated when not in use
 // conversions should be falliable
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 pub trait IterateAndSpikeGPU: IterateAndSpike {
     /// Returns the compiled kernel for electrical inputs
     fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction;
@@ -1091,8 +1094,10 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
     fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context) -> HashMap<String, BufferGPU>;
     /// Converts buffers back to a grid of neurons
     fn convert_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
         buffers: HashMap<String, BufferGPU>,
         rows: usize,
         cols: usize,
-    ) -> Vec<Vec<Self>>;
+        queue: &CommandQueue,
+    );
 }
