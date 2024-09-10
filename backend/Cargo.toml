@@ -27,14 +27,15 @@ rand_distr = "0.4.3"
 rayon = "1.8.0"
 rustfft = "6.1.0"
 iterate_and_spike_traits = { path = "src/neuron/iterate_and_spike_traits", version = "0.7.0" }
-# opencl3 = { version = "0.9.5", optional = true } 
-opencl3 = "0.9.5"
+opencl3 = { version = "0.9.5", optional = true } 
+# opencl3 = "0.9.5"
 
 # [dev-dependencies]
 # ratatui = "0.26.3"
 
-# [features]
-# gpu = []
+[features]
+default = ["gpu"]
+gpu = ["dep:opencl3"]
 
 [lib]
 name = "spiking_neural_networks"
