@@ -50,6 +50,8 @@ def calculate_correlation(patterns):
 p_on = 0.5
 num_patterns = 4
 
+correlation_threshold = 150
+
 not_unique = True
 too_correlated = True
 while not_unique or too_correlated:
@@ -61,7 +63,7 @@ while not_unique or too_correlated:
         patterns.append(p)
 
     not_unique = check_uniqueness(patterns)    
-    too_correlated = calculate_correlation(np.array(patterns)).sum() > 150
+    too_correlated = calculate_correlation(np.array(patterns)).sum() > correlation_threshold
 
 def setup_neuron(neuron):
     neuron.current_voltage = np.random.uniform(-65, 30)
