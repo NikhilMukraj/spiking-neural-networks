@@ -9,18 +9,18 @@ use super::iterate_and_spike::{
     IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
     NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
 };
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
     IterateAndSpikeGPU, BufferGPU, KernelFunction,
 };
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 use opencl3::{
-    context::Context, kernel::Kernel, program::Program, 
-    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint},
+    context::Context, kernel::Kernel, program::Program, command_queue::CommandQueue,
+    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint, CL_NON_BLOCKING},
 };
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 use std::collections::HashMap;
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 use std::ptr;
 use super::plasticity::BCMActivity;
 
@@ -354,8 +354,30 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
     }
 } 
 
+#[cfg(feature = "gpu")]
+macro_rules! read_and_set_buffer {
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
+        if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
+            unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer");
+            }
+        }
+    };
+    
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, UInt) => {
+        if let Some(BufferGPU::UInt(buffer)) = $buffers.get($buffer_name) {
+            unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer");
+            }
+        }
+    };
+}
 
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
     fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
@@ -423,7 +445,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
         for name in argument_names {
             let buffer = match name {
-                "inputs" | "current_voltage" | "alpha" | "v_reset" | "v_c" 
+                "current_voltage" | "alpha" | "v_reset" | "v_c" 
                 | "integration_constant" | "dt" | "tau_m" | "v_th" => {
                     unsafe {
                         BufferGPU::Float(
@@ -432,7 +454,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                         )
                     }
                 },
-                "index_to_position" | "is_spiking" => {
+                "is_spiking" => {
                     unsafe {
                         BufferGPU::UInt(
                             Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
@@ -448,12 +470,50 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         buffers
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn convert_to_cpu(
-        _buffers: HashMap<String, BufferGPU>,
-        _rows: usize,
-        _cols: usize,
-    ) -> Vec<Vec<Self>> {
-        todo!()
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) {
+        let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
+        let mut alpha: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_reset: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_c: Vec<f32> = vec![0.0; rows * cols];
+        let mut integration_constant: Vec<f32> = vec![0.0; rows * cols];
+        let mut dt: Vec<f32> = vec![0.0; rows * cols];
+        let mut tau_m: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut is_spiking: Vec<u32> = vec![0; rows * cols];
+
+        read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
+        read_and_set_buffer!(buffers, queue, "alpha", &mut alpha, Float);
+        read_and_set_buffer!(buffers, queue, "v_reset", &mut v_reset, Float);
+        read_and_set_buffer!(buffers, queue, "v_c", &mut v_c, Float);
+        read_and_set_buffer!(buffers, queue, "integration_constant", &mut integration_constant, Float);
+        read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
+        read_and_set_buffer!(buffers, queue, "tau_m", &mut tau_m, Float);
+        read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
+
+        for i in 0..rows {
+            for j in 0..cols {
+                let idx = i * cols + j;
+                let cell = &mut cell_grid[i][j];
+                
+                cell.current_voltage = current_voltage[idx];
+                cell.alpha = alpha[idx];
+                cell.v_reset = v_reset[idx];
+                cell.v_c = v_c[idx];
+                cell.integration_constant = integration_constant[idx];
+                cell.dt = dt[idx];
+                cell.tau_m = tau_m[idx];
+                cell.v_th = v_th[idx];
+                cell.is_spiking = is_spiking[idx] == 1;
+            }
+        }
     }
 }
 
