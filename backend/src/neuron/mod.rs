@@ -41,6 +41,8 @@ use plasticity::{
 pub mod iterate_and_spike_traits {
     pub use iterate_and_spike_traits::*;
 }
+#[cfg(feature = "gpu")]
+pub mod gpu_lattices;
 use crate::error::{AgentError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError};
 use crate::graph::{Graph, GraphPosition, AdjacencyMatrix, ToGraphPosition, Position};
 use crate::interactable::{Agent, UnsupervisedAgent};
