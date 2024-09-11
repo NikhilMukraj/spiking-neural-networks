@@ -11,6 +11,9 @@
 // // eventually will need neurotransmitter gpu type
 // // eventually add lattice history
 
+// // convert graph to gpu
+// // may need to use gpu graph outside of trait first
+
 // pub struct LatticeGPU<
 //     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
 //     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<V>, 
