@@ -66,6 +66,15 @@ impl<U: Send + Sync + Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Po
     type GraphPos = AdjacencyMatrix<GraphPosition, U>;
 }
 
+#[cfg(feature = "gpu")]
+/// Handles conversion of graph of CPU to graph on GPU
+pub trait GraphToGPU<GraphGPU> {
+    /// Converts graph to graph on GPU
+    fn convert_to_gpu(&self) -> GraphGPU;
+    /// Converts from graph on GPU to graph on CPU
+    fn convert_from_gpu(&mut self, gpu_graph: GraphGPU);
+}
+
 /// A graph implemented as an adjacency matrix where the positions of each node
 /// are converted to `usize` to be index in a 2-dimensional matrix
 /// 
