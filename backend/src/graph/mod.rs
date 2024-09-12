@@ -8,7 +8,13 @@ use std::{
     cmp::Eq,
 };
 use crate::error::GraphError;
-// use crate::neuron::iterate_and_spike::GaussianParameters;
+#[cfg(feature = "gpu")]
+use opencl3::{
+    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint, CL_BLOCKING}, 
+    command_queue::CommandQueue, context::Context,
+};
+#[cfg(feature = "gpu")]
+use std::ptr;
 
 
 /// Cartesian coordinate represented as unsigned integers for x and y
@@ -67,10 +73,19 @@ impl<U: Send + Sync + Debug + Clone + Copy> ToGraphPosition for AdjacencyList<Po
 }
 
 #[cfg(feature = "gpu")]
+/// An implementation of a graph that works on a GPU where the weights are floats
+pub struct GraphGPU {
+    pub connections: Buffer<cl_uint>,
+    pub weights: Buffer<cl_float>,
+    pub index_to_position: Buffer<cl_uint>,
+    pub size: u32,
+}
+
+#[cfg(feature = "gpu")]
 /// Handles conversion of graph of CPU to graph on GPU
-pub trait GraphToGPU<GraphGPU> {
+pub trait GraphToGPU {
     /// Converts graph to graph on GPU
-    fn convert_to_gpu(&self) -> GraphGPU;
+    fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU;
     /// Converts from graph on GPU to graph on CPU
     fn convert_from_gpu(&mut self, gpu_graph: GraphGPU);
 }
@@ -262,6 +277,68 @@ impl<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Deb
             history: vec![],
             id: 0,
         }
+    }
+}
+
+impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
+    fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU {
+        let length = self.position_to_index.len();
+
+        let weights: Vec<f32> = self.matrix.clone()
+            .into_iter()
+            .flatten()
+            .map(|i| i.unwrap_or(0.))
+            .collect();
+        let connections: Vec<u32> = self.matrix.clone()
+            .into_iter()
+            .flatten()
+            .map(|i| match i {
+                Some(_) => 1,
+                None => 0,
+            })
+            .collect();
+        let index_to_position: Vec<u32> = self.index_to_position.values()
+            .map(|pos| (pos.0 * length + pos.1) as u32)
+            .collect();
+
+        let mut connections_buffer = unsafe {
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, length * length, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+        let mut weights_buffer = unsafe {
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, length * length, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+        let mut index_to_position_buffer = unsafe {
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, length, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _connections_write_event = unsafe { 
+            queue.enqueue_write_buffer(&mut connections_buffer, CL_BLOCKING, 0, &connections, &[])
+                .expect("Could not write to buffer") 
+        };
+        let _weights_write_event = unsafe { 
+            queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights, &[])
+                .expect("Could not write to buffer") 
+        };
+        let index_to_position_write_event = unsafe { 
+            queue.enqueue_write_buffer(&mut index_to_position_buffer, CL_BLOCKING, 0, &index_to_position, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        index_to_position_write_event.wait().expect("Could not wait");
+
+        GraphGPU { 
+            connections: connections_buffer, 
+            weights: weights_buffer, 
+            index_to_position: index_to_position_buffer, 
+            size: length as u32,
+        }
+    }
+    
+    fn convert_from_gpu(&mut self, _gpu_graph: GraphGPU) {
+        todo!()
     }
 }
 
