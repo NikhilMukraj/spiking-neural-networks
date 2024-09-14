@@ -281,6 +281,7 @@ impl<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Deb
     }
 }
 
+#[cfg(feature = "gpu")]
 impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
     fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU {
         let length = self.position_to_index.len();
