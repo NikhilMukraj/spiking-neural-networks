@@ -10,7 +10,8 @@ use std::{
 use crate::error::GraphError;
 #[cfg(feature = "gpu")]
 use opencl3::{
-    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint, CL_BLOCKING}, 
+    memory::{Buffer, CL_MEM_READ_WRITE}, 
+    types::{cl_float, cl_uint, CL_BLOCKING, CL_NON_BLOCKING}, 
     command_queue::CommandQueue, context::Context,
 };
 #[cfg(feature = "gpu")]
@@ -87,7 +88,7 @@ pub trait GraphToGPU {
     /// Converts graph to graph on GPU
     fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU;
     /// Converts from graph on GPU to graph on CPU
-    fn convert_from_gpu(&mut self, gpu_graph: GraphGPU);
+    fn convert_from_gpu(&mut self, gpu_graph: GraphGPU, queue: &CommandQueue);
 }
 
 /// A graph implemented as an adjacency matrix where the positions of each node
@@ -337,8 +338,37 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
         }
     }
     
-    fn convert_from_gpu(&mut self, _gpu_graph: GraphGPU) {
-        todo!()
+    #[allow(clippy::needless_range_loop)]
+    fn convert_from_gpu(&mut self, gpu_graph: GraphGPU, queue: &CommandQueue) {
+        let length = gpu_graph.size as usize;
+
+        let mut connections: Vec<cl_uint> = vec![0; length * length];
+        let mut weights: Vec<cl_float> = vec![0.0; length * length];
+
+        let _connections_read_event = unsafe {
+            queue.enqueue_read_buffer(&gpu_graph.connections, CL_NON_BLOCKING, 0, &mut connections, &[])
+                .expect("Could not read from buffer")
+        };
+        let weights_read_event = unsafe {
+            queue.enqueue_read_buffer(&gpu_graph.weights, CL_NON_BLOCKING, 0, &mut weights, &[])
+                .expect("Could not read from buffer")
+        };
+    
+        weights_read_event.wait().expect("Could not wait");
+
+        let mut matrix: Vec<Vec<Option<f32>>> = vec![vec![None; length]; length];
+        for i in 0..length {
+            for j in 0..length {
+                let idx = i * length + j;
+                matrix[i][j] = if connections[idx] == 1 {
+                    Some(weights[idx])
+                } else {
+                    None
+                };
+            }
+        }
+
+        self.matrix = matrix;   
     }
 }
 
