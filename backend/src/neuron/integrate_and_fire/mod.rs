@@ -379,7 +379,7 @@ macro_rules! read_and_set_buffer {
 
 #[cfg(feature = "gpu")]
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
-    fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction {
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
             String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
@@ -393,6 +393,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 __global const float *inputs,
                 __global const uint *index_to_position,
                 __global float *current_voltage,
+                __global float *gap_conductance,
                 __global float *alpha,
                 __global float *v_reset,
                 __global float *v_c,
@@ -436,8 +437,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         let mut buffers = HashMap::new();
 
         let argument_names = vec![
-            "inputs", "index_to_position", "current_voltage", "alpha", 
-            "v_reset", "v_c", "integration_constant", "dt", "tau_m",
+            "inputs", "index_to_position", "current_voltage", "gap_conductance", 
+            "alpha", "v_reset", "v_c", "integration_constant", "dt", "tau_m",
             "v_th", "is_spiking",
         ];
 
@@ -479,6 +480,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         queue: &CommandQueue,
     ) {
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
+        let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
         let mut alpha: Vec<f32> = vec![0.0; rows * cols];
         let mut v_reset: Vec<f32> = vec![0.0; rows * cols];
         let mut v_c: Vec<f32> = vec![0.0; rows * cols];
@@ -489,6 +491,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         let mut is_spiking: Vec<u32> = vec![0; rows * cols];
 
         read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
+        read_and_set_buffer!(buffers, queue, "gap_conductance", &mut gap_conductance, Float);
         read_and_set_buffer!(buffers, queue, "alpha", &mut alpha, Float);
         read_and_set_buffer!(buffers, queue, "v_reset", &mut v_reset, Float);
         read_and_set_buffer!(buffers, queue, "v_c", &mut v_c, Float);
@@ -504,6 +507,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 let cell = &mut cell_grid[i][j];
                 
                 cell.current_voltage = current_voltage[idx];
+                cell.gap_conductance = gap_conductance[idx];
                 cell.alpha = alpha[idx];
                 cell.v_reset = v_reset[idx];
                 cell.v_c = v_c[idx];
