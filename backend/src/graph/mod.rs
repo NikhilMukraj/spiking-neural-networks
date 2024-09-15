@@ -79,7 +79,7 @@ pub struct GraphGPU {
     pub connections: Buffer<cl_uint>,
     pub weights: Buffer<cl_float>,
     pub index_to_position: Buffer<cl_uint>,
-    pub size: u32,
+    pub size: usize,
 }
 
 #[cfg(feature = "gpu")]
@@ -335,13 +335,13 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
             connections: connections_buffer, 
             weights: weights_buffer, 
             index_to_position: index_to_position_buffer, 
-            size: length as u32,
+            size: length,
         }
     }
     
     #[allow(clippy::needless_range_loop)]
     fn convert_from_gpu(&mut self, gpu_graph: GraphGPU, queue: &CommandQueue) {
-        let length = gpu_graph.size as usize;
+        let length = gpu_graph.size;
 
         let mut connections: Vec<cl_uint> = vec![0; length * length];
         let mut weights: Vec<cl_float> = vec![0.0; length * length];
