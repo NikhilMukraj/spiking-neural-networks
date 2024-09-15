@@ -1085,7 +1085,7 @@ pub enum BufferGPU {
 #[cfg(feature = "gpu")]
 pub trait IterateAndSpikeGPU: IterateAndSpike {
     /// Returns the compiled kernel for electrical inputs
-    fn iterate_and_spike_electrical_kernel(&self, context: &Context) -> KernelFunction;
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction;
     // /// Returns the compiled kernel for chemical inputs
     // fn iterate_and_spike_chemical_kernel(&self) -> KernelFunction;
     // /// Returns the compiled kernel for electirlca and chemical inputs
