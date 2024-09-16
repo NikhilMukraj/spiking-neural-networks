@@ -61,7 +61,7 @@ pub struct LatticeGPU<
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
     N: NeurotransmitterType,
 > {
-    cell_grid: Vec<Vec<T>>,
+    pub cell_grid: Vec<Vec<T>>,
     graph: U,
     incoming_connections_kernel: Kernel,
     context: Context,
@@ -109,7 +109,7 @@ where
 
     // modify to be falliable
     // modify to account for last firing time
-    pub fn run_lattices(&mut self, iterations: usize) {
+    pub fn run_lattice(&mut self, iterations: usize) {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context);
 
         let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue);
