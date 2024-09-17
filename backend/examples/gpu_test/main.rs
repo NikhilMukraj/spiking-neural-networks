@@ -1,4 +1,4 @@
-use std::{fs::File, io::Write};
+// use std::{fs::File, io::Write};
 use rand::Rng;
 extern crate spiking_neural_networks;
 use spiking_neural_networks::{
@@ -6,7 +6,7 @@ use spiking_neural_networks::{
     neuron::{
         integrate_and_fire::QuadraticIntegrateAndFireNeuron,
         gpu_lattices::LatticeGPU,
-        Lattice,
+        Lattice
     }
 };
 
@@ -50,23 +50,31 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     gpu_lattice.run_lattice(1);
 
-    let mut cpu_file = File::create("cpu_lattice.txt").expect("Could not create file");
-    let mut gpu_file = File::create("gpu_lattice.txt").expect("Could not create file");
+    // let mut cpu_file = File::create("cpu_lattice.txt").expect("Could not create file");
+    // let mut gpu_file = File::create("gpu_lattice.txt").expect("Could not create file");
 
-    for row in lattice.cell_grid.iter() {
-        for neuron in row {
-            write!(cpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
+    // for row in lattice.cell_grid.iter() {
+    //     for neuron in row {
+    //         write!(cpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
+    //     }
+    //     writeln!(cpu_file).expect("Could not write to file");
+    // }
+
+    // for row in gpu_lattice.cell_grid.iter() {
+    //     for neuron in row {
+    //         write!(gpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
+    //     }
+    //     writeln!(gpu_file).expect("Could not write to file");
+    // }
+
+    for (row1, row2) in lattice.cell_grid.iter().zip(gpu_lattice.cell_grid.iter()) {
+        for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
+            assert!((neuron1.current_voltage - neuron2.current_voltage).abs() <= 0.1)
         }
-        writeln!(cpu_file).expect("Could not write to file");
     }
 
-    for row in gpu_lattice.cell_grid.iter() {
-        for neuron in row {
-            write!(gpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
-        }
-        writeln!(gpu_file).expect("Could not write to file");
-    }
+    // continue checking how different lattices are at each iteration
+    // assert equals err <= 0.1 for each cell
 
-    
     Ok(())
 }
