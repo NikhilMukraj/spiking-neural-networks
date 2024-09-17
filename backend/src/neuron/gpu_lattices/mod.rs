@@ -9,7 +9,7 @@ use opencl3::{
 use crate::graph::{Graph, GraphToGPU};
 use super::iterate_and_spike::{IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterType};
 use super::plasticity::Plasticity;
-use super::{Lattice, LatticeHistory};
+use super::{Lattice, LatticeHistory, Position, impl_apply};
 
 
 // pub trait GraphGPU: Default {
@@ -21,6 +21,35 @@ use super::{Lattice, LatticeHistory};
 
 // convert graph to gpu
 // may need to use gpu graph outside of trait first
+
+// macro_rules! impl_apply {
+//     () => {
+//         /// Applies a function across the entire cell grid to each neuron
+//         pub fn apply<F>(&mut self, f: F)
+//         where
+//             F: Fn(&mut T),
+//         {
+//             for row in self.cell_grid.iter_mut() {
+//                 for neuron in row {
+//                     f(neuron);
+//                 }
+//             }
+//         }
+
+//         /// Applies a function across the entire cell grid to each neuron
+//         /// given the position, `(usize, usize)`, of the neuron and the neuron itself
+//         pub fn apply_given_position<F>(&mut self, f: F)
+//         where
+//             F: Fn((usize, usize), &mut T),
+//         {
+//             for (i, row) in self.cell_grid.iter_mut().enumerate() {
+//                 for (j, neuron) in row.iter_mut().enumerate() {
+//                     f((i, j), neuron);
+//                 }
+//             }
+//         }
+//     };
+// }
 
 const INPUTS_KERNEL: &str = r#"
 __kernel void calculate_internal_electrical_inputs(
@@ -74,6 +103,9 @@ where
     U: Graph<K = (usize, usize), V = f32> + GraphToGPU,
     N: NeurotransmitterType,
 {
+    impl_apply!();
+
+    // Generates a GPU lattice from a given lattice
     pub fn from_lattice<
         LatticeHistoryCPU: LatticeHistory, 
         W: Plasticity<T, T, f32>,
@@ -107,8 +139,14 @@ where
         }
     }
 
+    /// Sets timestep variable for the lattice
+    pub fn set_dt(&mut self, dt: f32) {
+        self.apply(|neuron| neuron.set_dt(dt));
+        // self.plasticity.set_dt(dt);
+    }
+
     // modify to be falliable
-    // modify to account for last firing time
+    // modify to account for last firing time (reset firing time macro)
     pub fn run_lattice(&mut self, iterations: usize) {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context);
 
