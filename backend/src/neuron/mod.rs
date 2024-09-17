@@ -447,6 +447,8 @@ macro_rules! impl_apply {
     };
 }
 
+pub (crate) use impl_apply;
+
 /// Electrical inputs for internal calculations
 pub type InternalElectricalInputs = HashMap<(usize, usize), f32>;
 
