@@ -7,7 +7,7 @@ use opencl3::{
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::graph::{Graph, GraphToGPU};
-use super::iterate_and_spike::{IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterType};
+use super::iterate_and_spike::{BufferGPU, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterType};
 use super::plasticity::Plasticity;
 use super::{Lattice, LatticeHistory, Position, impl_apply};
 
@@ -173,13 +173,23 @@ where
 
         for _n in 0..iterations {
             let gap_junctions_event = unsafe {
-                ExecuteKernel::new(&self.incoming_connections_kernel)
-                    .set_arg(&gpu_graph.connections)
+                let mut kernel_execution = ExecuteKernel::new(&self.incoming_connections_kernel);
+
+                kernel_execution.set_arg(&gpu_graph.connections)
                     .set_arg(&gpu_graph.weights)
-                    .set_arg(&gpu_graph.index_to_position)
-                    .set_arg(&gpu_cell_grid.get("gap_conductance"))
-                    .set_arg(&gpu_cell_grid.get("current_voltage"))
-                    .set_arg(&gpu_graph.size)
+                    .set_arg(&gpu_graph.index_to_position);
+
+                match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer") {
+                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                };
+
+                match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer") {
+                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                };
+
+                kernel_execution.set_arg(&gpu_graph.size)
                     .set_arg(&sums_buffer)
                     .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
                     // .set_wait_event(&sums_write_event)
@@ -193,7 +203,10 @@ where
                 let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
 
                 for i in iterate_kernel.argument_names.iter() {
-                    kernel_execution.set_arg(&gpu_cell_grid.get(i));
+                    match &gpu_cell_grid.get(i).expect("Could not retrieve buffer") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
                 }
 
                 kernel_execution.set_global_work_size(gpu_graph.size)
