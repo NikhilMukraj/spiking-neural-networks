@@ -406,13 +406,13 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];
 
-                v[index] += (
+                current_voltage[index] += (
                     alpha[index] * (current_voltage[index] - v_reset[index]) * 
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * dt[index];
-                if (v[index] >= v_th[index]) {
-                    v[index] = v_reset[index];
+                if (current_voltage[index] >= v_th[index]) {
+                    current_voltage[index] = v_reset[index];
                     is_spiking[index] = 1;
                 } else {
                     is_spiking[index] = 0;
@@ -446,7 +446,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
         for name in argument_names {
             let buffer = match name {
-                "current_voltage" | "alpha" | "v_reset" | "v_c" 
+                "current_voltage" | "alpha" | "v_reset" | "v_c" | "gap_conductance"
                 | "integration_constant" | "dt" | "tau_m" | "v_th" => {
                     unsafe {
                         BufferGPU::Float(
@@ -463,7 +463,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                         )
                     }
                 }
-                _ => continue,
+                _ => panic!("Unexpected argument name"),
             };
             buffers.insert(name.to_string(), buffer);
         }
