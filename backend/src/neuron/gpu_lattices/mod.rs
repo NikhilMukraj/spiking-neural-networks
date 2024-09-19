@@ -203,10 +203,16 @@ where
                 let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
 
                 for i in iterate_kernel.argument_names.iter() {
-                    match &gpu_cell_grid.get(i).expect("Could not retrieve buffer") {
-                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                    };
+                    if i == "inputs" {
+                        kernel_execution.set_arg(&sums_buffer);
+                    } else if i == "index_to_position" {
+                        kernel_execution.set_arg(&gpu_graph.index_to_position);
+                    } else {
+                        match &gpu_cell_grid.get(i).expect("Could not retrieve buffer") {
+                            BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                        };
+                    }
                 }
 
                 kernel_execution.set_global_work_size(gpu_graph.size)
