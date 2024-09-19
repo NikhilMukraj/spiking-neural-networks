@@ -393,7 +393,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 __global const float *inputs,
                 __global const uint *index_to_position,
                 __global float *current_voltage,
-                __global float *gap_conductance,
                 __global float *alpha,
                 __global float *v_reset,
                 __global float *v_c,
@@ -410,7 +409,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                     alpha[index] * (current_voltage[index] - v_reset[index]) * 
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
-                    * dt[index];
+                    * (dt[index] / tau_m[index]);
                 if (current_voltage[index] >= v_th[index]) {
                     current_voltage[index] = v_reset[index];
                     is_spiking[index] = 1;
