@@ -437,9 +437,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         let mut buffers = HashMap::new();
 
         let argument_names = vec![
-            "inputs", "index_to_position", "current_voltage", "gap_conductance", 
-            "alpha", "v_reset", "v_c", "integration_constant", "dt", "tau_m",
-            "v_th", "is_spiking",
+           "current_voltage", "gap_conductance", "alpha", "v_reset", "v_c", 
+           "integration_constant", "dt", "tau_m", "v_th", "is_spiking",
         ];
 
         let n = cell_grid.len() * cell_grid.first().map_or(0, |v| v.len());
