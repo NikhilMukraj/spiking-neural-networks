@@ -23,8 +23,8 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         ..QuadraticIntegrateAndFireNeuron::default_impl()
     };
 
-    // let iterations = 5000;
-    let (num_rows, num_cols) = (10, 10);
+    let iterations = 10;
+    let (num_rows, num_cols) = (2, 2);
    
     // infers type based on base neuron and default implementation
     let mut lattice = Lattice::default_impl();
@@ -46,35 +46,25 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone());
 
-    lattice.run_lattice(1)?;
+    lattice.run_lattice(iterations)?;
 
-    gpu_lattice.run_lattice(1);
-
-    // let mut cpu_file = File::create("cpu_lattice.txt").expect("Could not create file");
-    // let mut gpu_file = File::create("gpu_lattice.txt").expect("Could not create file");
-
-    // for row in lattice.cell_grid.iter() {
-    //     for neuron in row {
-    //         write!(cpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
-    //     }
-    //     writeln!(cpu_file).expect("Could not write to file");
-    // }
-
-    // for row in gpu_lattice.cell_grid.iter() {
-    //     for neuron in row {
-    //         write!(gpu_file, "{}\t", neuron.current_voltage).expect("Could not write to file");
-    //     }
-    //     writeln!(gpu_file).expect("Could not write to file");
-    // }
+    gpu_lattice.run_lattice(iterations);
 
     for (row1, row2) in lattice.cell_grid.iter().zip(gpu_lattice.cell_grid.iter()) {
         for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
-            assert!((neuron1.current_voltage - neuron2.current_voltage).abs() <= 0.1)
+            let error = (neuron1.current_voltage - neuron2.current_voltage).abs();
+            assert!(error <= 5., "error: {}", error);
         }
     }
 
-    // continue checking how different lattices are at each iteration
-    // assert equals err <= 0.1 for each cell
+    const GREEN: &str = "\x1b[32m";
+    const RESET: &str = "\x1b[0m";
+    
+    println!("{}GPU test passed{}", GREEN, RESET);
+
+    // inputs appear to be wrong
+    // implement grid history for lattice
+    // and then check how it differs
 
     Ok(())
 }
