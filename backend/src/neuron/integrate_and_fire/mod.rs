@@ -385,7 +385,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
             String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
             String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
             String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
-            String::from("v_th"), String::from("is_spiking"),
+            String::from("v_th"), String::from("refractory_count"), String::from("tref"),
+            String::from("is_spiking"),
         ];
 
         let program_source = String::from(r#"
@@ -400,6 +401,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 __global float *dt,
                 __global float *tau_m,
                 __global float *v_th,
+                __global float *refractory_count,
+                __global float *tref,
                 __global uint *is_spiking
             ) {
                 int gid = get_global_id(0);
@@ -410,9 +413,15 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * (dt[index] / tau_m[index]);
-                if (current_voltage[index] >= v_th[index]) {
+
+                if (refractory_count[index] > 0) {
+                    current_voltage[index] = v_reset[index];
+                    refractory_count[index] -= dt[index]; 
+                    is_spiking[index] = 0;
+                } else if (current_voltage[index] >= v_th[index]) {
                     current_voltage[index] = v_reset[index];
                     is_spiking[index] = 1;
+                    refractory_count[index] = tref[index] / dt[index];
                 } else {
                     is_spiking[index] = 0;
                 }
@@ -437,15 +446,16 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
         let argument_names = vec![
            "current_voltage", "gap_conductance", "alpha", "v_reset", "v_c", 
-           "integration_constant", "dt", "tau_m", "v_th", "is_spiking",
+           "integration_constant", "dt", "tau_m", "v_th", "refractory_count",
+           "tref", "is_spiking",
         ];
 
         let n = cell_grid.len() * cell_grid.first().map_or(0, |v| v.len());
 
         for name in argument_names {
             let buffer = match name {
-                "current_voltage" | "alpha" | "v_reset" | "v_c" | "gap_conductance"
-                | "integration_constant" | "dt" | "tau_m" | "v_th" => {
+                "current_voltage" | "alpha" | "v_reset" | "v_c" | "gap_conductance" | "integration_constant" 
+                | "dt" | "tau_m" | "v_th" | "refractory_count" | "tref" => {
                     unsafe {
                         BufferGPU::Float(
                             Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
@@ -486,6 +496,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         let mut dt: Vec<f32> = vec![0.0; rows * cols];
         let mut tau_m: Vec<f32> = vec![0.0; rows * cols];
         let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut refractory_count: Vec<f32> = vec![0.0; rows * cols];
+        let mut tref: Vec<f32> = vec![0.0; rows * cols];
         let mut is_spiking: Vec<u32> = vec![0; rows * cols];
 
         read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
@@ -497,6 +509,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
         read_and_set_buffer!(buffers, queue, "tau_m", &mut tau_m, Float);
         read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "refractory_count", &mut refractory_count, Float);
+        read_and_set_buffer!(buffers, queue, "tref", &mut tref, Float);
         read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
 
         for i in 0..rows {
@@ -513,6 +527,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 cell.dt = dt[idx];
                 cell.tau_m = tau_m[idx];
                 cell.v_th = v_th[idx];
+                cell.refractory_count = refractory_count[idx];
+                cell.tref = tref[idx];
                 cell.is_spiking = is_spiking[idx] == 1;
             }
         }
