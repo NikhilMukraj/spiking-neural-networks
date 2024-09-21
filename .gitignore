@@ -54,6 +54,8 @@
 /interface/windows_venv/*
 /interface/notebooks/*.ipynb
 /interface/notebooks/*.py
+/interface/notebooks/*.json
+/interface/notebooks/*.toml
 /interface/notebooks/.ipynb_checkpoints
 /interface/notebooks/*.gif
 /interface/generate_methods.py
