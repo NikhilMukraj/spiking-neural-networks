@@ -66,5 +66,10 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     // implement grid history for lattice
     // and then check how it differs
 
+    // instead of using length
+    // graph should be passed a cell grid
+    // the row length should be found to use instead
+    // of trying to calculate length
+
     Ok(())
 }
