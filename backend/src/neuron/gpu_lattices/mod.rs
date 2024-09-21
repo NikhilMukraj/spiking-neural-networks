@@ -1,5 +1,3 @@
-use std::ptr;
-
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
     context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
@@ -10,6 +8,7 @@ use crate::graph::{Graph, GraphToGPU};
 use super::iterate_and_spike::{BufferGPU, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterType};
 use super::plasticity::Plasticity;
 use super::{Lattice, LatticeHistory, Position, impl_apply};
+use std::ptr;
 
 
 // pub trait GraphGPU: Default {
@@ -85,6 +84,32 @@ __kernel void calculate_internal_electrical_inputs(
 
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
+// trait LatticeHistoryGPU {
+//     fn to_gpu(&self) -> HashMap<String, BufferGPU>;
+//     fn from_gpu(&mut self, buffers: HashMap<String, BufferGPU>);  
+// }
+
+// impl LatticeHistoryGPU for GridVoltageHistory {
+//     fn to_gpu(&self) -> HashMap<String, BufferGPU> {
+//         let mut buffers = HashMap::new();
+        
+//         let flat_history: Vec<f32> = self.history.iter()
+//             .flat_map(|vec| vec.iter())
+//             .copied()
+//             .collect();
+
+//         let gpu_buffer = BufferGPU::Float(Buffer::<cl_float>::new(flat_history.len() as u64).unwrap());
+
+//         buffers.insert("voltage_history".to_string(), gpu_buffer);
+
+//         buffers
+//     }
+
+//     fn from_gpu(&mut self, buffers: HashMap<String, BufferGPU>) {
+        
+//     }
+// }
+
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
@@ -150,7 +175,7 @@ where
     pub fn run_lattice(&mut self, iterations: usize) {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context);
 
-        let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue);
+        let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid);
 
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context);
 
