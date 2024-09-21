@@ -9,6 +9,8 @@ use std::{
 };
 use crate::error::GraphError;
 #[cfg(feature = "gpu")]
+use super::neuron::iterate_and_spike::IterateAndSpikeGPU;
+#[cfg(feature = "gpu")]
 use opencl3::{
     memory::{Buffer, CL_MEM_READ_WRITE}, 
     types::{cl_float, cl_uint, CL_BLOCKING, CL_NON_BLOCKING}, 
@@ -86,7 +88,12 @@ pub struct GraphGPU {
 /// Handles conversion of graph of CPU to graph on GPU
 pub trait GraphToGPU {
     /// Converts graph to graph on GPU
-    fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU;
+    fn convert_to_gpu<T: IterateAndSpikeGPU>(
+        &self, 
+        context: &Context, 
+        queue: &CommandQueue, 
+        cell_grid: &[Vec<T>],
+    ) -> GraphGPU;
     /// Converts from graph on GPU to graph on CPU
     fn convert_from_gpu(&mut self, gpu_graph: GraphGPU, queue: &CommandQueue);
 }
@@ -283,8 +290,14 @@ impl<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Deb
 
 #[cfg(feature = "gpu")]
 impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
-    fn convert_to_gpu(&self, context: &Context, queue: &CommandQueue) -> GraphGPU {
-        let length = self.position_to_index.len();
+    fn convert_to_gpu<T: IterateAndSpikeGPU>(
+        &self, 
+        context: &Context, 
+        queue: &CommandQueue, 
+        cell_grid: &[Vec<T>],
+    ) -> GraphGPU {
+        let length = self.index_to_position.len();
+        let grid_row_length = cell_grid.first().unwrap_or(&vec![]).len();
 
         let weights: Vec<f32> = self.matrix.clone()
             .into_iter()
@@ -300,7 +313,7 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
             })
             .collect();
         let index_to_position: Vec<u32> = self.index_to_position.values()
-            .map(|pos| (pos.0 * length + pos.1) as u32)
+            .map(|pos| (pos.0 * grid_row_length + pos.1) as u32)
             .collect();
 
         let mut connections_buffer = unsafe {
