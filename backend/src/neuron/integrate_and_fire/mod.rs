@@ -85,7 +85,7 @@ macro_rules! impl_default_handle_spiking {
             } else if self.current_voltage >= self.v_th {
                 is_spiking = !is_spiking;
                 self.current_voltage = self.v_reset;
-                self.refractory_count = self.tref / self.dt
+                self.refractory_count = self.tref / self.dt;
             }
 
             self.is_spiking = is_spiking;
@@ -416,7 +416,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
                 if (refractory_count[index] > 0) {
                     current_voltage[index] = v_reset[index];
-                    refractory_count[index] -= dt[index]; 
+                    refractory_count[index] -= 1; 
                     is_spiking[index] = 0;
                 } else if (current_voltage[index] >= v_th[index]) {
                     current_voltage[index] = v_reset[index];
