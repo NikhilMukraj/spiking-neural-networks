@@ -85,28 +85,12 @@ __kernel void calculate_internal_electrical_inputs(
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
 // trait LatticeHistoryGPU {
-//     fn to_gpu(&self) -> HashMap<String, BufferGPU>;
-//     fn from_gpu(&mut self, buffers: HashMap<String, BufferGPU>);  
+//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, size: (usize, usize));  
 // }
 
 // impl LatticeHistoryGPU for GridVoltageHistory {
-//     fn to_gpu(&self) -> HashMap<String, BufferGPU> {
-//         let mut buffers = HashMap::new();
-        
-//         let flat_history: Vec<f32> = self.history.iter()
-//             .flat_map(|vec| vec.iter())
-//             .copied()
-//             .collect();
-
-//         let gpu_buffer = BufferGPU::Float(Buffer::<cl_float>::new(flat_history.len() as u64).unwrap());
-
-//         buffers.insert("voltage_history".to_string(), gpu_buffer);
-
-//         buffers
-//     }
-
-//     fn from_gpu(&mut self, buffers: HashMap<String, BufferGPU>) {
-        
+//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>) {
+        // 
 //     }
 // }
 
