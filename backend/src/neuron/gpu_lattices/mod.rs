@@ -85,6 +85,7 @@ __kernel void calculate_internal_electrical_inputs(
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
 // trait LatticeHistoryGPU {
+//     fn to_gpu(&self, iterations: usize, size: (usize, usize)) -> Buffers<String, BufferGPU>
 //     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, size: (usize, usize));  
 // }
 
@@ -157,7 +158,7 @@ where
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
     pub fn run_lattice(&mut self, iterations: usize) {
-        let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context);
+        let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue);
 
         let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid);
 
@@ -233,3 +234,7 @@ where
         }
     }
 }
+
+// track history over time to debug why kernel is not functioning
+// track with connections and when connections are all none
+// or with sums buffer just being a set constant value
