@@ -16,7 +16,8 @@ use super::iterate_and_spike::{
 #[cfg(feature = "gpu")]
 use opencl3::{
     context::Context, kernel::Kernel, program::Program, command_queue::CommandQueue,
-    memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, cl_uint, CL_NON_BLOCKING},
+    memory::{Buffer, CL_MEM_READ_WRITE}, 
+    types::{cl_float, cl_uint, CL_NON_BLOCKING, CL_BLOCKING},
 };
 #[cfg(feature = "gpu")]
 use std::collections::HashMap;
@@ -378,6 +379,108 @@ macro_rules! read_and_set_buffer {
 }
 
 #[cfg(feature = "gpu")]
+macro_rules! write_buffer {
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float) => {
+        let mut $name = unsafe {
+            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt) => {
+        let mut $name = unsafe {
+            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
+}
+
+#[cfg(feature = "gpu")]
+macro_rules! flatten_and_retrieve_field {
+    ($grid:expr, $field:ident, f32) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| neuron.$field)
+            .collect::<Vec<f32>>()
+    };
+
+    ($grid:expr, $field:ident, u32) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| if neuron.$field { 1 } else { 0 })
+            .collect::<Vec<u32>>()
+    };
+}
+
+#[cfg(feature = "gpu")]
+macro_rules! create_float_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, f32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, Float);
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, f32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, Float, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
+macro_rules! create_uint_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, UInt);
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, UInt, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
     fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
@@ -441,40 +544,36 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         }
     }
     
-    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context) -> HashMap<String, BufferGPU> {
+    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue) -> HashMap<String, BufferGPU> {
         let mut buffers = HashMap::new();
 
-        let argument_names = vec![
-           "current_voltage", "gap_conductance", "alpha", "v_reset", "v_c", 
-           "integration_constant", "dt", "tau_m", "v_th", "refractory_count",
-           "tref", "is_spiking",
-        ];
+        create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
+        create_float_buffer!(gap_conductance_buffer, context, queue, cell_grid, gap_conductance);
+        create_float_buffer!(alpha_buffer, context, queue, cell_grid, alpha);
+        create_float_buffer!(v_reset_buffer, context, queue, cell_grid, v_reset);
+        create_float_buffer!(v_c_buffer, context, queue, cell_grid, v_c);
+        create_float_buffer!(integration_constant_buffer, context, queue, cell_grid, integration_constant);
+        create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
+        create_float_buffer!(tau_m_buffer, context, queue, cell_grid, tau_m);
+        create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
+        create_float_buffer!(refractory_count_buffer, context, queue, cell_grid, refractory_count);
+        create_float_buffer!(tref_buffer, context, queue, cell_grid, tref);
 
-        let n = cell_grid.len() * cell_grid.first().map_or(0, |v| v.len());
+        create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
 
-        for name in argument_names {
-            let buffer = match name {
-                "current_voltage" | "alpha" | "v_reset" | "v_c" | "gap_conductance" | "integration_constant" 
-                | "dt" | "tau_m" | "v_th" | "refractory_count" | "tref" => {
-                    unsafe {
-                        BufferGPU::Float(
-                            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
-                                .expect("Buffer creation failed")
-                        )
-                    }
-                },
-                "is_spiking" => {
-                    unsafe {
-                        BufferGPU::UInt(
-                            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, n, ptr::null_mut())
-                                .expect("Buffer creation failed")
-                        )
-                    }
-                }
-                _ => panic!("Unexpected argument name"),
-            };
-            buffers.insert(name.to_string(), buffer);
-        }
+        buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
+        buffers.insert(String::from("gap_conductance"), BufferGPU::Float(gap_conductance_buffer));
+        buffers.insert(String::from("alpha"), BufferGPU::Float(alpha_buffer));
+        buffers.insert(String::from("v_reset"), BufferGPU::Float(v_reset_buffer));
+        buffers.insert(String::from("v_c"), BufferGPU::Float(v_c_buffer));
+        buffers.insert(String::from("integration_constant"), BufferGPU::Float(integration_constant_buffer));
+        buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
+        buffers.insert(String::from("tau_m"), BufferGPU::Float(tau_m_buffer));
+        buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
+        buffers.insert(String::from("refractory_count_buffer"), BufferGPU::Float(refractory_count_buffer));
+        buffers.insert(String::from("tref"), BufferGPU::Float(tref_buffer));
+
+        buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
 
         buffers
     }
