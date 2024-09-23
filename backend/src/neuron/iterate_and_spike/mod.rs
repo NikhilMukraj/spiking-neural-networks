@@ -1091,7 +1091,11 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
     // /// Returns the compiled kernel for electirlca and chemical inputs
     // fn iterate_and_spike_electrochemical_kernel(&self) -> KernelFunction;
     /// Converts a grid of the neuron type to a vector of buffers
-    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context) -> HashMap<String, BufferGPU>;
+    fn convert_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> HashMap<String, BufferGPU>;
     /// Converts buffers back to a grid of neurons
     fn convert_to_cpu(
         cell_grid: &mut Vec<Vec<Self>>,
