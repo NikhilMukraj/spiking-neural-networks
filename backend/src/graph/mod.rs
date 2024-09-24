@@ -312,7 +312,15 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
                 None => 0,
             })
             .collect();
-        let index_to_position: Vec<u32> = self.index_to_position.values()
+
+        let mut cpu_index_to_position: Vec<_> = self.index_to_position.iter().collect();
+        cpu_index_to_position.sort_by_key(|&(key, _)| std::cmp::Reverse(key));
+        let cpu_index_to_position: Vec<_> = cpu_index_to_position.iter()
+            .map(|&(_, value)| value)
+            .collect();
+
+        let index_to_position: Vec<u32> = cpu_index_to_position
+            .iter()
             .map(|pos| (pos.0 * grid_row_length + pos.1) as u32)
             .collect();
 
