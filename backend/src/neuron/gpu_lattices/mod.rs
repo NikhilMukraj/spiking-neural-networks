@@ -218,7 +218,7 @@ where
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&gpu_graph.index_to_position);
                     } else {
-                        match &gpu_cell_grid.get(i).expect("Could not retrieve buffer") {
+                        match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
                         };
