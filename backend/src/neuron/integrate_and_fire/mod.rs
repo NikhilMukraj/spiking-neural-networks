@@ -570,7 +570,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
         buffers.insert(String::from("tau_m"), BufferGPU::Float(tau_m_buffer));
         buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
-        buffers.insert(String::from("refractory_count_buffer"), BufferGPU::Float(refractory_count_buffer));
+        buffers.insert(String::from("refractory_count"), BufferGPU::Float(refractory_count_buffer));
         buffers.insert(String::from("tref"), BufferGPU::Float(tref_buffer));
 
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
