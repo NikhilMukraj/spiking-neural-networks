@@ -517,9 +517,9 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                     ) 
                     * (dt[index] / tau_m[index]);
 
-                if (refractory_count[index] > 0) {
+                if (refractory_count[index] > 0.0f) {
                     current_voltage[index] = v_reset[index];
-                    refractory_count[index] -= 1; 
+                    refractory_count[index] -= 1.0f; 
                     is_spiking[index] = 0;
                 } else if (current_voltage[index] >= v_th[index]) {
                     current_voltage[index] = v_reset[index];
