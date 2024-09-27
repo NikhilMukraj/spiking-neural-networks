@@ -84,14 +84,45 @@ __kernel void calculate_internal_electrical_inputs(
 
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
+// const GRID_VOLTAGE_HISTORY_KERNEL: &str = r#"
+// __kernel void add_grid_voltage_history(
+//     __global const uint *index_to_position,
+//     __global const float *voltages,
+//     __global float *history,
+//     __global int iteration,
+//     __global int size
+// ) {
+//     int gid = get_global_id(0);
+//     int index = index_to_position[i];
+
+//     history[iteration * size + index] = voltages[index]; 
+// }
+// "#;
+
+// const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
+
+// add kernel return statement
 // trait LatticeHistoryGPU {
-//     fn to_gpu(&self, iterations: usize, size: (usize, usize)) -> Buffers<String, BufferGPU>
-//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, size: (usize, usize));  
+//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
+//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
 // }
 
 // impl LatticeHistoryGPU for GridVoltageHistory {
-//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>) {
-        // 
+//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
+//         let history_buffer = unsafe {
+//             Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
+//                 .expect("Could not create buffer")
+//         };
+
+//         let mut buffers = HashMap::new();
+
+//         buffers.insert(String::from("history"), BufferGPU::Float(history_buffer));
+
+//         buffers
+//     }
+
+//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)) {
+        
 //     }
 // }
 
