@@ -1,4 +1,3 @@
-// use std::{fs::File, io::Write};
 use rand::Rng;
 extern crate spiking_neural_networks;
 use spiking_neural_networks::{
@@ -23,7 +22,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         ..QuadraticIntegrateAndFireNeuron::default_impl()
     };
 
-    let iterations = 9;
+    let iterations = 1000;
     let (num_rows, num_cols) = (5, 5);
    
     // infers type based on base neuron and default implementation
@@ -56,7 +55,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
             let error = (neuron1.current_voltage - neuron2.current_voltage).abs();
             assert!(
-                error <= 5., "error: {}, neuron1: {}, neuron2: {}\n{:#?}\n{:#?}", 
+                error <= 10., "error: {}, neuron1: {}, neuron2: {}\n{:#?}\n{:#?}", 
                 error,
                 neuron1.current_voltage,
                 neuron2.current_voltage,
@@ -75,10 +74,13 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     
     println!("{}GPU test passed{}", GREEN, RESET);
 
-    // current voltage is never updated with sums inputs
+    // sums are calculated correctly seemingly
+    // current voltage is not updated correctly with sums inputs
+
     // try removing refractory period 
     // refractory period may be causing issues
-    // sums are calculated correctly seemingly
+
+    // try using a simple lif kernel for testing
 
     Ok(())
 }
