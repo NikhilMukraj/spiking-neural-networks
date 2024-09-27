@@ -1,7 +1,7 @@
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
     context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
-    kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_WRITE_ONLY}, 
+    kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, 
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::graph::{Graph, GraphToGPU};
@@ -165,7 +165,7 @@ where
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context);
 
         let mut sums_buffer = unsafe {
-            Buffer::<cl_float>::create(&self.context, CL_MEM_WRITE_ONLY, gpu_graph.size, ptr::null_mut())
+            Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut())
                 .expect("Could not create buffer")
         };
 
