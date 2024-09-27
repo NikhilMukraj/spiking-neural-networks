@@ -513,7 +513,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
                 current_voltage[index] += (
                     alpha[index] * (current_voltage[index] - v_reset[index]) * 
-                    (current_voltage[index] - v_c[index]) + (integration_constant[index] * inputs[index])
+                    (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * (dt[index] / tau_m[index]);
 
@@ -633,6 +633,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         }
     }
 }
+
 
 /// An adaptive leaky integrate and fire neuron
 #[derive(Debug, Clone, IterateAndSpikeBase)]
