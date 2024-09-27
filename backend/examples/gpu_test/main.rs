@@ -23,8 +23,8 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         ..QuadraticIntegrateAndFireNeuron::default_impl()
     };
 
-    let iterations = 10;
-    let (num_rows, num_cols) = (2, 2);
+    let iterations = 9;
+    let (num_rows, num_cols) = (5, 5);
    
     // infers type based on base neuron and default implementation
     let mut lattice = Lattice::default_impl();
@@ -36,10 +36,12 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     );
 
     lattice.connect(&connection_conditional, None);
+    // lattice.connect(&|_, _| true, None);
 
     lattice.apply(|neuron: &mut _| {
         let mut rng = rand::thread_rng();
         neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        // neuron.current_voltage = -5.;
     });
 
     lattice.update_grid_history = true;
@@ -53,7 +55,18 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     for (row1, row2) in lattice.cell_grid.iter().zip(gpu_lattice.cell_grid.iter()) {
         for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
             let error = (neuron1.current_voltage - neuron2.current_voltage).abs();
-            assert!(error <= 5., "error: {}", error);
+            assert!(
+                error <= 5., "error: {}, neuron1: {}, neuron2: {}\n{:#?}\n{:#?}", 
+                error,
+                neuron1.current_voltage,
+                neuron2.current_voltage,
+                lattice.cell_grid.iter()
+                    .map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<f32>>())
+                    .collect::<Vec<Vec<f32>>>(),
+                gpu_lattice.cell_grid.iter()
+                    .map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<f32>>())
+                    .collect::<Vec<Vec<f32>>>(),
+            );
         }
     }
 
@@ -62,14 +75,10 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     
     println!("{}GPU test passed{}", GREEN, RESET);
 
-    // inputs appear to be wrong
-    // implement grid history for lattice
-    // and then check how it differs
-
-    // instead of using length
-    // graph should be passed a cell grid
-    // the row length should be found to use instead
-    // of trying to calculate length
+    // current voltage is never updated with sums inputs
+    // try removing refractory period 
+    // refractory period may be causing issues
+    // sums are calculated correctly seemingly
 
     Ok(())
 }
