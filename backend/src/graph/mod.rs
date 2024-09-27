@@ -296,7 +296,7 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
         queue: &CommandQueue, 
         cell_grid: &[Vec<T>],
     ) -> GraphGPU {
-        let length = self.index_to_position.len();
+        let size = self.index_to_position.len();
         let grid_row_length = cell_grid.first().unwrap_or(&vec![]).len();
 
         let weights: Vec<f32> = self.matrix.clone()
@@ -325,15 +325,15 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
             .collect();
 
         let mut connections_buffer = unsafe {
-            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, length * length, ptr::null_mut())
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size * size, ptr::null_mut())
                 .expect("Could not create buffer")
         };
         let mut weights_buffer = unsafe {
-            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, length * length, ptr::null_mut())
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, size * size, ptr::null_mut())
                 .expect("Could not create buffer")
         };
         let mut index_to_position_buffer = unsafe {
-            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, length, ptr::null_mut())
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
                 .expect("Could not create buffer")
         };
 
@@ -356,7 +356,7 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
             connections: connections_buffer, 
             weights: weights_buffer, 
             index_to_position: index_to_position_buffer, 
-            size: length,
+            size,
         }
     }
     
