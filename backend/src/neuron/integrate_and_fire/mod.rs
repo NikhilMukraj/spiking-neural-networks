@@ -1237,3 +1237,201 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> BCMActivity for BCMIzhike
         self.average_activity
     }
 }
+
+#[derive(Clone, IterateAndSpikeBase)]
+pub struct SimpleLeakyIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
+    /// Current voltage (mV)
+    pub current_voltage: f32,
+    /// Leaky channel conductance (nS)
+    pub g: f32,
+    /// Reversal potential (mV)
+    pub e: f32,
+    /// Voltage threshold (mV)
+    pub v_th: f32,
+    /// Voltage reset value (mV)
+    pub v_reset: f32,
+    /// Initial voltage value (mV)
+    pub v_init: f32,
+    /// Gap conductance of input gap junctions
+    pub gap_conductance: f32,
+    /// Membrane capacitance (nF)
+    pub c_m: f32, 
+    /// Time step (ms)
+    pub dt: f32, 
+    /// Whether the neuron is currently spiking
+    pub is_spiking: bool,
+    /// Last timestep the neuron fired
+    pub last_firing_time: Option<usize>,
+    /// Postsynaptic neurotransmitters in cleft
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
+    /// Ionotropic receptor ligand gated channels
+    pub ligand_gates: LigandGatedChannels<R>,
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> SimpleLeakyIntegrateAndFire<T, R> {
+    fn handle_spiking(&mut self) -> bool {
+        let mut is_spiking = false;
+
+        if self.current_voltage >= self.v_th {
+            is_spiking = !is_spiking;
+            self.current_voltage = self.v_reset;
+        }
+
+        self.is_spiking = is_spiking;
+
+        self.is_spiking
+    }
+
+    fn get_dv_change(&self, i: f32) -> f32 {
+        (self.g * (self.current_voltage - self.e) + i) * self.dt
+    }
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for SimpleLeakyIntegrateAndFire<T, R> {
+    impl_default_neurotransmitter_methods!();
+
+    fn iterate_and_spike(&mut self, input_current: f32) -> bool {
+        let dv = self.get_dv_change(input_current);
+        self.current_voltage += dv;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+
+        self.handle_spiking()
+    }
+
+    fn iterate_with_neurotransmitter_and_spike(
+        &mut self, 
+        input_current: f32, 
+        t_total: &NeurotransmitterConcentrations<Self::N>,
+    ) -> bool {
+        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+
+        let dv = self.get_dv_change(input_current);
+        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+
+        self.current_voltage += dv + neurotransmitter_dv;
+
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+
+        self.handle_spiking()
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction {
+        let kernel_name = String::from("simple_leaky_integrate_and_fire_iterate_and_spike");
+        let argument_names = vec![
+            String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
+            String::from("g"), String::from("e"), String::from("v_th"), 
+            String::from("v_reset"), String::from("dt"), String::from("is_spiking"),
+        ];
+
+        let program_source = String::from(r#"
+            __kernel void simple_leaky_integrate_and_fire_iterate_and_spike(
+                __global const float *inputs,
+                __global const uint *index_to_position,
+                __global float *v,
+                __global float *g,
+                __global float *e,
+                __global float *v_th,
+                __global float *v_reset,
+                __global uint *is_spiking,
+                __global float *dt
+            ) {
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
+
+                v[index] += (g[index] * (v[index] - e[index]) + inputs[index]) * dt[index];
+                if (v[index] >= v_th[index]) {
+                    v[index] = v_reset[index];
+                    is_spiking[index] = 1;
+                } else {
+                    is_spiking[index] = 0;
+                }
+            }
+        "#);
+
+        let iterate_and_spike_program = Program::create_and_build_from_source(context, &program_source, "")
+            .expect("Program::create_and_build_from_source failed");
+        let kernel = Kernel::create(&iterate_and_spike_program, &kernel_name)
+            .expect("Kernel::create failed");
+
+        KernelFunction { 
+            kernel, 
+            program_source, 
+            kernel_name, 
+            argument_names, 
+        }
+    }
+    
+    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue) -> HashMap<String, BufferGPU> {
+        let mut buffers = HashMap::new();
+
+        create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
+        create_float_buffer!(gap_conductance_buffer, context, queue, cell_grid, gap_conductance);
+        create_float_buffer!(g_buffer, context, queue, cell_grid, g);
+        create_float_buffer!(e_buffer, context, queue, cell_grid, e);
+        create_float_buffer!(v_reset_buffer, context, queue, cell_grid, v_reset);
+        create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
+        create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
+
+        create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
+
+        buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
+        buffers.insert(String::from("gap_conductance"), BufferGPU::Float(gap_conductance_buffer));
+        buffers.insert(String::from("g"), BufferGPU::Float(g_buffer));
+        buffers.insert(String::from("e"), BufferGPU::Float(e_buffer));
+        buffers.insert(String::from("v_reset"), BufferGPU::Float(v_reset_buffer));
+        buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
+        buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
+
+        buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
+
+        buffers
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    fn convert_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) {
+        let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
+        let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
+        let mut g: Vec<f32> = vec![0.0; rows * cols];
+        let mut e: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_reset: Vec<f32> = vec![0.0; rows * cols];
+        let mut dt: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut is_spiking: Vec<u32> = vec![0; rows * cols];
+
+        read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
+        read_and_set_buffer!(buffers, queue, "gap_conductance", &mut gap_conductance, Float);
+        read_and_set_buffer!(buffers, queue, "g", &mut g, Float);
+        read_and_set_buffer!(buffers, queue, "e", &mut e, Float);
+        read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
+        read_and_set_buffer!(buffers, queue, "v_reset", &mut v_reset, Float);
+        read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
+
+        for i in 0..rows {
+            for j in 0..cols {
+                let idx = i * cols + j;
+                let cell = &mut cell_grid[i][j];
+                
+                cell.current_voltage = current_voltage[idx];
+                cell.gap_conductance = gap_conductance[idx];
+                cell.g = g[idx];
+                cell.e = e[idx];
+                cell.v_reset = v_reset[idx];
+                cell.dt = dt[idx];
+                cell.v_th = v_th[idx];
+                cell.is_spiking = is_spiking[idx] == 1;
+            }
+        }
+    }
+}
