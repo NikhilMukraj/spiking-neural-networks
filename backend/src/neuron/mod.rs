@@ -1982,8 +1982,6 @@ where
             })
             .collect();
 
-        
-
         aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
@@ -2645,8 +2643,6 @@ where
                 final_input
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
-
-        
 
         aggregate_neurotransmitter_concentrations(&input_vals)
     }
