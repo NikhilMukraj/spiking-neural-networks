@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
     context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
@@ -5,18 +6,11 @@ use opencl3::{
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::graph::{Graph, GraphToGPU};
-use super::iterate_and_spike::{BufferGPU, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterType};
+use super::{iterate_and_spike::{BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterType}, GridVoltageHistory};
 use super::plasticity::Plasticity;
 use super::{Lattice, LatticeHistory, Position, impl_apply};
 use std::ptr;
 
-
-// pub trait GraphGPU: Default {
-
-// }
-
-// eventually will need neurotransmitter gpu type
-// eventually add lattice history
 
 // convert graph to gpu
 // may need to use gpu graph outside of trait first
@@ -84,47 +78,94 @@ __kernel void calculate_internal_electrical_inputs(
 
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
-// const GRID_VOLTAGE_HISTORY_KERNEL: &str = r#"
-// __kernel void add_grid_voltage_history(
-//     __global const uint *index_to_position,
-//     __global const float *voltages,
-//     __global float *history,
-//     __global int iteration,
-//     __global int size
-// ) {
-//     int gid = get_global_id(0);
-//     int index = index_to_position[i];
+const GRID_VOLTAGE_HISTORY_KERNEL: &str = r#"
+__kernel void add_grid_voltage_history(
+    __global const uint *index_to_position,
+    __global const float *current_voltage,
+    __global float *history,
+    __global int iteration,
+    __global int size
+) {
+    int gid = get_global_id(0);
+    int index = index_to_position[i];
 
-//     history[iteration * size + index] = voltages[index]; 
-// }
-// "#;
+    history[iteration * size + index] = current_voltage[index]; 
+}
+"#;
 
-// const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
+const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
+pub trait LatticeHistoryGPU {
+    fn get_kernel(&self, context: &Context) -> KernelFunction;
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
+    fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
+}
 
-// add kernel return statement
-// trait LatticeHistoryGPU {
-//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
-//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
-// }
+impl LatticeHistoryGPU for GridVoltageHistory {
+    fn get_kernel(&self, context: &Context) -> KernelFunction {
+        let history_program = Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "")
+            .expect("Program::create_and_build_from_source failed");
+        let history_kernel = Kernel::create(&history_program, GRID_VOLTAGE_HISTORY_KERNEL_NAME)
+            .expect("Kernel::create failed");
 
-// impl LatticeHistoryGPU for GridVoltageHistory {
-//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
-//         let history_buffer = unsafe {
-//             Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
-//                 .expect("Could not create buffer")
-//         };
+        let argument_names = vec![
+            String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
+            String::from("iteration"), String::from("size")
+        ];
 
-//         let mut buffers = HashMap::new();
+        KernelFunction { 
+            kernel: history_kernel, 
+            program_source: String::from(GRID_VOLTAGE_HISTORY_KERNEL), 
+            kernel_name: String::from(GRID_VOLTAGE_HISTORY_KERNEL_NAME), 
+            argument_names
+        }
+    }
 
-//         buffers.insert(String::from("history"), BufferGPU::Float(history_buffer));
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
+        let history_buffer = unsafe {
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
 
-//         buffers
-//     }
+        let mut buffers = HashMap::new();
 
-//     fn add_from_gpu(&mut self, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)) {
-        
-//     }
-// }
+        buffers.insert(String::from("history"), BufferGPU::Float(history_buffer));
+
+        buffers
+    }
+
+    fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)) {
+        let mut results = vec![0.0; iterations * size.0 * size.1];
+        let results_read_event = unsafe {
+            queue.enqueue_read_buffer(
+                match buffers.get("history").expect("Could not get history") {
+                    BufferGPU::Float(value) => value,
+                    BufferGPU::UInt(_) => unreachable!("History is not unsigned integer")
+                }, 
+                CL_NON_BLOCKING, 
+                0, 
+                &mut results, 
+                &[]
+            ).expect("Could not read buffer")
+        };
+
+        results_read_event.wait().expect("Could not wait");
+
+        let mut nested_vector: Vec<Vec<Vec<f32>>> = Vec::with_capacity(iterations);
+
+        for i in 0..iterations {
+            let mut grid: Vec<Vec<f32>> = Vec::with_capacity(size.0);
+            for j in 0..size.0 {
+                let start_idx = i * size.0 * size.1 + j * size.1;
+                let end_idx = start_idx + size.1;
+                grid.push(results[start_idx..end_idx].to_vec());
+            }
+
+            nested_vector.push(grid);
+        }
+
+        self.history.extend(nested_vector)
+    }
+}
 
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
@@ -262,6 +303,8 @@ where
             };
 
             iterate_event.wait().expect("Could not wait");
+
+            // if history add history
         }
     }
 }
