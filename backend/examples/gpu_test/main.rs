@@ -16,14 +16,19 @@ fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
     x != y
 }
 
+// fn random_weight(_: (usize, usize), _: (usize, usize)) -> f32 {
+//     let mut rng = rand::thread_rng();
+//     rng.gen_range(0.5..=1.5)
+// }
+
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let base_neuron = SimpleLeakyIntegrateAndFire {
-        gap_conductance: 10.,
+        gap_conductance: 0.1,
         ..SimpleLeakyIntegrateAndFire::default_impl()
     };
 
     let iterations = 1000;
-    let (num_rows, num_cols) = (5, 5);
+    let (num_rows, num_cols) = (2, 2);
    
     // infers type based on base neuron and default implementation
     let mut lattice = Lattice::default_impl();
@@ -40,7 +45,6 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     lattice.apply(|neuron: &mut _| {
         let mut rng = rand::thread_rng();
         neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
-        // neuron.current_voltage = -5.;
     });
 
     lattice.update_grid_history = true;
@@ -73,14 +77,6 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     const RESET: &str = "\x1b[0m";
     
     println!("{}GPU test passed{}", GREEN, RESET);
-
-    // sums are calculated correctly seemingly
-    // current voltage is not updated correctly with sums inputs
-
-    // try removing refractory period 
-    // refractory period may be causing issues
-
-    // try using a simple lif kernel for testing
 
     Ok(())
 }
