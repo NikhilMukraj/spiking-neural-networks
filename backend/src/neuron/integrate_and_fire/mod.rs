@@ -131,8 +131,6 @@ pub struct LeakyIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorK
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
-    /// Parameters used in generating noise
-    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
@@ -160,7 +158,6 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for LeakyIntegrat
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::default(),
         }
@@ -1266,6 +1263,32 @@ pub struct SimpleLeakyIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorK
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
+}
+
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for SimpleLeakyIntegrateAndFire<T, R> {
+    fn default() -> Self {
+        SimpleLeakyIntegrateAndFire {
+            current_voltage: -75., 
+            gap_conductance: 10.,
+            v_th: -55., // spike threshold (mV)
+            v_reset: -75., // reset potential (mV)
+            c_m: 100., // membrane capacitance (nF)
+            g: -0.1, // leak conductance (nS)
+            v_init: -75., // initial potential (mV)
+            e: 0., // leak reversal potential (mV)
+            dt: 0.1, // simulation time step (ms)
+            is_spiking: false,
+            last_firing_time: None,
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            ligand_gates: LigandGatedChannels::default(),
+        }
+    }
+}
+
+impl SimpleLeakyIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> {
+    pub fn default_impl() -> Self {
+        SimpleLeakyIntegrateAndFire::default()
+    }
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> SimpleLeakyIntegrateAndFire<T, R> {
