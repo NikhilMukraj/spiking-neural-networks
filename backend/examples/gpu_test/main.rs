@@ -3,7 +3,7 @@ extern crate spiking_neural_networks;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError,
     neuron::{
-        integrate_and_fire::QuadraticIntegrateAndFireNeuron,
+        integrate_and_fire::SimpleLeakyIntegrateAndFire,
         gpu_lattices::LatticeGPU,
         Lattice
     }
@@ -17,9 +17,9 @@ fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
 }
 
 fn main() -> Result<(), SpikingNeuralNetworksError> {
-    let base_neuron = QuadraticIntegrateAndFireNeuron {
+    let base_neuron = SimpleLeakyIntegrateAndFire {
         gap_conductance: 10.,
-        ..QuadraticIntegrateAndFireNeuron::default_impl()
+        ..SimpleLeakyIntegrateAndFire::default_impl()
     };
 
     let iterations = 1000;
