@@ -660,8 +660,6 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             })
             .collect::<Vec<NeurotransmitterConcentrations<N>>>();
 
-        
-
         aggregate_neurotransmitter_concentrations(&input_vals)
     }
 
