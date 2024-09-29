@@ -356,21 +356,25 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 macro_rules! read_and_set_buffer {
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
         if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
-            unsafe {
+            let read_event = unsafe {
                 $queue
                     .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
-                    .expect("Could not read buffer");
-            }
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
         }
     };
     
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, UInt) => {
         if let Some(BufferGPU::UInt(buffer)) = $buffers.get($buffer_name) {
-            unsafe {
+            let read_event = unsafe {
                 $queue
                     .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
-                    .expect("Could not read buffer");
-            }
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
         }
     };
 }
@@ -578,7 +582,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
     #[allow(clippy::needless_range_loop)]
     fn convert_to_cpu(
         cell_grid: &mut Vec<Vec<Self>>,
-        buffers: HashMap<String, BufferGPU>,
+        buffers: &HashMap<String, BufferGPU>,
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
@@ -1355,20 +1359,20 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
             __kernel void simple_leaky_integrate_and_fire_iterate_and_spike(
                 __global const float *inputs,
                 __global const uint *index_to_position,
-                __global float *v,
+                __global float *current_voltage,
                 __global float *g,
                 __global float *e,
                 __global float *v_th,
                 __global float *v_reset,
-                __global uint *is_spiking,
-                __global float *dt
+                __global float *dt,
+                __global uint *is_spiking
             ) {
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];
 
-                v[index] += (g[index] * (v[index] - e[index]) + inputs[index]) * dt[index];
-                if (v[index] >= v_th[index]) {
-                    v[index] = v_reset[index];
+                current_voltage[index] += (g[index] * (current_voltage[index] - e[index]) + inputs[index]) * dt[index];
+                if (current_voltage[index] >= v_th[index]) {
+                    current_voltage[index] = v_reset[index];
                     is_spiking[index] = 1;
                 } else {
                     is_spiking[index] = 0;
@@ -1418,7 +1422,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
     #[allow(clippy::needless_range_loop)]
     fn convert_to_cpu(
         cell_grid: &mut Vec<Vec<Self>>,
-        buffers: HashMap<String, BufferGPU>,
+        buffers: &HashMap<String, BufferGPU>,
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
