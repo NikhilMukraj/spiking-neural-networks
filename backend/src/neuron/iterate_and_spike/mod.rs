@@ -1099,7 +1099,7 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
     /// Converts buffers back to a grid of neurons
     fn convert_to_cpu(
         cell_grid: &mut Vec<Vec<Self>>,
-        buffers: HashMap<String, BufferGPU>,
+        buffers: &HashMap<String, BufferGPU>,
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
