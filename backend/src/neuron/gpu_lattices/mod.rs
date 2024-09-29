@@ -57,7 +57,7 @@ __kernel void calculate_internal_electrical_inputs(
     int gid = get_global_id(0);
 
     float sum = 0.0f;
-    uint count = 0;
+    float count = 0.0f;
     for (int i = 0; i < n; i++) {
         if (connections[i * n + gid] == 1) {
             int presynaptic_index = index_to_position[i];
@@ -68,7 +68,7 @@ __kernel void calculate_internal_electrical_inputs(
         }
     }
     
-    if (count != 0) {
+    if (count != 0.0f) {
         res[gid] = sum / count;
     } else {
         res[gid] = 0;
@@ -306,6 +306,17 @@ where
 
             // if history add history
         }
+
+        let rows = self.cell_grid.len();
+        let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+
+        T::convert_to_cpu(
+            &mut self.cell_grid, 
+            &gpu_cell_grid, 
+            rows, 
+            cols, 
+            &self.queue
+        );
     }
 }
 
