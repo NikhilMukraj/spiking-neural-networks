@@ -83,8 +83,8 @@ __kernel void add_grid_voltage_history(
     __global const uint *index_to_position,
     __global const float *current_voltage,
     __global float *history,
-    __global int iteration,
-    __global int size
+    __global const int iteration,
+    __global const int size
 ) {
     int gid = get_global_id(0);
     int index = index_to_position[i];
@@ -167,6 +167,24 @@ impl LatticeHistoryGPU for GridVoltageHistory {
     }
 }
 
+// const LAST_FIRING_TIME_KERNEL: &str = r#"
+// __kernel__ void set_last_firing_time(
+//     __global const uint *index_to_position,
+//     __global const uint *is_spiking,
+//     __global const int iteration,
+//     __global int last_firing_time
+// ) {
+//     int gid = get_global_id(0);
+//     int index = index_to_position[gid];
+
+//     if (is_spiking[index] == 1) {
+//         last_firing_time[index] = iteration;
+//     }
+// } 
+// "#;
+
+// const LAST_FIRING_TIME_KERNEL_NAME: &str = "set_last_firing_time";
+
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
@@ -175,6 +193,7 @@ pub struct LatticeGPU<
     pub cell_grid: Vec<Vec<T>>,
     graph: U,
     incoming_connections_kernel: Kernel,
+    // last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
 }
@@ -187,18 +206,12 @@ where
 {
     impl_apply!();
 
-    // Generates a GPU lattice from a given lattice
-    pub fn from_lattice<
+    // Generates a GPU lattice given a lattice and a device
+    pub fn from_lattice_given_device< 
         LatticeHistoryCPU: LatticeHistory, 
         W: Plasticity<T, T, f32>,
-    >(lattice: Lattice<T, U, LatticeHistoryCPU, W, N>) -> Self {
-        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-            .expect("Could not get GPU devices")
-            .first()
-            .expect("No GPU found");
-        let device = Device::new(device_id);
-
-        let context = Context::from_device(&device).expect("Context::from_device failed");
+    >(lattice: Lattice<T, U, LatticeHistoryCPU, W, N>, device: &Device) -> Self {
+        let context = Context::from_device(device).expect("Context::from_device failed");
 
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
@@ -212,13 +225,33 @@ where
         let incoming_connections_kernel = Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME)
             .expect("Kernel::create failed");
 
+        // let last_firing_time_program = Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "")
+        //     .expect("Program::create_and_build_from_source failed");
+        // let last_firing_time_kernel = Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME)
+        //     .expect("Kernel::create failed");
+
         LatticeGPU { 
             cell_grid: lattice.cell_grid, 
             graph: lattice.graph, 
             incoming_connections_kernel,
+            // last_firing_time_kernel,
             context,
             queue,
         }
+    }
+
+    // Generates a GPU lattice from a given lattice
+    pub fn from_lattice<
+        LatticeHistoryCPU: LatticeHistory, 
+        W: Plasticity<T, T, f32>,
+    >(lattice: Lattice<T, U, LatticeHistoryCPU, W, N>) -> Self {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        LatticeGPU::from_lattice_given_device(lattice, &device)
     }
 
     /// Sets timestep variable for the lattice
@@ -304,6 +337,29 @@ where
 
             iterate_event.wait().expect("Could not wait");
 
+            // let last_firing_time_event = unsafe {
+            //     let mut kernel_execution = ExecuteKernel::new(&self.last_firing_time_kernel)
+            //         .set_arg(&gpu_graph.index_to_position)
+            //         .set_arg(
+            //             match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+            //                 BufferGPU::Float(buffer) => unreachable!("Is spiking cannot be float"),
+            //                 BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+            //             }
+            //         )
+            //         .set_arg(iteration)
+            //         .set_arg(
+            //             match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+            //                 _ => unreachable!("Last firing cannot be float or unsigned integer"),
+            //                 BufferGPU::Int(buffer) => kernel_execution.set_arg(buffer),
+            //             }
+            //         )
+            //         .set_global_work_size(gpu_graph.size)
+            //         .enqueue_nd_range(&self.queue)
+            //         .expect("Could not queue kernel")
+            // };
+
+            // last_firing_time_event.wait().expect("Could not wait")
+
             // if history add history
         }
 
@@ -320,6 +376,7 @@ where
     }
 }
 
-// track history over time to debug why kernel is not functioning
-// track with connections and when connections are all none
-// or with sums buffer just being a set constant value
+// track history over time 
+// last firing time kernel
+// int buffer
+// should probably make method or macro to extract a buffer
