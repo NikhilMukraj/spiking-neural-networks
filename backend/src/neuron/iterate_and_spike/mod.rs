@@ -10,7 +10,7 @@ use std::{
 #[cfg(feature = "gpu")]
 use opencl3::{
     kernel::Kernel, context::Context, command_queue::CommandQueue,
-    memory::Buffer, types::{cl_float, cl_uint}
+    memory::Buffer, types::{cl_float, cl_uint, cl_int}
 };
 
 
@@ -1072,6 +1072,7 @@ pub struct KernelFunction {
 pub enum BufferGPU {
     Float(Buffer<cl_float>),
     UInt(Buffer<cl_uint>),
+    OptionalUInt(Buffer<cl_int>),
 }
 
 // set args on the fly using a for loop
