@@ -17,7 +17,7 @@ use super::iterate_and_spike::{
 use opencl3::{
     context::Context, kernel::Kernel, program::Program, command_queue::CommandQueue,
     memory::{Buffer, CL_MEM_READ_WRITE}, 
-    types::{cl_float, cl_uint, CL_NON_BLOCKING, CL_BLOCKING},
+    types::{cl_float, cl_uint, cl_int, CL_NON_BLOCKING, CL_BLOCKING},
 };
 #[cfg(feature = "gpu")]
 use std::collections::HashMap;
@@ -377,6 +377,18 @@ macro_rules! read_and_set_buffer {
             read_event.wait().expect("Could not wait for read");
         }
     };
+
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, OptionalUInt) => {
+        if let Some(BufferGPU::OptionalUInt(buffer)) = $buffers.get($buffer_name) {
+            let read_event = unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
+        }
+    };
 }
 
 #[cfg(feature = "gpu")]
@@ -396,6 +408,18 @@ macro_rules! write_buffer {
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt) => {
         let mut $name = unsafe {
             Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt) => {
+        let mut $name = unsafe {
+            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
                 .expect("Could not create buffer")
         };
 
@@ -432,6 +456,20 @@ macro_rules! write_buffer {
 
         last_event.wait().expect("Could not wait");
     };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
 }
 
 #[cfg(feature = "gpu")]
@@ -448,6 +486,13 @@ macro_rules! flatten_and_retrieve_field {
             .flat_map(|inner| inner.iter())
             .map(|neuron| if neuron.$field { 1 } else { 0 })
             .collect::<Vec<u32>>()
+    };
+
+    ($grid:expr, $field:ident, OptionalUInt) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| match neuron.$field { Some(value) => value as i32, None => -1 })
+            .collect::<Vec<i32>>()
     };
 }
 
@@ -478,6 +523,21 @@ macro_rules! create_uint_buffer {
         let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
         let cell_grid_size = flattened_field.len();
         write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, UInt, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
+macro_rules! create_optional_uint_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, OptionalUInt);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, OptionalUInt);
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, OptionalUInt);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, OptionalUInt, last);
     };
 }
 
@@ -560,6 +620,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         create_float_buffer!(refractory_count_buffer, context, queue, cell_grid, refractory_count);
         create_float_buffer!(tref_buffer, context, queue, cell_grid, tref);
 
+        create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
+
         create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
 
         buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
@@ -573,6 +635,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
         buffers.insert(String::from("refractory_count"), BufferGPU::Float(refractory_count_buffer));
         buffers.insert(String::from("tref"), BufferGPU::Float(tref_buffer));
+
+        buffers.insert(String::from("last_firing_time"), BufferGPU::OptionalUInt(last_firing_time_buffer));
 
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
 
@@ -598,6 +662,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         let mut v_th: Vec<f32> = vec![0.0; rows * cols];
         let mut refractory_count: Vec<f32> = vec![0.0; rows * cols];
         let mut tref: Vec<f32> = vec![0.0; rows * cols];
+        let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
         let mut is_spiking: Vec<u32> = vec![0; rows * cols];
 
         read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
@@ -611,6 +676,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
         read_and_set_buffer!(buffers, queue, "refractory_count", &mut refractory_count, Float);
         read_and_set_buffer!(buffers, queue, "tref", &mut tref, Float);
+        read_and_set_buffer!(buffers, queue, "last_firing_time", &mut last_firing_time, OptionalUInt);
         read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
 
         for i in 0..rows {
@@ -629,6 +695,11 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 cell.v_th = v_th[idx];
                 cell.refractory_count = refractory_count[idx];
                 cell.tref = tref[idx];
+                cell.last_firing_time = if last_firing_time[idx] == -1 {
+                    None
+                } else {
+                    Some(last_firing_time[idx] as usize)
+                };
                 cell.is_spiking = is_spiking[idx] == 1;
             }
         }
@@ -1404,6 +1475,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
         create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
         create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
 
+        create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
+
         create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
 
         buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
@@ -1413,6 +1486,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
         buffers.insert(String::from("v_reset"), BufferGPU::Float(v_reset_buffer));
         buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
         buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
+
+        buffers.insert(String::from("last_firing_time"), BufferGPU::OptionalUInt(last_firing_time_buffer));
 
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
 
@@ -1434,6 +1509,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
         let mut v_reset: Vec<f32> = vec![0.0; rows * cols];
         let mut dt: Vec<f32> = vec![0.0; rows * cols];
         let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
         let mut is_spiking: Vec<u32> = vec![0; rows * cols];
 
         read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
@@ -1443,6 +1519,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
         read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
         read_and_set_buffer!(buffers, queue, "v_reset", &mut v_reset, Float);
         read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "last_firing_time", &mut last_firing_time, OptionalUInt);
         read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
 
         for i in 0..rows {
@@ -1457,6 +1534,11 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
                 cell.v_reset = v_reset[idx];
                 cell.dt = dt[idx];
                 cell.v_th = v_th[idx];
+                cell.last_firing_time = if last_firing_time[idx] == -1 {
+                    None
+                } else {
+                    Some(last_firing_time[idx] as usize)
+                };
                 cell.is_spiking = is_spiking[idx] == 1;
             }
         }
