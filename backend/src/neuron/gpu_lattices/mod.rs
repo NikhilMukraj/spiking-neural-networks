@@ -139,7 +139,8 @@ impl LatticeHistoryGPU for GridVoltageHistory {
             queue.enqueue_read_buffer(
                 match buffers.get("history").expect("Could not get history") {
                     BufferGPU::Float(value) => value,
-                    BufferGPU::UInt(_) => unreachable!("History is not unsigned integer")
+                    BufferGPU::UInt(_) => unreachable!("History is not unsigned integer"),
+                    BufferGPU::OptionalUInt(_) => unreachable!("History is not optional unsigned integer"),
                 }, 
                 CL_NON_BLOCKING, 
                 0, 
@@ -167,23 +168,23 @@ impl LatticeHistoryGPU for GridVoltageHistory {
     }
 }
 
-// const LAST_FIRING_TIME_KERNEL: &str = r#"
-// __kernel__ void set_last_firing_time(
-//     __global const uint *index_to_position,
-//     __global const uint *is_spiking,
-//     __global const int iteration,
-//     __global int last_firing_time
-// ) {
-//     int gid = get_global_id(0);
-//     int index = index_to_position[gid];
+const LAST_FIRING_TIME_KERNEL: &str = r#"
+__kernel__ void set_last_firing_time(
+    __global const uint *index_to_position,
+    __global const uint *is_spiking,
+    __global const int iteration,
+    __global int last_firing_time
+) {
+    int gid = get_global_id(0);
+    int index = index_to_position[gid];
 
-//     if (is_spiking[index] == 1) {
-//         last_firing_time[index] = iteration;
-//     }
-// } 
-// "#;
+    if (is_spiking[index] == 1) {
+        last_firing_time[index] = iteration;
+    }
+} 
+"#;
 
-// const LAST_FIRING_TIME_KERNEL_NAME: &str = "set_last_firing_time";
+const LAST_FIRING_TIME_KERNEL_NAME: &str = "set_last_firing_time";
 
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
@@ -193,9 +194,10 @@ pub struct LatticeGPU<
     pub cell_grid: Vec<Vec<T>>,
     graph: U,
     incoming_connections_kernel: Kernel,
-    // last_firing_time_kernel: Kernel,
+    last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
+    internal_clock: usize,
 }
 
 impl<T, U, N> LatticeGPU<T, U, N>
@@ -225,16 +227,17 @@ where
         let incoming_connections_kernel = Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME)
             .expect("Kernel::create failed");
 
-        // let last_firing_time_program = Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "")
-        //     .expect("Program::create_and_build_from_source failed");
-        // let last_firing_time_kernel = Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME)
-        //     .expect("Kernel::create failed");
+        let last_firing_time_program = Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "")
+            .expect("Program::create_and_build_from_source failed");
+        let last_firing_time_kernel = Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME)
+            .expect("Kernel::create failed");
 
         LatticeGPU { 
             cell_grid: lattice.cell_grid, 
             graph: lattice.graph, 
             incoming_connections_kernel,
-            // last_firing_time_kernel,
+            last_firing_time_kernel,
+            internal_clock: 0,
             context,
             queue,
         }
@@ -286,7 +289,7 @@ where
     
         sums_write_event.wait().expect("Could not wait");
 
-        for _n in 0..iterations {
+        for _ in 0..iterations {
             let gap_junctions_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&self.incoming_connections_kernel);
 
@@ -296,12 +299,12 @@ where
 
                 match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer") {
                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    _ => unreachable!("gap_condutance must be float"),
                 };
 
                 match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer") {
                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    _ => unreachable!("current_voltage must be float"),
                 };
 
                 kernel_execution.set_arg(&gpu_graph.size)
@@ -325,6 +328,7 @@ where
                     } else {
                         match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                            BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
                         };
                     }
@@ -337,30 +341,32 @@ where
 
             iterate_event.wait().expect("Could not wait");
 
-            // let last_firing_time_event = unsafe {
-            //     let mut kernel_execution = ExecuteKernel::new(&self.last_firing_time_kernel)
-            //         .set_arg(&gpu_graph.index_to_position)
-            //         .set_arg(
-            //             match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-            //                 BufferGPU::Float(buffer) => unreachable!("Is spiking cannot be float"),
-            //                 BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-            //             }
-            //         )
-            //         .set_arg(iteration)
-            //         .set_arg(
-            //             match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-            //                 _ => unreachable!("Last firing cannot be float or unsigned integer"),
-            //                 BufferGPU::Int(buffer) => kernel_execution.set_arg(buffer),
-            //             }
-            //         )
-            //         .set_global_work_size(gpu_graph.size)
-            //         .enqueue_nd_range(&self.queue)
-            //         .expect("Could not queue kernel")
-            // };
+            let last_firing_time_event = unsafe {
+                ExecuteKernel::new(&self.last_firing_time_kernel)
+                    .set_arg(&gpu_graph.index_to_position)
+                    .set_arg(
+                        match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
+                            BufferGPU::UInt(buffer) => buffer,
+                            _ => unreachable!("current_voltage cannot be float or optional unsigned integer"),
+                        }
+                    )
+                    .set_arg(
+                        match &gpu_cell_grid.get("last_firing_time").expect("Could not retrieve buffer: last_firing_time") {
+                            BufferGPU::OptionalUInt(buffer) => buffer,
+                            _ => unreachable!("last_firing_time cannot be float or mandatory unsigned integer"),
+                        }
+                    )
+                    .set_arg(&(self.internal_clock as i32))
+                    .set_global_work_size(gpu_graph.size)
+                    .enqueue_nd_range(&self.queue)
+                    .expect("Could not queue kernel")
+            };
 
-            // last_firing_time_event.wait().expect("Could not wait")
+            last_firing_time_event.wait().expect("Could not wait");
 
             // if history add history
+
+            self.internal_clock += 1;
         }
 
         let rows = self.cell_grid.len();
