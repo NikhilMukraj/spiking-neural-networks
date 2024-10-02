@@ -59,7 +59,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
             let error = (neuron1.current_voltage - neuron2.current_voltage).abs();
             assert!(
-                error <= 10., "error: {}, neuron1: {}, neuron2: {}\n{:#?}\n{:#?}", 
+                error <= 2., "error: {}, neuron1: {}, neuron2: {}\n{:#?}\n{:#?}", 
                 error,
                 neuron1.current_voltage,
                 neuron2.current_voltage,
@@ -69,6 +69,17 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
                 gpu_lattice.cell_grid.iter()
                     .map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<f32>>())
                     .collect::<Vec<Vec<f32>>>(),
+            );
+
+            let error = (
+                neuron1.last_firing_time.unwrap_or(0) as isize - 
+                neuron2.last_firing_time.unwrap_or(0) as isize
+            ).abs();
+            assert!(
+                error <= 2, "error: {:#?}, neuron1: {:#?}, neuron2: {:#?}",
+                error,
+                neuron1.last_firing_time,
+                neuron2.last_firing_time,
             );
         }
     }
