@@ -169,11 +169,11 @@ impl LatticeHistoryGPU for GridVoltageHistory {
 }
 
 const LAST_FIRING_TIME_KERNEL: &str = r#"
-__kernel__ void set_last_firing_time(
+__kernel void set_last_firing_time(
     __global const uint *index_to_position,
     __global const uint *is_spiking,
-    __global const int iteration,
-    __global int last_firing_time
+    __global int *last_firing_time,
+    int iteration
 ) {
     int gid = get_global_id(0);
     int index = index_to_position[gid];
@@ -345,9 +345,9 @@ where
                 ExecuteKernel::new(&self.last_firing_time_kernel)
                     .set_arg(&gpu_graph.index_to_position)
                     .set_arg(
-                        match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
+                        match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
                             BufferGPU::UInt(buffer) => buffer,
-                            _ => unreachable!("current_voltage cannot be float or optional unsigned integer"),
+                            _ => unreachable!("is_spiking cannot be float or optional unsigned integer"),
                         }
                     )
                     .set_arg(
