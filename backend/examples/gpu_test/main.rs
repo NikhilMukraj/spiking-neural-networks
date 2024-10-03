@@ -47,7 +47,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
     });
 
-    lattice.update_grid_history = true;
+    // lattice.update_grid_history = true;
 
     let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone());
 
