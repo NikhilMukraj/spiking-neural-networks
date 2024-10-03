@@ -94,9 +94,9 @@ __kernel void add_grid_voltage_history(
 "#;
 
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
-pub trait LatticeHistoryGPU {
+pub trait LatticeHistoryGPU: LatticeHistory {
     fn get_kernel(&self, context: &Context) -> KernelFunction;
-    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
+    fn to_gpu(&self, context: &Context, iterations: usize, size: usize) -> HashMap<String, BufferGPU>;
     fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
 }
 
@@ -120,9 +120,9 @@ impl LatticeHistoryGPU for GridVoltageHistory {
         }
     }
 
-    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
+    fn to_gpu(&self, context: &Context, iterations: usize, size: usize) -> HashMap<String, BufferGPU> {
         let history_buffer = unsafe {
-            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size, ptr::null_mut())
                 .expect("Could not create buffer")
         };
 
@@ -189,6 +189,7 @@ const LAST_FIRING_TIME_KERNEL_NAME: &str = "set_last_firing_time";
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
+    V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterType,
 > {
     pub cell_grid: Vec<Vec<T>>,
@@ -197,22 +198,25 @@ pub struct LatticeGPU<
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
+    pub grid_history: V,
+    grid_history_kernel: KernelFunction,
+    pub update_grid_history: bool,
     internal_clock: usize,
 }
 
-impl<T, U, N> LatticeGPU<T, U, N>
+impl<T, U, V, N> LatticeGPU<T, U, V, N>
 where
     T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
     U: Graph<K = (usize, usize), V = f32> + GraphToGPU,
+    V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterType,
 {
     impl_apply!();
 
     // Generates a GPU lattice given a lattice and a device
     pub fn from_lattice_given_device< 
-        LatticeHistoryCPU: LatticeHistory, 
         W: Plasticity<T, T, f32>,
-    >(lattice: Lattice<T, U, LatticeHistoryCPU, W, N>, device: &Device) -> Self {
+    >(lattice: Lattice<T, U, V, W, N>, device: &Device) -> Self {
         let context = Context::from_device(device).expect("Context::from_device failed");
 
         let queue = CommandQueue::create_default_with_properties(
@@ -232,12 +236,16 @@ where
         let last_firing_time_kernel = Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME)
             .expect("Kernel::create failed");
 
+
         LatticeGPU { 
             cell_grid: lattice.cell_grid, 
             graph: lattice.graph, 
             incoming_connections_kernel,
             last_firing_time_kernel,
             internal_clock: 0,
+            grid_history_kernel: lattice.grid_history.get_kernel(&context),
+            grid_history: lattice.grid_history,
+            update_grid_history: lattice.update_grid_history,
             context,
             queue,
         }
@@ -245,9 +253,8 @@ where
 
     // Generates a GPU lattice from a given lattice
     pub fn from_lattice<
-        LatticeHistoryCPU: LatticeHistory, 
         W: Plasticity<T, T, f32>,
-    >(lattice: Lattice<T, U, LatticeHistoryCPU, W, N>) -> Self {
+    >(lattice: Lattice<T, U, V, W, N>) -> Self {
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
             .expect("Could not get GPU devices")
             .first()
@@ -288,6 +295,12 @@ where
         };
     
         sums_write_event.wait().expect("Could not wait");
+
+        let gpu_grid_history = if self.update_grid_history {
+            self.grid_history.to_gpu(&self.context, iterations, gpu_graph.size)
+        } else {
+            HashMap::new()
+        };
 
         for _ in 0..iterations {
             let gap_junctions_event = unsafe {
@@ -364,7 +377,41 @@ where
 
             last_firing_time_event.wait().expect("Could not wait");
 
-            // if history add history
+            if self.update_grid_history {
+                let update_history_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
+
+                    for i in self.grid_history_kernel.argument_names.iter() {
+                        if i == "iteration" {
+                            kernel_execution.set_arg(&self.internal_clock);
+                        } else if i == "size" {
+                            kernel_execution.set_arg(&gpu_graph.size);
+                        } else if i == "index_to_position" {
+                            kernel_execution.set_arg(&gpu_graph.index_to_position);
+                        } else if gpu_cell_grid.contains_key(i) {
+                            match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        } else if gpu_grid_history.contains_key(i) {
+                            match &gpu_grid_history.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        } else {
+                            unreachable!("Unkown argument in history kernel");
+                        }
+                    }
+    
+                    kernel_execution.set_global_work_size(gpu_graph.size)
+                        .enqueue_nd_range(&self.queue)
+                        .expect("Could not queue kernel")
+                };
+
+                update_history_event.wait().expect("Could not wait");
+            }
 
             self.internal_clock += 1;
         }
