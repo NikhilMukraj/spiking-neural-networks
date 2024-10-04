@@ -83,11 +83,11 @@ __kernel void add_grid_voltage_history(
     __global const uint *index_to_position,
     __global const float *current_voltage,
     __global float *history,
-    __global const int iteration,
-    __global const int size
+    int iteration,
+    int size
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[i];
+    uint index = index_to_position[gid];
 
     history[iteration * size + index] = current_voltage[index]; 
 }
@@ -96,7 +96,7 @@ __kernel void add_grid_voltage_history(
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
 pub trait LatticeHistoryGPU: LatticeHistory {
     fn get_kernel(&self, context: &Context) -> KernelFunction;
-    fn to_gpu(&self, context: &Context, iterations: usize, size: usize) -> HashMap<String, BufferGPU>;
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
     fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
 }
 
@@ -120,9 +120,9 @@ impl LatticeHistoryGPU for GridVoltageHistory {
         }
     }
 
-    fn to_gpu(&self, context: &Context, iterations: usize, size: usize) -> HashMap<String, BufferGPU> {
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
         let history_buffer = unsafe {
-            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size, ptr::null_mut())
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
                 .expect("Could not create buffer")
         };
 
@@ -296,8 +296,11 @@ where
     
         sums_write_event.wait().expect("Could not wait");
 
+        let rows = self.cell_grid.len();
+        let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+
         let gpu_grid_history = if self.update_grid_history {
-            self.grid_history.to_gpu(&self.context, iterations, gpu_graph.size)
+            self.grid_history.to_gpu(&self.context, iterations, (rows, cols))
         } else {
             HashMap::new()
         };
@@ -416,8 +419,9 @@ where
             self.internal_clock += 1;
         }
 
-        let rows = self.cell_grid.len();
-        let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+        if self.update_grid_history {
+            self.grid_history.add_from_gpu(&self.queue, gpu_grid_history, iterations, (rows, cols));
+        }
 
         T::convert_to_cpu(
             &mut self.cell_grid, 
