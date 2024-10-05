@@ -84,6 +84,21 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         }
     }
 
+    for (cpu_cell_grid, gpu_cell_grid) in lattice.grid_history.history.iter()
+        .zip(gpu_lattice.grid_history.history.iter()) {
+        for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+            for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                let error = (voltage1 - voltage2).abs();
+                assert!(
+                    error <= 2., "error: {}, voltage1: {}, voltage2: {}", 
+                    error,
+                    voltage1,
+                    voltage2,
+                );
+            }
+        }
+    }
+
     const GREEN: &str = "\x1b[32m";
     const RESET: &str = "\x1b[0m";
     
