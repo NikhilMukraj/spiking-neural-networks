@@ -104,6 +104,15 @@ pub trait NMDADefault {
 /// Marker trait for neurotransmitter type
 pub trait NeurotransmitterType: Hash + PartialEq + Eq + Clone + Copy + Debug + Send + Sync {}
 
+/// Trait for GPU compatible neurotransmitter type
+#[cfg(feature = "gpu")]
+pub trait NeurotransmitterTypeGPU: NeurotransmitterType {
+    /// Converts the type to a numeric index (must be unique among types)
+    fn type_to_numeric(&self) -> usize;
+    /// Gets the number of availible types
+    fn number_of_types() -> usize;
+}
+
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
 pub enum IonotropicNeurotransmitterType {
@@ -118,6 +127,22 @@ pub enum IonotropicNeurotransmitterType {
 }
 
 impl NeurotransmitterType for IonotropicNeurotransmitterType {}
+
+#[cfg(feature = "gpu")]
+impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
+    fn type_to_numeric(&self) -> usize {
+        match &self {
+            IonotropicNeurotransmitterType::AMPA => 0,
+            IonotropicNeurotransmitterType::NMDA => 1,
+            IonotropicNeurotransmitterType::GABAa => 2,
+            IonotropicNeurotransmitterType::GABAb => 3,
+        }
+    }
+
+    fn number_of_types() -> usize {
+        4
+    }
+}
 
 impl IonotropicNeurotransmitterType {
     /// Converts type to string
@@ -794,6 +819,234 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
             .for_each(|value| value.apply_t_change(voltage, dt));
     }
 }
+
+
+#[cfg(feature = "gpu")]
+macro_rules! read_and_set_buffer {
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
+        if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
+            let read_event = unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
+        }
+    };
+    
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, UInt) => {
+        if let Some(BufferGPU::UInt(buffer)) = $buffers.get($buffer_name) {
+            let read_event = unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
+        }
+    };
+
+    ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, OptionalUInt) => {
+        if let Some(BufferGPU::OptionalUInt(buffer)) = $buffers.get($buffer_name) {
+            let read_event = unsafe {
+                $queue
+                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
+                    .expect("Could not read buffer")
+            };
+
+            read_event.wait().expect("Could not wait for read");
+        }
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use read_and_set_buffer;
+
+#[cfg(feature = "gpu")]
+macro_rules! write_buffer {
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float) => {
+        let mut $name = unsafe {
+            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt) => {
+        let mut $name = unsafe {
+            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt) => {
+        let mut $name = unsafe {
+            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let _ = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt, last) => {
+        let mut $name = unsafe {
+            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
+                .expect("Could not create buffer")
+        };
+
+        let last_event = unsafe { 
+            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
+                .expect("Could not write to buffer") 
+        };
+
+        last_event.wait().expect("Could not wait");
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use write_buffer;
+
+#[cfg(feature = "gpu")]
+macro_rules! flatten_and_retrieve_field {
+    ($grid:expr, $field:ident, f32) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| neuron.$field)
+            .collect::<Vec<f32>>()
+    };
+
+    ($grid:expr, $field:ident, u32) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| if neuron.$field { 1 } else { 0 })
+            .collect::<Vec<u32>>()
+    };
+
+    ($grid:expr, $field:ident, OptionalUInt) => {
+        $grid.iter()
+            .flat_map(|inner| inner.iter())
+            .map(|neuron| match neuron.$field { Some(value) => value as i32, None => -1 })
+            .collect::<Vec<i32>>()
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use flatten_and_retrieve_field;
+
+#[cfg(feature = "gpu")]
+macro_rules! create_float_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, f32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, Float);
+    };
+
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, f32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, Float, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use create_float_buffer;
+
+#[cfg(feature = "gpu")]
+macro_rules! create_uint_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, UInt);
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, UInt, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use create_uint_buffer;
+
+#[cfg(feature = "gpu")]
+macro_rules! create_optional_uint_buffer {
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, OptionalUInt);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, OptionalUInt);
+    };
+    
+    ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident, last) => {
+        let flattened_field = flatten_and_retrieve_field!($grid, $field, OptionalUInt);
+        let cell_grid_size = flattened_field.len();
+        write_buffer!($name, $context, $queue, cell_grid_size, &flattened_field, OptionalUInt, last);
+    };
+}
+
+#[cfg(feature = "gpu")]
+pub(crate) use create_optional_uint_buffer;
+
+// #[cfg(feature = "gpu")]
+// impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N, T> {
+//     fn convert_to_gpu(
+//         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+//     ) -> HashMap<String, BufferGPU> {
+            // if neurotransmitter type not enabled on this specific struct
+            // mark as false and then fill with zeros
+//     }
+
+//     fn convert_to_cpu(cell_grid: &mut Vec<Vec<Self>>,
+//         buffers: &HashMap<String, BufferGPU>,
+//         rows: usize,
+//         cols: usize,
+//         queue: &CommandQueue,
+//     ) {
+        // if neurotransmitter type not enabled on this specific struct
+        // do not add to hashmap
+//     }
+// }
 
 /// Multiplies multiple neurotransmitters concentrations by a single scalar value
 pub fn weight_neurotransmitter_concentration<N: NeurotransmitterType>(
