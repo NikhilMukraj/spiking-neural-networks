@@ -1044,12 +1044,12 @@ pub(crate) use create_optional_uint_buffer;
 //     fn convert_to_gpu(
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
 //     ) -> HashMap<String, BufferGPU> {
-//         for row in grid {
-//             for value in row {
+//         for (n, row) in grid.enumerate() {
+//             for (m, value) in row {
 //                 for i in Self::get_all_types() {
 //                     match value.get(i) {
 //                         Some(value) => {
-//                             // write buffers
+//                             // write buffers at the given index
 //                         },
 //                         None => {
 //                             // fill with zeros
