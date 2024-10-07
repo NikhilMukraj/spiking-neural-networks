@@ -3,7 +3,7 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{HashMap, hash_map::{Values, ValuesMut, Keys}},
+    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
 };
@@ -111,6 +111,8 @@ pub trait NeurotransmitterTypeGPU: NeurotransmitterType {
     fn type_to_numeric(&self) -> usize;
     /// Gets the number of availible types
     fn number_of_types() -> usize;
+    /// Gets all neurotransmitter types availiable
+    fn get_all_types() -> HashSet<Self>;
 }
 
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
@@ -141,6 +143,15 @@ impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
 
     fn number_of_types() -> usize {
         4
+    }
+
+    fn get_all_types() -> HashSet<Self> {
+        HashSet::from([
+            IonotropicNeurotransmitterType::AMPA,
+            IonotropicNeurotransmitterType::NMDA,
+            IonotropicNeurotransmitterType::GABAa,
+            IonotropicNeurotransmitterType::GABAb,
+        ])
     }
 }
 
@@ -1033,8 +1044,20 @@ pub(crate) use create_optional_uint_buffer;
 //     fn convert_to_gpu(
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
 //     ) -> HashMap<String, BufferGPU> {
-            // if neurotransmitter type not enabled on this specific struct
-            // mark as false and then fill with zeros
+//         for row in grid {
+//             for value in row {
+//                 for i in Self::get_all_types() {
+//                     match value.get(i) {
+//                         Some(value) => {
+//                             // write buffers
+//                         },
+//                         None => {
+//                             // fill with zeros
+//                         }
+//                     }
+//                 }
+//             }
+//         }
 //     }
 
 //     fn convert_to_cpu(cell_grid: &mut Vec<Vec<Self>>,
