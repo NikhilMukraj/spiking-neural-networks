@@ -177,6 +177,12 @@ pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     fn set_t(&mut self, t: f32);
 }
 
+/// Neurotransmitter kinetics that are compatible with the GPU
+pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics {
+    /// Retrieves the given value
+    fn get_attribute(&self, value: &str) -> Option<f32>;
+}
+
 /// Neurotransmitter concentration based off of approximation 
 /// found in this [paper](https://papers.cnl.salk.edu/PDFs/Kinetic%20Models%20of%20Synaptic%20Transmission%201998-3229.pdf)
 #[derive(Debug, Clone, Copy)]
@@ -396,6 +402,7 @@ Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync
     fn apply_r_change(&mut self, t: f32, dt: f32);
     /// Gets the receptor gating value
     fn get_r(&self) -> f32;
+    /// Sets the receptor gating value
     fn set_r(&mut self, r: f32);
 }
 
@@ -1050,6 +1057,7 @@ pub(crate) use create_optional_uint_buffer;
 //                     match value.get(i) {
 //                         Some(value) => {
 //                             // write buffers at the given index
+//                             // write buffers with dynamic indexing of neurotransmitter kinetics
 //                         },
 //                         None => {
 //                             // fill with zeros
