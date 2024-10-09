@@ -177,10 +177,15 @@ pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     fn set_t(&mut self, t: f32);
 }
 
+#[cfg(feature = "gpu")]
 /// Neurotransmitter kinetics that are compatible with the GPU
 pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics {
     /// Retrieves the given value
     fn get_attribute(&self, value: &str) -> Option<f32>;
+    /// Retrieves all attribute names
+    fn get_attribute_names() -> HashSet<String>;
+    /// Gets update function with the associated argument names
+    fn get_update_function() -> (Vec<String>, String);
 }
 
 /// Neurotransmitter concentration based off of approximation 
@@ -288,6 +293,55 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 
     fn set_t(&mut self, t: f32) {
         self.t = t;
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
+    fn get_attribute(&self, value: &str) -> Option<f32> {
+        match value {
+            "t" => Some(self.t),
+            "t_max" => Some(self.t_max),
+            "v_th" => Some(self.v_th),
+            "clearance_constant" => Some(self.clearance_constant),
+            _ => None,
+        }
+    }
+
+    fn get_attribute_names() -> HashSet<String> {
+        HashSet::from(
+            [
+                String::from("t"), String::from("t_max"), String::from("v_th"), 
+                String::from("clearance_constant")
+            ]
+        )
+    }
+
+    fn get_update_function() -> (Vec<String>, String) {
+        (
+            vec![
+                String::from("voltage"), String::from("dt"), String::from("t"),
+                String::from("t_max"), String::from("v_th"), String::from("clearance_constant"),
+            ],
+            String::from("
+                float get_t(
+                    float voltage, 
+                    float dt,
+                    float t,
+                    float t_max,
+                    float v_th,
+                    float clearance_constant,
+                ) { 
+                    float is_spiking_modifier = 0;
+                    if (voltage > v_th) {
+                        is_spiking_modifier = 1;
+                    }
+                    float new_t = dt * -clearance_constant * t + (is_spiking_modifier * t_max);
+
+                    return clamp(t, 0, t_max);
+                }
+            ")
+        )
     }
 }
 
@@ -1051,6 +1105,7 @@ pub(crate) use create_optional_uint_buffer;
 //     fn convert_to_gpu(
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
 //     ) -> HashMap<String, BufferGPU> {
+//         let buffers: HashMap<String, f32> = HashMap::new(); // each key is kinetic attribute name
 //         for (n, row) in grid.enumerate() {
 //             for (m, value) in row {
 //                 for i in Self::get_all_types() {
@@ -1066,6 +1121,7 @@ pub(crate) use create_optional_uint_buffer;
 //                 }
 //             }
 //         }
+//         // write vectors to buffers 
 //     }
 
 //     fn convert_to_cpu(cell_grid: &mut Vec<Vec<Self>>,
