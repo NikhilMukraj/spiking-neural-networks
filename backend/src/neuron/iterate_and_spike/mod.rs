@@ -1113,6 +1113,9 @@ pub(crate) use create_optional_uint_buffer;
 //                         Some(value) => {
 //                             // write buffers at the given index
 //                             // write buffers with dynamic indexing of neurotransmitter kinetics
+//                              for attribute in T::get_attribute_names() {
+//                                  // get asssociated value and write to buffer
+//                              }
 //                         },
 //                         None => {
 //                             // fill with zeros
