@@ -1106,6 +1106,9 @@ pub(crate) use create_optional_uint_buffer;
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
 //     ) -> HashMap<String, BufferGPU> {
 //         let buffers: HashMap<String, f32> = HashMap::new(); // each key is kinetic attribute name
+//         for i in T::get_attribute_names {
+//              buffers.insert(&i, vec![]);
+//         }
 //         for (n, row) in grid.enumerate() {
 //             for (m, value) in row {
 //                 for i in Self::get_all_types() {
@@ -1115,10 +1118,15 @@ pub(crate) use create_optional_uint_buffer;
 //                             // write buffers with dynamic indexing of neurotransmitter kinetics
 //                              for attribute in T::get_attribute_names() {
 //                                  // get asssociated value and write to buffer
+//                                  // buffers.get_mut(&attribute).append(grid[n][m].get_attribute(&attribute));
 //                              }
 //                         },
 //                         None => {
 //                             // fill with zeros
+///                            for attribute in T::get_attribute_names() {
+//                                  // get asssociated value and write to buffer
+//                                  // buffers.get_mut(&attribute).append(0.);
+//                              }
 //                         }
 //                     }
 //                 }
