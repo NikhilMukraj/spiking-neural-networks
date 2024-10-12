@@ -10,8 +10,11 @@ use std::{
 #[cfg(feature = "gpu")]
 use opencl3::{
     kernel::Kernel, context::Context, command_queue::CommandQueue,
-    memory::Buffer, types::{cl_float, cl_uint, cl_int}
+    memory::{Buffer, CL_MEM_READ_WRITE}, 
+    types::{cl_float, cl_uint, cl_int, CL_BLOCKING},
 };
+#[cfg(feature = "gpu")]
+use std::ptr;
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -1100,51 +1103,73 @@ macro_rules! create_optional_uint_buffer {
 #[cfg(feature = "gpu")]
 pub(crate) use create_optional_uint_buffer;
 
-// #[cfg(feature = "gpu")]
-// impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N, T> {
-//     fn convert_to_gpu(
-//         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
-//     ) -> HashMap<String, BufferGPU> {
-//         let buffers: HashMap<String, f32> = HashMap::new(); // each key is kinetic attribute name
-//         for i in T::get_attribute_names {
-//              buffers.insert(&i, vec![]);
-//         }
-//         for (n, row) in grid.enumerate() {
-//             for (m, value) in row {
-//                 for i in Self::get_all_types() {
-//                     match value.get(i) {
-//                         Some(value) => {
-//                             // write buffers at the given index
-//                             // write buffers with dynamic indexing of neurotransmitter kinetics
-//                              for attribute in T::get_attribute_names() {
-//                                  // get asssociated value and write to buffer
-//                                  // buffers.get_mut(&attribute).append(grid[n][m].get_attribute(&attribute));
-//                              }
-//                         },
-//                         None => {
-//                             // fill with zeros
-///                            for attribute in T::get_attribute_names() {
-//                                  // get asssociated value and write to buffer
-//                                  // buffers.get_mut(&attribute).append(0.);
-//                              }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//         // write vectors to buffers 
-//     }
+fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU>(
+    value: &Neurotransmitters<N, T>, i: N, buffers_contents: &mut HashMap<String, Vec<f32>>
+) {
+    match value.get(&i) {
+        Some(value) => {
+            for attribute in T::get_attribute_names() {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                    retrieved_attribute.push(
+                        value.get_attribute(&attribute).expect("Attribute not found")
+                    )
+                } else {
+                    unreachable!("Attribute not found");
+                }
+            }
+        },
+        None => {
+            for attribute in T::get_attribute_names() {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                    retrieved_attribute.push(0.)
+                } else {
+                    unreachable!("Attribute not found")
+                }
+            }
+        }
+    }
+}
 
-//     fn convert_to_cpu(cell_grid: &mut Vec<Vec<Self>>,
-//         buffers: &HashMap<String, BufferGPU>,
-//         rows: usize,
-//         cols: usize,
-//         queue: &CommandQueue,
-//     ) {
-        // if neurotransmitter type not enabled on this specific struct
-        // do not add to hashmap
-//     }
-// }
+#[cfg(feature = "gpu")]
+impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitters<N, T> {
+    pub fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
+    ) -> HashMap<String, BufferGPU> {
+        let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
+        for i in T::get_attribute_names() {
+            buffers_contents.insert(i.to_string(), vec![]);
+        }
+
+        for row in grid.iter() {
+            for value in row.iter() {
+                for i in N::get_all_types() {
+                    extract_or_pad_neurotransmitter(value, i, &mut buffers_contents);
+                }
+            }
+        }
+
+        let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
+
+        let size = rows * cols;
+
+        for (key, value) in buffers_contents.iter() {
+            write_buffer!(current_buffer, context, queue, size, value, Float, last);
+
+            buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+        }
+
+        buffers
+    }
+
+    // pub fn convert_to_cpu(cell_grid: &mut Vec<Vec<Self>>,
+    //     buffers: &HashMap<String, BufferGPU>,
+    //     rows: usize,
+    //     cols: usize,
+    //     queue: &CommandQueue,
+    // ) {
+    //     todo!()
+    // }
+}
 
 /// Multiplies multiple neurotransmitters concentrations by a single scalar value
 pub fn weight_neurotransmitter_concentration<N: NeurotransmitterType>(
