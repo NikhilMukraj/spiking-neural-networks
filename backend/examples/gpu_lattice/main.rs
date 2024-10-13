@@ -16,11 +16,6 @@ fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
     x != y
 }
 
-// fn random_weight(_: (usize, usize), _: (usize, usize)) -> f32 {
-//     let mut rng = rand::thread_rng();
-//     rng.gen_range(0.5..=1.5)
-// }
-
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let base_neuron = SimpleLeakyIntegrateAndFire {
         gap_conductance: 0.1,
@@ -40,7 +35,6 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     );
 
     lattice.connect(&connection_conditional, None);
-    // lattice.connect(&|_, _| true, None);
 
     lattice.apply(|neuron: &mut _| {
         let mut rng = rand::thread_rng();
@@ -103,8 +97,6 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     const RESET: &str = "\x1b[0m";
     
     println!("{}GPU test passed{}", GREEN, RESET);
-
-    // compare histories
-
+    
     Ok(())
 }
