@@ -45,8 +45,8 @@
 /backend/examples/lsm_architecture/*.ipynb
 /backend/examples/lsm_architecture/*.txt
 /backend/examples/interacting_pools/*.csv
-/backend/examples/gpu_test/*.txt
-/backend/examples/gpu_test/*.ipynb
+/backend/examples/gpu_lattice/*.txt
+/backend/examples/gpu_lattice/*.ipynb
 /images/data/*
 /archive_interface/target
 /archive_interface/.venv
