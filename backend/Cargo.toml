@@ -9,7 +9,7 @@ repository = "https://github.com/NikhilMukraj/spiking-neural-networks"
 readme = "README.md"
 keywords = ["neuron", "neural", "neuroscience", "neurotransmission", "biophysics"]
 categories = ["science::neuroscience", "science", "mathematics"]
-exclude = ["benches/*"]
+exclude = ["benches/*", "test/*"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
