@@ -6,7 +6,13 @@ use opencl3::{
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::graph::{Graph, GraphToGPU};
-use super::{iterate_and_spike::{BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterType}, GridVoltageHistory};
+use super::{
+    iterate_and_spike::{
+        BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
+        KernelFunction, NeurotransmitterType
+    }, 
+    GridVoltageHistory,
+};
 use super::plasticity::Plasticity;
 use super::{Lattice, LatticeHistory, Position, impl_apply};
 use std::ptr;
