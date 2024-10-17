@@ -1,9 +1,7 @@
-extern crate test;
-
-
 #[cfg(test)]
 mod tests {
     use rand::Rng;
+    use std::result::Result;
     extern crate spiking_neural_networks;
     use spiking_neural_networks::{
         error::SpikingNeuralNetworksError,
@@ -14,11 +12,17 @@ mod tests {
         }
     };
 
+    fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
+        ((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)).sqrt() <= 2. && 
+        rand::thread_rng().gen_range(0.0..=1.0) <= 0.8 &&
+        x != y
+    }
+
     // check if history over time is within 2 mV of each other
     // check if last firing time is within 2 timesteps of one another
 
     #[test]
-    pub fn test_accuracy() {
+    pub fn test_electrical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
         let base_neuron = SimpleLeakyIntegrateAndFire {
             gap_conductance: 0.1,
             ..SimpleLeakyIntegrateAndFire::default_impl()
@@ -93,5 +97,7 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
     }
 }
