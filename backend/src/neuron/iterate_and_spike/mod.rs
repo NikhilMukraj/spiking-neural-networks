@@ -1205,9 +1205,9 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     pub fn convert_to_cpu(
         neurotransmitter_grid: &mut [Vec<Self>],
         buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
         rows: usize,
         cols: usize,
-        queue: &CommandQueue,
     ) {
         let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
