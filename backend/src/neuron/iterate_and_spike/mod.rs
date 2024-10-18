@@ -3,7 +3,7 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap, HashSet},
+    collections::{hash_map::{Keys, Values, ValuesMut}, BTreeSet, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
 };
@@ -115,13 +115,13 @@ pub trait NeurotransmitterTypeGPU: NeurotransmitterType {
     /// Gets the number of availible types
     fn number_of_types() -> usize;
     /// Gets all neurotransmitter types availiable
-    fn get_all_types() -> HashSet<Self>;
+    fn get_all_types() -> BTreeSet<Self>;
     /// Converts the type to a string
     fn to_string(&self) -> String;
 }
 
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
-#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub enum IonotropicNeurotransmitterType {
     /// Neurotransmitter type that effects only AMPA receptors
     AMPA,
@@ -150,8 +150,8 @@ impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
         4
     }
 
-    fn get_all_types() -> HashSet<Self> {
-        HashSet::from([
+    fn get_all_types() -> BTreeSet<Self> {
+        BTreeSet::from([
             IonotropicNeurotransmitterType::AMPA,
             IonotropicNeurotransmitterType::NMDA,
             IonotropicNeurotransmitterType::GABAa,
@@ -1184,13 +1184,15 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
-        let size = rows * cols;
+        let size = rows * cols * N::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
             write_buffer!(current_buffer, context, queue, size, value, Float, last);
 
             buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
         }
+
+        let size = rows * cols;
 
         for (key, value) in flags.iter() {
             write_buffer!(current_buffer, context, queue, size, value, UInt, last);
@@ -1219,7 +1221,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         for key in buffers.keys() {
             if !string_types.contains(key) {
-                let mut current_contents = vec![0.; rows * cols];
+                let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
                 read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
 
                 cpu_conversion.insert(key.clone(), current_contents);
@@ -1229,31 +1231,41 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
                 flags.insert(
                     key.clone(), 
-                    current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>()
+                    current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
                 );
             }
         }
 
-        for i in 0..rows {
-            for j in 0..cols {
-                let idx = i * cols + j;
-            
-                let mut current_neurotransmitter: HashMap<N, T> = HashMap::new();
-
-                for neurotransmitter_type in N::get_all_types() {
-                    if flags.get(&neurotransmitter_type.to_string()).unwrap()[idx] {
-                        let mut kinetics = T::default();
-                        for key in T::get_attribute_names() {
-                            kinetics.set_attribute(&key, cpu_conversion.get(&key).unwrap()[idx]);
+        for row in 0..rows {
+            for col in 0..cols {
+                let grid_value = &mut neurotransmitter_grid[row][col];
+                let flag_index = row * cols + col;
+                for i in N::get_all_types() {
+                    let i_str = i.to_string();
+                    let index = row * cols * N::number_of_types() 
+                        + col * N::number_of_types() + i.type_to_numeric();
+    
+                    if let Some(flag) = flags.get(&i_str) {
+                        if flag[flag_index] {
+                            if !grid_value.neurotransmitters.contains_key(&i) {
+                                grid_value.insert(i, T::default());
+                            }
+    
+                            for attribute in T::get_attribute_names() {
+                                println!("{}: {}, {}", flag_index, index, attribute);
+                                if let Some(values) = cpu_conversion.get(&attribute) {
+                                    let attr_value = values[index];
+                                    grid_value.neurotransmitters
+                                        .get_mut(&i)
+                                        .unwrap()
+                                        .set_attribute(&attribute, attr_value);
+                                }
+                            }
+                        } else {
+                            grid_value.neurotransmitters.remove(&i);
                         }
-
-                        current_neurotransmitter.insert(neurotransmitter_type, kinetics);
                     }
                 }
-
-                neurotransmitter_grid[i][j] = Neurotransmitters { 
-                    neurotransmitters: current_neurotransmitter 
-                };
             }
         }
     }
