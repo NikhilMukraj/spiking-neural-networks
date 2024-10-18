@@ -72,5 +72,16 @@ mod tests {
 
         // assert_eq!(cpu_conversion, neurotransmitters_grid);
         // check each hashmap
+
+        assert_eq!(cpu_conversion.len(), neurotransmitters_grid.len());
+
+        for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
+            for (actual, expected) in row1.iter().zip(row2.iter()) {
+                assert_eq!(
+                    actual.neurotransmitters, 
+                    expected.neurotransmitters,
+                );
+            }
+        }
     }
 }
