@@ -251,7 +251,7 @@ impl NeurotransmitterKinetics for DestexheNeurotransmitter {
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
 /// slowly decreases the concentration over time by a factor of `dt` times `clearance_constant`
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ApproximateNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
     pub t_max: f32,
@@ -369,7 +369,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
 /// then immediately sets it to 0
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DiscreteSpikeNeurotransmitter {
     /// Maximal neurotransmitter concentration (mM)
     pub t_max: f32,
@@ -838,7 +838,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 }
 
 /// Multiple neurotransmitters with their associated types
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Neurotransmitters<N: NeurotransmitterType, T: NeurotransmitterKinetics> {
     pub neurotransmitters: HashMap<N, T>
 }
