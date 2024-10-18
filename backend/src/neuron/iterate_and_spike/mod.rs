@@ -109,7 +109,7 @@ pub trait NeurotransmitterType: Hash + PartialEq + Eq + Clone + Copy + Debug + S
 
 /// Trait for GPU compatible neurotransmitter type
 #[cfg(feature = "gpu")]
-pub trait NeurotransmitterTypeGPU: NeurotransmitterType {
+pub trait NeurotransmitterTypeGPU: NeurotransmitterType + PartialOrd + Ord {
     /// Converts the type to a numeric index (must be unique among types)
     fn type_to_numeric(&self) -> usize;
     /// Gets the number of availible types
