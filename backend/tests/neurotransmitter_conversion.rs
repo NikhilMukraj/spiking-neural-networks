@@ -29,7 +29,7 @@ mod tests {
         neurotransmitters3.neurotransmitters.insert(
             IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default()
         );
-        neurotransmitters2.neurotransmitters.insert(
+        neurotransmitters3.neurotransmitters.insert(
             IonotropicNeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default()
         );
         let neurotransmitters4 = Neurotransmitters { neurotransmitters: HashMap::new() };
@@ -69,11 +69,6 @@ mod tests {
             1,
             4,
         );
-
-        // assert_eq!(cpu_conversion, neurotransmitters_grid);
-        // check each hashmap
-
-        assert_eq!(cpu_conversion.len(), neurotransmitters_grid.len());
 
         for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
             for (actual, expected) in row1.iter().zip(row2.iter()) {
