@@ -5,7 +5,7 @@ use opencl3::{
     kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, 
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
-use crate::graph::{Graph, GraphToGPU};
+use crate::{error::GPUError, graph::{Graph, GraphToGPU}};
 use super::{
     iterate_and_spike::{
         BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
@@ -101,48 +101,68 @@ __kernel void add_grid_voltage_history(
 
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
 pub trait LatticeHistoryGPU: LatticeHistory {
-    fn get_kernel(&self, context: &Context) -> KernelFunction;
-    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU>;
-    fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize));  
+    fn get_kernel(&self, context: &Context) -> Result<KernelFunction, GPUError>;
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    fn add_from_gpu(
+        &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
+    ) -> Result<(), GPUError>;  
 }
 
 impl LatticeHistoryGPU for GridVoltageHistory {
-    fn get_kernel(&self, context: &Context) -> KernelFunction {
-        let history_program = Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "")
-            .expect("Program::create_and_build_from_source failed");
-        let history_kernel = Kernel::create(&history_program, GRID_VOLTAGE_HISTORY_KERNEL_NAME)
-            .expect("Kernel::create failed");
+    fn get_kernel(&self, context: &Context) -> Result<KernelFunction, GPUError> {
+        let history_program = match Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let history_kernel = match Kernel::create(&history_program, GRID_VOLTAGE_HISTORY_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
         let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
             String::from("iteration"), String::from("size")
         ];
 
-        KernelFunction { 
-            kernel: history_kernel, 
-            program_source: String::from(GRID_VOLTAGE_HISTORY_KERNEL), 
-            kernel_name: String::from(GRID_VOLTAGE_HISTORY_KERNEL_NAME), 
-            argument_names
-        }
+        Ok(
+            KernelFunction { 
+                kernel: history_kernel, 
+                program_source: String::from(GRID_VOLTAGE_HISTORY_KERNEL), 
+                kernel_name: String::from(GRID_VOLTAGE_HISTORY_KERNEL_NAME), 
+                argument_names
+            }
+        )
     }
 
-    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> HashMap<String, BufferGPU> {
+    fn to_gpu(
+        &self, context: &Context, iterations: usize, size: (usize, usize)
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
         let history_buffer = unsafe {
-            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_float>::create(
+                context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut()
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let mut buffers = HashMap::new();
 
         buffers.insert(String::from("history"), BufferGPU::Float(history_buffer));
 
-        buffers
+        Ok(buffers)
     }
 
-    fn add_from_gpu(&mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)) {
+    fn add_from_gpu(
+        &mut self, 
+        queue: &CommandQueue, 
+        buffers: HashMap<String, BufferGPU>, 
+        iterations: usize, 
+        size: (usize, usize)
+    ) -> Result<(), GPUError> {
         let mut results = vec![0.0; iterations * size.0 * size.1];
         let results_read_event = unsafe {
-            queue.enqueue_read_buffer(
+            let event = queue.enqueue_read_buffer(
                 match buffers.get("history").expect("Could not get history") {
                     BufferGPU::Float(value) => value,
                     BufferGPU::UInt(_) => unreachable!("History is not unsigned integer"),
@@ -152,7 +172,12 @@ impl LatticeHistoryGPU for GridVoltageHistory {
                 0, 
                 &mut results, 
                 &[]
-            ).expect("Could not read buffer")
+            );
+
+            match event {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         results_read_event.wait().expect("Could not wait");
@@ -170,7 +195,9 @@ impl LatticeHistoryGPU for GridVoltageHistory {
             nested_vector.push(grid);
         }
 
-        self.history.extend(nested_vector)
+        self.history.extend(nested_vector);
+
+        Ok(())
     }
 }
 
@@ -222,45 +249,60 @@ where
     // Generates a GPU lattice given a lattice and a device
     pub fn from_lattice_given_device< 
         W: Plasticity<T, T, f32>,
-    >(lattice: Lattice<T, U, V, W, N>, device: &Device) -> Self {
-        let context = Context::from_device(device).expect("Context::from_device failed");
+    >(lattice: Lattice<T, U, V, W, N>, device: &Device) -> Result<Self, GPUError> {
+        let context = match Context::from_device(device) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::GetDeviceFailure),
+        };
 
-        let queue = CommandQueue::create_default_with_properties(
+        let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
                 CL_QUEUE_SIZE,
-            )
-            .expect("CommandQueue::create_default failed");
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::GetDeviceFailure),
+            };
 
-        let incoming_connections_program = Program::create_and_build_from_source(&context, INPUTS_KERNEL, "")
-            .expect("Program::create_and_build_from_source failed");
-        let incoming_connections_kernel = Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME)
-            .expect("Kernel::create failed");
+        let incoming_connections_program = match Program::create_and_build_from_source(&context, INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let incoming_connections_kernel = match Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
-        let last_firing_time_program = Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "")
-            .expect("Program::create_and_build_from_source failed");
-        let last_firing_time_kernel = Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME)
-            .expect("Kernel::create failed");
+        let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let last_firing_time_kernel = match Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
 
-        LatticeGPU { 
-            cell_grid: lattice.cell_grid, 
-            graph: lattice.graph, 
-            incoming_connections_kernel,
-            last_firing_time_kernel,
-            internal_clock: 0,
-            grid_history_kernel: lattice.grid_history.get_kernel(&context),
-            grid_history: lattice.grid_history,
-            update_grid_history: lattice.update_grid_history,
-            context,
-            queue,
-        }
+        Ok(
+            LatticeGPU { 
+                cell_grid: lattice.cell_grid, 
+                graph: lattice.graph, 
+                incoming_connections_kernel,
+                last_firing_time_kernel,
+                internal_clock: 0,
+                grid_history_kernel: lattice.grid_history.get_kernel(&context)?,
+                grid_history: lattice.grid_history,
+                update_grid_history: lattice.update_grid_history,
+                context,
+                queue,
+            }
+        )
     }
 
     // Generates a GPU lattice from a given lattice
     pub fn from_lattice<
         W: Plasticity<T, T, f32>,
-    >(lattice: Lattice<T, U, V, W, N>) -> Self {
+    >(lattice: Lattice<T, U, V, W, N>) -> Result<Self, GPUError> {
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
             .expect("Could not get GPU devices")
             .first()
@@ -278,7 +320,7 @@ where
 
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
-    pub fn run_lattice(&mut self, iterations: usize) {
+    pub fn run_lattice(&mut self, iterations: usize) -> Result<(), GPUError> {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue);
 
         let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid);
@@ -286,27 +328,35 @@ where
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context);
 
         let mut sums_buffer = unsafe {
-            Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let sums_write_event = unsafe { 
-            self.queue.enqueue_write_buffer(
+            match self.queue.enqueue_write_buffer(
                 &mut sums_buffer, 
                 CL_NON_BLOCKING, 
                 0, 
                 &(0..gpu_graph.size).map(|_| 0.).collect::<Vec<f32>>(), 
                 &[]
-            ).expect("Could not write to sums")
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
     
-        sums_write_event.wait().expect("Could not wait");
+        match sums_write_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
 
         let rows = self.cell_grid.len();
         let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
 
         let gpu_grid_history = if self.update_grid_history {
-            self.grid_history.to_gpu(&self.context, iterations, (rows, cols))
+            self.grid_history.to_gpu(&self.context, iterations, (rows, cols))?
         } else {
             HashMap::new()
         };
@@ -329,12 +379,13 @@ where
                     _ => unreachable!("current_voltage must be float"),
                 };
 
-                kernel_execution.set_arg(&gpu_graph.size)
+                match kernel_execution.set_arg(&gpu_graph.size)
                     .set_arg(&sums_buffer)
                     .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
-                    // .set_wait_event(&sums_write_event)
-                    .enqueue_nd_range(&self.queue)
-                    .expect("Could not queue kernel")
+                    .enqueue_nd_range(&self.queue) {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::QueueFailure),
+                    }
             };
 
             gap_junctions_event.wait().expect("Could not wait");
@@ -356,15 +407,20 @@ where
                     }
                 }
 
-                kernel_execution.set_global_work_size(gpu_graph.size)
-                    .enqueue_nd_range(&self.queue)
-                    .expect("Could not queue kernel")
+                match kernel_execution.set_global_work_size(gpu_graph.size)
+                    .enqueue_nd_range(&self.queue) {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::QueueFailure),
+                    }
             };
 
-            iterate_event.wait().expect("Could not wait");
+            match iterate_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
 
             let last_firing_time_event = unsafe {
-                ExecuteKernel::new(&self.last_firing_time_kernel)
+                match ExecuteKernel::new(&self.last_firing_time_kernel)
                     .set_arg(&gpu_graph.index_to_position)
                     .set_arg(
                         match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
@@ -380,11 +436,16 @@ where
                     )
                     .set_arg(&(self.internal_clock as i32))
                     .set_global_work_size(gpu_graph.size)
-                    .enqueue_nd_range(&self.queue)
-                    .expect("Could not queue kernel")
+                    .enqueue_nd_range(&self.queue) {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::QueueFailure),
+                    }
             };
 
-            last_firing_time_event.wait().expect("Could not wait");
+            match last_firing_time_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
 
             if self.update_grid_history {
                 let update_history_event = unsafe {
@@ -414,19 +475,24 @@ where
                         }
                     }
     
-                    kernel_execution.set_global_work_size(gpu_graph.size)
-                        .enqueue_nd_range(&self.queue)
-                        .expect("Could not queue kernel")
+                    match kernel_execution.set_global_work_size(gpu_graph.size)
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
                 };
 
-                update_history_event.wait().expect("Could not wait");
+                match update_history_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
             }
 
             self.internal_clock += 1;
         }
 
         if self.update_grid_history {
-            self.grid_history.add_from_gpu(&self.queue, gpu_grid_history, iterations, (rows, cols));
+            self.grid_history.add_from_gpu(&self.queue, gpu_grid_history, iterations, (rows, cols))?;
         }
 
         T::convert_to_cpu(
@@ -436,6 +502,8 @@ where
             cols, 
             &self.queue
         );
+
+        Ok(())
     }
 }
 
