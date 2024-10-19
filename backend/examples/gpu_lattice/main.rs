@@ -43,11 +43,11 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     lattice.update_grid_history = true;
 
-    let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone());
+    let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
 
     lattice.run_lattice(iterations)?;
 
-    gpu_lattice.run_lattice(iterations);
+    gpu_lattice.run_lattice(iterations)?;
 
     for (row1, row2) in lattice.cell_grid.iter().zip(gpu_lattice.cell_grid.iter()) {
         for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
