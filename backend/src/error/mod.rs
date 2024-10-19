@@ -180,6 +180,7 @@ impl Display for TimeSeriesProcessingError {
 impl_debug_default!(TimeSeriesProcessingError);
 
 #[derive(Clone, PartialEq, Eq)]
+/// A set of errors for an agent failing during iteration
 pub enum AgentError {
     AgentIterationFailure(String)
 }
@@ -187,6 +188,43 @@ pub enum AgentError {
 impl Display for AgentError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         let AgentError::AgentIterationFailure(err_msg) = self;
+
+        write!(f, "{}", err_msg)
+    }
+}
+
+#[cfg(feature = "gpu")]
+#[derive(Copy, Clone, PartialEq, Eq)]
+/// A set of errors for processing on the GPU
+pub enum GPUError {
+    /// Could not compile program
+    ProgramCompileFailure,
+    /// Could not compile kernel
+    KernelCompileFailure,
+    /// Could not create buffer
+    BufferCreateError,
+    /// Could not read buffer
+    BufferReadError,
+    /// Could not wait for event
+    WaitError,
+    /// Could not get device
+    GetDeviceFailure,
+    /// Could not queue
+    QueueFailure,
+}
+
+#[cfg(feature = "gpu")]
+impl Display for GPUError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let err_msg = match &self {
+            GPUError::ProgramCompileFailure => "Could not compile program",
+            GPUError::KernelCompileFailure => "Could not compile kernel",
+            GPUError::BufferCreateError => "Could not create buffer",
+            GPUError::BufferReadError => "Could not read buffer",
+            GPUError::WaitError => "Could not wait for event",
+            GPUError::GetDeviceFailure => "Could not get device",
+            GPUError::QueueFailure => "Could not queue",
+        };
 
         write!(f, "{}", err_msg)
     }
@@ -207,6 +245,9 @@ pub enum SpikingNeuralNetworksError {
     PatternRelatedError(PatternError),
     /// Errors related to agent
     AgentRelatedError(AgentError),
+    #[cfg(feature = "gpu")]
+    /// Errors related to the gpu
+    GPURelatedError(GPUError),
 }
 
 impl Display for SpikingNeuralNetworksError {
@@ -217,7 +258,9 @@ impl Display for SpikingNeuralNetworksError {
             SpikingNeuralNetworksError::GraphRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::PatternRelatedError(err) => write!(f, "{}", err),
-            SpikingNeuralNetworksError::AgentRelatedError(err) => write!(f, "{}", err)
+            SpikingNeuralNetworksError::AgentRelatedError(err) => write!(f, "{}", err),
+            #[cfg(feature = "gpu")]
+            SpikingNeuralNetworksError::GPURelatedError(err) => write!(f, "{}", err),
         }
     }
 }
@@ -240,3 +283,5 @@ impl_from_error_default!(GraphError, GraphRelatedError);
 impl_from_error_default!(LatticeNetworkError, LatticeNetworkRelatedError);
 impl_from_error_default!(PatternError, PatternRelatedError);
 impl_from_error_default!(AgentError, AgentRelatedError);
+#[cfg(feature = "gpu")]
+impl_from_error_default!(GPUError, GPURelatedError);
