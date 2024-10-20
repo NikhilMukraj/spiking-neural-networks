@@ -16,6 +16,8 @@ use super::iterate_and_spike::{
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
 };
 #[cfg(feature = "gpu")]
+use crate::error::GPUError;
+#[cfg(feature = "gpu")]
 use opencl3::{
     context::Context, kernel::Kernel, program::Program, command_queue::CommandQueue,
     memory::{Buffer, CL_MEM_READ_WRITE}, 
@@ -356,7 +358,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 
 #[cfg(feature = "gpu")]
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
-    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction {
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
             String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
@@ -405,20 +407,28 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
             }
         "#);
 
-        let iterate_and_spike_program = Program::create_and_build_from_source(context, &program_source, "")
-            .expect("Program::create_and_build_from_source failed");
-        let kernel = Kernel::create(&iterate_and_spike_program, &kernel_name)
-            .expect("Kernel::create failed");
+        let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
-        KernelFunction { 
-            kernel, 
-            program_source, 
-            kernel_name, 
-            argument_names, 
-        }
+        Ok(
+            KernelFunction { 
+                kernel, 
+                program_source, 
+                kernel_name, 
+                argument_names, 
+            }
+        )
     }
     
-    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue) -> HashMap<String, BufferGPU> {
+    fn convert_to_gpu(
+        cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
         let mut buffers = HashMap::new();
 
         create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
@@ -453,7 +463,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
 
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
 
-        buffers
+        Ok(buffers)
     }
 
     #[allow(clippy::needless_range_loop)]
@@ -463,7 +473,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
-    ) {
+    ) -> Result<(), GPUError> {
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
         let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
         let mut alpha: Vec<f32> = vec![0.0; rows * cols];
@@ -516,6 +526,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
                 cell.is_spiking = is_spiking[idx] == 1;
             }
         }
+
+        Ok(())
     }
 }
 
@@ -1231,7 +1243,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
 
 #[cfg(feature = "gpu")]
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
-    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction {
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("simple_leaky_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
             String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
@@ -1264,20 +1276,28 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
             }
         "#);
 
-        let iterate_and_spike_program = Program::create_and_build_from_source(context, &program_source, "")
-            .expect("Program::create_and_build_from_source failed");
-        let kernel = Kernel::create(&iterate_and_spike_program, &kernel_name)
-            .expect("Kernel::create failed");
+        let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure)
+        };
+        let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
-        KernelFunction { 
-            kernel, 
-            program_source, 
-            kernel_name, 
-            argument_names, 
-        }
+        Ok(
+            KernelFunction { 
+                kernel, 
+                program_source, 
+                kernel_name, 
+                argument_names, 
+            }
+        )
     }
     
-    fn convert_to_gpu(cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue) -> HashMap<String, BufferGPU> {
+    fn convert_to_gpu(
+        cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
         let mut buffers = HashMap::new();
 
         create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
@@ -1304,7 +1324,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
 
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
 
-        buffers
+        Ok(buffers)
     }
 
     #[allow(clippy::needless_range_loop)]
@@ -1314,7 +1334,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
-    ) {
+    ) -> Result<(), GPUError> {
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
         let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
         let mut g: Vec<f32> = vec![0.0; rows * cols];
@@ -1355,5 +1375,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
                 cell.is_spiking = is_spiking[idx] == 1;
             }
         }
+
+        Ok(())
     }
 }
