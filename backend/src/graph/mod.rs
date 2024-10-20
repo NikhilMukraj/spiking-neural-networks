@@ -348,19 +348,19 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
         let _connections_write_event = unsafe { 
             match queue.enqueue_write_buffer(&mut connections_buffer, CL_BLOCKING, 0, &connections, &[]) {
                 Ok(value) => value,
-                Err(_) => return Err(GPUError::QueueFailure),
+                Err(_) => return Err(GPUError::BufferWriteError),
             }
         };
         let _weights_write_event = unsafe { 
             match queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights, &[]) {
                 Ok(value) => value,
-                Err(_) => return Err(GPUError::QueueFailure),
+                Err(_) => return Err(GPUError::BufferWriteError),
             }
         };
         let index_to_position_write_event = unsafe { 
             match queue.enqueue_write_buffer(&mut index_to_position_buffer, CL_BLOCKING, 0, &index_to_position, &[]) {
                 Ok(value) => value,
-                Err(_) => return Err(GPUError::QueueFailure),
+                Err(_) => return Err(GPUError::BufferWriteError),
             }
         };
 
