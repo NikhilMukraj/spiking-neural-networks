@@ -3,7 +3,7 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{hash_map::{Keys, Values, ValuesMut}, BTreeSet, HashMap, HashSet},
+    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
 };
@@ -14,7 +14,9 @@ use opencl3::{
     types::{cl_float, cl_uint, cl_int, CL_BLOCKING, CL_NON_BLOCKING},
 };
 #[cfg(feature = "gpu")]
-use std::ptr;
+use std::{ptr, collections::BTreeSet};
+#[cfg(feature = "gpu")]
+use crate::error::GPUError;
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
@@ -919,36 +921,48 @@ macro_rules! read_and_set_buffer {
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
         if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
             let read_event = unsafe {
-                $queue
-                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
-                    .expect("Could not read buffer")
+                match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::BufferReadError),
+                }
             };
 
-            read_event.wait().expect("Could not wait for read");
+            match read_event.wait() {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::WaitError),
+            };
         }
     };
     
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, UInt) => {
         if let Some(BufferGPU::UInt(buffer)) = $buffers.get($buffer_name) {
             let read_event = unsafe {
-                $queue
-                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
-                    .expect("Could not read buffer")
+                match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::BufferReadError),
+                }
             };
 
-            read_event.wait().expect("Could not wait for read");
+            match read_event.wait() {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::WaitError),
+            };
         }
     };
 
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, OptionalUInt) => {
         if let Some(BufferGPU::OptionalUInt(buffer)) = $buffers.get($buffer_name) {
             let read_event = unsafe {
-                $queue
-                    .enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[])
-                    .expect("Could not read buffer")
+                match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::BufferReadError),
+                }
             };
 
-            read_event.wait().expect("Could not wait for read");
+            match read_event.wait() {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::WaitError),
+            };
         }
     };
 }
@@ -960,80 +974,113 @@ pub(crate) use read_and_set_buffer;
 macro_rules! write_buffer {
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float) => {
         let mut $name = unsafe {
-            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let _ = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
     };
     
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt) => {
         let mut $name = unsafe {
-            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let _ = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
     };
 
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt) => {
         let mut $name = unsafe {
-            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let _ = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
     };
 
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float, last) => {
         let mut $name = unsafe {
-            Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let last_event = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
 
-        last_event.wait().expect("Could not wait");
+        match last_event.wait() {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::WaitError),
+        };
     };
     
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt, last) => {
         let mut $name = unsafe {
-            Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let last_event = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
 
-        last_event.wait().expect("Could not wait");
+        match last_event.wait() {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::WaitError),
+        };
     };
 
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt, last) => {
         let mut $name = unsafe {
-            Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut())
-                .expect("Could not create buffer")
+            match Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
         };
 
         let last_event = unsafe { 
-            $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[])
-                .expect("Could not write to buffer") 
+            match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
         };
 
-        last_event.wait().expect("Could not wait");
+        match last_event.wait() {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::WaitError),
+        };
     };
 }
 
@@ -1163,7 +1210,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
 impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitters<N, T> {
     pub fn convert_to_gpu(
         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
-    ) -> HashMap<String, BufferGPU> {
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
         let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
         for i in T::get_attribute_names() {
             buffers_contents.insert(i.to_string(), vec![]);
@@ -1200,7 +1247,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
         }
 
-        buffers
+        Ok(buffers)
     }
 
     #[allow(clippy::needless_range_loop)]
@@ -1210,7 +1257,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         queue: &CommandQueue,
         rows: usize,
         cols: usize,
-    ) {
+    ) -> Result<(), GPUError> {
         let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
@@ -1268,6 +1315,8 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                 }
             }
         }
+
+        Ok(())
     }
 }
 
@@ -1562,7 +1611,7 @@ pub enum BufferGPU {
 #[cfg(feature = "gpu")]
 pub trait IterateAndSpikeGPU: IterateAndSpike {
     /// Returns the compiled kernel for electrical inputs
-    fn iterate_and_spike_electrical_kernel(context: &Context) -> KernelFunction;
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     // /// Returns the compiled kernel for chemical inputs
     // fn iterate_and_spike_chemical_kernel(&self) -> KernelFunction;
     // /// Returns the compiled kernel for electirlca and chemical inputs
@@ -1572,7 +1621,7 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
         cell_grid: &[Vec<Self>], 
         context: &Context,
         queue: &CommandQueue,
-    ) -> HashMap<String, BufferGPU>;
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts buffers back to a grid of neurons
     fn convert_to_cpu(
         cell_grid: &mut Vec<Vec<Self>>,
@@ -1580,5 +1629,5 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
         rows: usize,
         cols: usize,
         queue: &CommandQueue,
-    );
+    ) -> Result<(), GPUError>;
 }
