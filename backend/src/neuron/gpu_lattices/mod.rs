@@ -321,11 +321,11 @@ where
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
     pub fn run_lattice(&mut self, iterations: usize) -> Result<(), GPUError> {
-        let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue);
+        let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
 
-        let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid);
+        let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid)?;
 
-        let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context);
+        let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context)?;
 
         let mut sums_buffer = unsafe {
             match Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut()) {
@@ -343,7 +343,7 @@ where
                 &[]
             ) {
                 Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError),
+                Err(_) => return Err(GPUError::BufferWriteError),
             }
         };
     
@@ -501,7 +501,7 @@ where
             rows, 
             cols, 
             &self.queue
-        );
+        )?;
 
         Ok(())
     }
