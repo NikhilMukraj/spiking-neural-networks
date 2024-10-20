@@ -7,13 +7,14 @@ mod tests {
     use std::collections::HashMap;
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-            Neurotransmitters, IonotropicNeurotransmitterType,
-            ApproximateNeurotransmitter,
-            AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
+        Neurotransmitters, IonotropicNeurotransmitterType,
+        ApproximateNeurotransmitter,
+        AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
     };
+    use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
     #[test]
-    pub fn test_neurotransmitter_conversion() {
+    pub fn test_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters1 = Neurotransmitters { neurotransmitters: HashMap::new() };
         neurotransmitters1.neurotransmitters.insert(
             IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
@@ -59,7 +60,7 @@ mod tests {
             &queue,
             1,
             4,
-        );
+        )?;
 
         let mut cpu_conversion = neurotransmitters_grid.clone();
         Neurotransmitters::convert_to_cpu(
@@ -68,7 +69,7 @@ mod tests {
             &queue,
             1,
             4,
-        );
+        )?;
 
         for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
             for (actual, expected) in row1.iter().zip(row2.iter()) {
@@ -78,5 +79,7 @@ mod tests {
                 );
             }
         }
+
+        Ok(())
     }
 }
