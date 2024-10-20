@@ -203,6 +203,8 @@ pub enum GPUError {
     KernelCompileFailure,
     /// Could not create buffer
     BufferCreateError,
+    /// Could not write to buffer
+    BufferWriteError,
     /// Could not read buffer
     BufferReadError,
     /// Could not wait for event
@@ -219,6 +221,7 @@ impl Display for GPUError {
         let err_msg = match &self {
             GPUError::ProgramCompileFailure => "Could not compile program",
             GPUError::KernelCompileFailure => "Could not compile kernel",
+            GPUError::BufferWriteError => "Could not write to buffer",
             GPUError::BufferCreateError => "Could not create buffer",
             GPUError::BufferReadError => "Could not read buffer",
             GPUError::WaitError => "Could not wait for event",
