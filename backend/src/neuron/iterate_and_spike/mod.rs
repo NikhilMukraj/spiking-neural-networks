@@ -473,14 +473,26 @@ impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
 }
 
 /// Calculates receptor gating values over time based on neurotransmitter concentration
-pub trait ReceptorKinetics: 
-Clone + Default + AMPADefault + GABAaDefault + GABAbDefault + NMDADefault + Sync + Send {
+pub trait ReceptorKinetics: Clone + Default + Sync + Send {
     /// Calculates the change in receptor gating based on neurotransmitter input
     fn apply_r_change(&mut self, t: f32, dt: f32);
     /// Gets the receptor gating value
     fn get_r(&self) -> f32;
     /// Sets the receptor gating value
     fn set_r(&mut self, r: f32);
+}
+
+#[cfg(feature = "gpu")]
+/// Receptor kinetics that are compatible with the GPU
+pub trait ReceptorKineticsGPU: ReceptorKinetics {
+    /// Retrieves the given attribute
+    fn get_attribute(&self, attribute: &str) -> Option<f32>;
+    /// Sets the given value
+    fn set_attribute(&mut self, attribute: &str, value: f32);
+    /// Retrieves all attribute names
+    fn get_attribute_names() -> HashSet<String>;
+    /// Gets update function with the associated argument names
+    fn get_update_function() -> (Vec<String>, String);
 }
 
 /// Receptor dynamics based off of model 
@@ -644,7 +656,7 @@ pub struct LigandGatedChannel<T: ReceptorKinetics> {
     pub current: f32,
 }
 
-impl<T: ReceptorKinetics> AMPADefault for LigandGatedChannel<T> {
+impl<T: ReceptorKinetics + AMPADefault> AMPADefault for LigandGatedChannel<T> {
     fn ampa_default() -> Self {
         LigandGatedChannel {
             g: 1.0, // 1.0 nS
@@ -656,7 +668,7 @@ impl<T: ReceptorKinetics> AMPADefault for LigandGatedChannel<T> {
     }
 }
 
-impl<T: ReceptorKinetics> GABAaDefault for LigandGatedChannel<T> {
+impl<T: ReceptorKinetics + GABAaDefault> GABAaDefault for LigandGatedChannel<T> {
     fn gabaa_default() -> Self {
         LigandGatedChannel {
             g: 1.2, // 1.2 nS
@@ -668,7 +680,7 @@ impl<T: ReceptorKinetics> GABAaDefault for LigandGatedChannel<T> {
     }
 }
 
-impl<T: ReceptorKinetics> GABAbDefault for LigandGatedChannel<T> {
+impl<T: ReceptorKinetics + GABAbDefault> GABAbDefault for LigandGatedChannel<T> {
     fn gabab_default() -> Self {
         LigandGatedChannel {
             g: 0.06, // 0.06 nS
@@ -692,7 +704,7 @@ impl<DestexheReceptor: ReceptorKinetics + GABAbDefault2> GABAbDefault2 for Ligan
     }
 }
 
-impl<T: ReceptorKinetics> NMDADefault for LigandGatedChannel<T> {
+impl<T: ReceptorKinetics + NMDADefault> NMDADefault for LigandGatedChannel<T> {
     fn nmda_default() -> Self {
         LigandGatedChannel {
             g: 0.6, // 0.6 nS
@@ -838,6 +850,25 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
             })
     }
 }
+
+// #[cfg(feature = "gpu")]
+// impl <T: ReceptorKinetics> LigandGatedChannel<T> {
+//     pub fn convert_to_gpu(
+//         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
+//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+//         Ok(())
+//     }
+
+//     pub fn convert_to_cpu(
+//         neurotransmitter_grid: &mut [Vec<Self>],
+//         buffers: &HashMap<String, BufferGPU>,
+//         queue: &CommandQueue,
+//         rows: usize,
+//         cols: usize,
+//     ) -> Result<(), GPUError> {
+//         Ok(())
+//     }
+// }
 
 /// Multiple neurotransmitters with their associated types
 #[derive(Clone, Debug, PartialEq, Eq)]
