@@ -563,6 +563,42 @@ impl ReceptorKinetics for ApproximateReceptor {
     }
 }
 
+#[cfg(feature = "gpu")]
+impl ReceptorKineticsGPU for ApproximateReceptor {
+    fn get_attribute(&self, value: &str) -> Option<f32> {
+        match value {
+            "r" => Some(self.r),
+            _ => None,
+        }
+    }
+
+    fn set_attribute(&mut self, attribute: &str, value: f32) {
+        match attribute {
+            "r" => self.r = value,
+            _ => unreachable!(),
+        }
+    }
+
+    fn get_attribute_names() -> HashSet<String> {
+        HashSet::from([String::from("r")])
+    }
+
+    fn get_update_function() -> (Vec<String>, String) {
+        (
+            vec![
+                String::from("t")
+            ],
+            String::from("
+                float get_r(
+                    float t,
+                ) { 
+                    return t;
+                }
+            ")
+        )
+    }
+}
+
 macro_rules! impl_approximate_receptor_default {
     ($trait:ident, $method:ident) => {
         impl $trait for ApproximateReceptor {
