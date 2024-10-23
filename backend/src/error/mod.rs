@@ -179,6 +179,25 @@ impl Display for TimeSeriesProcessingError {
 
 impl_debug_default!(TimeSeriesProcessingError);
 
+/// A set of potential errors when using receptors and neurotransmitters
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ReceptorNeurotransmitterError {
+    /// Types are not compatible with one another
+    MismatchedTypes
+}
+
+impl Display for ReceptorNeurotransmitterError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let err_msg = match self {
+            ReceptorNeurotransmitterError::MismatchedTypes => "Types are not compatible with one another"
+        };
+
+        write!(f, "{}", err_msg)
+    }
+}
+
+impl_debug_default!(ReceptorNeurotransmitterError);
+
 #[derive(Clone, PartialEq, Eq)]
 /// A set of errors for an agent failing during iteration
 pub enum AgentError {
@@ -233,6 +252,8 @@ impl Display for GPUError {
     }
 }
 
+impl_debug_default!(GPUError);
+
 /// A set of errors that may occur when using the library
 #[derive(Clone, PartialEq, Eq)]
 pub enum SpikingNeuralNetworksError {
@@ -246,6 +267,8 @@ pub enum SpikingNeuralNetworksError {
     LatticeNetworkRelatedError(LatticeNetworkError),
     /// Errors related to patterns
     PatternRelatedError(PatternError),
+    /// Errors related to neurotransmitter and receptor types
+    ReceptorNeurotransmitterRelatedError(ReceptorNeurotransmitterError),
     /// Errors related to agent
     AgentRelatedError(AgentError),
     #[cfg(feature = "gpu")]
@@ -261,6 +284,7 @@ impl Display for SpikingNeuralNetworksError {
             SpikingNeuralNetworksError::GraphRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::LatticeNetworkRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::PatternRelatedError(err) => write!(f, "{}", err),
+            SpikingNeuralNetworksError::ReceptorNeurotransmitterRelatedError(err) => write!(f, "{}", err),
             SpikingNeuralNetworksError::AgentRelatedError(err) => write!(f, "{}", err),
             #[cfg(feature = "gpu")]
             SpikingNeuralNetworksError::GPURelatedError(err) => write!(f, "{}", err),
@@ -285,6 +309,7 @@ impl_from_error_default!(GeneticAlgorithmError, GeneticAlgorithmRelatedErrors);
 impl_from_error_default!(GraphError, GraphRelatedError);
 impl_from_error_default!(LatticeNetworkError, LatticeNetworkRelatedError);
 impl_from_error_default!(PatternError, PatternRelatedError);
+impl_from_error_default!(ReceptorNeurotransmitterError, ReceptorNeurotransmitterRelatedError);
 impl_from_error_default!(AgentError, AgentRelatedError);
 #[cfg(feature = "gpu")]
 impl_from_error_default!(GPUError, GPURelatedError);
