@@ -3,23 +3,20 @@ use std::{
     io::{BufWriter, Write},
 };
 extern crate spiking_neural_networks;
-use spiking_neural_networks::neuron::{
-    iterate_and_spike::{
-        AMPADefault, IterateAndSpike, LigandGatedChannel, IonotropicNeurotransmitterType, 
-        ReceptorKinetics, DestexheNeurotransmitter,
-    }, 
-    hodgkin_huxley::HodgkinHuxleyNeuron, 
-    iterate_coupled_spiking_neurons
-};
+use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{
+    hodgkin_huxley::HodgkinHuxleyNeuron, iterate_and_spike::{
+        AMPADefault, DestexheNeurotransmitter, IonotropicNeurotransmitterType, IterateAndSpike, LigandGatedChannel, ReceptorKinetics
+    }, iterate_coupled_spiking_neurons
+}};
 
 
 // Couples two Hodgkin Huxley neurons with neurotransmission and tracks relevant 
 // history regarding voltages, neurotransmitter values, and receptor values
 // which are written to a .csv file at the working directory
-fn main() {
+fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
     presynaptic_neuron.ligand_gates
-        .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
+        .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())?;
     presynaptic_neuron.synaptic_neurotransmitters
         .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
 
@@ -73,4 +70,6 @@ fn main() {
             receptor_values[i],
         ).expect("Could not write to file");
     }
+
+    Ok(())
 }
