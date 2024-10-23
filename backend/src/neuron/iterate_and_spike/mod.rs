@@ -7,6 +7,7 @@ use std::{
     fmt::Debug,
     hash::Hash,
 };
+use crate::error::ReceptorNeurotransmitterError;
 #[cfg(feature = "gpu")]
 use opencl3::{
     kernel::Kernel, context::Context, command_queue::CommandQueue,
@@ -818,6 +819,34 @@ impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
     }
 }
 
+fn matching_neurotransmitter_and_receptor_type(
+    neurotransmitter_type: &IonotropicNeurotransmitterType,
+    receptor_type: &IonotropicLigandGatedReceptorType,
+) -> bool {
+    if let IonotropicLigandGatedReceptorType::AMPA(_) = receptor_type {
+        if *neurotransmitter_type == IonotropicNeurotransmitterType::AMPA {
+            return true;
+        }
+    }
+    if let IonotropicLigandGatedReceptorType::NMDA(_) = receptor_type {
+        if *neurotransmitter_type == IonotropicNeurotransmitterType::NMDA {
+            return true;
+        }
+    }
+    if let IonotropicLigandGatedReceptorType::GABAa(_) = receptor_type {
+        if *neurotransmitter_type == IonotropicNeurotransmitterType::GABAa {
+            return true;
+        }
+    }
+    if let IonotropicLigandGatedReceptorType::GABAb(_) = receptor_type {
+        if *neurotransmitter_type == IonotropicNeurotransmitterType::GABAb {
+            return true;
+        }
+    }
+
+    false
+}
+
 impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     /// Returns how many ligand gates there are
     pub fn len(&self) -> usize {
@@ -854,8 +883,14 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
         &mut self, 
         neurotransmitter_type: IonotropicNeurotransmitterType, 
         ligand_gate: LigandGatedChannel<T>
-    ) {
+    ) -> Result<(), ReceptorNeurotransmitterError> {
+        if !matching_neurotransmitter_and_receptor_type(&neurotransmitter_type, &ligand_gate.receptor_type) {
+            return Err(ReceptorNeurotransmitterError::MismatchedTypes);
+        }
+
         self.ligand_gates.insert(neurotransmitter_type, ligand_gate);
+
+        Ok(())
     }
 
     /// Calculates the receptor currents for each channel based on a given voltage (mV)
@@ -892,6 +927,9 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 //     pub fn convert_to_gpu(
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
 //     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+//         // aggreate a list of all possible attributes (prefix those that are sub attributes)
+//         // flags that depend on
+//         // add to list 
 //         Ok(())
 //     }
 
