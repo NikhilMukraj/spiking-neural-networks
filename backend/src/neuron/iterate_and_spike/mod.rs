@@ -808,7 +808,7 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
 /// Multiple igand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
-    pub ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
+    ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
 }
 
 impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
@@ -947,7 +947,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 /// Multiple neurotransmitters with their associated types
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Neurotransmitters<N: NeurotransmitterType, T: NeurotransmitterKinetics> {
-    pub neurotransmitters: HashMap<N, T>
+    neurotransmitters: HashMap<N, T>
 }
 
 /// A hashmap of neurotransmitter types and their associated concentration
