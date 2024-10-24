@@ -4,7 +4,6 @@ mod tests {
         command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
         context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
     };
-    use std::collections::HashMap;
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::iterate_and_spike::{
         Neurotransmitters, IonotropicNeurotransmitterType,
@@ -15,25 +14,25 @@ mod tests {
 
     #[test]
     pub fn test_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
-        let mut neurotransmitters1 = Neurotransmitters { neurotransmitters: HashMap::new() };
-        neurotransmitters1.neurotransmitters.insert(
+        let mut neurotransmitters1 = Neurotransmitters::default();
+        neurotransmitters1.insert(
             IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
-        neurotransmitters1.neurotransmitters.insert(
+        neurotransmitters1.insert(
             IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
-        let mut neurotransmitters2 = Neurotransmitters { neurotransmitters: HashMap::new() };
-        neurotransmitters2.neurotransmitters.insert(
+        let mut neurotransmitters2 = Neurotransmitters::default();
+        neurotransmitters2.insert(
             IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
-        let mut neurotransmitters3 = Neurotransmitters { neurotransmitters: HashMap::new() };
-        neurotransmitters3.neurotransmitters.insert(
+        let mut neurotransmitters3 = Neurotransmitters::default();
+        neurotransmitters3.insert(
             IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default()
         );
-        neurotransmitters3.neurotransmitters.insert(
+        neurotransmitters3.insert(
             IonotropicNeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default()
         );
-        let neurotransmitters4 = Neurotransmitters { neurotransmitters: HashMap::new() };
+        let neurotransmitters4 = Neurotransmitters::default();
 
         let neurotransmitters_grid = vec![
             vec![neurotransmitters1, neurotransmitters2, neurotransmitters3, neurotransmitters4]
@@ -74,8 +73,8 @@ mod tests {
         for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
             for (actual, expected) in row1.iter().zip(row2.iter()) {
                 assert_eq!(
-                    actual.neurotransmitters, 
-                    expected.neurotransmitters,
+                    actual, 
+                    expected,
                 );
             }
         }
