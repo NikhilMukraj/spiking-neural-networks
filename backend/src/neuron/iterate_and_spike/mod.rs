@@ -805,6 +805,33 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     // }
 }
 
+// #[cfg(feature = "gpu")]
+// impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
+//     /// Retrieves a given attribute from the ligand gated channel
+//     fn get_attribute(&self, attribute: &str) -> Option<f32> {
+//         match attribute {
+//             "current" => Some(self.current),
+//             "reversal" => Some(self.reversal),
+//             "g" => Some(self.g),
+//             // "mg" => Some(
+
+//             // )
+//             // "gabab_g" => Some(
+
+//             // ),
+//             // "gabab_k3" => Some(
+
+//             // ),
+//             // "gabab_k4" => Some(
+
+//             // ),
+//             _ => {
+//                 self.receptor.get_attribute(attribute)
+//             },
+//         }
+//     }
+// }
+
 /// Multiple igand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
