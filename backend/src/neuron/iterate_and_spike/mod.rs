@@ -23,20 +23,14 @@ use crate::error::GPUError;
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
 #[derive(Debug, Clone, Copy)]
 pub struct BV {
-    /// Calculates NMDA modifier based on voltage and magnesium concentration
-    /// given a function to calculate the modfier
-    pub bv_calc: fn(f32) -> f32,
-}
-
-fn default_bv_calc(voltage: f32) -> f32 {
-    // 1.5 mM of Mg
-    1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57)) 
+    /// Concentration of extracellular magnesium (mM)
+    pub mg: f32,
 }
 
 impl Default for BV {
     fn default() -> Self {
         BV { 
-            bv_calc: default_bv_calc
+            mg: 1.5 // mM
         }
     }
 }
@@ -45,7 +39,7 @@ impl BV {
     /// Calculates effect of magnesium and voltage on NMDA receptor,
     /// voltage should be in mV
     fn calculate_b(&self, voltage: f32) -> f32 {
-        (self.bv_calc)(voltage)
+        1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57))
     }
 }
 
@@ -813,18 +807,22 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
 //             "current" => Some(self.current),
 //             "reversal" => Some(self.reversal),
 //             "g" => Some(self.g),
-//             // "mg" => Some(
-
-//             // )
-//             // "gabab_g" => Some(
-
-//             // ),
-//             // "gabab_k3" => Some(
-
-//             // ),
-//             // "gabab_k4" => Some(
-
-//             // ),
+//             "nmda_mg" => match &self.receptor_type {
+//                 IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
+//                 _ => None
+//             },
+//             "gabab_g" => match &self.receptor_type {
+//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
+//                 _ => None
+//             },
+//             "gabab_k3" => match &self.receptor_type {
+//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
+//                 _ => None
+//             },
+//             "gabab_k4" => match &self.receptor_type {
+//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
+//                 _ => None
+//             },
 //             _ => {
 //                 self.receptor.get_attribute(attribute)
 //             },
