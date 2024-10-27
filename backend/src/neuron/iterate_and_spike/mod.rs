@@ -828,9 +828,40 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
 //             },
 //         }
 //     }
+
+//     fn get_all_attribute_names() -> HashSet<String> {
+//         HashSet::from([
+//             String::from("current"), String::from("reversal"), String::from("g"),
+//             String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
+//             String::from("gabab_k4")
+//         ])
+//     }
+
+//     fn get_attribute_names(&self) -> HashSet<String> {
+//         let mut attributes = HashSet::from([
+//             String::from("current"), String::from("reversal"), String::from("g"),
+//         ]);
+
+//         match &self.receptor_type {
+//             IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
+//             IonotropicLigandGatedReceptorType::NMDA(_) => {
+//                 attributes.insert(String::from("nmda_mg"));
+
+//                 attributes
+//             },
+//             IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
+//             IonotropicLigandGatedReceptorType::GABAb(_) => {
+//                 attributes.insert(String::from("gabab_g"));
+//                 attributes.insert(String::from("gabab_k3"));
+//                 attributes.insert(String::from("gabab_k4"));
+
+//                 attributes
+//             }
+//         }
+//     }
 // }
 
-/// Multiple igand gated channels with their associated neurotransmitter type
+/// Multiple ligand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
     ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
@@ -948,25 +979,107 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 }
 
 // #[cfg(feature = "gpu")]
-// impl <T: ReceptorKinetics> LigandGatedChannel<T> {
+// fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
+//     value: &LigandGatedChannels<T>, 
+//     i: IonotropicNeurotransmitterType, 
+//     buffers_contents: &mut HashMap<String, Vec<f32>>,
+//     flags: &mut HashMap<String, Vec<u32>>,
+// ) {
+//     match value.get(&i) {
+//         Some(current_value) => {
+//             if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+//                 current_flag.push(1);
+//             }
+
+//             for attribute in LigandGatedChannel::<T>::get_all_attribute_names() {
+//                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+//                     if current_value.get_attribute_names().contains(&attribute) {
+//                         retrieved_attribute.push(
+//                             current_value.get_attribute(&attribute).expect("Attribute not found")
+//                         );
+//                     } else {
+//                         retrieved_attribute.push(
+//                             0.
+//                         );
+//                     }
+//                 } else {
+//                     unreachable!("Attribute not found");
+//                 }
+//             }
+//         },
+//         None => {
+//             if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+//                 current_flag.push(0);
+//             }
+
+//             for attribute in LigandGatedChannel::<T>::get_all_attribute_names() {
+//                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+//                     retrieved_attribute.push(0.)
+//                 } else {
+//                     unreachable!("Attribute not found")
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// #[cfg(feature = "gpu")]
+// impl <T: ReceptorKineticsGPU> LigandGatedChannels<T> {
 //     pub fn convert_to_gpu(
 //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
 //     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
 //         // aggreate a list of all possible attributes (prefix those that are sub attributes)
 //         // flags that depend on
 //         // add to list 
-//         Ok(())
+
+//         let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
+//         for i in T::get_attribute_names() {
+//             buffers_contents.insert(i.to_string(), vec![]);
+//         }
+
+//         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
+//         for i in IonotropicNeurotransmitterType::get_all_types() {
+//             flags.insert(i.to_string().clone(), vec![]);
+//         }
+
+//         for row in grid.iter() {
+//             for value in row.iter() {
+//                 for i in IonotropicNeurotransmitterType::get_all_types() {
+//                     extract_or_pad_ligand_gates(value, i, &mut buffers_contents, &mut flags);
+//                 }
+//             }
+//         }
+
+//         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
+
+//         let size = rows * cols * IonotropicNeurotransmitterType::number_of_types();
+
+//         for (key, value) in buffers_contents.iter() {
+//             write_buffer!(current_buffer, context, queue, size, value, Float, last);
+
+//             buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+//         }
+
+//         let size = rows * cols;
+
+//         for (key, value) in flags.iter() {
+//             write_buffer!(current_buffer, context, queue, size, value, UInt, last);
+
+//             buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+//         }
+
+//         Ok(buffers)
 //     }
 
-//     pub fn convert_to_cpu(
-//         neurotransmitter_grid: &mut [Vec<Self>],
-//         buffers: &HashMap<String, BufferGPU>,
-//         queue: &CommandQueue,
-//         rows: usize,
-//         cols: usize,
-//     ) -> Result<(), GPUError> {
-//         Ok(())
-//     }
+//     // pub fn convert_to_cpu(
+//     //     neurotransmitter_grid: &mut [Vec<Self>],
+//     //     buffers: &HashMap<String, BufferGPU>,
+//     //     queue: &CommandQueue,
+//     //     rows: usize,
+//     //     cols: usize,
+//     // ) -> Result<(), GPUError> {
+//     //     Ok(())
+//     // }
 // }
 
 /// Multiple neurotransmitters with their associated types
@@ -1298,6 +1411,7 @@ macro_rules! create_optional_uint_buffer {
 #[cfg(feature = "gpu")]
 pub(crate) use create_optional_uint_buffer;
 
+#[cfg(feature = "gpu")]
 fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU>(
     value: &Neurotransmitters<N, T>, 
     i: N, 
