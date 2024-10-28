@@ -799,67 +799,97 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     // }
 }
 
-// #[cfg(feature = "gpu")]
-// impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
-//     /// Retrieves a given attribute from the ligand gated channel
-//     fn get_attribute(&self, attribute: &str) -> Option<f32> {
-//         match attribute {
-//             "current" => Some(self.current),
-//             "reversal" => Some(self.reversal),
-//             "g" => Some(self.g),
-//             "nmda_mg" => match &self.receptor_type {
-//                 IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
-//                 _ => None
-//             },
-//             "gabab_g" => match &self.receptor_type {
-//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
-//                 _ => None
-//             },
-//             "gabab_k3" => match &self.receptor_type {
-//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
-//                 _ => None
-//             },
-//             "gabab_k4" => match &self.receptor_type {
-//                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
-//                 _ => None
-//             },
-//             _ => {
-//                 self.receptor.get_attribute(attribute)
-//             },
-//         }
-//     }
+#[cfg(feature = "gpu")]
+impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
+    /// Retrieves a given attribute from the ligand gated channel
+    fn get_attribute(&self, attribute: &str) -> Option<f32> {
+        match attribute {
+            "current" => Some(self.current),
+            "reversal" => Some(self.reversal),
+            "g" => Some(self.g),
+            "nmda_mg" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
+                _ => None
+            },
+            "gabab_g" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
+                _ => None
+            },
+            "gabab_k3" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
+                _ => None
+            },
+            "gabab_k4" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
+                _ => None
+            },
+            _ => {
+                self.receptor.get_attribute(attribute)
+            },
+        }
+    }
 
-//     fn get_all_attribute_names() -> HashSet<String> {
-//         HashSet::from([
-//             String::from("current"), String::from("reversal"), String::from("g"),
-//             String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
-//             String::from("gabab_k4")
-//         ])
-//     }
+    /// Sets a given attribute to a given value
+    fn set_attribute(&mut self, attribute: &str, value: f32) {
+        match attribute {
+            "current" => self.current = value,
+            "reversal" => self.reversal = value,
+            "g" => self.g = value,
+            "nmda_mg" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = value,
+                _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
+            },
+            "gabab_g" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = value,
+                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
+            },
+            "gabab_k3" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = value,
+                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
+            },
+            "gabab_k4" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = value,
+                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
+            },
+            _ => {
+                self.receptor.set_attribute(attribute, value)
+            },
+        }
+    }
 
-//     fn get_attribute_names(&self) -> HashSet<String> {
-//         let mut attributes = HashSet::from([
-//             String::from("current"), String::from("reversal"), String::from("g"),
-//         ]);
+    /// Gets all possible attribute names
+    fn get_all_possible_attribute_names() -> HashSet<String> {
+        HashSet::from([
+            String::from("current"), String::from("reversal"), String::from("g"),
+            String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
+            String::from("gabab_k4")
+        ])
+    }
 
-//         match &self.receptor_type {
-//             IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
-//             IonotropicLigandGatedReceptorType::NMDA(_) => {
-//                 attributes.insert(String::from("nmda_mg"));
+    /// Gets all valid attribute names
+    fn get_valid_attribute_names(&self) -> HashSet<String> {
+        let mut attributes = HashSet::from([
+            String::from("current"), String::from("reversal"), String::from("g"),
+        ]);
 
-//                 attributes
-//             },
-//             IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
-//             IonotropicLigandGatedReceptorType::GABAb(_) => {
-//                 attributes.insert(String::from("gabab_g"));
-//                 attributes.insert(String::from("gabab_k3"));
-//                 attributes.insert(String::from("gabab_k4"));
+        match &self.receptor_type {
+            IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
+            IonotropicLigandGatedReceptorType::NMDA(_) => {
+                attributes.insert(String::from("nmda_mg"));
 
-//                 attributes
-//             }
-//         }
-//     }
-// }
+                attributes
+            },
+            IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
+            IonotropicLigandGatedReceptorType::GABAb(_) => {
+                attributes.insert(String::from("gabab_g"));
+                attributes.insert(String::from("gabab_k3"));
+                attributes.insert(String::from("gabab_k4"));
+
+                attributes
+            }
+        }
+    }
+}
 
 /// Multiple ligand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug)]
@@ -978,109 +1008,180 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 }
 
-// #[cfg(feature = "gpu")]
-// fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
-//     value: &LigandGatedChannels<T>, 
-//     i: IonotropicNeurotransmitterType, 
-//     buffers_contents: &mut HashMap<String, Vec<f32>>,
-//     flags: &mut HashMap<String, Vec<u32>>,
-// ) {
-//     match value.get(&i) {
-//         Some(current_value) => {
-//             if let Some(current_flag) = flags.get_mut(&i.to_string()) {
-//                 current_flag.push(1);
-//             }
+#[cfg(feature = "gpu")]
+fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
+    value: &LigandGatedChannels<T>, 
+    i: IonotropicNeurotransmitterType, 
+    buffers_contents: &mut HashMap<String, Vec<f32>>,
+    flags: &mut HashMap<String, Vec<u32>>,
+) {
+    match value.get(&i) {
+        Some(current_value) => {
+            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+                current_flag.push(1);
+            }
 
-//             for attribute in LigandGatedChannel::<T>::get_all_attribute_names() {
-//                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
-//                     if current_value.get_attribute_names().contains(&attribute) {
-//                         retrieved_attribute.push(
-//                             current_value.get_attribute(&attribute).expect("Attribute not found")
-//                         );
-//                     } else {
-//                         retrieved_attribute.push(
-//                             0.
-//                         );
-//                     }
-//                 } else {
-//                     unreachable!("Attribute not found");
-//                 }
-//             }
-//         },
-//         None => {
-//             if let Some(current_flag) = flags.get_mut(&i.to_string()) {
-//                 current_flag.push(0);
-//             }
+            for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                    if current_value.get_valid_attribute_names().contains(&attribute) {
+                        retrieved_attribute.push(
+                            current_value.get_attribute(&attribute).expect("Attribute not found")
+                        );
+                    } else {
+                        retrieved_attribute.push(
+                            0.
+                        );
+                    }
+                } else {
+                    unreachable!("Attribute not found");
+                }
+            }
+        },
+        None => {
+            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+                current_flag.push(0);
+            }
 
-//             for attribute in LigandGatedChannel::<T>::get_all_attribute_names() {
-//                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
-//                     retrieved_attribute.push(0.)
-//                 } else {
-//                     unreachable!("Attribute not found")
-//                 }
-//             }
-//         }
-//     }
-// }
+            for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                    retrieved_attribute.push(0.)
+                } else {
+                    unreachable!("Attribute not found")
+                }
+            }
+        }
+    }
+}
 
-// #[cfg(feature = "gpu")]
-// impl <T: ReceptorKineticsGPU> LigandGatedChannels<T> {
-//     pub fn convert_to_gpu(
-//         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
-//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-//         // aggreate a list of all possible attributes (prefix those that are sub attributes)
-//         // flags that depend on
-//         // add to list 
+#[cfg(feature = "gpu")]
+impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> LigandGatedChannels<T> {
+    pub fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        // aggreate a list of all possible attributes (prefix those that are sub attributes)
+        // flags that depend on
+        // add to list 
 
-//         let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
-//         for i in T::get_attribute_names() {
-//             buffers_contents.insert(i.to_string(), vec![]);
-//         }
+        let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
+        for i in T::get_attribute_names() {
+            buffers_contents.insert(i.to_string(), vec![]);
+        }
 
-//         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
-//         for i in IonotropicNeurotransmitterType::get_all_types() {
-//             flags.insert(i.to_string().clone(), vec![]);
-//         }
+        let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
+        for i in IonotropicNeurotransmitterType::get_all_types() {
+            flags.insert(i.to_string().clone(), vec![]);
+        }
 
-//         for row in grid.iter() {
-//             for value in row.iter() {
-//                 for i in IonotropicNeurotransmitterType::get_all_types() {
-//                     extract_or_pad_ligand_gates(value, i, &mut buffers_contents, &mut flags);
-//                 }
-//             }
-//         }
+        for row in grid.iter() {
+            for value in row.iter() {
+                for i in IonotropicNeurotransmitterType::get_all_types() {
+                    extract_or_pad_ligand_gates(value, i, &mut buffers_contents, &mut flags);
+                }
+            }
+        }
 
-//         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
+        let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
-//         let size = rows * cols * IonotropicNeurotransmitterType::number_of_types();
+        let size = rows * cols * IonotropicNeurotransmitterType::number_of_types();
 
-//         for (key, value) in buffers_contents.iter() {
-//             write_buffer!(current_buffer, context, queue, size, value, Float, last);
+        for (key, value) in buffers_contents.iter() {
+            write_buffer!(current_buffer, context, queue, size, value, Float, last);
 
-//             buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
-//         }
+            buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+        }
 
-//         let size = rows * cols;
+        let size = rows * cols;
 
-//         for (key, value) in flags.iter() {
-//             write_buffer!(current_buffer, context, queue, size, value, UInt, last);
+        for (key, value) in flags.iter() {
+            write_buffer!(current_buffer, context, queue, size, value, UInt, last);
 
-//             buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
-//         }
+            buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+        }
 
-//         Ok(buffers)
-//     }
+        Ok(buffers)
+    }
 
-//     // pub fn convert_to_cpu(
-//     //     neurotransmitter_grid: &mut [Vec<Self>],
-//     //     buffers: &HashMap<String, BufferGPU>,
-//     //     queue: &CommandQueue,
-//     //     rows: usize,
-//     //     cols: usize,
-//     // ) -> Result<(), GPUError> {
-//     //     Ok(())
-//     // }
-// }
+    #[allow(clippy::needless_range_loop)]
+    pub fn convert_to_cpu(
+        ligand_gates_grid: &mut [Vec<Self>],
+        buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), GPUError> {
+        let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
+
+        let string_types: Vec<String> = IonotropicNeurotransmitterType::get_all_types()
+            .into_iter()
+            .map(|i| i.to_string())
+            .collect();
+
+        for key in buffers.keys() {
+            if !string_types.contains(key) {
+                let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
+
+                cpu_conversion.insert(key.clone(), current_contents);
+            } else {
+                let mut current_contents = vec![0; rows * cols];
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
+
+                flags.insert(
+                    key.clone(), 
+                    current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
+                );
+            }
+        }
+
+        for row in 0..rows {
+            for col in 0..cols {
+                let grid_value = &mut ligand_gates_grid[row][col];
+                let flag_index = row * cols + col;
+                for i in IonotropicNeurotransmitterType::get_all_types() {
+                    let i_str = i.to_string();
+                    let index = row * cols * IonotropicNeurotransmitterType::number_of_types() 
+                        + col * IonotropicNeurotransmitterType::number_of_types() + i.type_to_numeric();
+    
+                    if let Some(flag) = flags.get(&i_str) {
+                        if flag[flag_index] {
+                            if !grid_value.ligand_gates.contains_key(&i) {
+                                match i {
+                                    IonotropicNeurotransmitterType::AMPA => grid_value.insert(
+                                        i, LigandGatedChannel::ampa_default()
+                                    ).expect("Should insert correct channel type"),
+                                    IonotropicNeurotransmitterType::NMDA => grid_value.insert(
+                                        i, LigandGatedChannel::nmda_default()
+                                    ).expect("Should insert correct channel type"),
+                                    IonotropicNeurotransmitterType::GABAa => grid_value.insert(
+                                        i, LigandGatedChannel::gabaa_default()
+                                    ).expect("Should insert correct channel type"),
+                                    IonotropicNeurotransmitterType::GABAb => grid_value.insert(
+                                        i, LigandGatedChannel::gabab_default()
+                                    ).expect("Should insert correct channel type"),
+                                };
+                            }
+
+                            let current_ligand_gated_channel = grid_value.get_mut(&i).unwrap();
+    
+                            for attribute in current_ligand_gated_channel.get_valid_attribute_names() {
+                                if let Some(values) = cpu_conversion.get(&attribute) {
+                                    let attr_value = values[index];
+                                    
+                                    current_ligand_gated_channel.set_attribute(&attribute, attr_value);
+                                }
+                            }
+                        } else {
+                            grid_value.ligand_gates.remove(&i);
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// Multiple neurotransmitters with their associated types
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1543,7 +1644,6 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                             }
     
                             for attribute in T::get_attribute_names() {
-                                println!("{}: {}, {}", flag_index, index, attribute);
                                 if let Some(values) = cpu_conversion.get(&attribute) {
                                     let attr_value = values[index];
                                     grid_value.neurotransmitters
