@@ -21,7 +21,7 @@ use crate::error::GPUError;
 
 
 /// Modifier for NMDA receptor current based on magnesium concentration and voltage
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BV {
     /// Concentration of extracellular magnesium (mM)
     pub mg: f32,
@@ -44,7 +44,7 @@ impl BV {
 }
 
 /// Modifier for GABAb receptors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct GABAbDissociation {
     pub g: f32,
     pub n: f32,
@@ -539,7 +539,7 @@ impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
 
 /// Receptor dynamics approximation that just sets the receptor
 /// gating value to the inputted neurotransmitter concentration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ApproximateReceptor {
     pub r: f32,
 }
@@ -660,7 +660,7 @@ impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 
 /// Enum containing the type of ionotropic ligand gated receptor
 /// containing a modifier to use when calculating current
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum IonotropicLigandGatedReceptorType {
     /// AMPA receptor
     AMPA(f32),
@@ -673,7 +673,7 @@ pub enum IonotropicLigandGatedReceptorType {
 }
 
 /// Singular ligand gated channel 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct LigandGatedChannel<T: ReceptorKinetics> {
     /// Maximal synaptic conductance (nS)
     pub g: f32,
@@ -892,7 +892,7 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
 }
 
 /// Multiple ligand gated channels with their associated neurotransmitter type
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
     ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
 }
