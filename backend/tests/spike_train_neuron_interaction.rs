@@ -20,6 +20,7 @@ mod tests {
     fn get_history_from_example(
         num_rows: usize,
         num_cols: usize,
+        iterations: usize,
         electrical_synapse: bool,
         chemical_synapse: bool,
     ) -> Result<SpikeHistory, SpikingNeuralNetworksError> {
@@ -48,9 +49,7 @@ mod tests {
         network.parallel = true;
         network.electrical_synapse = electrical_synapse;
         network.chemical_synapse = chemical_synapse;
-    
-        let iterations = 2500;
-    
+
         network.run_lattices(iterations)?;
     
         network.get_mut_spike_train_lattice(&0).unwrap().apply(|neuron| {
@@ -66,14 +65,14 @@ mod tests {
 
     #[test]
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
-        println!("{:#?}", get_history_from_example(3, 3, true, false));
+        println!("{:#?}", get_history_from_example(3, 3, 2500, true, false));
 
         Ok(())
     }
 
     #[test]
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
-        println!("{:#?}", get_history_from_example(3, 3, false, true));
+        println!("{:#?}", get_history_from_example(3, 3, 2500, false, true));
 
         Ok(())
     }
