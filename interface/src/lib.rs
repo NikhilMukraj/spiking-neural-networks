@@ -119,7 +119,7 @@ implement_basic_getter_and_setter!(
 #[pymethods]
 impl PyApproximateNeurotransmitter {
     #[new]
-    #[pyo3(signature = (t_max=1., t=0., v_th=30., clearance_constant=0.1))]
+    #[pyo3(signature = (t_max=1., t=0., v_th=25., clearance_constant=0.1))]
     fn new(t_max: f32, t: f32, v_th: f32, clearance_constant: f32) -> Self {
         PyApproximateNeurotransmitter {
             neurotransmitter: ApproximateNeurotransmitter {
