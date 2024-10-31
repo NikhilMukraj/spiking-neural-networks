@@ -65,6 +65,7 @@ mod tests {
         network.parallel = true;
         network.electrical_synapse = electrical_synapse;
         network.chemical_synapse = chemical_synapse;
+        network.set_dt(1.);
 
         network.run_lattices(iterations)?;
     
@@ -94,12 +95,15 @@ mod tests {
     #[test]
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let iterations = 2500;
-        let history = get_history_from_example(3, 3, iterations, true, false)?;
+        let history = get_history_from_example(1, 1, iterations, true, false)?;
 
         // check that before 2500 it is <=1, then after it is >= 1
 
         assert!(counts_spikes_in_range(&history.history, 0, iterations) <= 1);
-        assert!(counts_spikes_in_range(&history.history, iterations, iterations + iterations) > 1);
+        let after_activation_spikes = counts_spikes_in_range(
+            &history.history, iterations, iterations + iterations
+        );
+        assert!(after_activation_spikes > 2, "number of spikes: {}", after_activation_spikes);
 
         Ok(())
     }
@@ -107,12 +111,15 @@ mod tests {
     #[test]
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let iterations = 2500;
-        let history = get_history_from_example(3, 3, 2500, false, true)?;
+        let history = get_history_from_example(1, 1, 2500, false, true)?;
 
         // check that before 2500 it is <=1, then after it is >= 1
 
         assert!(counts_spikes_in_range(&history.history, 0, iterations) <= 1);
-        assert!(counts_spikes_in_range(&history.history, iterations, iterations + iterations) > 1);
+        let after_activation_spikes = counts_spikes_in_range(
+            &history.history, iterations, iterations + iterations
+        );
+        assert!(after_activation_spikes > 2, "number of spikes: {}", after_activation_spikes);
 
         Ok(())
     }
