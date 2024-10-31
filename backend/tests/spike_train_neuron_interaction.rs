@@ -4,7 +4,10 @@
 mod tests {
     extern crate spiking_neural_networks;
     use spiking_neural_networks::graph::AdjacencyMatrix;
-    use spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType;
+    use spiking_neural_networks::neuron::iterate_and_spike::{
+        IonotropicNeurotransmitterType, LigandGatedChannel, LigandGatedChannels, Neurotransmitters,
+        ApproximateNeurotransmitter, AMPADefault,
+    };
     use spiking_neural_networks::neuron::plasticity::STDP;
     use spiking_neural_networks::neuron::{
         integrate_and_fire::IzhikevichNeuron,
@@ -25,10 +28,22 @@ mod tests {
         electrical_synapse: bool,
         chemical_synapse: bool,
     ) -> Result<SpikeHistory, SpikingNeuralNetworksError> {
+        let mut neurotransmitters = Neurotransmitters::default();
+        neurotransmitters.insert(
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+        );
+        let mut ligand_gates = LigandGatedChannels::default();
+        ligand_gates.insert(
+            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+        )?;
+
         let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
         izhikevich_neuron.gap_conductance = 10.;
+        izhikevich_neuron.synaptic_neurotransmitters = neurotransmitters.clone();
+        izhikevich_neuron.ligand_gates = ligand_gates;
         let mut poisson_neuron = PoissonNeuron::default_impl();
         poisson_neuron.chance_of_firing = 0.;
+        poisson_neuron.synaptic_neurotransmitters = neurotransmitters;
     
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
         spike_train_lattice.set_id(0);
@@ -62,34 +77,42 @@ mod tests {
         Ok(network.get_lattice(&1).unwrap().grid_history.clone())
     }
     
-    // fn count_nonzero_in_range(
-    //     data: &Vec<Vec<Vec<usize>>>, 
-    //     start: usize, 
-    //     end: usize
-    // ) -> usize {
-    //     let bounded_end = end.min(data.len());
+    fn counts_spikes_in_range(
+        data: &[Vec<Vec<bool>>], 
+        start: usize, 
+        end: usize
+    ) -> usize {
+        let bounded_end = end.min(data.len());
     
-    //     data[start..bounded_end].iter()
-    //         .flat_map(|inner_vec| inner_vec.iter())
-    //         .flat_map(|innermost_vec| innermost_vec.iter())
-    //         .filter(|&&value| value != 0)
-    //         .count()
-    // }    
+        data[start..bounded_end].iter()
+            .flat_map(|inner_vec| inner_vec.iter())
+            .flat_map(|innermost_vec| innermost_vec.iter())
+            .filter(|&&value| value)
+            .count()
+    }    
 
     #[test]
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
-        println!("{:#?}", get_history_from_example(3, 3, 2500, true, false));
+        let iterations = 2500;
+        let history = get_history_from_example(3, 3, iterations, true, false)?;
 
         // check that before 2500 it is <=1, then after it is >= 1
+
+        assert!(counts_spikes_in_range(&history.history, 0, iterations) <= 1);
+        assert!(counts_spikes_in_range(&history.history, iterations, iterations + iterations) > 1);
 
         Ok(())
     }
 
     #[test]
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
-        println!("{:#?}", get_history_from_example(3, 3, 2500, false, true));
+        let iterations = 2500;
+        let history = get_history_from_example(3, 3, 2500, false, true)?;
 
         // check that before 2500 it is <=1, then after it is >= 1
+
+        assert!(counts_spikes_in_range(&history.history, 0, iterations) <= 1);
+        assert!(counts_spikes_in_range(&history.history, iterations, iterations + iterations) > 1);
 
         Ok(())
     }
