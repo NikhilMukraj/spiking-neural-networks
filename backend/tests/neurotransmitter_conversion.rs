@@ -37,8 +37,8 @@ mod tests {
             &neurotransmitters_grid,
             &context,
             &queue,
-            1,
-            4,
+            0,
+            0,
         )?;
 
         let mut cpu_conversion = neurotransmitters_grid.clone();
@@ -46,8 +46,8 @@ mod tests {
             &mut cpu_conversion,
             &gpu_conversion,
             &queue,
-            1,
-            4,
+            0,
+            0,
         )?;
 
         for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
