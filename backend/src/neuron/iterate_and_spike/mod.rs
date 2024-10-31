@@ -1576,6 +1576,10 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
+        if rows == 0 || cols == 0 {
+            return Ok(buffers);
+        }
+
         let size = rows * cols * N::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
@@ -1610,6 +1614,14 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             .into_iter()
             .map(|i| i.to_string())
             .collect();
+
+        if rows == 0 || cols == 0 {
+            for inner in neurotransmitter_grid {
+                inner.clear();
+            }
+
+            return Ok(());
+        }
 
         for key in buffers.keys() {
             if !string_types.contains(key) {
