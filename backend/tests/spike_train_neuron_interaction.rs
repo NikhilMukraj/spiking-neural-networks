@@ -12,6 +12,7 @@ mod tests {
         SpikeTrainLattice, Lattice, LatticeNetwork, SpikeHistory
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
+    
 
     fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
         x == y
@@ -60,12 +61,26 @@ mod tests {
 
         Ok(network.get_lattice(&1).unwrap().grid_history.clone())
     }
-
-    // needs aggregator function, aggregates all spikes between given indexes
+    
+    // fn count_nonzero_in_range(
+    //     data: &Vec<Vec<Vec<usize>>>, 
+    //     start: usize, 
+    //     end: usize
+    // ) -> usize {
+    //     let bounded_end = end.min(data.len());
+    
+    //     data[start..bounded_end].iter()
+    //         .flat_map(|inner_vec| inner_vec.iter())
+    //         .flat_map(|innermost_vec| innermost_vec.iter())
+    //         .filter(|&&value| value != 0)
+    //         .count()
+    // }    
 
     #[test]
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         println!("{:#?}", get_history_from_example(3, 3, 2500, true, false));
+
+        // check that before 2500 it is <=1, then after it is >= 1
 
         Ok(())
     }
@@ -73,6 +88,8 @@ mod tests {
     #[test]
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         println!("{:#?}", get_history_from_example(3, 3, 2500, false, true));
+
+        // check that before 2500 it is <=1, then after it is >= 1
 
         Ok(())
     }
