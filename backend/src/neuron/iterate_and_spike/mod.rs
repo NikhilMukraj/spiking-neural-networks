@@ -1033,7 +1033,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
                         );
                     }
                 } else {
-                    unreachable!("Attribute not found");
+                    unreachable!("Attribute ({}) not found", attribute);
                 }
             }
         },
@@ -1062,8 +1062,15 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         // flags that depend on
         // add to list 
 
+        if rows == 0 || cols == 0 {
+            return Ok(HashMap::new());
+        }
+
         let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
         for i in T::get_attribute_names() {
+            buffers_contents.insert(i.to_string(), vec![]);
+        }
+        for i in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
             buffers_contents.insert(i.to_string(), vec![]);
         }
 
@@ -1109,6 +1116,14 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         rows: usize,
         cols: usize,
     ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            for inner in ligand_gates_grid {
+                inner.clear();
+            }
+
+            return Ok(());
+        }
+
         let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
