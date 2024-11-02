@@ -79,7 +79,10 @@ mod tests {
             IonotropicNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default()
         )?;
         ligand_gates3.insert(
-            IonotropicNeurotransmitterType::GABAb, LigandGatedChannel::gabab_default()
+            IonotropicNeurotransmitterType::GABAb, LigandGatedChannel {
+                current: 5.,
+                ..LigandGatedChannel::gabab_default()
+            }
         )?;
         let ligand_gates4 = LigandGatedChannels::default();
 
