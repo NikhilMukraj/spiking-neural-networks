@@ -39,7 +39,7 @@ impl BV {
     /// Calculates effect of magnesium and voltage on NMDA receptor,
     /// voltage should be in mV
     fn calculate_b(&self, voltage: f32) -> f32 {
-        1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57))
+        1. / (1. + ((-0.062 * voltage).exp() * self.mg / 3.57))
     }
 }
 
@@ -823,6 +823,10 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
                 _ => None
             },
+            "gabab_kd" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.kd),
+                _ => None
+            },
             _ => {
                 self.receptor.get_attribute(attribute)
             },
@@ -851,6 +855,10 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
+            "gabab_kd" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = value,
+                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
+            }
             _ => {
                 self.receptor.set_attribute(attribute, value)
             },
@@ -1197,7 +1205,29 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         Ok(())
     }
 
-    // pub fn get_ligand_gated_channels_update_function() -> String {}
+    // pub fn get_ligand_gated_channels_update_function() -> String {
+    //     format!(
+    //         r#"
+    //         if (flags[index]) {{ // AMPA
+    //             r[index] = get_r({});
+    //             current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
+    //         }}
+    //         if (flags[index + 1]) {{ // NMDA
+    //             r[index + 1] = get_r({})
+    //             float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * mg[index + 1] / 3.57); 
+    //             // 1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57))
+    //         }}
+    //         if (flags[index + 2]) {{ // GABAa 
+    //             r[index + 2] = get_r({});
+    //             current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
+    //         }}
+    //         if (flags[index + 3]) {{ // GABAb
+    //             r[index + 3] = get_r({});
+    //             float modifier = 
+    //         }}
+    //         "#,
+    //     )
+    // }
 }
 
 /// Multiple neurotransmitters with their associated types
@@ -1701,7 +1731,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         format!(
             r#"
                 for (int i; i < 4; i++) {{
-                    if flags[index + i] {{
+                    if (flags[index + i]) {{
                         t[index + i] = get_t({});
                     }}
                 }}
