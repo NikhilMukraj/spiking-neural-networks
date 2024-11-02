@@ -1689,6 +1689,24 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         Ok(())
     }
+
+    pub fn get_neurotransmitter_update_kernel_code() -> String {
+        let args = T::get_update_function().0
+            .iter()
+            .map(|i| format!("{}[index + i]", i))
+            .collect::<Vec<String>>()
+            .join(", ");
+        format!(
+            r#"
+                for (int i; i < 4; i++) {{
+                    if flags[index + i] {{
+                        t[index + i] = get_t({});
+                    }}
+                }}
+            "#,
+            args
+        )
+    }
 }
 
 /// Multiplies multiple neurotransmitters concentrations by a single scalar value
