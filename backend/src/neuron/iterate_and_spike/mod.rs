@@ -1196,6 +1196,8 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         Ok(())
     }
+
+    // pub fn get_ligand_gated_channels_update_function() -> String {}
 }
 
 /// Multiple neurotransmitters with their associated types
