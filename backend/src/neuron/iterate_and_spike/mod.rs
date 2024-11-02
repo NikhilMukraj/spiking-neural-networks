@@ -827,6 +827,10 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.kd),
                 _ => None
             },
+            "gabab_n" => match &self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.n),
+                _ => None
+            },
             _ => {
                 self.receptor.get_attribute(attribute)
             },
@@ -859,6 +863,10 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
+            "gabab_n" => match &mut self.receptor_type {
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = value,
+                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
+            }
             _ => {
                 self.receptor.set_attribute(attribute, value)
             },
@@ -870,7 +878,7 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
         HashSet::from([
             String::from("current"), String::from("reversal"), String::from("g"),
             String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
-            String::from("gabab_k4")
+            String::from("gabab_k4"), String::from("gabab_kd"), String::from("gabab_n"),
         ])
     }
 
@@ -892,6 +900,8 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 attributes.insert(String::from("gabab_g"));
                 attributes.insert(String::from("gabab_k3"));
                 attributes.insert(String::from("gabab_k4"));
+                attributes.insert(String::from("gabab_kd"));
+                attributes.insert(String::from("gabab_n"));
 
                 attributes
             }
@@ -1214,8 +1224,8 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     //         }}
     //         if (flags[index + 1]) {{ // NMDA
     //             r[index + 1] = get_r({})
-    //             float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * mg[index + 1] / 3.57); 
-    //             // 1. / (1. + ((-0.062 * voltage).exp() * 1.5 / 3.57))
+    //             float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57); 
+    //             current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
     //         }}
     //         if (flags[index + 2]) {{ // GABAa 
     //             r[index + 2] = get_r({});
@@ -1223,7 +1233,11 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     //         }}
     //         if (flags[index + 3]) {{ // GABAb
     //             r[index + 3] = get_r({});
-    //             float modifier = 
+    //             gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
+    //             float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
+    //             float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
+    //             float modifier =  top / bottom;
+    //             current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
     //         }}
     //         "#,
     //     )
