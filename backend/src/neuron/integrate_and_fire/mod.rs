@@ -425,6 +425,10 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
             }
         )
     }
+
+    fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        todo!()
+    }
     
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
@@ -1293,6 +1297,10 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Si
                 argument_names, 
             }
         )
+    }
+
+    fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        todo!()
     }
     
     fn convert_to_gpu(
