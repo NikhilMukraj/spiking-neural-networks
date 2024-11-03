@@ -1071,6 +1071,14 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
     }
 }
 
+fn get_receptor_args<T: ReceptorKineticsGPU>(indexer: &str) -> String {
+    T::get_update_function().0
+        .iter()
+        .map(|i| format!("{}{}", i, indexer))
+        .collect::<Vec<String>>()
+        .join(", ")
+}
+
 #[cfg(feature = "gpu")]
 impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> LigandGatedChannels<T> {
     pub fn convert_to_gpu(
@@ -1215,33 +1223,37 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         Ok(())
     }
 
-    // pub fn get_ligand_gated_channels_update_function() -> String {
-    //     format!(
-    //         r#"
-    //         if (flags[index]) {{ // AMPA
-    //             r[index] = get_r({});
-    //             current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
-    //         }}
-    //         if (flags[index + 1]) {{ // NMDA
-    //             r[index + 1] = get_r({})
-    //             float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57); 
-    //             current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
-    //         }}
-    //         if (flags[index + 2]) {{ // GABAa 
-    //             r[index + 2] = get_r({});
-    //             current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
-    //         }}
-    //         if (flags[index + 3]) {{ // GABAb
-    //             r[index + 3] = get_r({});
-    //             gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
-    //             float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
-    //             float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
-    //             float modifier =  top / bottom;
-    //             current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
-    //         }}
-    //         "#,
-    //     )
-    // }
+    pub fn get_ligand_gated_channels_update_function() -> String {
+        format!(
+            r#"
+            if (flags[index]) {{ // AMPA
+                r[index] = get_r({});
+                current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
+            }}
+            if (flags[index + 1]) {{ // NMDA
+                r[index + 1] = get_r({})
+                float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57); 
+                current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
+            }}
+            if (flags[index + 2]) {{ // GABAa 
+                r[index + 2] = get_r({});
+                current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
+            }}
+            if (flags[index + 3]) {{ // GABAb
+                r[index + 3] = get_r({});
+                gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
+                float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
+                float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
+                float modifier =  top / bottom;
+                current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
+            }}
+            "#,
+            get_receptor_args::<T>("[index]"),
+            get_receptor_args::<T>("[index + 1]"),
+            get_receptor_args::<T>("[index + 2]"),
+            get_receptor_args::<T>("[index + 3]"),
+        )
+    }
 }
 
 /// Multiple neurotransmitters with their associated types
