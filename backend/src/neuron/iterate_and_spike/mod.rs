@@ -2059,10 +2059,8 @@ pub enum BufferGPU {
 pub trait IterateAndSpikeGPU: IterateAndSpike {
     /// Returns the compiled kernel for electrical inputs
     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
-    // /// Returns the compiled kernel for chemical inputs
-    // fn iterate_and_spike_chemical_kernel(&self) -> KernelFunction;
-    // /// Returns the compiled kernel for electirlca and chemical inputs
-    // fn iterate_and_spike_electrochemical_kernel(&self) -> KernelFunction;
+    /// Returns the compiled kernel for chemical inputs
+    fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     /// Converts a grid of the neuron type to a vector of buffers
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], 
