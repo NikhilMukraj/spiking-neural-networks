@@ -4,16 +4,14 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, 
-    GapConductance, GaussianParameters, IonotropicNeurotransmitterType, 
-    IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, 
-    NeurotransmitterKinetics, Neurotransmitters, ReceptorKinetics, Timestep
+    AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, GABAaDefault, GABAbDefault, GapConductance, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterKineticsGPU, Neurotransmitters, ReceptorKinetics, ReceptorKineticsGPU, Timestep
 };
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
     IterateAndSpikeGPU, BufferGPU, KernelFunction, 
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
+    // LigandGatedChannel, NeurotransmitterTypeGPU
 };
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
@@ -357,7 +355,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 } 
 
 #[cfg(feature = "gpu")]
-impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
+impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
@@ -427,6 +425,70 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for Qu
     }
 
     fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        // let mut argument_names = vec![
+        //     String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
+        //     String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
+        //     String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
+        //     String::from("v_th"), String::from("refractory_count"), String::from("tref"),
+        //     String::from("is_spiking"),
+        // ];
+        // for i in IonotropicNeurotransmitterType::get_all_types() {
+        //     argument_names.push(i.to_string());
+        // }
+        // argument_names.extend(T::get_attribute_names());
+        // argument_names.extend(LigandGatedChannel::<R>::get_all_possible_attribute_names());
+
+        // let uint_args = [String::from("index_to_position"), String::from("is_spiking")];
+
+        // let arguments: String = argument_names
+        //     .iter()
+        //     .enumerate()
+        //     .map(|(i, name)| {
+        //         let qualifier = if i < 2 { "__global const " } else { "__global " };
+        //         let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
+        //         format!("{}{} *{}", qualifier, type_decl, name)
+        //     })
+        //     .collect::<Vec<_>>()
+        //     .join(",\n                ");
+
+        // let program_source = format!(r#"
+        //     {}
+        //     {}
+
+        //     __kernel void quadratic_integrate_and_fire_iterate_and_spike(
+        //         {}
+        //     ) {{
+        //         int gid = get_global_id(0);
+        //         int index = index_to_position[gid];
+
+        //         current_voltage[index] += (
+        //             alpha[index] * (current_voltage[index] - v_reset[index]) * 
+        //             (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
+        //             ) 
+        //             * (dt[index] / tau_m[index]);
+
+        //         if (refractory_count[index] > 0.0f) {{
+        //             current_voltage[index] = v_reset[index];
+        //             refractory_count[index] -= 1.0f; 
+        //             is_spiking[index] = 0;
+        //         }} else if (current_voltage[index] >= v_th[index]) {{
+        //             current_voltage[index] = v_reset[index];
+        //             is_spiking[index] = 1;
+        //             refractory_count[index] = tref[index] / dt[index];
+        //         }} else {{
+        //             is_spiking[index] = 0;
+        //         }}
+
+        //         {}
+        //         {}
+        //     }}"#, 
+        //     T::get_update_function().1,
+        //     R::get_update_function().1,
+        //     arguments,
+        //     Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
+        //     LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
+        // );
+
         todo!()
     }
     
@@ -1246,7 +1308,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
 }
 
 #[cfg(feature = "gpu")]
-impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
+impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("simple_leaky_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
