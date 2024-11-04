@@ -874,7 +874,7 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     }
 
     /// Gets all possible attribute names
-    fn get_all_possible_attribute_names() -> HashSet<String> {
+    pub fn get_all_possible_attribute_names() -> HashSet<String> {
         HashSet::from([
             String::from("current"), String::from("reversal"), String::from("g"),
             String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
