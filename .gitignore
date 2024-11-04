@@ -60,6 +60,7 @@
 /interface/notebooks/*.toml
 /interface/notebooks/.ipynb_checkpoints
 /interface/notebooks/*.gif
+/interface/notebooks/*.npy
 /interface/generate_methods.py
 /build_test/pratt/target
 /build_test/other_ast/target
