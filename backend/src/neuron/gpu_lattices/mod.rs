@@ -84,6 +84,46 @@ __kernel void calculate_internal_electrical_inputs(
 
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
+// const NEUROTRANSMITTER_INPUTS_KERNEL: &str = r#"
+// __kernel void get_neurotransmitter_inputs(
+//     __global const uint *connections, 
+//     __global const float *weights, 
+//     __global const uint *index_to_position,
+//     __global const float *t,
+//     uint n, 
+//     uint number_of_types,
+//     __global float *counts,
+//     __global float *res
+// ) {
+//     int gid = get_global_id(0);
+
+//     for (int i = 0; i < n; i++) {
+//         if (connections[i * n + gid] == 1) {
+//             int presynaptic_index = index_to_position[i];
+//             // int postsynaptic_index = index_to_position[gid]; // maybe use this instead of just gid
+//             for (int t_index = 0; t_index < number_of_types; t_index++) {
+//                 if (flags[t_index] == 1) {
+//                     res[gid + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
+//                     counts[gid + t_index]++;
+//                 }
+//             }
+//         }
+//     }
+
+//     for (int t_index = 0; t_index < number_of_types; t_index++) {
+//         if (flags[gid + t_index] == 1) {
+//             if (counts[gid + t_index] != 0.0f) {
+//                 res[gid + t_index] /= counts[gid + t_index];
+//             } else {
+//                 res[gid + t_index] = 0;
+//             }
+//         }
+//     }
+// }
+// "#;
+
+// const NEUROTRANSMITTER_INPUTS_KERNEL_NAME: &str = "get_neurotransmitter_inputs";
+
 const GRID_VOLTAGE_HISTORY_KERNEL: &str = r#"
 __kernel void add_grid_voltage_history(
     __global const uint *index_to_position,
