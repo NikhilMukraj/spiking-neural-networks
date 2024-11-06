@@ -595,6 +595,24 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
         Ok(())
     }
+
+    fn convert_electrochemical_to_gpu(
+        _cell_grid: &[Vec<Self>], 
+        _context: &Context,
+        _queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        todo!()
+    }
+
+    fn convert_electrochemical_to_cpu(
+        _cell_grid: &mut Vec<Vec<Self>>,
+        _buffers: &HashMap<String, BufferGPU>,
+        _rows: usize,
+        _cols: usize,
+        _queue: &CommandQueue,
+    ) -> Result<(), GPUError> {
+        todo!()
+    }
 }
 
 
@@ -1447,5 +1465,23 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         }
 
         Ok(())
+    }
+
+    fn convert_electrochemical_to_gpu(
+        _cell_grid: &[Vec<Self>], 
+        _context: &Context,
+        _queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        todo!()
+    }
+
+    fn convert_electrochemical_to_cpu(
+        _cell_grid: &mut Vec<Vec<Self>>,
+        _buffers: &HashMap<String, BufferGPU>,
+        _rows: usize,
+        _cols: usize,
+        _queue: &CommandQueue,
+    ) -> Result<(), GPUError> {
+        todo!()
     }
 }
