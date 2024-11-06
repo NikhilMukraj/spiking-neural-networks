@@ -2075,4 +2075,18 @@ pub trait IterateAndSpikeGPU: IterateAndSpike {
         cols: usize,
         queue: &CommandQueue,
     ) -> Result<(), GPUError>;
+    /// Converts a grid of the neuron type to a vector of buffers with necessary chemical data
+    fn convert_electrochemical_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts buffers back to a grid of neurons with necessary chemical data
+    fn convert_electrochemical_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError>;
 }
