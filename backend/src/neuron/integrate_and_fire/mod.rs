@@ -601,6 +601,21 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         _context: &Context,
         _queue: &CommandQueue,
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        // let mut buffers = Self::convert_electrochemical_to_gpu(cell_grid, context, queue)?;
+        // let neurotransmitters = cell_grid.iter()
+        //     .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters).collect())
+        //     .collect();
+        // let ligand_gates = cell_grid.iter()
+        //     .map(|row| row.iter().map(|cell| cell.ligand_gates).collect())
+        //     .collect();
+        // let neurotransmitter_buffers = Neurotransmitters::<T>::convert_to_gpu(neurotransmitters, context, queue)?;
+        // let ligand_gates_buffers = LigandGatedChannels::<R>::convert_to_gpu(ligand_gates, context, queue)?;
+
+        // buffers.extend(neurotransmitter_buffers);
+        // buffers.extend(ligand_gates_buffers);
+
+        // Ok(buffers)
+
         todo!()
     }
 
