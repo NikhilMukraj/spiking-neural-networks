@@ -1082,13 +1082,15 @@ fn get_receptor_args<T: ReceptorKineticsGPU>(indexer: &str) -> String {
 #[cfg(feature = "gpu")]
 impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> LigandGatedChannels<T> {
     pub fn convert_to_gpu(
-        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
         // aggreate a list of all possible attributes (prefix those that are sub attributes)
         // flags that depend on
         // add to list 
 
-        if rows == 0 || cols == 0 {
+        let length = grid.iter().map(|row| row.len()).sum();
+
+        if length == 0 {
             return Ok(HashMap::new());
         }
 
@@ -1115,7 +1117,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
-        let size = rows * cols * IonotropicNeurotransmitterType::number_of_types();
+        let size = length * IonotropicNeurotransmitterType::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
             write_buffer!(current_buffer, context, queue, size, value, Float, last);
@@ -1123,7 +1125,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
         }
 
-        let size = rows * cols;
+        let size = length;
 
         for (key, value) in flags.iter() {
             write_buffer!(current_buffer, context, queue, size, value, UInt, last);
@@ -1627,8 +1629,14 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
 #[cfg(feature = "gpu")]
 impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitters<N, T> {
     pub fn convert_to_gpu(
-        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue, rows: usize, cols: usize,
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        let length = grid.iter().map(|row| row.len()).sum();
+
+        if length == 0 {
+            return Ok(HashMap::new());
+        }
+
         let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
         for i in T::get_attribute_names() {
             buffers_contents.insert(i.to_string(), vec![]);
@@ -1649,11 +1657,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
-        if rows == 0 || cols == 0 {
-            return Ok(buffers);
-        }
-
-        let size = rows * cols * N::number_of_types();
+        let size = length * N::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
             write_buffer!(current_buffer, context, queue, size, value, Float, last);
@@ -1661,7 +1665,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
         }
 
-        let size = rows * cols;
+        let size = length;
 
         for (key, value) in flags.iter() {
             write_buffer!(current_buffer, context, queue, size, value, UInt, last);
