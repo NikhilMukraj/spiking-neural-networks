@@ -36,8 +36,6 @@ mod tests {
             &ligand_gates_grid,
             &context,
             &queue,
-            0,
-            0,
         )?;
 
         let mut cpu_conversion = ligand_gates_grid.clone();
@@ -109,8 +107,6 @@ mod tests {
             &ligand_gates_grid,
             &context,
             &queue,
-            1,
-            4,
         )?;
 
         let mut cpu_conversion = ligand_gates_grid.clone();
