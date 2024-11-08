@@ -308,20 +308,20 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_attribute(&self, value: &str) -> Option<f32> {
         match value {
-            "t" => Some(self.t),
-            "t_max" => Some(self.t_max),
-            "v_th" => Some(self.v_th),
-            "clearance_constant" => Some(self.clearance_constant),
+            "neurotransmitters_t" => Some(self.t),
+            "neurotransmitters_t_max" => Some(self.t_max),
+            "neurotransmitters_v_th" => Some(self.v_th),
+            "neurotransmitters_clearance_constant" => Some(self.clearance_constant),
             _ => None,
         }
     }
 
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "t" => self.t = value,
-            "t_max" => self.t_max = value,
-            "v_th" => self.v_th = value,
-            "clearance_constant" => self.clearance_constant = value,
+            "neurotransmitters_t" => self.t = value,
+            "neurotransmitters_t_max" => self.t_max = value,
+            "neurotransmitters_v_th" => self.v_th = value,
+            "neurotransmitters_clearance_constant" => self.clearance_constant = value,
             _ => unreachable!(),
         }
     }
@@ -329,8 +329,8 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_attribute_names() -> HashSet<String> {
         HashSet::from(
             [
-                String::from("t"), String::from("t_max"), String::from("v_th"), 
-                String::from("clearance_constant")
+                String::from("neurotransmitters_t"), String::from("neurotransmitters_t_max"), 
+                String::from("neurotransmitters_v_th"), String::from("neurotransmitters_clearance_constant")
             ]
         )
     }
@@ -338,25 +338,27 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("voltage"), String::from("dt"), String::from("t"),
-                String::from("t_max"), String::from("v_th"), String::from("clearance_constant"),
+                String::from("voltage"), String::from("dt"), String::from("neurotransmitters_t"),
+                String::from("neurotransmitters_t_max"), String::from("neurotransmitters_v_th"), 
+                String::from("neurotransmitters_clearance_constant"),
             ],
             String::from("
                 float get_t(
                     float voltage, 
                     float dt,
-                    float t,
-                    float t_max,
-                    float v_th,
-                    float clearance_constant,
+                    float neurotransmitters_t,
+                    float neurotransmitters_t_max,
+                    float neurotransmitters_v_th,
+                    float neurotransmitters_clearance_constant,
                 ) { 
                     float is_spiking_modifier = 0;
-                    if (voltage > v_th) {
+                    if (voltage > neurotransmitters_v_th) {
                         is_spiking_modifier = 1;
                     }
-                    float new_t = dt * -clearance_constant * t + (is_spiking_modifier * t_max);
+                    float new_t = dt * -neurotransmitters_clearance_constant * neurotransmitters_t + 
+                        (is_spiking_modifier * neurotransmitters_t_max);
 
-                    return clamp(t, 0, t_max);
+                    return clamp(new_t, 0, neurotransmitters_t_max);
                 }
             ")
         )
@@ -562,30 +564,30 @@ impl ReceptorKinetics for ApproximateReceptor {
 impl ReceptorKineticsGPU for ApproximateReceptor {
     fn get_attribute(&self, value: &str) -> Option<f32> {
         match value {
-            "r" => Some(self.r),
+            "ligand_gates_r" => Some(self.r),
             _ => None,
         }
     }
 
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "r" => self.r = value,
+            "ligand_gates_r" => self.r = value,
             _ => unreachable!(),
         }
     }
 
     fn get_attribute_names() -> HashSet<String> {
-        HashSet::from([String::from("r")])
+        HashSet::from([String::from("ligand_gates_r")])
     }
 
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("t")
+                String::from("neurotransmitters_t")
             ],
             String::from("
                 float get_r(
-                    float t,
+                    float neurotransmitters_t,
                 ) { 
                     return t;
                 }
@@ -804,30 +806,30 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Retrieves a given attribute from the ligand gated channel
     fn get_attribute(&self, attribute: &str) -> Option<f32> {
         match attribute {
-            "current" => Some(self.current),
-            "reversal" => Some(self.reversal),
-            "g" => Some(self.g),
-            "nmda_mg" => match &self.receptor_type {
+            "ligand_gates_current" => Some(self.current),
+            "ligand_gates_reversal" => Some(self.reversal),
+            "ligand_gates_g" => Some(self.g),
+            "ligand_gates_nmda_mg" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
                 _ => None
             },
-            "gabab_g" => match &self.receptor_type {
+            "ligand_gates_gabab_g" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
                 _ => None
             },
-            "gabab_k3" => match &self.receptor_type {
+            "ligand_gates_gabab_k3" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
                 _ => None
             },
-            "gabab_k4" => match &self.receptor_type {
+            "ligand_gates_gabab_k4" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
                 _ => None
             },
-            "gabab_kd" => match &self.receptor_type {
+            "ligand_gates_gabab_kd" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.kd),
                 _ => None
             },
-            "gabab_n" => match &self.receptor_type {
+            "ligand_gates_gabab_n" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.n),
                 _ => None
             },
@@ -840,30 +842,30 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Sets a given attribute to a given value
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "current" => self.current = value,
-            "reversal" => self.reversal = value,
-            "g" => self.g = value,
-            "nmda_mg" => match &mut self.receptor_type {
+            "ligand_gates_current" => self.current = value,
+            "ligand_gates_reversal" => self.reversal = value,
+            "ligand_gates_g" => self.g = value,
+            "ligand_gates_nmda_mg" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = value,
                 _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
             },
-            "gabab_g" => match &mut self.receptor_type {
+            "ligand_gates_gabab_g" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "gabab_k3" => match &mut self.receptor_type {
+            "ligand_gates_gabab_k3" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "gabab_k4" => match &mut self.receptor_type {
+            "ligand_gates_gabab_k4" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "gabab_kd" => match &mut self.receptor_type {
+            "ligand_gates_gabab_kd" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
-            "gabab_n" => match &mut self.receptor_type {
+            "ligand_gates_gabab_n" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
@@ -876,32 +878,32 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Gets all possible attribute names
     pub fn get_all_possible_attribute_names() -> HashSet<String> {
         HashSet::from([
-            String::from("current"), String::from("reversal"), String::from("g"),
-            String::from("nmda_mg"), String::from("gabab_g"), String::from("gabab_k3"),
-            String::from("gabab_k4"), String::from("gabab_kd"), String::from("gabab_n"),
+            String::from("ligand_gates_current"), String::from("ligand_gates_reversal"), String::from("ligand_gates_g"),
+            String::from("ligand_gates_nmda_mg"), String::from("ligand_gates_gabab_g"), String::from("ligand_gates_gabab_k3"),
+            String::from("ligand_gates_gabab_k4"), String::from("ligand_gates_gabab_kd"), String::from("ligand_gates_gabab_n"),
         ])
     }
 
     /// Gets all valid attribute names
     fn get_valid_attribute_names(&self) -> HashSet<String> {
         let mut attributes = HashSet::from([
-            String::from("current"), String::from("reversal"), String::from("g"),
+            String::from("ligand_gates_current"), String::from("ligand_gates_reversal"), String::from("ligand_gates_g"),
         ]);
 
         match &self.receptor_type {
             IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
             IonotropicLigandGatedReceptorType::NMDA(_) => {
-                attributes.insert(String::from("nmda_mg"));
+                attributes.insert(String::from("ligand_gates_nmda_mg"));
 
                 attributes
             },
             IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
             IonotropicLigandGatedReceptorType::GABAb(_) => {
-                attributes.insert(String::from("gabab_g"));
-                attributes.insert(String::from("gabab_k3"));
-                attributes.insert(String::from("gabab_k4"));
-                attributes.insert(String::from("gabab_kd"));
-                attributes.insert(String::from("gabab_n"));
+                attributes.insert(String::from("ligand_gates_gabab_g"));
+                attributes.insert(String::from("ligand_gates_gabab_k3"));
+                attributes.insert(String::from("ligand_gates_gabab_k4"));
+                attributes.insert(String::from("ligand_gates_gabab_kd"));
+                attributes.insert(String::from("ligand_gates_gabab_n"));
 
                 attributes
             }
@@ -1043,7 +1045,8 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
                     if current_value.get_valid_attribute_names().contains(&attribute) {
                         retrieved_attribute.push(
-                            current_value.get_attribute(&attribute).expect("Attribute not found")
+                            current_value.get_attribute(&attribute)
+                                .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute))
                         );
                     } else {
                         retrieved_attribute.push(
@@ -1064,7 +1067,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
                     retrieved_attribute.push(0.)
                 } else {
-                    unreachable!("Attribute not found")
+                    unreachable!("Attribute ({}) not found", attribute)
                 }
             }
         }
@@ -1160,15 +1163,15 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             .map(|i| i.to_string())
             .collect();
 
-        for key in buffers.keys() {
-            if !string_types.contains(key) {
+        for key in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
+            if !string_types.contains(&key) {
                 let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
+                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, Float);
 
                 cpu_conversion.insert(key.clone(), current_contents);
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, UInt);
 
                 flags.insert(
                     key.clone(), 
@@ -1229,25 +1232,25 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         format!(
             r#"
             if (flags[index]) {{ // AMPA
-                r[index] = get_r({});
-                current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
+                ligand_gates_r[index] = get_r({});
+                current[index] = ligand_gates_g[index] * ligand_gates_r[index] * (voltage[index] - ligand_gates_reversal[index]); 
             }}
             if (flags[index + 1]) {{ // NMDA
                 r[index + 1] = get_r({})
-                float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57); 
-                current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
+                float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * ligand_gates_nmda_mg[index + 1] / 3.57); 
+                current[index + 1] = modifier * ligand_gates_g[index + 1] * ligand_gates_r[index + 1] * (voltage[index] - ligand_gates_reversal[index + 1]);
             }}
             if (flags[index + 2]) {{ // GABAa 
-                r[index + 2] = get_r({});
-                current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
+                ligand_gates_r[index + 2] = get_r({});
+                current[index + 2] = g[index + 2] * ligand_gates_r[index + 2] * (voltage[index] - reversal[index + 2]); 
             }}
             if (flags[index + 3]) {{ // GABAb
-                r[index + 3] = get_r({});
-                gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
-                float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
-                float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
+                ligand_gates_r[index + 3] = get_r({});
+                ligand_gates_gabab_g[index + 3] += (ligand_gates_gabab_k3 * ligand_gates_r[index + 3] - ligand_gates_gabab_k4[index + 3] * ligand_gates_gabab_g[index + 3]) * dt[index];
+                float bottom = pow(gabab_g[index + 3], ligand_gates_gabab_n[index + 3]) * ligand_gates_gabab_kd[index + 3];
+                float top = pow(ligand_gates_gabab_g[index + 3], ligand_gates_gabab_n[index + 3]);
                 float modifier =  top / bottom;
-                current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
+                current[index + 3] = modifier * ligand_gates_g[index + 3] * ligand_gates_r[index + 3] * (voltage[index] - ligand_gates_reversal[index + 3]);
             }}
             "#,
             get_receptor_args::<T>("[index]"),
@@ -1603,10 +1606,11 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
             for attribute in T::get_attribute_names() {
                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
                     retrieved_attribute.push(
-                        value.get_attribute(&attribute).expect("Attribute not found")
+                        value.get_attribute(&attribute)
+                            .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute))
                     )
                 } else {
-                    unreachable!("Attribute not found");
+                    unreachable!("Attribute ({}) not found", attribute)
                 }
             }
         },
@@ -1619,7 +1623,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
                 if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
                     retrieved_attribute.push(0.)
                 } else {
-                    unreachable!("Attribute not found")
+                    unreachable!("Attribute ({}) not found", attribute)
                 }
             }
         }
@@ -1700,15 +1704,15 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             return Ok(());
         }
 
-        for key in buffers.keys() {
-            if !string_types.contains(key) {
+        for key in T::get_attribute_names() {
+            if !string_types.contains(&key) {
                 let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
+                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, Float);
 
                 cpu_conversion.insert(key.clone(), current_contents);
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, UInt);
 
                 flags.insert(
                     key.clone(), 
