@@ -597,36 +597,63 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     }
 
     fn convert_electrochemical_to_gpu(
-        _cell_grid: &[Vec<Self>], 
-        _context: &Context,
-        _queue: &CommandQueue,
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        // let mut buffers = Self::convert_electrochemical_to_gpu(cell_grid, context, queue)?;
-        // let neurotransmitters = cell_grid.iter()
-        //     .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters).collect())
-        //     .collect();
-        // let ligand_gates = cell_grid.iter()
-        //     .map(|row| row.iter().map(|cell| cell.ligand_gates).collect())
-        //     .collect();
-        // let neurotransmitter_buffers = Neurotransmitters::<T>::convert_to_gpu(neurotransmitters, context, queue)?;
-        // let ligand_gates_buffers = LigandGatedChannels::<R>::convert_to_gpu(ligand_gates, context, queue)?;
+        let mut buffers = Self::convert_to_gpu(cell_grid, context, queue)?;
 
-        // buffers.extend(neurotransmitter_buffers);
-        // buffers.extend(ligand_gates_buffers);
+        let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+            .collect();
+        let ligand_gates: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.ligand_gates.clone()).collect())
+            .collect();
 
-        // Ok(buffers)
+        let neurotransmitter_buffers = Neurotransmitters::<IonotropicNeurotransmitterType, T>::convert_to_gpu(
+            &neurotransmitters, context, queue
+        )?;
+        let ligand_gates_buffers = LigandGatedChannels::<R>::convert_to_gpu(
+            &ligand_gates, context, queue
+        )?;
 
-        todo!()
+        buffers.extend(neurotransmitter_buffers);
+        buffers.extend(ligand_gates_buffers);
+
+        Ok(buffers)
     }
 
     fn convert_electrochemical_to_cpu(
-        _cell_grid: &mut Vec<Vec<Self>>,
-        _buffers: &HashMap<String, BufferGPU>,
-        _rows: usize,
-        _cols: usize,
-        _queue: &CommandQueue,
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
     ) -> Result<(), GPUError> {
-        todo!()
+        let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+            .collect();
+        let mut ligand_gates: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.ligand_gates.clone()).collect())
+            .collect();
+
+        Self::convert_to_cpu(cell_grid, buffers, rows, cols, queue)?;
+        
+        Neurotransmitters::<IonotropicNeurotransmitterType, T>::convert_to_cpu(
+            &mut neurotransmitters, buffers, queue, rows, cols
+        )?;
+        LigandGatedChannels::<R>::convert_to_cpu(
+            &mut ligand_gates, buffers, queue, rows, cols
+        )?;
+
+        for (i, row) in cell_grid.iter_mut().enumerate() {
+            for (j, cell) in row.iter_mut().enumerate() {
+                cell.synaptic_neurotransmitters = neurotransmitters[i][j].clone();
+                cell.ligand_gates = ligand_gates[i][j].clone();
+            }
+        }
+
+        Ok(())
     }
 }
 
