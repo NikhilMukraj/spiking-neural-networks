@@ -56,6 +56,12 @@ def fill_defaults(parsed):
 
     if 'second_cue' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['second_cue'] = True
+    if 'second_cue_is_noisy' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['second_cue_is_noisy'] = False
+    if 'first_cue_is_noisy' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['first_cue_is_noisy'] = False
+    if 'noisy_cue_noise_level' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['noisy_cue_noise_level'] = 0.1
 
     if 'measure_snr' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['measure_snr'] = False
@@ -268,6 +274,17 @@ def get_spike_train_setup_function(pattern_index, distortion):
 
     return setup_spike_train
 
+def get_noisy_spike_train_setup_function(noise_level):
+    def setup_spike_train(neuron):
+        if np.random.uniform(0, 1) < noise_level:
+            neuron.chance_of_firing = 0.01
+        else:
+            neuron.chance_of_firing = 0
+        
+        return neuron
+
+    return setup_spike_train
+
 def find_peaks_above_threshold(series, threshold):
     peaks, _ = scipy.signal.find_peaks(np.array(series))
     filtered_peaks = [index for index in peaks if series[index] > threshold]
@@ -361,7 +378,10 @@ for current_state in tqdm(all_states):
 
         spike_train_lattice = ln.PoissonLattice(2)
         spike_train_lattice.populate(poisson, exc_n, exc_n)
-        spike_train_lattice.apply_given_position(get_spike_train_setup_function(pattern1, distortion))
+        if not parsed_toml['simulation_parameters']['first_cue_is_noisy']:
+            spike_train_lattice.apply_given_position(get_spike_train_setup_function(pattern1, distortion))
+        else:
+            spike_train_lattice.apply(get_noisy_spike_train_setup_function(parsed_toml['simulation_parameters']['noisy_cue_noise_level']))
 
         network = ln.IzhikevichNetwork.generate_network([exc_lattice, inh_lattice], [spike_train_lattice])
         network.connect(
@@ -438,10 +458,13 @@ for current_state in tqdm(all_states):
                 
             first_acc = bool(pattern1 == np.argmax(correlation_coefficients))
 
-        if parsed_toml['simulation_parameters']['second_cue']:
-            network.apply_spike_train_lattice_given_position(2, get_spike_train_setup_function(pattern2, distortion))
+        if not parsed_toml['simulation_parameters']['second_cue_is_noisy']:
+            if parsed_toml['simulation_parameters']['second_cue']:
+                network.apply_spike_train_lattice_given_position(2, get_spike_train_setup_function(pattern2, distortion))
+            else:
+                network.apply_spike_train_lattice(2, reset_spike_train)
         else:
-            network.apply_spike_train_lattice(2, reset_spike_train)
+            spike_train_lattice.apply(get_noisy_spike_train_setup_function(parsed_toml['simulation_parameters']['noisy_cue_noise_level']))
 
         for _ in range(parsed_toml['simulation_parameters']['iterations2']):
             network.run_lattices(1)
@@ -455,52 +478,55 @@ for current_state in tqdm(all_states):
         current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
         firing_max = current_pred_pattern.max()
 
-        if not parsed_toml['simulation_parameters']['use_correlation_as_accuracy']:
-            if not parsed_toml['simulation_parameters']['get_all_accuracies']:
-                second_acc = try_max(
-                    [acc(patterns[pattern2], np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
-                )
-                second_acc_inv = try_max(
-                    [acc(np.logical_not(patterns[pattern2]).astype(int), np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
-                )
-
-                second_acc = max(second_acc, second_acc_inv)
-            else:
-                accs = []
-                for pattern_index in range(num_patterns):
+        if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            if not parsed_toml['simulation_parameters']['use_correlation_as_accuracy']:
+                if not parsed_toml['simulation_parameters']['get_all_accuracies']:
                     second_acc = try_max(
-                        [
-                            acc(
-                                patterns[pattern_index], 
-                                np.array([len([j for j in i if j >= second_window]) for i in peaks]), 
-                                threshold=i
-                            ) 
-                            for i in range(0, firing_max)
-                        ]
+                        [acc(patterns[pattern2], np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
                     )
-
                     second_acc_inv = try_max(
-                        [
-                            acc(
-                                np.logical_not(patterns[pattern_index]).astype(int), 
-                                np.array([len([j for j in i if j >= second_window]) for i in peaks]), 
-                                threshold=i
-                            ) 
-                            for i in range(0, firing_max)
-                        ]
+                        [acc(np.logical_not(patterns[pattern2]).astype(int), np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
                     )
 
-                    accs.append(max(second_acc, second_acc_inv))
+                    second_acc = max(second_acc, second_acc_inv)
+                else:
+                    accs = []
+                    for pattern_index in range(num_patterns):
+                        second_acc = try_max(
+                            [
+                                acc(
+                                    patterns[pattern_index], 
+                                    np.array([len([j for j in i if j >= second_window]) for i in peaks]), 
+                                    threshold=i
+                                ) 
+                                for i in range(0, firing_max)
+                            ]
+                        )
 
-                second_acc = [float(i) for i in accs]
+                        second_acc_inv = try_max(
+                            [
+                                acc(
+                                    np.logical_not(patterns[pattern_index]).astype(int), 
+                                    np.array([len([j for j in i if j >= second_window]) for i in peaks]), 
+                                    threshold=i
+                                ) 
+                                for i in range(0, firing_max)
+                            ]
+                        )
+
+                        accs.append(max(second_acc, second_acc_inv))
+
+                    second_acc = [float(i) for i in accs]
+            else:
+                correlation_coefficients = []
+                for pattern_index in range(num_patterns):
+                    correlation_coefficients.append(
+                        np.corrcoef(patterns[pattern_index], np.array([len([j for j in i if j >= second_window]) for i in peaks]))[0, 1]
+                    )
+                    
+                second_acc = bool(pattern2 == np.argmax(correlation_coefficients))
         else:
-            correlation_coefficients = []
-            for pattern_index in range(num_patterns):
-                correlation_coefficients.append(
-                    np.corrcoef(patterns[pattern_index], np.array([len([j for j in i if j >= second_window]) for i in peaks]))[0, 1]
-                )
-                
-            second_acc = bool(pattern2 == np.argmax(correlation_coefficients))
+            second_acc = 0
 
         current_state['trial'] = trial
         current_state['pattern1'] = pattern1
