@@ -109,7 +109,13 @@ mod tests {
             &queue,
         )?;
 
-        let mut cpu_conversion = ligand_gates_grid.clone();
+        // let mut cpu_conversion = ligand_gates_grid.clone();
+        let mut cpu_conversion = vec![
+            vec![
+                LigandGatedChannels::default(), LigandGatedChannels::default(),
+                LigandGatedChannels::default(), LigandGatedChannels::default(),
+            ]
+        ];
         LigandGatedChannels::convert_to_cpu(
             &mut cpu_conversion,
             &gpu_conversion,
