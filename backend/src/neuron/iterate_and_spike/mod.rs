@@ -1158,20 +1158,20 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
-        let string_types: Vec<String> = IonotropicNeurotransmitterType::get_all_types()
+        let string_types: HashSet<String> = IonotropicNeurotransmitterType::get_all_types()
             .into_iter()
             .map(|i| i.to_string())
             .collect();
 
-        for key in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-            if !string_types.contains(&key) {
+        for key in LigandGatedChannel::<T>::get_all_possible_attribute_names().union(&string_types) {
+            if !string_types.contains(key) {
                 let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
-                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, Float);
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
 
                 cpu_conversion.insert(key.clone(), current_contents);
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
 
                 flags.insert(
                     key.clone(), 
@@ -1704,15 +1704,20 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             return Ok(());
         }
 
-        for key in T::get_attribute_names() {
-            if !string_types.contains(&key) {
+        let all_neurotransmitter_flag_strings: HashSet<String> = N::get_all_types()
+            .iter()
+            .map(|i| i.to_string())
+            .collect();
+
+        for key in T::get_attribute_names().union(&all_neurotransmitter_flag_strings) {
+            if !string_types.contains(key) {
                 let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
-                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, Float);
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
 
                 cpu_conversion.insert(key.clone(), current_contents);
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, &key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
 
                 flags.insert(
                     key.clone(), 
