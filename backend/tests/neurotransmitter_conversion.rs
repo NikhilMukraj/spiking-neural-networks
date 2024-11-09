@@ -12,6 +12,7 @@ mod tests {
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
+    type GridType = Vec<Vec<Neurotransmitters<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>>>;
 
     #[test]
     pub fn test_empty_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
@@ -30,7 +31,6 @@ mod tests {
             )
             .expect("CommandQueue::create_default failed");
 
-        type GridType = Vec<Vec<Neurotransmitters<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>>>;
         let neurotransmitters_grid: GridType = vec![];
 
         let gpu_conversion = Neurotransmitters::convert_to_gpu(
@@ -107,7 +107,12 @@ mod tests {
             &queue,
         )?;
 
-        let mut cpu_conversion = neurotransmitters_grid.clone();
+        let mut cpu_conversion: GridType = vec![
+            vec![
+                Neurotransmitters::default(), Neurotransmitters::default(), 
+                Neurotransmitters::default(), Neurotransmitters::default()
+            ]
+        ];
         Neurotransmitters::convert_to_cpu(
             &mut cpu_conversion,
             &gpu_conversion,
