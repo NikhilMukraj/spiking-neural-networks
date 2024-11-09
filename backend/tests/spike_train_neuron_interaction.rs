@@ -193,6 +193,7 @@ mod tests {
         assert!(after_activation_spikes > 2, "number of spikes: {}", after_activation_spikes);
 
         // similar results could be achieved by increasing c_m rather than iterations
+        // or change frequency of poisson neurons
 
         Ok(())
     }
