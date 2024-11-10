@@ -1,6 +1,3 @@
-// check regular conversion
-// check electrochemical conversion
-
 #[cfg(test)]
 mod tests {
     use rand::Rng;
