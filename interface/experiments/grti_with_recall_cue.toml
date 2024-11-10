@@ -1,7 +1,7 @@
 [simulation_parameters]
 peaks_on = true
 second_cue = false
-# second_cue_is_noisy = false
+second_cue_is_noisy = false
 use_correlation_as_accuracy = true
 measure_snr = true
 weights_scalar = 1
