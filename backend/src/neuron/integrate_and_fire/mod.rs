@@ -495,6 +495,10 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if cell_grid.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let mut buffers = HashMap::new();
 
         create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
@@ -540,6 +544,12 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         cols: usize,
         queue: &CommandQueue,
     ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            cell_grid.clear();
+
+            return Ok(());
+        }
+        
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
         let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
         let mut alpha: Vec<f32> = vec![0.0; rows * cols];
@@ -601,6 +611,10 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         context: &Context,
         queue: &CommandQueue,
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if cell_grid.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let mut buffers = Self::convert_to_gpu(cell_grid, context, queue)?;
 
         let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
@@ -630,6 +644,12 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         cols: usize,
         queue: &CommandQueue,
     ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            cell_grid.clear();
+
+            return Ok(());
+        }
+
         let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
             .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
             .collect();
@@ -1428,6 +1448,10 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if cell_grid.is_empty() {
+            return Ok(HashMap::new());
+        }
+
         let mut buffers = HashMap::new();
 
         create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
@@ -1465,6 +1489,12 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         cols: usize,
         queue: &CommandQueue,
     ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            cell_grid.clear();
+
+            return Ok(());
+        }
+
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
         let mut gap_conductance: Vec<f32> = vec![0.0; rows * cols];
         let mut g: Vec<f32> = vec![0.0; rows * cols];
