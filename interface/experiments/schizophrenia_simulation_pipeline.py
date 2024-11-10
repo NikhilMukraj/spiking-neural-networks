@@ -542,7 +542,10 @@ for current_state in tqdm(all_states):
             signal = np.array([np.array(i).mean() for i in hist])
 
             current_value['first_snr'] = float(signal_to_noise(signal[:parsed_toml['simulation_parameters']['iterations1']]))
-            current_value['second_snr'] = float(signal_to_noise(signal[parsed_toml['simulation_parameters']['iterations1']:]))
+            if iterations2 != 0:
+                current_value['second_snr'] = float(signal_to_noise(signal[parsed_toml['simulation_parameters']['iterations1']:]))
+            else:
+                current_value['second_snr'] = None
 
         if parsed_toml['simulation_parameters']['peaks_on']:
             current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
