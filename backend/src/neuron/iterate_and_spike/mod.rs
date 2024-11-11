@@ -246,7 +246,7 @@ impl NeurotransmitterKinetics for DestexheNeurotransmitter {
 }
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
-/// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
+/// maximal value when a spike is detected and
 /// slowly decreases the concentration over time by a factor of `dt` times `clearance_constant`
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ApproximateNeurotransmitter {
@@ -254,8 +254,6 @@ pub struct ApproximateNeurotransmitter {
     pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
     pub t: f32,
-    /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f32,
     /// Amount to decrease neurotransmitter concentration by
     pub clearance_constant: f32,
 }
@@ -267,7 +265,6 @@ macro_rules! impl_approximate_neurotransmitter_default {
                 ApproximateNeurotransmitter {
                     t_max: $t_max,
                     t: 0.,
-                    v_th: 25.,
                     clearance_constant: 0.01,
                 }
             }
@@ -311,7 +308,6 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         match value {
             "neurotransmitters$t" => Some(self.t),
             "neurotransmitters$t_max" => Some(self.t_max),
-            "neurotransmitters$v_th" => Some(self.v_th),
             "neurotransmitters$clearance_constant" => Some(self.clearance_constant),
             _ => None,
         }
@@ -321,7 +317,6 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         match attribute {
             "neurotransmitters$t" => self.t = value,
             "neurotransmitters$t_max" => self.t_max = value,
-            "neurotransmitters$v_th" => self.v_th = value,
             "neurotransmitters$clearance_constant" => self.clearance_constant = value,
             _ => unreachable!(),
         }
@@ -331,7 +326,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         HashSet::from(
             [
                 String::from("neurotransmitters$t"), String::from("neurotransmitters$t_max"), 
-                String::from("neurotransmitters$v_th"), String::from("neurotransmitters$clearance_constant")
+                String::from("neurotransmitters$clearance_constant")
             ]
         )
     }
@@ -373,8 +368,6 @@ pub struct DiscreteSpikeNeurotransmitter {
     pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
     pub t: f32,
-    /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f32,
 }
 
 impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
@@ -398,7 +391,6 @@ macro_rules! impl_discrete_neurotransmitter_default {
                 DiscreteSpikeNeurotransmitter {
                     t_max: $t_max,
                     t: 0.,
-                    v_th: 25.,
                 }
             }
         }
@@ -412,7 +404,7 @@ impl_discrete_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_discrete_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
-/// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
+/// maximal value when a spike is detected and
 /// slowly through exponential decay that scales based on the 
 /// [`decay_constant`](Self::decay_constant) and [`dt`](Self::decay_constant)
 #[derive(Debug, Clone, Copy)]
@@ -421,8 +413,6 @@ pub struct ExponentialDecayNeurotransmitter {
     pub t_max: f32,
     /// Current neurotransmitter concentration (mM)
     pub t: f32,
-    /// Voltage threshold for detecting spikes (mV)
-    pub v_th: f32,
     /// Amount to decay neurotransmitter concentration by
     pub decay_constant: f32,
 }
@@ -434,7 +424,6 @@ macro_rules! impl_exp_decay_neurotransmitter_default {
                 ExponentialDecayNeurotransmitter {
                     t_max: $t_max,
                     t: 0.,
-                    v_th: 25.,
                     decay_constant: 2.0,
                 }
             }
