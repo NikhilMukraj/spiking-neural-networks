@@ -1917,7 +1917,7 @@ pub trait Timestep {
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
 ///     IonotropicNeurotransmitterType,
 /// };
-/// use spiking_neural_networks::neuron::intermediate_delegate::Intermediate;
+/// use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;
 /// 
 /// 
 /// #[derive(Debug, Clone, IterateAndSpikeBase)]
@@ -1997,7 +1997,7 @@ pub trait Timestep {
 ///         self.current_voltage += dv; // updates voltage
 /// 
 ///         // calculates neurotransmitter concentration
-///         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
+///         self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
 /// 
 ///         self.handle_spiking()
 ///     }
@@ -2016,7 +2016,7 @@ pub trait Timestep {
 /// 
 ///         self.current_voltage += dv + neurotransmitter_dv; // applies receptor currents and change in voltage
 /// 
-///         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
+///         self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
 /// 
 ///         self.handle_spiking()
 ///     }
