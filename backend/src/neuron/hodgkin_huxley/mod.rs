@@ -15,7 +15,7 @@ use super::iterate_and_spike::{
 use super::ion_channels::{
     NaIonChannel, KIonChannel, KLeakChannel, IonChannel, TimestepIndependentIonChannel
 };
-use crate::neuron::intermediate_delegate::Intermediate;
+use crate::neuron::intermediate_delegate::NeurotransmittersIntermediate;
 
 
 // multicomparment stuff, refer to dopamine modeling paper as well
@@ -166,7 +166,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
 
     /// Updates neurotransmitter concentrations based on membrane potential
     pub fn update_neurotransmitters(&mut self) {
-        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
+        self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
     }
 
     /// Updates receptor gating based on neurotransmitter input

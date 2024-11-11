@@ -210,7 +210,7 @@
 //! use spiking_neural_networks::neuron::ion_channels::{
 //!     BasicGatingVariable, IonChannel, TimestepIndependentIonChannel,
 //! };
-//! use spiking_neural_networks::neuron::intermediate_delegate::Intermediate;
+//! use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;
 //!  
 //! 
 //! /// A calcium channel with reduced dimensionality
@@ -387,7 +387,7 @@
 //!         let last_voltage = self.current_voltage;
 //!         self.current_voltage += self.get_dv_change(input_current);
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
+//!         self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
@@ -410,7 +410,7 @@
 //!         let receptor_current = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 //!         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
+//!         self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
