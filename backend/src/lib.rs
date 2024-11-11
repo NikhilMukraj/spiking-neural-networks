@@ -210,6 +210,7 @@
 //! use spiking_neural_networks::neuron::ion_channels::{
 //!     BasicGatingVariable, IonChannel, TimestepIndependentIonChannel,
 //! };
+//! use spiking_neural_networks::neuron::intermediate_delegate::Intermediate;
 //!  
 //! 
 //! /// A calcium channel with reduced dimensionality
@@ -386,7 +387,7 @@
 //!         let last_voltage = self.current_voltage;
 //!         self.current_voltage += self.get_dv_change(input_current);
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+//!         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
@@ -409,7 +410,7 @@
 //!         let receptor_current = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
 //!         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 //! 
-//!         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+//!         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
 //! 
 //!         self.handle_spiking(last_voltage)
 //!     }
@@ -437,8 +438,8 @@
 //! }
 //! 
 //! // used to determine when voltage spike occurs
-//! fn heaviside(x: f32) -> f32 {
-//!     if x > 0. {
+//! fn bool_to_float(flag: bool) -> f32 {
+//!     if flag {
 //!         1.
 //!     } else {
 //!         0.
@@ -451,10 +452,10 @@
 //! }
 //! 
 //! impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-//!     fn apply_t_change(&mut self, voltage: f32, dt: f32) {
-//!         let t_change = exp_decay(self.t, self.decay_constant, dt);
+//!     fn apply_t_change<U: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &U) {
+//!         let t_change = exp_decay(self.t, self.decay_constant, neuron.get_dt());
 //!         // add change and account for spike
-//!         self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
+//!         self.t += t_change + (bool_to_float(neuron.is_spiking()) * self.t_max);
 //!         self.t = self.t_max.min(self.t.max(0.)); // clamp values
 //!     }
 //! 
