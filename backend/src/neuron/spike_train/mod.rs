@@ -9,6 +9,7 @@ use super::iterate_and_spike::{
 };
 use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
 use super::plasticity::BCMActivity;
+use super::intermediate_delegate::Intermediate;
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
 /// of the simulation (neural refractoriness function), when the spike train spikes
@@ -202,7 +203,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
         };
         self.is_spiking = is_spiking;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         is_spiking
     }
@@ -288,7 +289,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
         };
         self.is_spiking = is_spiking;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         is_spiking
     }
@@ -419,7 +420,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 
         self.is_spiking = is_spiking;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         is_spiking
     }
