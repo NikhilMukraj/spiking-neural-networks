@@ -308,20 +308,20 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_attribute(&self, value: &str) -> Option<f32> {
         match value {
-            "neurotransmitters_t" => Some(self.t),
-            "neurotransmitters_t_max" => Some(self.t_max),
-            "neurotransmitters_v_th" => Some(self.v_th),
-            "neurotransmitters_clearance_constant" => Some(self.clearance_constant),
+            "neurotransmitters$t" => Some(self.t),
+            "neurotransmitters$t_max" => Some(self.t_max),
+            "neurotransmitters$v_th" => Some(self.v_th),
+            "neurotransmitters$clearance_constant" => Some(self.clearance_constant),
             _ => None,
         }
     }
 
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "neurotransmitters_t" => self.t = value,
-            "neurotransmitters_t_max" => self.t_max = value,
-            "neurotransmitters_v_th" => self.v_th = value,
-            "neurotransmitters_clearance_constant" => self.clearance_constant = value,
+            "neurotransmitters$t" => self.t = value,
+            "neurotransmitters$t_max" => self.t_max = value,
+            "neurotransmitters$v_th" => self.v_th = value,
+            "neurotransmitters$clearance_constant" => self.clearance_constant = value,
             _ => unreachable!(),
         }
     }
@@ -329,8 +329,8 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_attribute_names() -> HashSet<String> {
         HashSet::from(
             [
-                String::from("neurotransmitters_t"), String::from("neurotransmitters_t_max"), 
-                String::from("neurotransmitters_v_th"), String::from("neurotransmitters_clearance_constant")
+                String::from("neurotransmitters$t"), String::from("neurotransmitters$t_max"), 
+                String::from("neurotransmitters$v_th"), String::from("neurotransmitters$clearance_constant")
             ]
         )
     }
@@ -338,9 +338,9 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("voltage"), String::from("dt"), String::from("neurotransmitters_t"),
-                String::from("neurotransmitters_t_max"), String::from("neurotransmitters_v_th"), 
-                String::from("neurotransmitters_clearance_constant"),
+                String::from("voltage"), String::from("dt"), String::from("neurotransmitters$t"),
+                String::from("neurotransmitters$t_max"), String::from("neurotransmitters_v$th"), 
+                String::from("neurotransmitters$clearance_constant"),
             ],
             String::from("
                 float get_t(
@@ -564,26 +564,26 @@ impl ReceptorKinetics for ApproximateReceptor {
 impl ReceptorKineticsGPU for ApproximateReceptor {
     fn get_attribute(&self, value: &str) -> Option<f32> {
         match value {
-            "ligand_gates_r" => Some(self.r),
+            "ligand_gates$r" => Some(self.r),
             _ => None,
         }
     }
 
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "ligand_gates_r" => self.r = value,
+            "ligand_gates$r" => self.r = value,
             _ => unreachable!(),
         }
     }
 
     fn get_attribute_names() -> HashSet<String> {
-        HashSet::from([String::from("ligand_gates_r")])
+        HashSet::from([String::from("ligand_gates$r")])
     }
 
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("neurotransmitters_t")
+                String::from("neurotransmitters$t")
             ],
             String::from("
                 float get_r(
@@ -806,30 +806,30 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Retrieves a given attribute from the ligand gated channel
     fn get_attribute(&self, attribute: &str) -> Option<f32> {
         match attribute {
-            "ligand_gates_current" => Some(self.current),
-            "ligand_gates_reversal" => Some(self.reversal),
-            "ligand_gates_g" => Some(self.g),
-            "ligand_gates_nmda_mg" => match &self.receptor_type {
+            "ligand_gates$current" => Some(self.current),
+            "ligand_gates$reversal" => Some(self.reversal),
+            "ligand_gates$g" => Some(self.g),
+            "ligand_gates$nmda_mg" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
                 _ => None
             },
-            "ligand_gates_gabab_g" => match &self.receptor_type {
+            "ligand_gates$gabab_g" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
                 _ => None
             },
-            "ligand_gates_gabab_k3" => match &self.receptor_type {
+            "ligand_gates$gabab_k3" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
                 _ => None
             },
-            "ligand_gates_gabab_k4" => match &self.receptor_type {
+            "ligand_gates$gabab_k4" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
                 _ => None
             },
-            "ligand_gates_gabab_kd" => match &self.receptor_type {
+            "ligand_gates$gabab_kd" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.kd),
                 _ => None
             },
-            "ligand_gates_gabab_n" => match &self.receptor_type {
+            "ligand_gates$gabab_n" => match &self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.n),
                 _ => None
             },
@@ -842,30 +842,30 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Sets a given attribute to a given value
     fn set_attribute(&mut self, attribute: &str, value: f32) {
         match attribute {
-            "ligand_gates_current" => self.current = value,
-            "ligand_gates_reversal" => self.reversal = value,
-            "ligand_gates_g" => self.g = value,
-            "ligand_gates_nmda_mg" => match &mut self.receptor_type {
+            "ligand_gates$current" => self.current = value,
+            "ligand_gates$reversal" => self.reversal = value,
+            "ligand_gates$g" => self.g = value,
+            "ligand_gates$nmda_mg" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = value,
                 _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
             },
-            "ligand_gates_gabab_g" => match &mut self.receptor_type {
+            "ligand_gates$gabab_g" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "ligand_gates_gabab_k3" => match &mut self.receptor_type {
+            "ligand_gates$gabab_k3" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "ligand_gates_gabab_k4" => match &mut self.receptor_type {
+            "ligand_gates$gabab_k4" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
-            "ligand_gates_gabab_kd" => match &mut self.receptor_type {
+            "ligand_gates$gabab_kd" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
-            "ligand_gates_gabab_n" => match &mut self.receptor_type {
+            "ligand_gates$gabab_n" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = value,
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
@@ -878,32 +878,32 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Gets all possible attribute names
     pub fn get_all_possible_attribute_names() -> HashSet<String> {
         HashSet::from([
-            String::from("ligand_gates_current"), String::from("ligand_gates_reversal"), String::from("ligand_gates_g"),
-            String::from("ligand_gates_nmda_mg"), String::from("ligand_gates_gabab_g"), String::from("ligand_gates_gabab_k3"),
-            String::from("ligand_gates_gabab_k4"), String::from("ligand_gates_gabab_kd"), String::from("ligand_gates_gabab_n"),
+            String::from("ligand_gates$current"), String::from("ligand_gates$reversal"), String::from("ligand_gates$g"),
+            String::from("ligand_gates$nmda_mg"), String::from("ligand_gates$gabab_g"), String::from("ligand_gates$gabab_k3"),
+            String::from("ligand_gates$gabab_k4"), String::from("ligand_gates$gabab_kd"), String::from("ligand_gates$gabab_n"),
         ])
     }
 
     /// Gets all valid attribute names
     fn get_valid_attribute_names(&self) -> HashSet<String> {
         let mut attributes = HashSet::from([
-            String::from("ligand_gates_current"), String::from("ligand_gates_reversal"), String::from("ligand_gates_g"),
+            String::from("ligand_gates$current"), String::from("ligand_gates$reversal"), String::from("ligand_gates$g"),
         ]);
 
         match &self.receptor_type {
             IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
             IonotropicLigandGatedReceptorType::NMDA(_) => {
-                attributes.insert(String::from("ligand_gates_nmda_mg"));
+                attributes.insert(String::from("ligand_gates$nmda_mg"));
 
                 attributes
             },
             IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
             IonotropicLigandGatedReceptorType::GABAb(_) => {
-                attributes.insert(String::from("ligand_gates_gabab_g"));
-                attributes.insert(String::from("ligand_gates_gabab_k3"));
-                attributes.insert(String::from("ligand_gates_gabab_k4"));
-                attributes.insert(String::from("ligand_gates_gabab_kd"));
-                attributes.insert(String::from("ligand_gates_gabab_n"));
+                attributes.insert(String::from("ligand_gates_gabab$g"));
+                attributes.insert(String::from("ligand_gates_gabab$k3"));
+                attributes.insert(String::from("ligand_gates_gabab$k4"));
+                attributes.insert(String::from("ligand_gates_gabab$kd"));
+                attributes.insert(String::from("ligand_gates_gabab$n"));
 
                 attributes
             }
