@@ -6,6 +6,7 @@ use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, GABAaDefault, GABAbDefault, GapConductance, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterKineticsGPU, Neurotransmitters, ReceptorKinetics, ReceptorKineticsGPU, Timestep
 };
+use crate::neuron::intermediate_delegate::Intermediate;
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
     IterateAndSpikeGPU, BufferGPU, KernelFunction, 
@@ -185,7 +186,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
         let dv = self.leaky_get_dv_change(input_current);
         self.current_voltage += dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
@@ -203,7 +204,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Leaky
 
         self.current_voltage += dv + neurotransmitter_dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
@@ -221,7 +222,7 @@ macro_rules! impl_iterate_and_spike {
                 self.current_voltage += dv;
                 self.w_value += dw;
 
-                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+                self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
                 self.$handle_spiking()
             }
@@ -241,7 +242,7 @@ macro_rules! impl_iterate_and_spike {
                 self.current_voltage += dv + neurotransmitter_dv;
                 self.w_value += dw;
 
-                self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+                self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
                 self.$handle_spiking()
             }
@@ -330,7 +331,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         let dv = self.quadratic_get_dv_change(input_current);
         self.current_voltage += dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
@@ -348,7 +349,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 
         self.current_voltage += dv + neurotransmitter_dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
@@ -1234,7 +1235,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.izhikevich_handle_spiking()
     }
@@ -1265,7 +1266,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for BCMIz
         self.current_voltage += dv + neurotransmitter_dv;
         self.w_value += dw;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.izhikevich_handle_spiking()
     }
@@ -1363,7 +1364,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
         let dv = self.get_dv_change(input_current);
         self.current_voltage += dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
@@ -1381,7 +1382,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
 
         self.current_voltage += dv + neurotransmitter_dv;
 
-        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+        self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_neuron(self));
 
         self.handle_spiking()
     }
