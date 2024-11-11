@@ -176,7 +176,7 @@ impl IonotropicNeurotransmitterType {
 /// Calculates neurotransmitter concentration over time based on voltage of neuron
 pub trait NeurotransmitterKinetics: Clone + Send + Sync {
     /// Calculates change in neurotransmitter concentration based on voltage
-    fn apply_t_change(&mut self, voltage: f32, dt: f32);
+    fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T);
     /// Returns neurotransmitter concentration
     fn get_t(&self) -> f32;
     /// Manually sets neurotransmitter concentration
@@ -232,8 +232,8 @@ impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 impl NeurotransmitterKinetics for DestexheNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32, _: f32) {
-        self.t = self.t_max / (1. + (-(voltage - self.v_p) / self.k_p).exp());
+    fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {
+        self.t = self.t_max / (1. + (-(neuron.get_current_voltage() - self.v_p) / self.k_p).exp());
     }
 
     fn get_t(&self) -> f32 {
@@ -281,8 +281,9 @@ impl_approximate_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
 impl_approximate_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
-fn heaviside(x: f32) -> f32 {
-    if x > 0. {
+
+fn bool_to_float(flag: bool) -> f32 {
+    if flag {
         1.
     } else {
         0.
@@ -290,8 +291,8 @@ fn heaviside(x: f32) -> f32 {
 }
 
 impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
-        self.t += dt * -self.clearance_constant * self.t + (heaviside(voltage - self.v_th) * self.t_max);
+    fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {
+        self.t += neuron.get_dt() * -self.clearance_constant * self.t + (bool_to_float(neuron.is_spiking()) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
 
@@ -338,21 +339,19 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("voltage"), String::from("dt"), String::from("neurotransmitters$t"),
-                String::from("neurotransmitters$t_max"), String::from("neurotransmitters_v$th"), 
-                String::from("neurotransmitters$clearance_constant"),
+                String::from("is_spiking"), String::from("dt"), String::from("neurotransmitters$t"),
+                String::from("neurotransmitters$t_max"), String::from("neurotransmitters$clearance_constant"),
             ],
             String::from("
                 float get_t(
-                    float voltage, 
+                    float is_spiking, 
                     float dt,
                     float neurotransmitters_t,
                     float neurotransmitters_t_max,
-                    float neurotransmitters_v_th,
                     float neurotransmitters_clearance_constant,
                 ) { 
                     float is_spiking_modifier = 0;
-                    if (voltage > neurotransmitters_v_th) {
+                    if (is_spiking) {
                         is_spiking_modifier = 1;
                     }
                     float new_t = dt * -neurotransmitters_clearance_constant * neurotransmitters_t + 
@@ -379,8 +378,8 @@ pub struct DiscreteSpikeNeurotransmitter {
 }
 
 impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32, _: f32) {
-        self.t = self.t_max * heaviside(voltage - self.v_th);
+    fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {
+        self.t = self.t_max * bool_to_float(neuron.is_spiking());
     }
 
     fn get_t(&self) -> f32 {
@@ -454,9 +453,9 @@ fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
 }
 
 impl NeurotransmitterKinetics for ExponentialDecayNeurotransmitter {
-    fn apply_t_change(&mut self, voltage: f32, dt: f32) {
-        let t_change = exp_decay(self.t, self.decay_constant, dt);
-        self.t += t_change + (heaviside(voltage - self.v_th) * self.t_max);
+    fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {
+        let t_change = exp_decay(self.t, self.decay_constant, neuron.get_dt());
+        self.t += t_change + (bool_to_float(neuron.is_spiking()) * self.t_max);
         self.t = self.t_max.min(self.t.max(0.));
     }
 
@@ -1331,9 +1330,9 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
     }
 
     /// Calculates the neurotransmitter concentrations based on the given voltage (mV)
-    pub fn apply_t_changes(&mut self, voltage: f32, dt: f32) {
+    pub fn apply_t_changes<U: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &U) {
         self.neurotransmitters.values_mut()
-            .for_each(|value| value.apply_t_change(voltage, dt));
+            .for_each(|value| value.apply_t_change(neuron));
     }
 }
 
@@ -1918,6 +1917,7 @@ pub trait Timestep {
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
 ///     IonotropicNeurotransmitterType,
 /// };
+/// use spiking_neural_networks::neuron::intermediate_delegate::Intermediate;
 /// 
 /// 
 /// #[derive(Debug, Clone, IterateAndSpikeBase)]
@@ -1997,7 +1997,7 @@ pub trait Timestep {
 ///         self.current_voltage += dv; // updates voltage
 /// 
 ///         // calculates neurotransmitter concentration
-///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+///         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
 /// 
 ///         self.handle_spiking()
 ///     }
@@ -2016,7 +2016,7 @@ pub trait Timestep {
 /// 
 ///         self.current_voltage += dv + neurotransmitter_dv; // applies receptor currents and change in voltage
 /// 
-///         self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
+///         self.synaptic_neurotransmitters.apply_t_changes(&Intermediate::from_iterate_and_spike(self));
 /// 
 ///         self.handle_spiking()
 ///     }
