@@ -25,6 +25,7 @@ pub mod hodgkin_huxley;
 pub mod morris_lecar;
 pub mod attractors;
 pub mod spike_train;
+pub mod intermediate_delegate;
 use spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain};
 pub mod iterate_and_spike;
 use iterate_and_spike::{ 
