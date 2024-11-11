@@ -478,6 +478,9 @@ for current_state in tqdm(all_states):
         current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
         firing_max = current_pred_pattern.max()
 
+        if parsed_toml['simulation_parameters']['second_cue'] == False:
+            pattern2 = pattern1
+
         if parsed_toml['simulation_parameters']['iterations2'] != 0:
             if not parsed_toml['simulation_parameters']['use_correlation_as_accuracy']:
                 if not parsed_toml['simulation_parameters']['get_all_accuracies']:
