@@ -462,12 +462,6 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         //         int gid = get_global_id(0);
         //         int index = index_to_position[gid];
 
-        //         current_voltage[index] += (
-        //             alpha[index] * (current_voltage[index] - v_reset[index]) * 
-        //             (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
-        //             ) 
-        //             * (dt[index] / tau_m[index]);
-
         //         if (refractory_count[index] > 0.0f) {{
         //             current_voltage[index] = v_reset[index];
         //             refractory_count[index] -= 1.0f; 
@@ -482,6 +476,15 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
         //         {}
         //         {}
+
+        //         current_voltage[index] += (
+        //             alpha[index] * (current_voltage[index] - v_reset[index]) * 
+        //             (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
+        //             ) 
+        //             * (dt[index] / tau_m[index]);
+        //         float receptor_current = ligand_gates_current[index] + ligand_gates_current[index + 1] 
+        //              + ligand_gates_current[index + 2] + ligand_gates_current[index + 3];
+        //         current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
         //     }}"#, 
         //     T::get_update_function().1,
         //     R::get_update_function().1,
@@ -489,6 +492,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         //     Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
         //     LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
         // );
+
+        // load in arguments
 
         todo!()
     }
@@ -510,6 +515,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         create_float_buffer!(integration_constant_buffer, context, queue, cell_grid, integration_constant);
         create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
         create_float_buffer!(tau_m_buffer, context, queue, cell_grid, tau_m);
+        create_float_buffer!(c_m_buffer, context, queue, cell_grid, c_m);
         create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
         create_float_buffer!(refractory_count_buffer, context, queue, cell_grid, refractory_count);
         create_float_buffer!(tref_buffer, context, queue, cell_grid, tref);
@@ -526,6 +532,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         buffers.insert(String::from("integration_constant"), BufferGPU::Float(integration_constant_buffer));
         buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
         buffers.insert(String::from("tau_m"), BufferGPU::Float(tau_m_buffer));
+        buffers.insert(String::from("c_m"), BufferGPU::Float(c_m_buffer));
         buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
         buffers.insert(String::from("refractory_count"), BufferGPU::Float(refractory_count_buffer));
         buffers.insert(String::from("tref"), BufferGPU::Float(tref_buffer));
@@ -559,6 +566,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         let mut integration_constant: Vec<f32> = vec![0.0; rows * cols];
         let mut dt: Vec<f32> = vec![0.0; rows * cols];
         let mut tau_m: Vec<f32> = vec![0.0; rows * cols];
+        let mut c_m: Vec<f32>  = vec![0.0; rows * cols];
         let mut v_th: Vec<f32> = vec![0.0; rows * cols];
         let mut refractory_count: Vec<f32> = vec![0.0; rows * cols];
         let mut tref: Vec<f32> = vec![0.0; rows * cols];
@@ -573,6 +581,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         read_and_set_buffer!(buffers, queue, "integration_constant", &mut integration_constant, Float);
         read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
         read_and_set_buffer!(buffers, queue, "tau_m", &mut tau_m, Float);
+        read_and_set_buffer!(buffers, queue, "c_m", &mut c_m, Float);
         read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
         read_and_set_buffer!(buffers, queue, "refractory_count", &mut refractory_count, Float);
         read_and_set_buffer!(buffers, queue, "tref", &mut tref, Float);
@@ -592,6 +601,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 cell.integration_constant = integration_constant[idx];
                 cell.dt = dt[idx];
                 cell.tau_m = tau_m[idx];
+                cell.c_m = c_m[idx];
                 cell.v_th = v_th[idx];
                 cell.refractory_count = refractory_count[idx];
                 cell.tref = tref[idx];
