@@ -267,13 +267,16 @@ pub struct LatticeGPU<
 > {
     pub cell_grid: Vec<Vec<T>>,
     graph: U,
-    incoming_connections_kernel: Kernel,
+    electrical_incoming_connections_kernel: Kernel,
+    // chemical_incoming_connections_kernel: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
     pub grid_history: V,
     grid_history_kernel: KernelFunction,
     pub update_grid_history: bool,
+    pub electrical_synapse: bool,
+    pub chemical_synapse: bool,
     internal_clock: usize,
 }
 
@@ -327,12 +330,14 @@ where
             LatticeGPU { 
                 cell_grid: lattice.cell_grid, 
                 graph: lattice.graph, 
-                incoming_connections_kernel,
+                electrical_incoming_connections_kernel: incoming_connections_kernel,
                 last_firing_time_kernel,
                 internal_clock: 0,
                 grid_history_kernel: lattice.grid_history.get_kernel(&context)?,
                 grid_history: lattice.grid_history,
                 update_grid_history: lattice.update_grid_history,
+                electrical_synapse: lattice.electrical_synapse,
+                chemical_synapse: lattice.chemical_synapse,
                 context,
                 queue,
             }
@@ -360,7 +365,7 @@ where
 
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
-    pub fn run_lattice(&mut self, iterations: usize) -> Result<(), GPUError> {
+    pub fn run_lattice_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
 
         let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid)?;
@@ -403,7 +408,7 @@ where
 
         for _ in 0..iterations {
             let gap_junctions_event = unsafe {
-                let mut kernel_execution = ExecuteKernel::new(&self.incoming_connections_kernel);
+                let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
 
                 kernel_execution.set_arg(&gpu_graph.connections)
                     .set_arg(&gpu_graph.weights)
@@ -544,6 +549,19 @@ where
         )?;
 
         Ok(())
+    }
+
+    pub fn run_lattice_chemical_synapses(&mut self, _iterations: usize) -> Result<(), GPUError> {
+        todo!("Not implemented yet")
+    }
+
+    pub fn run_lattice(&mut self, iterations: usize) -> Result<(), GPUError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (false, false) => Ok(()),
+            (true, false) => self.run_lattice_electrical_synapses(iterations),
+            (false, true) => self.run_lattice_chemical_synapses(iterations),
+            (true, true) => todo!("Not implemented yet")
+        }
     }
 }
 
