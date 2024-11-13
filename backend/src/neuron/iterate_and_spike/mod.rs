@@ -789,6 +789,24 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     // }
 }
 
+// fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> String {
+//     let mut num = 0;
+//     let mut unique = false;
+
+//     while !unique {
+//         for i in other_attributes {
+//             if i.starts_with(&format!("{}{}_", prefix, num)) {
+//                 num += 1;
+//                 break;
+//             }
+//         }
+
+//         unique = true;
+//     }
+
+//     format!("{}{}_", prefix, num)
+// }
+
 #[cfg(feature = "gpu")]
 impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Retrieves a given attribute from the ligand gated channel
