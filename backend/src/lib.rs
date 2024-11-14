@@ -437,7 +437,6 @@
 //!     pub decay_constant: f32,
 //! }
 //! 
-//! // used to determine when voltage spike occurs
 //! fn bool_to_float(flag: bool) -> f32 {
 //!     if flag {
 //!         1.
