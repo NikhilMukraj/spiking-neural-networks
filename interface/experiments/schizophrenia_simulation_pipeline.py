@@ -54,6 +54,8 @@ def fill_defaults(parsed):
     if 'peaks_on' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['peaks_on'] = False
 
+    if 'cue_firing_rate' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['cue_firing_rate'] = 0.01
     if 'second_cue' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['second_cue'] = True
     if 'second_cue_is_noisy' not in parsed['simulation_parameters']:
@@ -258,7 +260,7 @@ def reset_spike_train(neuron):
 
     return neuron
 
-def get_spike_train_setup_function(pattern_index, distortion):
+def get_spike_train_setup_function(pattern_index, distortion, firing_rate):
     def setup_spike_train(pos, neuron):
         x, y = pos
         index = x * exc_n + y
@@ -268,7 +270,7 @@ def get_spike_train_setup_function(pattern_index, distortion):
             state ^= 1
 
         if state:
-            neuron.chance_of_firing = 0.001
+            neuron.chance_of_firing = firing_rate
         else:
             neuron.chance_of_firing = 0
 
@@ -380,15 +382,6 @@ for current_state in tqdm(all_states):
 
         spike_train_lattice = ln.PoissonLattice(2)
         spike_train_lattice.populate(poisson, exc_n, exc_n)
-        if not parsed_toml['simulation_parameters']['first_cue_is_noisy']:
-            spike_train_lattice.apply_given_position(get_spike_train_setup_function(pattern1, distortion))
-        else:
-            spike_train_lattice.apply(
-                get_noisy_spike_train_setup_function(
-                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
-                    parsed_toml['simulation_parameters']['noisy_cue_firing_rate'],
-                )
-            )
 
         network = ln.IzhikevichNetwork.generate_network([exc_lattice, inh_lattice], [spike_train_lattice])
         network.connect(
@@ -404,6 +397,24 @@ for current_state in tqdm(all_states):
         network.connect(2, 1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
         network.parallel = True
+
+        if not parsed_toml['simulation_parameters']['first_cue_is_noisy']:
+            network.apply_spike_train_lattice_given_position(
+                2, 
+                get_spike_train_setup_function(
+                    pattern1, 
+                    distortion,
+                    parsed_toml['simulation_parameters']['cue_firing_rate'],
+                )
+            )
+        else:
+            network.apply_spike_train_lattice_given_position(
+                2, 
+                get_noisy_spike_train_setup_function(
+                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+                    parsed_toml['simulation_parameters']['noisy_cue_firing_rate'],
+                )
+            )
 
         network.electrical_synapse = False
         network.chemical_synapse = True
@@ -467,7 +478,14 @@ for current_state in tqdm(all_states):
 
         if not parsed_toml['simulation_parameters']['second_cue_is_noisy']:
             if parsed_toml['simulation_parameters']['second_cue']:
-                network.apply_spike_train_lattice_given_position(2, get_spike_train_setup_function(pattern2, distortion))
+                network.apply_spike_train_lattice_given_position(
+                    2, 
+                    get_spike_train_setup_function(
+                        pattern2, 
+                        distortion,
+                        parsed_toml['simulation_parameters']['cue_firing_rate']
+                    )
+                )
             else:
                 network.apply_spike_train_lattice(2, reset_spike_train)
         else:
