@@ -62,6 +62,8 @@ def fill_defaults(parsed):
         parsed['simulation_parameters']['first_cue_is_noisy'] = False
     if 'noisy_cue_noise_level' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['noisy_cue_noise_level'] = 0.1
+    if 'noisy_cue_firing_rate' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['noisy_cue_firing_rate'] = 0.01
 
     if 'measure_snr' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['measure_snr'] = False
@@ -274,10 +276,10 @@ def get_spike_train_setup_function(pattern_index, distortion):
 
     return setup_spike_train
 
-def get_noisy_spike_train_setup_function(noise_level):
+def get_noisy_spike_train_setup_function(noise_level, firing_rate):
     def setup_spike_train(neuron):
         if np.random.uniform(0, 1) < noise_level:
-            neuron.chance_of_firing = 0.01
+            neuron.chance_of_firing = firing_rate
         else:
             neuron.chance_of_firing = 0
         
@@ -381,7 +383,12 @@ for current_state in tqdm(all_states):
         if not parsed_toml['simulation_parameters']['first_cue_is_noisy']:
             spike_train_lattice.apply_given_position(get_spike_train_setup_function(pattern1, distortion))
         else:
-            spike_train_lattice.apply(get_noisy_spike_train_setup_function(parsed_toml['simulation_parameters']['noisy_cue_noise_level']))
+            spike_train_lattice.apply(
+                get_noisy_spike_train_setup_function(
+                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+                    parsed_toml['simulation_parameters']['noisy_cue_firing_rate'],
+                )
+            )
 
         network = ln.IzhikevichNetwork.generate_network([exc_lattice, inh_lattice], [spike_train_lattice])
         network.connect(
@@ -464,7 +471,12 @@ for current_state in tqdm(all_states):
             else:
                 network.apply_spike_train_lattice(2, reset_spike_train)
         else:
-            spike_train_lattice.apply(get_noisy_spike_train_setup_function(parsed_toml['simulation_parameters']['noisy_cue_noise_level']))
+            spike_train_lattice.apply(
+                get_noisy_spike_train_setup_function(
+                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+                    parsed['simulation_parameters']['noisy_cue_firing_rate'],
+                )
+            )
 
         for _ in range(parsed_toml['simulation_parameters']['iterations2']):
             network.run_lattices(1)
