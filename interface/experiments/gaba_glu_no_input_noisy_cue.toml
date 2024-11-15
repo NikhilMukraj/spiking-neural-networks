@@ -16,7 +16,7 @@ iterations1 = 5000
 iterations2 = 0
 trials = 15
 
-filename = "grti_no_input_noisy_cue.json"
+filename = "gaba_glu_no_input_noisy_cue.json"
 
 [variables]
 spike_train_to_exc = [0.25]

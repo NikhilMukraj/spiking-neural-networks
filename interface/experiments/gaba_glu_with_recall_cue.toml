@@ -16,7 +16,7 @@ iterations1 = 2000
 iterations2 = 3000
 trials = 15
 
-filename = "grti_with_cue.json"
+filename = "gaba_glu_with_cue.json"
 
 [variables]
 spike_train_to_exc = [5]
