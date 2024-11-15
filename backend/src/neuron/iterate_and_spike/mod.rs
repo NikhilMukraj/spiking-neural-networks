@@ -789,6 +789,7 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     // }
 }
 
+// #[cfg(feature = "gpu")]
 // fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> String {
 //     let mut num = 0;
 //     let mut unique = false;
@@ -1235,30 +1236,41 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     }
 
     pub fn get_ligand_gated_channels_update_function() -> String {
+        let kernel_args = LigandGatedChannel::<T>::get_all_possible_attribute_names()
+            .iter()
+            .map(|i| format!("__global *float {}", i.split("$").collect::<Vec<&str>>()[1]))
+            .collect::<Vec<String>>()
+            .join(", ");
         format!(
             r#"
-            if (flags[index]) {{ // AMPA
-                ligand_gates_r[index] = get_r({});
-                current[index] = ligand_gates_g[index] * ligand_gates_r[index] * (voltage[index] - ligand_gates_reversal[index]); 
-            }}
-            if (flags[index + 1]) {{ // NMDA
-                r[index + 1] = get_r({})
-                float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * ligand_gates_nmda_mg[index + 1] / 3.57); 
-                current[index + 1] = modifier * ligand_gates_g[index + 1] * ligand_gates_r[index + 1] * (voltage[index] - ligand_gates_reversal[index + 1]);
-            }}
-            if (flags[index + 2]) {{ // GABAa 
-                ligand_gates_r[index + 2] = get_r({});
-                current[index + 2] = g[index + 2] * ligand_gates_r[index + 2] * (voltage[index] - reversal[index + 2]); 
-            }}
-            if (flags[index + 3]) {{ // GABAb
-                ligand_gates_r[index + 3] = get_r({});
-                ligand_gates_gabab_g[index + 3] += (ligand_gates_gabab_k3 * ligand_gates_r[index + 3] - ligand_gates_gabab_k4[index + 3] * ligand_gates_gabab_g[index + 3]) * dt[index];
-                float bottom = pow(gabab_g[index + 3], ligand_gates_gabab_n[index + 3]) * ligand_gates_gabab_kd[index + 3];
-                float top = pow(ligand_gates_gabab_g[index + 3], ligand_gates_gabab_n[index + 3]);
-                float modifier =  top / bottom;
-                current[index + 3] = modifier * ligand_gates_g[index + 3] * ligand_gates_r[index + 3] * (voltage[index] - ligand_gates_reversal[index + 3]);
+            __kernel void ligand_gates_update_function(
+                __global *float voltage,
+                {}
+            ) {{
+                if (flags[index]) {{ // AMPA
+                    ligand_gates_r[index] = get_r({});
+                    current[index] = ligand_gates_g[index] * ligand_gates_r[index] * (voltage[index] - ligand_gates_reversal[index]); 
+                }}
+                if (flags[index + 1]) {{ // NMDA
+                    r[index + 1] = get_r({})
+                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * ligand_gates_nmda_mg[index + 1] / 3.57); 
+                    current[index + 1] = modifier * ligand_gates_g[index + 1] * ligand_gates_r[index + 1] * (voltage[index] - ligand_gates_reversal[index + 1]);
+                }}
+                if (flags[index + 2]) {{ // GABAa 
+                    ligand_gates_r[index + 2] = get_r({});
+                    current[index + 2] = g[index + 2] * ligand_gates_r[index + 2] * (voltage[index] - reversal[index + 2]); 
+                }}
+                if (flags[index + 3]) {{ // GABAb
+                    ligand_gates_r[index + 3] = get_r({});
+                    ligand_gates_gabab_g[index + 3] += (ligand_gates_gabab_k3 * ligand_gates_r[index + 3] - ligand_gates_gabab_k4[index + 3] * ligand_gates_gabab_g[index + 3]) * dt[index];
+                    float bottom = pow(gabab_g[index + 3], ligand_gates_gabab_n[index + 3]) * ligand_gates_gabab_kd[index + 3];
+                    float top = pow(ligand_gates_gabab_g[index + 3], ligand_gates_gabab_n[index + 3]);
+                    float modifier =  top / bottom;
+                    current[index + 3] = modifier * ligand_gates_g[index + 3] * ligand_gates_r[index + 3] * (voltage[index] - ligand_gates_reversal[index + 3]);
+                }}
             }}
             "#,
+            kernel_args,
             get_receptor_args::<T>("[index]"),
             get_receptor_args::<T>("[index + 1]"),
             get_receptor_args::<T>("[index + 2]"),
@@ -1768,20 +1780,31 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     }
 
     pub fn get_neurotransmitter_update_kernel_code() -> String {
-        let args = T::get_update_function().0
+        let kernel_args = T::get_update_function().0
+            .iter()
+            .map(|i| format!("__global *float {}", i))
+            .collect::<Vec<String>>()
+            .join(", ");
+        let func_args = T::get_update_function().0
             .iter()
             .map(|i| format!("{}[index + i]", i))
             .collect::<Vec<String>>()
             .join(", ");
         format!(
             r#"
-                for (int i; i < 4; i++) {{
-                    if (flags[index + i]) {{
-                        t[index + i] = get_t({});
+                __kernel void neurotransmitters_update(
+                    __global *float t,
+                    {}
+                ) {{
+                    for (int i; i < 4; i++) {{
+                        if (flags[index + i]) {{
+                            t[index + i] = get_t({});
+                        }}
                     }}
                 }}
             "#,
-            args
+            kernel_args,
+            func_args,
         )
     }
 }
@@ -2060,12 +2083,19 @@ pub struct KernelFunction {
 }
 
 #[cfg(feature = "gpu")]
-/// An encapsulation of a float or unsigned integer buffer for the GPU
+/// An encapsulation of a float or unsigned integer or optional unsigned integer buffer for the GPU
 pub enum BufferGPU {
     Float(Buffer<cl_float>),
     UInt(Buffer<cl_uint>),
     OptionalUInt(Buffer<cl_int>),
 }
+
+// #[cfg(feature = "gpu")]
+/// An encapsulation of a float or unsigned integer for converting to the GPU
+// pub enum BufferType {
+//     Float(f32),
+//     UInt(u32),
+// }
 
 // set args on the fly using a for loop
 // for n in x { kernel.set_arg(&n); } // modify this to use names instead
