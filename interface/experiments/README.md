@@ -69,11 +69,13 @@ simulation parameters will hold constant while these states change
 | `ampa_clearance`          | array[float]   | `[0.001]`     | Clearance rate for AMPA neurotransmitters                |
 | `gabaa_clearance`         | array[float]   | `[0.001]`     | Clearance rate for GABAa neurotransmitters               |
 
-If the `glutamate_clearance` field is present, it overrides `nmda_clearance` and `ampa_clearance` with its value
+If the `glutamate_clearance` field is present, it overrides `nmda_clearance` and `ampa_clearance` with its value,
+using `glutamate_clearance` will only iterate through states where the `nmda_clearance` and `ampa_clearance` values are the same,
+synchronizing the glutamate clearance values
 
 | Field                 | Type    | Default Value | Description                                                |
 |-----------------------|---------|---------------|------------------------------------------------------------|
-| `glutamate_clearance` | array   | None          | Single value applied to both NMDA and AMPA clearance rates |
+| `glutamate_clearance` | array[float]   | None          | Single value applied to both NMDA and AMPA clearance rates |
 
 ---
 
