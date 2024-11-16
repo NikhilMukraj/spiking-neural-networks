@@ -2,6 +2,14 @@
 
 ## Schizophrenia Simulation Pipeline
 
+The pipeline simulates brain activity by generating two groups of neurons, one inhibitory group
+and one excitatory group. The excitatory group acts as an autoassocative network that has been set
+to remember a set amount of randomly generated patterns. The inhibitory group is connected to the excitatory group in a one to all fashion, while the excitatory group is connected to the inhibitory
+group randomly. There is a spike train lattice that drives the inputs of the network into the excitatory
+group. During the simulation, a cue can be presented in the first phase and optionally the second phase,
+the cues can also either be a pattern cue with some distortion or a random noisy cue to act as a distractor.
+The variables of the simulation, the neurotransmitter decay or clearance values, the conductances of the ionotropic channels, or the weights themselves, can be varied for a set amount of trials. Presenting a cue with high inhibition may lead to the total activity of the network decaying over time to zero, resulting in the state not being maintained. Low inhibition with no cue may result in spontaneous activity lacking an input, which can simulate hallucination.
+
 ### `[simulation_parameters]`
 
 ---
