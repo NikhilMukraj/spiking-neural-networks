@@ -426,6 +426,15 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     }
 
     fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        // need to change args depending on whether float or uint
+        // let neurotransmitter_args = T::get_attribute_names()
+        //     .iter()
+        //     .map(|i| generate_unique_prefix(i, "neuro"))
+        //     .collect::<Vec<String>>();
+        // let ligand_gates_args = LigandGatedChannel::<R>::get_all_possible_attribute_names()
+        //     .iter()
+        //     .map(|i| generate_unique_prefix(i, "lg"))
+        //     .collect::<Vec<String>>();
         // let mut argument_names = vec![
         //     String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
         //     String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
@@ -436,8 +445,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         // for i in IonotropicNeurotransmitterType::get_all_types() {
         //     argument_names.push(i.to_string());
         // }
-        // argument_names.extend(T::get_attribute_names());
-        // argument_names.extend(LigandGatedChannel::<R>::get_all_possible_attribute_names());
+        // argument_names.extend(neurotransmitter_args);
+        // argument_names.extend(ligand_gates_args);
 
         // let uint_args = [String::from("index_to_position"), String::from("is_spiking")];
 
