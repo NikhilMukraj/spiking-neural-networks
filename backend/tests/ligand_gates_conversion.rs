@@ -66,7 +66,10 @@ mod tests {
             IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
         )?;
         ligand_gates1.insert(
-            IonotropicNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default()
+            IonotropicNeurotransmitterType::NMDA, LigandGatedChannel {
+                receptor: ApproximateReceptor { r: 1. },
+                ..LigandGatedChannel::nmda_default()
+            }
         )?;
         let mut ligand_gates2 = LigandGatedChannels::default();
         ligand_gates2.insert(
