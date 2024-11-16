@@ -99,7 +99,7 @@ const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
 //     for (int i = 0; i < n; i++) {
 //         if (connections[i * n + gid] == 1) {
-//             int presynaptic_index = index_to_position[i];
+//             int presynaptic_index = index_to_position[i] * number_of_types;
 //             // int postsynaptic_index = index_to_position[gid]; // maybe use this instead of just gid
 //             for (int t_index = 0; t_index < number_of_types; t_index++) {
 //                 if (flags[t_index] == 1) {
