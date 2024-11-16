@@ -187,11 +187,11 @@ pub trait NeurotransmitterKinetics: Clone + Send + Sync {
 /// Neurotransmitter kinetics that are compatible with the GPU
 pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics + Default {
     /// Retrieves the given attribute
-    fn get_attribute(&self, attribute: &str) -> Option<f32>;
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
     /// Sets the given value
-    fn set_attribute(&mut self, attribute: &str, value: f32);
+    fn set_attribute(&mut self, attribute: &str, value: BufferType);
     /// Retrieves all attribute names
-    fn get_attribute_names() -> HashSet<String>;
+    fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
     fn get_update_function() -> (Vec<String>, String);
 }
@@ -304,29 +304,39 @@ impl NeurotransmitterKinetics for ApproximateNeurotransmitter {
 
 #[cfg(feature = "gpu")]
 impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
-    fn get_attribute(&self, value: &str) -> Option<f32> {
+    fn get_attribute(&self, value: &str) -> Option<BufferType> {
         match value {
-            "neurotransmitters$t" => Some(self.t),
-            "neurotransmitters$t_max" => Some(self.t_max),
-            "neurotransmitters$clearance_constant" => Some(self.clearance_constant),
+            "neurotransmitters$t" => Some(BufferType::Float(self.t)),
+            "neurotransmitters$t_max" => Some(BufferType::Float(self.t_max)),
+            "neurotransmitters$clearance_constant" => Some(BufferType::Float(self.clearance_constant)),
             _ => None,
         }
     }
 
-    fn set_attribute(&mut self, attribute: &str, value: f32) {
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
         match attribute {
-            "neurotransmitters$t" => self.t = value,
-            "neurotransmitters$t_max" => self.t_max = value,
-            "neurotransmitters$clearance_constant" => self.clearance_constant = value,
+            "neurotransmitters$t" => self.t = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
+            "neurotransmitters$t_max" => self.t_max = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
+            "neurotransmitters$clearance_constant" => self.clearance_constant = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
             _ => unreachable!(),
         }
     }
 
-    fn get_attribute_names() -> HashSet<String> {
+    fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
         HashSet::from(
             [
-                String::from("neurotransmitters$t"), String::from("neurotransmitters$t_max"), 
-                String::from("neurotransmitters$clearance_constant")
+                (String::from("neurotransmitters$t"), AvailableBufferType::Float), 
+                (String::from("neurotransmitters$t_max"), AvailableBufferType::Float), 
+                (String::from("neurotransmitters$clearance_constant"), AvailableBufferType::Float),
             ]
         )
     }
@@ -471,11 +481,11 @@ pub trait ReceptorKinetics: Clone + Default + Sync + Send {
 /// Receptor kinetics that are compatible with the GPU
 pub trait ReceptorKineticsGPU: ReceptorKinetics {
     /// Retrieves the given attribute
-    fn get_attribute(&self, attribute: &str) -> Option<f32>;
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
     /// Sets the given value
-    fn set_attribute(&mut self, attribute: &str, value: f32);
+    fn set_attribute(&mut self, attribute: &str, value: BufferType);
     /// Retrieves all attribute names
-    fn get_attribute_names() -> HashSet<String>;
+    fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
     fn get_update_function() -> (Vec<String>, String);
 }
@@ -550,22 +560,25 @@ impl ReceptorKinetics for ApproximateReceptor {
 
 #[cfg(feature = "gpu")]
 impl ReceptorKineticsGPU for ApproximateReceptor {
-    fn get_attribute(&self, value: &str) -> Option<f32> {
+    fn get_attribute(&self, value: &str) -> Option<BufferType> {
         match value {
-            "ligand_gates$r" => Some(self.r),
+            "ligand_gates$r" => Some(BufferType::Float(self.r)),
             _ => None,
         }
     }
 
-    fn set_attribute(&mut self, attribute: &str, value: f32) {
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
         match attribute {
-            "ligand_gates$r" => self.r = value,
+            "ligand_gates$r" => self.r = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
             _ => unreachable!(),
         }
     }
 
-    fn get_attribute_names() -> HashSet<String> {
-        HashSet::from([String::from("ligand_gates$r")])
+    fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
+        HashSet::from([(String::from("ligand_gates$r"), AvailableBufferType::Float)])
     }
 
     fn get_update_function() -> (Vec<String>, String) {
@@ -811,33 +824,33 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
 #[cfg(feature = "gpu")]
 impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     /// Retrieves a given attribute from the ligand gated channel
-    fn get_attribute(&self, attribute: &str) -> Option<f32> {
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType> {
         match attribute {
-            "ligand_gates$current" => Some(self.current),
-            "ligand_gates$reversal" => Some(self.reversal),
-            "ligand_gates$g" => Some(self.g),
+            "ligand_gates$current" => Some(BufferType::Float(self.current)),
+            "ligand_gates$reversal" => Some(BufferType::Float(self.reversal)),
+            "ligand_gates$g" => Some(BufferType::Float(self.g)),
             "ligand_gates$nmda_mg" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::NMDA(value) => Some(value.mg),
+                IonotropicLigandGatedReceptorType::NMDA(value) => Some(BufferType::Float(value.mg)),
                 _ => None
             },
             "ligand_gates$gabab_g" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.g),
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.g)),
                 _ => None
             },
             "ligand_gates$gabab_k3" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k3),
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.k3)),
                 _ => None
             },
             "ligand_gates$gabab_k4" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.k4),
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.k4)),
                 _ => None
             },
             "ligand_gates$gabab_kd" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.kd),
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.kd)),
                 _ => None
             },
             "ligand_gates$gabab_n" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(value.n),
+                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.n)),
                 _ => None
             },
             _ => {
@@ -847,33 +860,60 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     }
 
     /// Sets a given attribute to a given value
-    fn set_attribute(&mut self, attribute: &str, value: f32) {
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
         match attribute {
-            "ligand_gates$current" => self.current = value,
-            "ligand_gates$reversal" => self.reversal = value,
-            "ligand_gates$g" => self.g = value,
+            "ligand_gates$current" => self.current = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
+            "ligand_gates$reversal" => self.reversal = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
+            "ligand_gates$g" => self.g = match value {
+                BufferType::Float(nested_val) => nested_val,
+                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+            },
             "ligand_gates$nmda_mg" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = value,
+                IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
             },
             "ligand_gates$gabab_g" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = value,
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_k3" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = value,
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_k4" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = value,
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_kd" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = value,
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
             "ligand_gates$gabab_n" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = value,
+                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = match value {
+                    BufferType::Float(nested_val) => nested_val,
+                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
             _ => {
@@ -883,34 +923,48 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
     }
 
     /// Gets all possible attribute names
-    pub fn get_all_possible_attribute_names() -> HashSet<String> {
-        HashSet::from([
-            String::from("ligand_gates$current"), String::from("ligand_gates$reversal"), String::from("ligand_gates$g"),
-            String::from("ligand_gates$nmda_mg"), String::from("ligand_gates$gabab_g"), String::from("ligand_gates$gabab_k3"),
-            String::from("ligand_gates$gabab_k4"), String::from("ligand_gates$gabab_kd"), String::from("ligand_gates$gabab_n"),
-        ])
+    pub fn get_all_possible_attribute_names() -> HashSet<(String, AvailableBufferType)> {
+        let mut attributes = HashSet::from([
+            (String::from("ligand_gates$current"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$reversal"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$g"), AvailableBufferType::Float),
+            (String::from("ligand_gates$nmda_mg"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$gabab_g"), AvailableBufferType::Float),
+            (String::from("ligand_gates$gabab_k3"), AvailableBufferType::Float),
+            (String::from("ligand_gates$gabab_k4"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$gabab_kd"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$gabab_n"), AvailableBufferType::Float),
+        ]);
+
+        attributes.extend(T::get_attribute_names());
+        
+        attributes
     }
 
     /// Gets all valid attribute names
-    fn get_valid_attribute_names(&self) -> HashSet<String> {
+    fn get_valid_attribute_names(&self) -> HashSet<(String, AvailableBufferType)> {
         let mut attributes = HashSet::from([
-            String::from("ligand_gates$current"), String::from("ligand_gates$reversal"), String::from("ligand_gates$g"),
+            (String::from("ligand_gates$current"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$reversal"), AvailableBufferType::Float), 
+            (String::from("ligand_gates$g"), AvailableBufferType::Float),
         ]);
+
+        attributes.extend(T::get_attribute_names());
 
         match &self.receptor_type {
             IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
             IonotropicLigandGatedReceptorType::NMDA(_) => {
-                attributes.insert(String::from("ligand_gates$nmda_mg"));
+                attributes.insert((String::from("ligand_gates$nmda_mg"), AvailableBufferType::Float));
 
                 attributes
             },
             IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
             IonotropicLigandGatedReceptorType::GABAb(_) => {
-                attributes.insert(String::from("ligand_gates_gabab$g"));
-                attributes.insert(String::from("ligand_gates_gabab$k3"));
-                attributes.insert(String::from("ligand_gates_gabab$k4"));
-                attributes.insert(String::from("ligand_gates_gabab$kd"));
-                attributes.insert(String::from("ligand_gates_gabab$n"));
+                attributes.insert((String::from("ligand_gates_gabab$g"), AvailableBufferType::Float));
+                attributes.insert((String::from("ligand_gates_gabab$k3"), AvailableBufferType::Float));
+                attributes.insert((String::from("ligand_gates_gabab$k4"), AvailableBufferType::Float));
+                attributes.insert((String::from("ligand_gates_gabab$kd"), AvailableBufferType::Float));
+                attributes.insert((String::from("ligand_gates_gabab$n"), AvailableBufferType::Float));
 
                 attributes
             }
@@ -1039,7 +1093,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
     value: &LigandGatedChannels<T>, 
     i: IonotropicNeurotransmitterType, 
-    buffers_contents: &mut HashMap<String, Vec<f32>>,
+    buffers_contents: &mut HashMap<String, Vec<BufferType>>,
     flags: &mut HashMap<String, Vec<u32>>,
 ) {
     match value.get(&i) {
@@ -1049,19 +1103,20 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
             }
 
             for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
                     if current_value.get_valid_attribute_names().contains(&attribute) {
                         retrieved_attribute.push(
-                            current_value.get_attribute(&attribute)
-                                .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute))
+                            current_value.get_attribute(&attribute.0)
+                                .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute.0))
                         );
                     } else {
-                        retrieved_attribute.push(
-                            0.
-                        );
+                        match attribute.1 {
+                            AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
+                            AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                        };
                     }
                 } else {
-                    unreachable!("Attribute ({}) not found", attribute);
+                    unreachable!("Attribute ({}) not found", attribute.0);
                 }
             }
         },
@@ -1071,10 +1126,13 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
             }
 
             for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
-                    retrieved_attribute.push(0.)
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
+                    match attribute.1 {
+                        AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
+                        AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                    };
                 } else {
-                    unreachable!("Attribute ({}) not found", attribute)
+                    unreachable!("Attribute ({}) not found", attribute.0)
                 }
             }
         }
@@ -1104,12 +1162,12 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             return Ok(HashMap::new());
         }
 
-        let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut buffers_contents: HashMap<String, Vec<BufferType>> = HashMap::new();
         for i in T::get_attribute_names() {
-            buffers_contents.insert(i.to_string(), vec![]);
+            buffers_contents.insert(i.0.to_string(), vec![]);
         }
         for i in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-            buffers_contents.insert(i.to_string(), vec![]);
+            buffers_contents.insert(i.0.to_string(), vec![]);
         }
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
@@ -1130,9 +1188,32 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         let size = length * IonotropicNeurotransmitterType::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
-            write_buffer!(current_buffer, context, queue, size, value, Float, last);
+            match value[0] {
+                BufferType::Float(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::Float(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<f32>>();
 
-            buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+                    write_buffer!(current_buffer, context, queue, size, &values, Float, last);
+
+                    buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+                },
+                BufferType::UInt(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::UInt(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<u32>>();
+
+                    write_buffer!(current_buffer, context, queue, size, &values, UInt, last);
+
+                    buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+                }
+            };  
         }
 
         let size = length;
@@ -1162,26 +1243,44 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             return Ok(());
         }
 
-        let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
-        let string_types: HashSet<String> = IonotropicNeurotransmitterType::get_all_types()
+        let string_types: HashSet<(String, AvailableBufferType)> = IonotropicNeurotransmitterType::get_all_types()
             .into_iter()
-            .map(|i| i.to_string())
+            .map(|i| (i.to_string(), AvailableBufferType::UInt))
             .collect();
 
         for key in LigandGatedChannel::<T>::get_all_possible_attribute_names().union(&string_types) {
             if !string_types.contains(key) {
-                let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
+                match key.1 {
+                    AvailableBufferType::Float => {
+                        let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);
 
-                cpu_conversion.insert(key.clone(), current_contents);
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::Float(*i))
+                            .collect::<Vec<BufferType>>();
+
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    },
+                    AvailableBufferType::UInt => {
+                        let mut current_contents = vec![0; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
+
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::UInt(*i))
+                            .collect::<Vec<BufferType>>();
+
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    }
+                }
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
                 flags.insert(
-                    key.clone(), 
+                    key.0.clone(), 
                     current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
                 );
             }
@@ -1218,10 +1317,8 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                             let current_ligand_gated_channel = grid_value.get_mut(&i).unwrap();
     
                             for attribute in current_ligand_gated_channel.get_valid_attribute_names() {
-                                if let Some(values) = cpu_conversion.get(&attribute) {
-                                    let attr_value = values[index];
-                                    
-                                    current_ligand_gated_channel.set_attribute(&attribute, attr_value);
+                                if let Some(values) = cpu_conversion.get(&attribute.0) {
+                                    current_ligand_gated_channel.set_attribute(&attribute.0, values[index]);
                                 }
                             }
                         } else {
@@ -1238,7 +1335,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     pub fn get_ligand_gated_channels_update_function() -> String {
         let kernel_args = LigandGatedChannel::<T>::get_all_possible_attribute_names()
             .iter()
-            .map(|i| format!("__global *float {}", i.split("$").collect::<Vec<&str>>()[1]))
+            .map(|i| format!("__global *{} {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
             .collect::<Vec<String>>()
             .join(", ");
         format!(
@@ -1612,7 +1709,7 @@ pub(crate) use create_optional_uint_buffer;
 fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU>(
     value: &Neurotransmitters<N, T>, 
     i: N, 
-    buffers_contents: &mut HashMap<String, Vec<f32>>,
+    buffers_contents: &mut HashMap<String, Vec<BufferType>>,
     flags: &mut HashMap<String, Vec<u32>>,
 ) {
     match value.get(&i) {
@@ -1622,13 +1719,13 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
             }
 
             for attribute in T::get_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
                     retrieved_attribute.push(
-                        value.get_attribute(&attribute)
-                            .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute))
+                        value.get_attribute(&attribute.0)
+                            .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute.0))
                     )
                 } else {
-                    unreachable!("Attribute ({}) not found", attribute)
+                    unreachable!("Attribute ({}) not found", attribute.0)
                 }
             }
         },
@@ -1638,10 +1735,13 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
             }
 
             for attribute in T::get_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute) {
-                    retrieved_attribute.push(0.)
+                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
+                    match attribute.1 {
+                        AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
+                        AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                    };
                 } else {
-                    unreachable!("Attribute ({}) not found", attribute)
+                    unreachable!("Attribute ({}) not found", attribute.0)
                 }
             }
         }
@@ -1659,9 +1759,9 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             return Ok(HashMap::new());
         }
 
-        let mut buffers_contents: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut buffers_contents: HashMap<String, Vec<BufferType>> = HashMap::new();
         for i in T::get_attribute_names() {
-            buffers_contents.insert(i.to_string(), vec![]);
+            buffers_contents.insert(i.0.to_string(), vec![]);
         }
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
@@ -1682,9 +1782,32 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         let size = length * N::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
-            write_buffer!(current_buffer, context, queue, size, value, Float, last);
+            match value[0] {
+                BufferType::Float(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::Float(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<f32>>();
 
-            buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+                    write_buffer!(current_buffer, context, queue, size, &values, Float, last);
+
+                    buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
+                },
+                BufferType::UInt(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::UInt(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<u32>>();
+
+                    write_buffer!(current_buffer, context, queue, size, &values, UInt, last);
+
+                    buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+                }
+            }
         }
 
         let size = length;
@@ -1706,7 +1829,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         rows: usize,
         cols: usize,
     ) -> Result<(), GPUError> {
-        let mut cpu_conversion: HashMap<String, Vec<f32>> = HashMap::new();
+        let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
         let string_types: Vec<String> = N::get_all_types()
@@ -1722,23 +1845,41 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             return Ok(());
         }
 
-        let all_neurotransmitter_flag_strings: HashSet<String> = N::get_all_types()
+        let all_neurotransmitter_flag_strings: HashSet<(String, AvailableBufferType)> = N::get_all_types()
             .iter()
-            .map(|i| i.to_string())
+            .map(|i| (i.to_string(), AvailableBufferType::UInt))
             .collect();
 
         for key in T::get_attribute_names().union(&all_neurotransmitter_flag_strings) {
-            if !string_types.contains(key) {
-                let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, Float);
+            if !string_types.contains(&key.0) {
+                match key.1 {
+                    AvailableBufferType::Float => {
+                        let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);
 
-                cpu_conversion.insert(key.clone(), current_contents);
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::Float(*i))
+                            .collect::<Vec<BufferType>>();
+        
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    },
+                    AvailableBufferType::UInt => {
+                        let mut current_contents = vec![0; rows * cols * N::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
+
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::UInt(*i))
+                            .collect::<Vec<BufferType>>();
+        
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    }
+                }
             } else {
                 let mut current_contents = vec![0; rows * cols];
-                read_and_set_buffer!(buffers, queue, key, &mut current_contents, UInt);
+                read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
                 flags.insert(
-                    key.clone(), 
+                    key.0.clone(), 
                     current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
                 );
             }
@@ -1760,12 +1901,11 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                             }
     
                             for attribute in T::get_attribute_names() {
-                                if let Some(values) = cpu_conversion.get(&attribute) {
-                                    let attr_value = values[index];
+                                if let Some(values) = cpu_conversion.get(&attribute.0) {
                                     grid_value.neurotransmitters
                                         .get_mut(&i)
                                         .unwrap()
-                                        .set_attribute(&attribute, attr_value);
+                                        .set_attribute(&attribute.0, values[index]);
                                 }
                             }
                         } else {
@@ -2090,12 +2230,30 @@ pub enum BufferGPU {
     OptionalUInt(Buffer<cl_int>),
 }
 
-// #[cfg(feature = "gpu")]
+#[cfg(feature = "gpu")]
+#[derive(Clone, Copy, Debug)]
 /// An encapsulation of a float or unsigned integer for converting to the GPU
-// pub enum BufferType {
-//     Float(f32),
-//     UInt(u32),
-// }
+pub enum BufferType {
+    Float(f32),
+    UInt(u32),
+}
+
+#[cfg(feature = "gpu")]
+#[derive(Hash, PartialEq, Eq, Debug)]
+/// An encapsulation of the possible types for converting to the GPU
+pub enum AvailableBufferType {
+    Float,
+    UInt,
+}
+
+impl AvailableBufferType {
+    fn to_str(&self) -> &str {
+        match self {
+            AvailableBufferType::Float => "float",
+            AvailableBufferType::UInt => "uint",
+        }
+    }
+}
 
 // set args on the fly using a for loop
 // for n in x { kernel.set_arg(&n); } // modify this to use names instead
