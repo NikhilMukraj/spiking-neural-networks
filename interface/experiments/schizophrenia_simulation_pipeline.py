@@ -408,7 +408,7 @@ for current_state in tqdm(all_states):
                 )
             )
         else:
-            network.apply_spike_train_lattice_given_position(
+            network.apply_spike_train_lattice(
                 2, 
                 get_noisy_spike_train_setup_function(
                     parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
@@ -489,7 +489,8 @@ for current_state in tqdm(all_states):
             else:
                 network.apply_spike_train_lattice(2, reset_spike_train)
         else:
-            spike_train_lattice.apply(
+            network.apply_spike_train_lattice(
+                2,
                 get_noisy_spike_train_setup_function(
                     parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
                     parsed['simulation_parameters']['noisy_cue_firing_rate'],
