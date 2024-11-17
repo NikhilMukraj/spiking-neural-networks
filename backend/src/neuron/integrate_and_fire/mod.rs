@@ -12,7 +12,7 @@ use super::iterate_and_spike::{
     IterateAndSpikeGPU, BufferGPU, KernelFunction, 
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
-    // LigandGatedChannel, NeurotransmitterTypeGPU
+    LigandGatedChannel, AvailableBufferType, generate_unique_prefix,
 };
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
@@ -425,86 +425,137 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         )
     }
 
-    fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
-        // need to change args depending on whether float or uint
-        // let neurotransmitter_args = T::get_attribute_names()
-        //     .iter()
-        //     .map(|i| generate_unique_prefix(i, "neuro"))
-        //     .collect::<Vec<String>>();
-        // let ligand_gates_args = LigandGatedChannel::<R>::get_all_possible_attribute_names()
-        //     .iter()
-        //     .map(|i| generate_unique_prefix(i, "lg"))
-        //     .collect::<Vec<String>>();
-        // let mut argument_names = vec![
-        //     String::from("inputs"), String::from("index_to_position"), String::from("current_voltage"), 
-        //     String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
-        //     String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
-        //     String::from("v_th"), String::from("refractory_count"), String::from("tref"),
-        //     String::from("is_spiking"),
-        // ];
-        // for i in IonotropicNeurotransmitterType::get_all_types() {
-        //     argument_names.push(i.to_string());
-        // }
-        // argument_names.extend(neurotransmitter_args);
-        // argument_names.extend(ligand_gates_args);
+    fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+        let argument_names = vec![
+            String::from("inputs"), String::from("t"), String::from("index_to_position"), String::from("current_voltage"), 
+            String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
+            String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
+            String::from("v_th"), String::from("refractory_count"), String::from("tref"),
+            String::from("is_spiking"),
+        ];
 
-        // let uint_args = [String::from("index_to_position"), String::from("is_spiking")];
+        let neurotransmitter_args = T::get_attribute_names_ordered()
+            .iter()
+            .map(|i| (i.1, format!("{}{}", generate_unique_prefix(&argument_names, "neuro"), i.0)))
+            .collect::<Vec<(AvailableBufferType, String)>>();
+        let neurotransmitter_arg_names = neurotransmitter_args.iter()
+            .map(|i| i.1.clone())
+            .collect::<Vec<String>>();
+        let combined_args = [argument_names.clone(), neurotransmitter_arg_names.clone()].concat();
+        let ligand_gates_args = LigandGatedChannel::<R>::get_all_possible_attribute_names_ordered()
+            .iter()
+            .map(|i| (
+                i.1, 
+                format!(
+                    "{}{}", 
+                    generate_unique_prefix(&combined_args, "lg"), i.0
+                )
+            ))
+            .collect::<Vec<(AvailableBufferType, String)>>();
+        let ligand_gates_args_names = ligand_gates_args.iter()
+            .map(|i| i.1.clone())
+            .collect::<Vec<String>>();
+        let parsed_neurotransmitter_args = neurotransmitter_args.iter()
+            .map(|i| format!("__global *{} {}", i.0.to_str(), i.1))
+            .collect::<Vec<String>>();
+        let parsed_ligand_gates_args = ligand_gates_args.iter()
+            .map(|i| format!("__global *{} {}", i.0.to_str(), i.1))
+            .collect::<Vec<String>>();
 
-        // let arguments: String = argument_names
-        //     .iter()
-        //     .enumerate()
-        //     .map(|(i, name)| {
-        //         let qualifier = if i < 2 { "__global const " } else { "__global " };
-        //         let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
-        //         format!("{}{} *{}", qualifier, type_decl, name)
-        //     })
-        //     .collect::<Vec<_>>()
-        //     .join(",\n                ");
+        let uint_args = [String::from("index_to_position"), String::from("is_spiking")];
 
-        // let program_source = format!(r#"
-        //     {}
-        //     {}
+        let mut parsed_argument_names: Vec<String> = argument_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let qualifier = if i < 2 { "__global const " } else { "__global " };
+                let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
+                format!("{}{} *{}", qualifier, type_decl, name)
+            })
+            .collect::<Vec<_>>();
 
-        //     __kernel void quadratic_integrate_and_fire_iterate_and_spike(
-        //         {}
-        //     ) {{
-        //         int gid = get_global_id(0);
-        //         int index = index_to_position[gid];
+        parsed_argument_names.extend(parsed_neurotransmitter_args);
+        parsed_argument_names.extend(parsed_ligand_gates_args);
 
-        //         if (refractory_count[index] > 0.0f) {{
-        //             current_voltage[index] = v_reset[index];
-        //             refractory_count[index] -= 1.0f; 
-        //             is_spiking[index] = 0;
-        //         }} else if (current_voltage[index] >= v_th[index]) {{
-        //             current_voltage[index] = v_reset[index];
-        //             is_spiking[index] = 1;
-        //             refractory_count[index] = tref[index] / dt[index];
-        //         }} else {{
-        //             is_spiking[index] = 0;
-        //         }}
+        let arguments: String = argument_names.join(",\n");
 
-        //         {}
-        //         {}
+        let program_source = format!(r#"
+            {}
+            {}
+        
+            {}
+            {}
 
-        //         current_voltage[index] += (
-        //             alpha[index] * (current_voltage[index] - v_reset[index]) * 
-        //             (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
-        //             ) 
-        //             * (dt[index] / tau_m[index]);
-        //         float receptor_current = ligand_gates_current[index] + ligand_gates_current[index + 1] 
-        //              + ligand_gates_current[index + 2] + ligand_gates_current[index + 3];
-        //         current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
-        //     }}"#, 
-        //     T::get_update_function().1,
-        //     R::get_update_function().1,
-        //     arguments,
-        //     Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
-        //     LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
-        // );
+            __kernel void quadratic_integrate_and_fire_iterate_and_spike_electrochemical(
+                {}
+            ) {{
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
 
-        // load in arguments
+                if (refractory_count[index] > 0.0f) {{
+                    current_voltage[index] = v_reset[index];
+                    refractory_count[index] -= 1.0f; 
+                    is_spiking[index] = 0;
+                }} else if (current_voltage[index] >= v_th[index]) {{
+                    current_voltage[index] = v_reset[index];
+                    is_spiking[index] = 1;
+                    refractory_count[index] = tref[index] / dt[index];
+                }} else {{
+                    is_spiking[index] = 0;
+                }}
 
-        todo!()
+                neurotransmitters_update(index, t, {});
+                ligand_gates_update_function(index, current_voltage{});
+
+                current_voltage[index] += (
+                    alpha[index] * (current_voltage[index] - v_reset[index]) * 
+                    (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
+                    ) 
+                    * (dt[index] / tau_m[index]);
+                float receptor_current = ligand_gates_current[index] + ligand_gates_current[index + 1] 
+                     + ligand_gates_current[index + 2] + ligand_gates_current[index + 3];
+                current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
+            }}"#, 
+            T::get_update_function().1,
+            R::get_update_function().1,
+            Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
+            LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
+            arguments,
+            neurotransmitter_arg_names.join(", "),
+            ligand_gates_args_names.join(", "),
+        );
+
+        let mut kernel_function_arguments = argument_names.clone();
+        kernel_function_arguments.extend(
+                T::get_attribute_names_ordered().iter()
+                    .map(|i| i.0.clone())
+                    .collect::<Vec<String>>()
+            );
+        kernel_function_arguments.extend(
+            LigandGatedChannel::<R>::get_all_possible_attribute_names_ordered().iter()
+                .map(|i| i.0.clone())
+                .collect::<Vec<String>>()
+        );
+
+        let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike_electrochemical");
+
+        let iterate_and_spike_electrochemical_program = match Program::create_and_build_from_source(context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let kernel = match Kernel::create(&iterate_and_spike_electrochemical_program, &kernel_name) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
+
+        Ok(
+            KernelFunction {
+                kernel,
+                program_source,
+                kernel_name,
+                argument_names: kernel_function_arguments
+            }
+        )
     }
     
     fn convert_to_gpu(
