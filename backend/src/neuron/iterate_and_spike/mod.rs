@@ -192,6 +192,8 @@ pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics + Default {
     fn set_attribute(&mut self, attribute: &str, value: BufferType);
     /// Retrieves all attribute names
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
+    /// Retrieves all attribute names in an ordered fashion
+    fn get_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
     fn get_update_function() -> (Vec<String>, String);
 }
@@ -339,6 +341,10 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
                 (String::from("neurotransmitters$clearance_constant"), AvailableBufferType::Float),
             ]
         )
+    }
+
+    fn get_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)> {
+        Self::get_attribute_names().into_iter().collect()
     }
 
     fn get_update_function() -> (Vec<String>, String) {
@@ -802,24 +808,24 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     // }
 }
 
-// #[cfg(feature = "gpu")]
-// fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> String {
-//     let mut num = 0;
-//     let mut unique = false;
+#[cfg(feature = "gpu")]
+pub fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> String {
+    let mut num = 0;
+    let mut unique = false;
 
-//     while !unique {
-//         for i in other_attributes {
-//             if i.starts_with(&format!("{}{}_", prefix, num)) {
-//                 num += 1;
-//                 break;
-//             }
-//         }
+    while !unique {
+        for i in other_attributes {
+            if i == &format!("{}{}_", prefix, num) {
+                num += 1;
+                break;
+            }
+        }
 
-//         unique = true;
-//     }
+        unique = true;
+    }
 
-//     format!("{}{}_", prefix, num)
-// }
+    format!("{}{}_", prefix, num)
+}
 
 #[cfg(feature = "gpu")]
 impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
@@ -939,6 +945,10 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
         attributes.extend(T::get_attribute_names());
         
         attributes
+    }
+
+    pub fn get_all_possible_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)> {
+        LigandGatedChannel::<T>::get_all_possible_attribute_names().into_iter().collect()
     }
 
     /// Gets all valid attribute names
@@ -1333,14 +1343,17 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     }
 
     pub fn get_ligand_gated_channels_update_function() -> String {
-        let kernel_args = LigandGatedChannel::<T>::get_all_possible_attribute_names()
+        let mut kernel_args = vec![String::from("uint index"), String::from("__global *float voltage")];
+        let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
             .iter()
             .map(|i| format!("__global *{} {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
-            .collect::<Vec<String>>()
-            .join(", ");
+            .collect::<Vec<String>>();
+        kernel_args.extend(ligand_gates_args);
+        let kernel_args = kernel_args.join(",\n");
         format!(
             r#"
             __kernel void ligand_gates_update_function(
+                uint index,
                 __global *float voltage,
                 {}
             ) {{
@@ -1933,6 +1946,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         format!(
             r#"
                 __kernel void neurotransmitters_update(
+                    uint index,
                     __global *float t,
                     {}
                 ) {{
@@ -2239,7 +2253,7 @@ pub enum BufferType {
 }
 
 #[cfg(feature = "gpu")]
-#[derive(Hash, PartialEq, Eq, Debug)]
+#[derive(Hash, PartialEq, Eq, Debug, Clone, Copy, PartialOrd, Ord)]
 /// An encapsulation of the possible types for converting to the GPU
 pub enum AvailableBufferType {
     Float,
@@ -2247,7 +2261,7 @@ pub enum AvailableBufferType {
 }
 
 impl AvailableBufferType {
-    fn to_str(&self) -> &str {
+    pub fn to_str(&self) -> &str {
         match self {
             AvailableBufferType::Float => "float",
             AvailableBufferType::UInt => "uint",
