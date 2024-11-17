@@ -19,7 +19,7 @@ trials = 15
 filename = "gaba_glu_with_cue.json"
 
 [variables]
-spike_train_to_exc = [4]
+spike_train_to_exc = [5]
 prob_of_exc_to_inh = [1]
 glutamate_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
 gabaa_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
