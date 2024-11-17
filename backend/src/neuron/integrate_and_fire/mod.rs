@@ -427,11 +427,11 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
     fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let argument_names = vec![
-            String::from("inputs"), String::from("t"), String::from("index_to_position"), String::from("current_voltage"), 
-            String::from("alpha"), String::from("v_reset"), String::from("v_c"), 
-            String::from("integration_constant"), String::from("dt"), String::from("tau_m"),
-            String::from("v_th"), String::from("refractory_count"), String::from("tref"),
-            String::from("is_spiking"),
+            String::from("number_of_types"), String::from("inputs"), String::from("t"), String::from("index_to_position"), 
+            String::from("current_voltage"), String::from("alpha"), String::from("v_reset"), 
+            String::from("v_c"), String::from("integration_constant"), String::from("dt"), 
+            String::from("tau_m"),String::from("v_th"), String::from("refractory_count"), 
+            String::from("tref"), String::from("is_spiking"),
         ];
 
         let neurotransmitter_args = T::get_attribute_names_ordered()
@@ -487,6 +487,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             {}
 
             __kernel void quadratic_integrate_and_fire_iterate_and_spike_electrochemical(
+                uint number_of_types,
                 {}
             ) {{
                 int gid = get_global_id(0);
@@ -504,8 +505,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     is_spiking[index] = 0;
                 }}
 
-                neurotransmitters_update(index, t, {});
-                ligand_gates_update_function(index, current_voltage{});
+                neurotransmitters_update(index * number_of_types, t, {});
+                ligand_gates_update_function(index * number_of_types, current_voltage{});
 
                 current_voltage[index] += (
                     alpha[index] * (current_voltage[index] - v_reset[index]) * 
