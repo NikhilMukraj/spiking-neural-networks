@@ -30,5 +30,9 @@ mod tests {
             .program_source;
 
         println!("{}", program_source);
+
+        // check to make sure all functions are there
+        // all arguments have no dollar signs
+        // all argument names are unique
     }
 }
