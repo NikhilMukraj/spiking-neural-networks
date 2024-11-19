@@ -436,7 +436,13 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
         let neurotransmitter_args = T::get_attribute_names_ordered()
             .iter()
-            .map(|i| (i.1, format!("{}{}", generate_unique_prefix(&argument_names, "neuro"), i.0)))
+            .map(|i| (
+                i.1, 
+                format!(
+                    "{}{}", generate_unique_prefix(&argument_names, "neuro"),
+                    i.0.split("$").collect::<Vec<&str>>()[1],
+                )
+            ))
             .collect::<Vec<(AvailableBufferType, String)>>();
         let neurotransmitter_arg_names = neurotransmitter_args.iter()
             .map(|i| i.1.clone())
@@ -448,7 +454,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 i.1, 
                 format!(
                     "{}{}", 
-                    generate_unique_prefix(&combined_args, "lg"), i.0
+                    generate_unique_prefix(&combined_args, "lg"), 
+                    i.0.split("$").collect::<Vec<&str>>()[1],
                 )
             ))
             .collect::<Vec<(AvailableBufferType, String)>>();
