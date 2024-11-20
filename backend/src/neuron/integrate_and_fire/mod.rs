@@ -481,6 +481,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             })
             .collect::<Vec<_>>();
 
+        parsed_argument_names.insert(0, String::from("uint number_of_types"));
+
         parsed_argument_names.extend(parsed_neurotransmitter_args);
         parsed_argument_names.extend(parsed_ligand_gates_args);
 
