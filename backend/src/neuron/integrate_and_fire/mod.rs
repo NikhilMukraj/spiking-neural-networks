@@ -486,8 +486,6 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         parsed_argument_names.extend(parsed_neurotransmitter_args);
         parsed_argument_names.extend(parsed_ligand_gates_args);
 
-        let arguments: String = argument_names.join(",\n");
-
         let program_source = format!(r#"
             {}
             {}
@@ -530,9 +528,9 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             R::get_update_function().1,
             Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
             LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
-            arguments,
-            neurotransmitter_arg_names.join(", "),
-            ligand_gates_args_names.join(", "),
+            parsed_argument_names.join(",\n"),
+            neurotransmitter_arg_names.join(",\n"),
+            ligand_gates_args_names.join(",\n"),
         );
 
         let mut kernel_function_arguments = argument_names.clone();
@@ -546,6 +544,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 .map(|i| i.0.clone())
                 .collect::<Vec<String>>()
         );
+
+        // println!("{}", program_source);
 
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike_electrochemical");
 
