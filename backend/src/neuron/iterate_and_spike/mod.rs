@@ -1358,25 +1358,25 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                 {}
             ) {{
                 if (flags[index]) {{ // AMPA
-                    ligand_gates_r[index] = get_r({});
-                    current[index] = ligand_gates_g[index] * ligand_gates_r[index] * (voltage[index] - ligand_gates_reversal[index]); 
+                    r[index] = get_r({});
+                    current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
                 }}
                 if (flags[index + 1]) {{ // NMDA
                     r[index + 1] = get_r({})
-                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * ligand_gates_nmda_mg[index + 1] / 3.57); 
-                    current[index + 1] = modifier * ligand_gates_g[index + 1] * ligand_gates_r[index + 1] * (voltage[index] - ligand_gates_reversal[index + 1]);
+                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57); 
+                    current[index + 1] = modifier * g[index + 1] * _r[index + 1] * (voltage[index] - reversal[index + 1]);
                 }}
                 if (flags[index + 2]) {{ // GABAa 
-                    ligand_gates_r[index + 2] = get_r({});
-                    current[index + 2] = g[index + 2] * ligand_gates_r[index + 2] * (voltage[index] - reversal[index + 2]); 
+                    r[index + 2] = get_r({});
+                    current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
                 }}
                 if (flags[index + 3]) {{ // GABAb
-                    ligand_gates_r[index + 3] = get_r({});
-                    ligand_gates_gabab_g[index + 3] += (ligand_gates_gabab_k3 * ligand_gates_r[index + 3] - ligand_gates_gabab_k4[index + 3] * ligand_gates_gabab_g[index + 3]) * dt[index];
-                    float bottom = pow(gabab_g[index + 3], ligand_gates_gabab_n[index + 3]) * ligand_gates_gabab_kd[index + 3];
-                    float top = pow(ligand_gates_gabab_g[index + 3], ligand_gates_gabab_n[index + 3]);
+                    r[index + 3] = get_r({});
+                    gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
+                    float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
+                    float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
                     float modifier =  top / bottom;
-                    current[index + 3] = modifier * ligand_gates_g[index + 3] * ligand_gates_r[index + 3] * (voltage[index] - ligand_gates_reversal[index + 3]);
+                    current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
                 }}
             }}
             "#,
@@ -1935,14 +1935,24 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     pub fn get_neurotransmitter_update_kernel_code() -> String {
         let kernel_args = T::get_update_function().0
             .iter()
-            .map(|i| format!("__global *float {}", i))
+            .map(|i| {
+                let split_result = i.split('$').collect::<Vec<&str>>();
+                let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
+                format!("__global float* {}", arg_name)
+            })
             .collect::<Vec<String>>()
-            .join(", ");
+            .join(",\n");
+
         let func_args = T::get_update_function().0
             .iter()
-            .map(|i| format!("{}[index + i]", i))
+            .map(|i| {
+                let split_result = i.split('$').collect::<Vec<&str>>();
+                let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
+                format!("{}[index + i]", arg_name)
+            })
             .collect::<Vec<String>>()
-            .join(", ");
+            .join(",\n");
+        
         format!(
             r#"
                 __kernel void neurotransmitters_update(
