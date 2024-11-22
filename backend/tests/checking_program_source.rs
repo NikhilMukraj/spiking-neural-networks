@@ -24,15 +24,11 @@ mod tests {
 
         let context = Context::from_device(&device).expect("Context::from_device failed");
 
-        let program_source = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::
-            iterate_and_spike_electrochemical_kernel(&context)
-            .unwrap()
-            .program_source;
+        let kernel_function = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::
+            iterate_and_spike_electrochemical_kernel(&context);
 
-        println!("{}", program_source);
+        assert!(kernel_function.is_ok());
 
-        // check to make sure all functions are there
-        // all arguments have no dollar signs
-        // all argument names are unique
+        println!("{}", kernel_function.unwrap().program_source);
     }
 }
