@@ -42,8 +42,8 @@ The following fields have default values if not specified in the TOML file:
 | `num_patterns`                 | integer | 3                  | Number of patterns to simulate (excitatory weights divided by this number) |
 | `weights_scalar`               | float   | 1                  | Scaling factor for excitatory weights                       |
 | `inh_weights_scalar`           | float   | 0.25               | Scaling factor for inhibitory weights                       |
-| `a`                            | float   | 1                  | Autoassociative network pattern calculation variable, $s\sum_{i}\sum_{j}(\xi^{u}_{i}-b)(\xi^{u}_{j}-a)$                          |
-| `b`                            | float   | 1                  | Autoassociative network pattern calculation variable, $s\sum_{i}\sum_{j}(\xi^{u}_{i}-b)(\xi^{u}_{j}-a)$                          |
+| `a`                            | float   | 1                  | Autoassociative network pattern calculation variable, $\frac{s}{n}\sum_{i}\sum_{j}(\xi^{u}_{i}-b)(\xi^{u}_{j}-a)$                          |
+| `b`                            | float   | 1                  | Autoassociative network pattern calculation variable, $\frac{s}{n}\sum_{i}\sum_{j}(\xi^{u}_{i}-b)(\xi^{u}_{j}-a)$                          |
 | `correlation_threshold`        | float   | 0.08               | Threshold for considering patterns as correlated too correlated (will generate new better if threshold crossed)           |
 | `use_correlation_as_accuracy`  | boolean | false              | Use correlation as a measure of accuracy (true if maxiamlly correlated pattern is inputed pattern)                 |
 | `get_all_accuracies`           | boolean | false              | Whether to write all accuracies to output                   |
