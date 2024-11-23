@@ -365,7 +365,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
                     float dt,
                     float neurotransmitters_t,
                     float neurotransmitters_t_max,
-                    float neurotransmitters_clearance_constant,
+                    float neurotransmitters_clearance_constant
                 ) { 
                     float is_spiking_modifier = 0;
                     if (is_spiking) {
@@ -1351,8 +1351,8 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     pub fn get_ligand_gated_channels_update_function() -> String {
         let mut kernel_args = vec![
             String::from("uint index"), 
-            String::from("__private *float voltage"), 
-            String::from("__private *uint flags"),
+            String::from("__private float* voltage"), 
+            String::from("__private uint* flags"),
         ];
         let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
             .iter()
@@ -1968,7 +1968,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                     __private *float t,
                     {}
                 ) {{
-                    for (int i; i < 4; i++) {{
+                    for (int i = 0; i < 4; i++) {{
                         if (flags[index + i]) {{
                             t[index + i] = get_t({});
                         }}
