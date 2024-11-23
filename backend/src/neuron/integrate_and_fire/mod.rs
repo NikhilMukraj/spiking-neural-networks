@@ -448,13 +448,14 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .map(|i| i.1.clone())
             .collect::<Vec<String>>();
         let combined_args = [argument_names.clone(), neurotransmitter_arg_names.clone()].concat();
+        let ligand_gates_prefix = generate_unique_prefix(&combined_args, "lg");
         let ligand_gates_args = LigandGatedChannel::<R>::get_all_possible_attribute_names_ordered()
             .iter()
             .map(|i| (
                 i.1, 
                 format!(
                     "{}{}", 
-                    generate_unique_prefix(&combined_args, "lg"), 
+                    ligand_gates_prefix, 
                     i.0.split("$").collect::<Vec<&str>>()[1],
                 )
             ))
@@ -475,13 +476,13 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .iter()
             .enumerate()
             .map(|(i, name)| {
-                let qualifier = if i < 2 { "__global const " } else { "__global " };
+                let qualifier = if i < 3 { "__global const " } else { "__global " };
                 let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
                 format!("{}{} *{}", qualifier, type_decl, name)
             })
             .collect::<Vec<_>>();
 
-        parsed_argument_names.insert(0, String::from("uint number_of_types"));
+        parsed_argument_names[0] = String::from("uint number_of_types");
 
         parsed_argument_names.extend(parsed_neurotransmitter_args);
         parsed_argument_names.extend(parsed_ligand_gates_args);
@@ -494,7 +495,6 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             {}
 
             __kernel void quadratic_integrate_and_fire_iterate_and_spike_electrochemical(
-                uint number_of_types,
                 {}
             ) {{
                 int gid = get_global_id(0);
@@ -512,16 +512,24 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     is_spiking[index] = 0;
                 }}
 
-                neurotransmitters_update(index * number_of_types, t, {});
-                ligand_gates_update_function(index * number_of_types, current_voltage{});
+                neurotransmitters_update(
+                    index * number_of_types, 
+                    t, 
+                    {}
+                );
+                ligand_gates_update_function(
+                    index * number_of_types,
+                    current_voltage,
+                    {}
+                );
 
                 current_voltage[index] += (
                     alpha[index] * (current_voltage[index] - v_reset[index]) * 
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * (dt[index] / tau_m[index]);
-                float receptor_current = ligand_gates_current[index] + ligand_gates_current[index + 1] 
-                     + ligand_gates_current[index + 2] + ligand_gates_current[index + 3];
+                float receptor_current = {}_current[index] + {}_current[index + 1] 
+                     + {}_current[index + 2] + {}_current[index + 3];
                 current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
             }}"#, 
             T::get_update_function().1,
@@ -531,6 +539,10 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             parsed_argument_names.join(",\n"),
             neurotransmitter_arg_names.join(",\n"),
             ligand_gates_args_names.join(",\n"),
+            ligand_gates_prefix,
+            ligand_gates_prefix,
+            ligand_gates_prefix,
+            ligand_gates_prefix,
         );
 
         let mut kernel_function_arguments = argument_names.clone();
@@ -545,7 +557,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 .collect::<Vec<String>>()
         );
 
-        // println!("{}", program_source);
+        println!("{}", program_source);
 
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike_electrochemical");
 
