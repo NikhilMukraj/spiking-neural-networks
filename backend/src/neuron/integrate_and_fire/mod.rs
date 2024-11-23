@@ -430,7 +430,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             String::from("number_of_types"), String::from("inputs"), String::from("t"), String::from("index_to_position"), 
             String::from("current_voltage"), String::from("alpha"), String::from("v_reset"), 
             String::from("v_c"), String::from("integration_constant"), String::from("dt"), 
-            String::from("tau_m"),String::from("v_th"), String::from("refractory_count"), 
+            String::from("tau_m"), String::from("c_m"), String::from("v_th"), String::from("refractory_count"), 
             String::from("tref"), String::from("is_spiking"),
         ];
 
