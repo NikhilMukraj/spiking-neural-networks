@@ -9,7 +9,7 @@ use spiking_neural_networks::{
     }, iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, DestexheNeurotransmitter, 
         DestexheReceptor, GABAaDefault, GABAbDefault, IterateAndSpike, LastFiringTime, 
-        LigandGatedChannel, LigandGatedChannels, 
+        LigandGatedChannel, LigandGatedChannels, IonotropicLigandGatedReceptorType, BV,
         NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
         IonotropicNeurotransmitterType, Neurotransmitters, ReceptorKinetics 
     }, 
@@ -17,7 +17,8 @@ use spiking_neural_networks::{
         DeltaDiracRefractoriness, NeuralRefractoriness, PoissonNeuron, SpikeTrain
     },
     plasticity::STDP, 
-    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, 
+    SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 }};
 
 
@@ -247,6 +248,24 @@ implement_basic_getter_and_setter!(
 
 impl_repr!(PyApproximateLigandGatedChannel, ligand_gate);
 
+trait BVNMDADefault {
+    fn bv_nmda_default() -> Self;
+}
+
+impl<T: ReceptorKinetics> BVNMDADefault for LigandGatedChannel<T> {
+    fn bv_nmda_default() -> Self {
+        LigandGatedChannel {
+            g: 0.6, // 0.6 nS
+            reversal: 0., // 0.0 mV
+            receptor: T::nmda_default(),
+            receptor_type: IonotropicLigandGatedReceptorType::NMDA(BV {
+                bv_calc: |voltage| 1. / (1. + ((-0.062 * voltage).exp() * 0.33 / 3.57))
+            }),
+            current: 0.,
+        }
+    }
+}
+
 #[pymethods]
 impl PyApproximateLigandGatedChannel {
     #[new]
@@ -255,7 +274,7 @@ impl PyApproximateLigandGatedChannel {
             IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
             IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
             IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::bv_nmda_default(),
         };
 
         PyApproximateLigandGatedChannel {
@@ -311,7 +330,7 @@ impl PyApproximateLigandGatedChannels {
                     IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
                     IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
                     IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::bv_nmda_default(),
                 };
     
                 ligand_gates.insert(current_type, neurotransmitter);
@@ -2072,7 +2091,7 @@ impl PyDestexheLigandGatedChannels {
                     IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
                     IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
                     IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+                    IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::bv_nmda_default(),
                 };
     
                 ligand_gates.insert(current_type, neurotransmitter);
@@ -2123,7 +2142,7 @@ impl PyDestexheLigandGatedChannel {
             IonotropicNeurotransmitterType::AMPA => LigandGatedChannel::ampa_default(),
             IonotropicNeurotransmitterType::GABAa => LigandGatedChannel::gabaa_default(),
             IonotropicNeurotransmitterType::GABAb => LigandGatedChannel::gabab_default(),
-            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::nmda_default(),
+            IonotropicNeurotransmitterType::NMDA => LigandGatedChannel::bv_nmda_default(),
         };
 
         PyDestexheLigandGatedChannel {
