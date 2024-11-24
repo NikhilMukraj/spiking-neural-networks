@@ -30,7 +30,7 @@ pub struct BV {
 impl Default for BV {
     fn default() -> Self {
         BV { 
-            mg: 1.5 // mM
+            mg: 0.33 // mM
         }
     }
 }
