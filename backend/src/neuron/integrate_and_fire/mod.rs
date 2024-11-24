@@ -464,10 +464,10 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .map(|i| i.1.clone())
             .collect::<Vec<String>>();
         let parsed_neurotransmitter_args = neurotransmitter_args.iter()
-            .map(|i| format!("__global *{} {}", i.0.to_str(), i.1))
+            .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
             .collect::<Vec<String>>();
         let parsed_ligand_gates_args = ligand_gates_args.iter()
-            .map(|i| format!("__global *{} {}", i.0.to_str(), i.1))
+            .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
             .collect::<Vec<String>>();
 
         let uint_args = [String::from("index_to_position"), String::from("is_spiking")];
@@ -478,7 +478,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .map(|(i, name)| {
                 let qualifier = if i < 3 { "__global const " } else { "__global " };
                 let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
-                format!("{}{} *{}", qualifier, type_decl, name)
+                format!("{}{} {}*", qualifier, type_decl, name)
             })
             .collect::<Vec<_>>();
 
