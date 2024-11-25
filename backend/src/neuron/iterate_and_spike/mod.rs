@@ -1356,7 +1356,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         ];
         let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
             .iter()
-            .map(|i| format!("__private *{} {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
+            .map(|i| format!("__private {}* {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
             .collect::<Vec<String>>();
         kernel_args.extend(ligand_gates_args);
         let kernel_args = kernel_args.join(",\n");
@@ -1965,7 +1965,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
-                    __private *float t,
+                    __private float* t,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
