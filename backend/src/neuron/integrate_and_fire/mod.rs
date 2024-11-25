@@ -478,7 +478,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .map(|(i, name)| {
                 let qualifier = if i < 3 { "__global const " } else { "__global " };
                 let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
-                format!("{}{} {}*", qualifier, type_decl, name)
+                format!("{}{}* {}", qualifier, type_decl, name)
             })
             .collect::<Vec<_>>();
 
