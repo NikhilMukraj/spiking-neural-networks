@@ -528,8 +528,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * (dt[index] / tau_m[index]);
-                float receptor_current = {}_current[index] + {}_current[index + 1] 
-                     + {}_current[index + 2] + {}_current[index + 3];
+                float receptor_current = {}current[index] + {}current[index + 1] 
+                     + {}current[index + 2] + {}current[index + 3];
                 current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
             }}"#, 
             T::get_update_function().1,
@@ -565,6 +565,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
         };
+
         let kernel = match Kernel::create(&iterate_and_spike_electrochemical_program, &kernel_name) {
             Ok(value) => value,
             Err(_) => return Err(GPUError::KernelCompileFailure),
