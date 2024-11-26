@@ -354,12 +354,6 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
                 String::from("neurotransmitters$t_max"), String::from("neurotransmitters$clearance_constant"),
             ],
             String::from("
-                float clamp(float value, float min, float max) {
-                    if (value < min) return min;
-                    if (value > max) return max;
-                    return value;
-                }
-
                 float get_t(
                     float is_spiking, 
                     float dt,
@@ -1155,10 +1149,11 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
     }
 }
 
+#[cfg(feature = "gpu")]
 fn get_receptor_args<T: ReceptorKineticsGPU>(indexer: &str) -> String {
     T::get_update_function().0
         .iter()
-        .map(|i| format!("{}{}", i, indexer))
+        .map(|i| format!("{}{}", i.split("$").collect::<Vec<&str>>()[1], indexer))
         .collect::<Vec<String>>()
         .join(", ")
 }
@@ -1351,12 +1346,12 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     pub fn get_ligand_gated_channels_update_function() -> String {
         let mut kernel_args = vec![
             String::from("uint index"), 
-            String::from("__private float* voltage"), 
-            String::from("__private uint* flags"),
+            String::from("__global float* voltage"), 
+            String::from("__global uint* flags"),
         ];
         let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
             .iter()
-            .map(|i| format!("__private {}* {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
+            .map(|i| format!("__global {}* {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
             .collect::<Vec<String>>();
         kernel_args.extend(ligand_gates_args);
         let kernel_args = kernel_args.join(",\n");
@@ -1380,7 +1375,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                 }}
                 if (flags[index + 3]) {{ // GABAb
                     r[index + 3] = get_r({});
-                    gabab_g[index + 3] += (gabab_k3 * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
+                    gabab_g[index + 3] += (gabab_k3[index + 3] * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
                     float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
                     float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
                     float modifier =  top / bottom;
@@ -1946,7 +1941,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             .map(|i| {
                 let split_result = i.split('$').collect::<Vec<&str>>();
                 let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
-                format!("__private float* {}", arg_name)
+                format!("__global float* {}", arg_name)
             })
             .collect::<Vec<String>>()
             .join(",\n");
@@ -1965,7 +1960,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
-                    __private float* t,
+                    __global float* t,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
