@@ -434,12 +434,13 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             String::from("tref"), String::from("is_spiking"),
         ];
 
+        let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
         let neurotransmitter_args = T::get_attribute_names_ordered()
             .iter()
             .map(|i| (
                 i.1, 
                 format!(
-                    "{}{}", generate_unique_prefix(&argument_names, "neuro"),
+                    "{}{}", neuro_prefix,
                     i.0.split("$").collect::<Vec<&str>>()[1],
                 )
             ))
@@ -514,12 +515,13 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
                 neurotransmitters_update(
                     index * number_of_types, 
-                    t, 
                     {}
                 );
                 ligand_gates_update_function(
                     index * number_of_types,
+                    {}t,
                     current_voltage,
+                    dt,
                     {}
                 );
 
@@ -538,6 +540,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
             parsed_argument_names.join(",\n"),
             neurotransmitter_arg_names.join(",\n"),
+            neuro_prefix,
             ligand_gates_args_names.join(",\n"),
             ligand_gates_prefix,
             ligand_gates_prefix,
