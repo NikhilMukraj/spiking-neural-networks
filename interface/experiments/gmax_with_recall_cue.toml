@@ -1,0 +1,28 @@
+[simulation_parameters]
+peaks_on = true
+second_cue = false
+second_cue_is_noisy = false
+use_correlation_as_accuracy = true
+measure_snr = true
+weights_scalar = 1
+inh_weights_scalar = 1
+skew = 0.1
+c_m = 25
+a = -1
+b = 0
+first_window = 1000
+second_window = 3000
+iterations1 = 2000
+iterations2 = 3000
+trials = 15
+
+filename = "gmax_with_recall_cue.json"
+
+[variables]
+spike_train_to_exc = [4.5]
+prob_of_exc_to_inh = [1]
+nmda_g = [0.5, 1.0, 1.5]
+ampa_g = [0.5, 1.0, 1.5]
+gabaa_g = [0.5, 1.0, 1.5]
+glutamate_clearance = [0.005]
+gabaa_clearance = [0.005]

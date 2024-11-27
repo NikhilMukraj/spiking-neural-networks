@@ -1,0 +1,28 @@
+[simulation_parameters]
+peaks_on = true
+first_cue_is_noisy = true
+second_cue = false
+use_correlation_as_accuracy = true
+measure_snr = true
+weights_scalar = 1
+inh_weights_scalar = 1
+skew = 0.1
+c_m = 25
+a = -1
+b = 0
+noisy_cue_noise_level = 0.15
+first_window = 1000
+iterations1 = 5000
+iterations2 = 0
+trials = 15
+
+filename = "gmax_no_input_noisy_cue.json"
+
+[variables]
+spike_train_to_exc = [0.5]
+prob_of_exc_to_inh = [1]
+nmda_g = [0.5, 1.0, 1.5]
+ampa_g = [0.5, 1.0, 1.5]
+gabaa_g = [0.5, 1.0, 1.5]
+glutamate_clearance = [0.005]
+gabaa_clearance = [0.005]
