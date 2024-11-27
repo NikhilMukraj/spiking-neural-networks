@@ -368,7 +368,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
                     float new_t = dt * -neurotransmitters_clearance_constant * neurotransmitters_t + 
                         (is_spiking_modifier * neurotransmitters_t_max);
 
-                    return clamp(new_t, 0, neurotransmitters_t_max);
+                    return clamp(new_t, 0.0f, neurotransmitters_t_max);
                 }
             ")
         )
@@ -594,7 +594,7 @@ impl ReceptorKineticsGPU for ApproximateReceptor {
             ],
             String::from("
                 float get_r(
-                    float neurotransmitters_t,
+                    float t
                 ) { 
                     return t;
                 }
@@ -1346,7 +1346,9 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     pub fn get_ligand_gated_channels_update_function() -> String {
         let mut kernel_args = vec![
             String::from("uint index"), 
+            String::from("__global float* t"),
             String::from("__global float* voltage"), 
+            String::from("__global float* dt"), 
             String::from("__global uint* flags"),
         ];
         let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
@@ -1960,7 +1962,6 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
-                    __global float* t,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
