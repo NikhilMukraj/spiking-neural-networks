@@ -1943,7 +1943,11 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             .map(|i| {
                 let split_result = i.split('$').collect::<Vec<&str>>();
                 let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
-                format!("__global float* {}", arg_name)
+                if i != "is_spiking" {
+                    format!("__global float* {}", arg_name)
+                } else {
+                    format!("__global uint* {}", arg_name)
+                }
             })
             .collect::<Vec<String>>()
             .join(",\n");
@@ -1962,6 +1966,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
+                    __global uint* flags,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
