@@ -29,6 +29,6 @@ mod tests {
 
         assert!(kernel_function.is_ok());
 
-        println!("{}", kernel_function.unwrap().program_source);
+        // println!("{}", kernel_function.unwrap().program_source);
     }
 }
