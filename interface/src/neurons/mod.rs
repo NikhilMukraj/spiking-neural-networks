@@ -1,14 +1,26 @@
+use spiking_neural_networks::neuron::{
+    iterate_and_spike::{
+        CurrentVoltage, GapConductance, GaussianFactor, GaussianParameters, IsSpiking, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, ReceptorKinetics, Timestep
+    }, 
+    iterate_and_spike_traits::IterateAndSpikeBase
+};
+
+
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, PartialOrd, Ord)]
+#[allow(clippy::upper_case_acronyms)]
 pub enum DopaGluGABANeurotransmitterType {
     Dopamine,
     Glutamate,
     GABA,
 }
 
-trait GlutamateGabaChannel {
+impl NeurotransmitterType for DopaGluGABANeurotransmitterType {}
+
+trait GlutamateGABAChannel {
     fn calculate_current(&mut self, voltage: f32) -> f32;
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct GlutamateReceptor<T: ReceptorKinetics> {
     ampa_g: f32,
     ampa_modifier: f32,
@@ -21,8 +33,8 @@ pub struct GlutamateReceptor<T: ReceptorKinetics> {
     current: f32,
 }
 
-impl<T: ReceptorKinetics> GlutamateGabaChannel for GlutamateReceptor<T> {
-    fn calculate_current(&mut self, voltage: f32) {
+impl<T: ReceptorKinetics> GlutamateGABAChannel for GlutamateReceptor<T> {
+    fn calculate_current(&mut self, voltage: f32) -> f32 {
         let ampa_current = self.ampa_g * self.ampa_receptor.get_r().powf(self.ampa_modifier) * (voltage - self.ampa_reversal);
         let nmda_current = self.nmda_g * self.nmda_receptor.get_r().powf(self.nmda_modifier) * (voltage - self.nmda_reversal);
 
@@ -32,9 +44,9 @@ impl<T: ReceptorKinetics> GlutamateGabaChannel for GlutamateReceptor<T> {
     }
 }
 
-impl<T: ReceptorKinetics> Default for GlutamateGabaChannel {
+impl<T: ReceptorKinetics> Default for GlutamateReceptor<T> {
     fn default() -> Self {
-        GlutamateGabaChannel {
+        GlutamateReceptor {
             ampa_g: 1.2,
             ampa_modifier: 1.,
             ampa_receptor: T::default(),
@@ -48,6 +60,7 @@ impl<T: ReceptorKinetics> Default for GlutamateGabaChannel {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct GABAReceptor<T: ReceptorKinetics> {
     g: f32,
     r: T,
@@ -55,15 +68,15 @@ pub struct GABAReceptor<T: ReceptorKinetics> {
     current: f32,
 }
 
-impl<T: ReceptorKinetics> GABAReceptor for GlutamateReceptor<T> {
-    fn calculate_current(&mut self, voltage: f32) {
+impl<T: ReceptorKinetics> GlutamateGABAChannel for GABAReceptor<T> {
+    fn calculate_current(&mut self, voltage: f32) -> f32 {
         self.current = self.g * self.r.get_r() * (voltage - self.reversal);
 
         self.current
     }
 }
 
-impl<T: ReceptorKinetics> Default for GABAReceptor {
+impl<T: ReceptorKinetics> Default for GABAReceptor<T> {
     fn default() -> Self {
         GABAReceptor {
             g: 0.,
@@ -74,6 +87,7 @@ impl<T: ReceptorKinetics> Default for GABAReceptor {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
 pub struct DopamineReceptor<T: ReceptorKinetics> {
     d1_r: T,
     d1_enabled: bool,
@@ -82,12 +96,12 @@ pub struct DopamineReceptor<T: ReceptorKinetics> {
 }
 
 impl<T: ReceptorKinetics> DopamineReceptor<T> {
-    fn apply_r_changes(&mut self, t: f32) {
+    fn apply_r_changes(&mut self, t: f32, dt: f32) {
         if self.d1_enabled {
-            self.d1_r.apply_r_change(t);
+            self.d1_r.apply_r_change(t, dt);
         }
         if self.d2_enabled {
-            self.d2_r.apply_r_change(t);
+            self.d2_r.apply_r_change(t, dt);
         }
     }
 
@@ -95,17 +109,29 @@ impl<T: ReceptorKinetics> DopamineReceptor<T> {
         let mut d1_modifier = 0.;
         let mut d2_modifier = 0.;
         if self.d2_enabled {
-            ampa_modifier = 1. + self.d2_r.get_r();
+            *ampa_modifier = 1. + self.d2_r.get_r();
             d2_modifier = self.d2_r.get_r();
         }
         if self.d1_enabled {
             d1_modifier = self.d1_r.get_r() * 0.5;
         }
-        nmda_modifier = 1. - d1_modifier + d2_modifier;
+        *nmda_modifier = 1. - d1_modifier + d2_modifier;
     }
 }
 
-pub struct DopaGluGabaReceptors<T: ReceptorKinetics> {
+impl<T: ReceptorKinetics> Default for DopamineReceptor<T> {
+    fn default() -> Self {
+        DopamineReceptor {
+            d1_r: T::default(),
+            d1_enabled: false,
+            d2_r: T::default(),
+            d2_enabled: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct DopaGluGABAReceptors<T: ReceptorKinetics> {
     dopamine_receptor: DopamineReceptor<T>,
     ampa_modifier: f32,
     nmda_modifier: f32,
@@ -113,67 +139,80 @@ pub struct DopaGluGabaReceptors<T: ReceptorKinetics> {
     gaba_receptor: Option<GlutamateReceptor<T>>,
 }
 
-impl<T: ReceptorKinetics> DopaGluGabaReceptors<T> {
-    fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<DopaGluGABANeurotransmitterType>) {
-        if t_total.contains(&DopaGluGABANeurotransmitterType::Glutamate) {
-            match self.glu_receptor {
-                Some(glu) => {
-                    glu.ampa_receptor.apply_r_change(t_total.get(&DopaGluGABANeurotransmitterType::Glutamate));
-                    glu.nmda_receptor.apply_r_change(t_total.get(&DopaGluGABANeurotransmitterType::Glutamate));
-                },
-                None => {}
+impl<T: ReceptorKinetics> DopaGluGABAReceptors<T> {
+    fn update_receptor_kinetics(
+        &mut self,
+        t_total: &NeurotransmitterConcentrations<DopaGluGABANeurotransmitterType>,
+        dt: f32,
+    ) {
+        if let Some(glutamate_concentration) = t_total.get(&DopaGluGABANeurotransmitterType::Glutamate) {
+            if let Some(ref mut glu) = self.glu_receptor {
+                glu.ampa_receptor
+                    .apply_r_change(*glutamate_concentration, dt);
+                glu.nmda_receptor
+                    .apply_r_change(*glutamate_concentration, dt);
             }
         }
-        if t_total.contains(&DopaGluGABANeurotransmitterType::GABA) {
-            match self.gaba_receptor {
-                Some(gaba) => {
-                    gaba.r.apply_r_change(t_total.get(&DopaGluGABANeurotransmitterType::GABA))
-                },
-                None => {}
+    
+        if let Some(gaba_concentration) = t_total.get(&DopaGluGABANeurotransmitterType::GABA) {
+            if let Some(ref mut gaba) = self.gaba_receptor {
+                gaba.ampa_receptor
+                    .apply_r_change(*gaba_concentration, dt);
             }
         }
-        if t_total.contains(&DopaGluGABANeurotransmitterType::Dopamine) {
-            self.dopamine_receptor.apply_r_changes(t_total.get(&DopaGluGABANeurotransmitterType::Dopamine));
+    
+        if let Some(dopamine_concentration) = t_total.get(&DopaGluGABANeurotransmitterType::Dopamine) {
+            self.dopamine_receptor
+                .apply_r_changes(*dopamine_concentration, dt);
         }
     }
-
+    
     fn set_receptor_currents(&mut self, voltage: f32) {
-        self.dopamine_receptor.get_modifiers(&mut ampa_modifier, &mut nmda_modifier);
-
-        match self.glu_receptor {
-            Some(glu) => {
-                glu.ampa_modifier = self.ampa_modifier;
-                glu.nmda_modifier = self.nmda_modifier;
-
-                let _ = glu.calculate_current(voltage);
-            },
-            None => {}
+        self.dopamine_receptor
+            .get_modifiers(&mut self.ampa_modifier, &mut self.nmda_modifier);
+    
+        if let Some(ref mut glu) = self.glu_receptor {
+            glu.ampa_modifier = self.ampa_modifier;
+            glu.nmda_modifier = self.nmda_modifier;
+            let _ = glu.calculate_current(voltage);
         }
-
-        match self.gaba_receptor {
-            Some(gaba) => {
-                let _ = gaba.calculate_current(voltage);
-            }
+    
+        if let Some(ref mut gaba) = self.gaba_receptor {
+            let _ = gaba.calculate_current(voltage);
         }
     }
+    
 
-    fn get_receptor_currents(&self) {
+    fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
         let mut current = 0.;
 
-        match self.glu_receptor {
+        match &self.glu_receptor {
             Some(glu) => {
                 current += glu.current;
             },
-            None => {}
+            None => {},
         }
 
-        match self.gaba_receptor {
+        match &self.gaba_receptor {
             Some(gaba) => {
                 current += gaba.current;
-            }
+            },
+            None => {},
         }
 
-        current
+        current / (dt / c_m)
+    }
+}
+
+impl<T: ReceptorKinetics> Default for DopaGluGABAReceptors<T> {
+    fn default() -> Self {
+        DopaGluGABAReceptors {
+            dopamine_receptor: DopamineReceptor::<T>::default(),
+            ampa_modifier: 0.,
+            nmda_modifier: 0.,
+            glu_receptor: None,
+            gaba_receptor: None,
+        }
     }
 }
 
@@ -184,8 +223,6 @@ pub struct DopaIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics
     pub current_voltage: f32, 
     /// Voltage threshold (mV)
     pub v_th: f32,
-    /// Voltage initialization value (mV) 
-    pub v_init: f32, 
     /// Controls speed
     pub a: f32, 
     /// Controls sensitivity to adaptive value
@@ -196,8 +233,6 @@ pub struct DopaIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics
     pub d: f32, 
     /// Adaptive value
     pub w_value: f32, 
-    /// Adaptive value initialization
-    pub w_init: f32, 
     /// Controls conductance of input gap junctions
     pub gap_conductance: f32, 
     /// Membrane time constant (ms)
@@ -210,15 +245,17 @@ pub struct DopaIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics
     pub is_spiking: bool,
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
+    /// Gaussian parameters
+    pub gaussian_params: GaussianParameters,
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<DopaGluGABANeurotransmitterType, T>,
-    /// Ionotropic receptor ligand gated channels
-    pub ligand_gates: DopaGluGabaReceptors<R>,
+    /// Dopamine, glutamate, and GABA receptors
+    pub ligand_gates: DopaGluGABAReceptors<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for DopaIzhikevichNeuron<T, R> {
     fn default() -> Self {
-        IzhikevichNeuron {
+        DopaIzhikevichNeuron {
             current_voltage: -65., 
             gap_conductance: 7.,
             w_value: 30.,
@@ -229,25 +266,22 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for DopaIzhikevic
             v_th: 30., // spike threshold (mV)
             tau_m: 1., // membrane time constant (ms)
             c_m: 100., // membrane capacitance (nF)
-            v_init: -65., // initial potential (mV)
-            w_init: 30., // initial w value
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
+            gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<DopaGluGABANeurotransmitterType, T>::default(),
-            ligand_gates: LigandGatedChannels::default(),
+            ligand_gates: DopaGluGABAReceptors::<R>::default(),
         }
     }
 }
 
-impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IzhikevichNeuron<T, R> {
+impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> DopaIzhikevichNeuron<T, R> {
     // Calculates how adaptive value changes
     pub fn izhikevich_get_dw_change(&self) -> f32 {
-        let dw = (
+        (
             self.a * (self.b * self.current_voltage - self.w_value)
-        ) * (self.dt / self.tau_m);
-
-        dw
+        ) * (self.dt / self.tau_m)
     }
 
     /// Determines whether the neuron is spiking, updates the voltage and 
@@ -288,7 +322,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for DopaI
         self.current_voltage += dv;
         self.w_value += dw;
 
-        self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.izhikevich_handle_spiking()
     }
@@ -299,7 +333,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for DopaI
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
         self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.ligand_gates.set_receptor_currents(self.current_voltage);
 
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
@@ -308,7 +342,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for DopaI
         self.current_voltage += dv + neurotransmitter_dv;
         self.w_value += dw;
 
-        self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
+        self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);
 
         self.izhikevich_handle_spiking()
     }
