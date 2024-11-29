@@ -1,5 +1,6 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
+// mod neurons;
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
     hodgkin_huxley::HodgkinHuxleyNeuron, 
