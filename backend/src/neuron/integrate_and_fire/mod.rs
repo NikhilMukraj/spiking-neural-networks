@@ -522,7 +522,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 );
                 ligand_gates_update_function(
                     index * number_of_types,
-                    {}t,
+                    t,
                     current_voltage,
                     dt,
                     flags,
@@ -544,7 +544,6 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
             parsed_argument_names.join(",\n"),
             neurotransmitter_arg_names.join(",\n"),
-            neuro_prefix,
             ligand_gates_args_names.join(",\n"),
             ligand_gates_prefix,
             ligand_gates_prefix,
