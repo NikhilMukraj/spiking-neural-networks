@@ -611,6 +611,33 @@ where
         //     Err(_) => return Err(GPUError::WaitError),
         // };
 
+        // let mut counts_buffer = unsafe {
+        //     match Buffer::<cl_float>::create(
+        //             &self.context, CL_MEM_READ_WRITE, gpu_graph.size * N::number_of_types(), ptr::null_mut()
+        //         ) {
+        //             Ok(value) => value,
+        //             Err(_) => return Err(GPUError::BufferCreateError),
+        //         }
+        // };
+
+        // let counts_buffer_write_event = unsafe { 
+        //     match self.queue.enqueue_write_buffer(
+        //         &mut counts_buffer, 
+        //         CL_NON_BLOCKING, 
+        //         0, 
+        //         &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
+        //         &[]
+        //     ) {
+        //         Ok(value) => value,
+        //         Err(_) => return Err(GPUError::BufferWriteError),
+        //     }
+        // };
+    
+        // match counts_buffer_write_event.wait() {
+        //     Ok(_) => {},
+        //     Err(_) => return Err(GPUError::WaitError),
+        // };
+
         // let rows = self.cell_grid.len();
         // let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
 
