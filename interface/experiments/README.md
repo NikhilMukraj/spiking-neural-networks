@@ -1,5 +1,40 @@
 # README
 
+## Todo
+
+- [x] Simulation pipeline for simulating a presentation of a cue and state transitioning
+- [x] Varying ionotropic neurotransmitters
+  - [x] Glutamate clearance
+  - [x] GABA clearance
+  - [ ] NMDA/AMPA clearance
+  - [ ] NMDA, AMPA, GABAa $g_max$
+- [ ] $D_1$ and $D_2$ model implementation for gain modulation on NMDA and AMPA
+  - [ ] Method to vary effect of dopamine concentration (probably through NMDA and AMPA modifier)
+- [ ] Bayesian inference with no gain modulation
+  - [ ] Emotional cue modulates selection of memory
+  - [ ] Existing memory modulates selection of memory
+- [ ] Bayesian inference with gain modulation
+  - [ ] Emotional cue modulates select of memory with dopamine mechanism
+  - [ ] Existing memory modulates selection of memory with dopamine mechanism
+  - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
+- [ ] Small world simulation
+  - [ ] Simulating multiple memories biasing each other with no dopamine modulation
+  - [ ] Simulating multiple memories biasing each other with dopamine modulation
+  - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
+- [ ] Liquid state machine
+  - [ ] STDP based learning of MNIST
+  - [ ] Varying ionotropic neurotransmitters
+    - [ ] Glutamate clearance
+    - [ ] GABA clearance
+    - [ ] NMDA/AMPA clearance
+    - [ ] NMDA, AMPA, GABAa $g_max$
+    - [ ] $D_1$ and $D_2$
+      - [ ] Dopamine clearance
+      - [ ] Dopamine modifier for AMPA
+      - [ ] Dopamine modifier for NMDA
+  - [ ] Small world simulation where liquid and memory interact
+- [ ] Repeat experiments with more detailed ion channel models and vary ion channel conductances
+
 ## Schizophrenia Simulation Pipeline
 
 The pipeline simulates brain activity by generating two groups of neurons, one inhibitory group
