@@ -64,6 +64,41 @@ impl PyIonotropicNeurotransmitterType {
     }
 }
 
+// #[pyclass]
+// #[pyo3(name = "DopaGluGABANeurotransmitterType")]
+// #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+// pub enum PyDopaGluGABANeurotransmitterType {
+//     Dopamine,
+//     Glutamate,
+//     GABA,
+// }
+
+// impl PyDopaGluGABANeurotransmitterType {
+//     pub fn convert_type(&self) -> DopaGluGABANeurotransmitterType {
+//         match self {
+//             PyDopaGluGABANeurotransmitterType::Dopamine => DopaGluGABANeurotransmitterType::Dopamine,
+//             PyDopaGluGABANeurotransmitterType::Glutamate => DopaGluGABANeurotransmitterType::Glutamate,
+//             PyDopaGluGABANeurotransmitterType::GABA => DopaGluGABANeurotransmitterType::GABA,
+//         }
+//     }
+// }
+
+// #[pymethods]
+// impl PyDopaGluGABANeurotransmitterType {
+//     fn __hash__(&self) -> u64 {
+//         let mut hasher = DefaultHasher::new();
+//         self.hash(&mut hasher);
+//         hasher.finish()
+//     }
+// }
+
+// #[pyclass]
+// #[pyo3(name = "GlutamateReceptor")]
+// #[derive(Debug, Clone)]
+// pub struct PyGlutamateReceptor {
+//     glutamate_receptor: GlutamateReceptor
+// }
+
 macro_rules! implement_basic_getter_and_setter {
     ($name:ident, $field:ident, $($param:ident, $get_name:ident, $set_name:ident),+) => {
         #[pymethods]
