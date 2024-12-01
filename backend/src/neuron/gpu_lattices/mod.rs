@@ -676,6 +676,10 @@ where
 
         //     // gap_junctions_event.wait().expect("Could not wait");
 
+        //     let chemical_synapses_event = unsafe {
+        //         let mut kernel_execution = ExecuteKernel::new(&self.chemical_incoming_connections_kernel);
+        //     };
+
         //     let iterate_event = unsafe {
         //         let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
 
@@ -686,6 +690,8 @@ where
         //                 kernel_execution.set_arg(&t_sums_buffer);
         //             } else if i == "index_to_position" {
         //                 kernel_execution.set_arg(&gpu_graph.index_to_position);
+        //             } else if i == "number_of_types" {
+        //                 kernel_execution.set_arg(&N::number_of_types());
         //             } else {
         //                 match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
         //                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
