@@ -27,13 +27,14 @@
     - [ ] Glutamate clearance
     - [ ] GABA clearance
     - [ ] NMDA/AMPA clearance
-    - [ ] NMDA, AMPA, GABAa $g_max$
+    - [ ] NMDA, AMPA, GABAa $g_{max}$
     - [ ] $D_1$ and $D_2$
       - [ ] Dopamine clearance
       - [ ] Dopamine modifier for AMPA
       - [ ] Dopamine modifier for NMDA
   - [ ] Small world simulation where liquid and memory interact
 - [ ] Repeat experiments with more detailed ion channel models and vary ion channel conductances
+  - [ ] Could also vary $Mg^{2+}$
 
 ## Schizophrenia Simulation Pipeline
 
