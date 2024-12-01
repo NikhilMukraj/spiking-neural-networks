@@ -47,7 +47,7 @@ impl<T: ReceptorKinetics> GlutamateGABAChannel for GlutamateReceptor<T> {
 impl<T: ReceptorKinetics> Default for GlutamateReceptor<T> {
     fn default() -> Self {
         GlutamateReceptor {
-            ampa_g: 1.2,
+            ampa_g: 1.,
             ampa_modifier: 1.,
             ampa_receptor: T::default(),
             ampa_reversal: 0.,
@@ -79,7 +79,7 @@ impl<T: ReceptorKinetics> GlutamateGABAChannel for GABAReceptor<T> {
 impl<T: ReceptorKinetics> Default for GABAReceptor<T> {
     fn default() -> Self {
         GABAReceptor {
-            g: 0.,
+            g: 1.2,
             r: T::default(),
             reversal: -80.,
             current: 0.,
