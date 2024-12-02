@@ -1,6 +1,10 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
 // mod neurons;
+// use neurons::{
+//     DopaGluGABANeurotransmitterType, DopaGluGABAReceptors, GlutamateReceptor, GABAReceptor,
+//     DopamineReceptor, GlutamateGABAChannel,
+// };
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
     hodgkin_huxley::HodgkinHuxleyNeuron, 
@@ -30,6 +34,45 @@ macro_rules! impl_repr {
             fn __repr__(&self) -> PyResult<String> {
                 Ok(format!("{:#?}", self.$field))
             }
+        }
+    };
+}
+
+
+macro_rules! implement_basic_getter_and_setter {
+    ($name:ident, $field:ident, $($param:ident, $get_name:ident, $set_name:ident),+) => {
+        #[pymethods]
+        impl $name {
+            $(
+                #[getter]
+                fn $get_name(&self) -> f32 {
+                    self.$field.$param
+                }
+
+                #[setter]
+                fn $set_name(&mut self, new_param: f32) {
+                    self.$field.$param = new_param;
+                }
+            )+
+        }
+    };
+}
+
+macro_rules! implement_nested_getter_and_setter {
+    ($name:ident, $field:ident, $nested_field:ident, $($param:ident, $py_name:ident, $get_name:ident, $set_name:ident),+) => {
+        #[pymethods]
+        impl $name {
+            $(
+                #[getter($py_name)]
+                fn $get_name(&self) -> f32 {
+                    self.$field.$nested_field.$param
+                }
+
+                #[setter($py_name)]
+                fn $set_name(&mut self, new_param: f32) {
+                    self.$field.$nested_field.$param = new_param;
+                }
+            )+
         }
     };
 }
@@ -146,23 +189,23 @@ impl PyIonotropicNeurotransmitterType {
 //     }
 
 //     fn get_ampa_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.ampa_receptor }
+//         PyApproximateReceptor { receptor: self.glutamate_receptor.ampa_receptor }
 //     }
 
 //     fn set_ampa_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.ampa_receptor = receptor.receptor;
+//         self.glutamate_receptor.ampa_receptor = receptor.receptor;
 //     }
 
 //     fn get_nmda_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.nmda_receptor }
+//         PyApproximateReceptor { receptor: self.glutamate_receptor.nmda_receptor }
 //     }
 
 //     fn set_nmda_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.nmda_receptor = receptor.receptor;
+//         self.glutamate_receptor.nmda_receptor = receptor.receptor;
 //     }
 
 //     fn calculate_current(&mut self, voltage: f32) -> f32 {
-//         self.glutamate_receptor.calculate_current(voltage);
+//         self.glutamate_receptor.calculate_current(voltage)
 //     }
 // }
 
@@ -195,21 +238,21 @@ impl PyIonotropicNeurotransmitterType {
 //                 g,
 //                 reversal,
 //                 current,
-//                 receptor: T::default(),
+//                 r: ApproximateReceptor::default(),
 //             }
 //         }
 //     }
 
 //     fn get_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.receptor }
+//         PyApproximateReceptor { receptor: self.gaba_receptor.r }
 //     }
 
 //     fn set_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.receptor = receptor.receptor;
+//         self.gaba_receptor.r = receptor.receptor;
 //     }
 
 //     fn calculate_current(&mut self, voltage: f32) -> f32 {
-//         self.glutamate_receptor.calculate_current(voltage);
+//         self.gaba_receptor.calculate_current(voltage)
 //     }
 // }
 
@@ -219,13 +262,6 @@ impl PyIonotropicNeurotransmitterType {
 // pub struct PyDopamineReceptor {
 //     dopamine_receptor: DopamineReceptor<ApproximateReceptor>,
 // }
-
-// implement_basic_getter_and_setter!(
-//     PyDopamineReceptor, 
-//     dopamine_receptor,
-//     d1_enabled, get_d1_enabled, set_d1_enabled,
-//     d2_enabled, get_d2_enabled, set_d2_enabled
-// );
 
 // #[pymethods]
 // impl PyDopamineReceptor {
@@ -250,17 +286,37 @@ impl PyIonotropicNeurotransmitterType {
 //         }
 //     }
 
+//     #[getter]
+//     fn get_d1_enabled(&self) -> bool {
+//         self.dopamine_receptor.d1_enabled
+//     }
+
+//     #[getter]
+//     fn get_d2_enabled(&self) -> bool {
+//         self.dopamine_receptor.d2_enabled
+//     }
+
+//     #[setter]
+//     fn set_d1_enabled(&mut self, flag: bool) {
+//         self.dopamine_receptor.d1_enabled = flag;
+//     }
+
+//     #[setter]
+//     fn set_d2_enabled(&mut self, flag: bool) {
+//         self.dopamine_receptor.d2_enabled = flag;
+//     }
+
 //     fn apply_r_changes(&mut self, t: f32, dt: f32) {
 //         self.dopamine_receptor.apply_r_changes(t, dt);
 //     }
 
-//     fn get_modifiers(&self, ampa_modifer: f32, nmda_modifier: f32) -> (f32, f32) {
-//         let mut local_ampa_modifier = ampa_modifer;
+//     fn get_modifiers(&self, ampa_modifier: f32, nmda_modifier: f32) -> (f32, f32) {
+//         let mut local_ampa_modifier = ampa_modifier;
 //         let mut local_nmda_modifier = nmda_modifier;
 //         self.dopamine_receptor
 //             .get_modifiers(&mut local_ampa_modifier, &mut local_nmda_modifier);
 
-//         (ampa_modifier, nmda_modifier)
+//         (local_ampa_modifier, local_nmda_modifier)
 //     }
 
 //     fn get_d1_r(&self) -> PyApproximateReceptor {
@@ -284,43 +340,93 @@ impl PyIonotropicNeurotransmitterType {
 //     }
 // }
 
-macro_rules! implement_basic_getter_and_setter {
-    ($name:ident, $field:ident, $($param:ident, $get_name:ident, $set_name:ident),+) => {
-        #[pymethods]
-        impl $name {
-            $(
-                #[getter]
-                fn $get_name(&self) -> f32 {
-                    self.$field.$param
-                }
+// #[pyclass]
+// #[pyo3(name = "DopaGluGABAReceptors")]
+// #[derive(Clone, Debug)]
+// pub struct PyDopaGluGABAReceptors {
+//     receptors: DopaGluGABAReceptors<ApproximateReceptor>
+// }
 
-                #[setter]
-                fn $set_name(&mut self, new_param: f32) {
-                    self.$field.$param = new_param;
-                }
-            )+
-        }
-    };
-}
+// implement_basic_getter_and_setter!(
+//     PyDopaGluGABAReceptors, 
+//     receptors,
+//     ampa_modifier, get_ampa_modifier, set_ampa_modifier,
+//     nmda_modifier, get_nmda_modifier, set_nmda_modifier
+// );
 
-macro_rules! implement_nested_getter_and_setter {
-    ($name:ident, $field:ident, $nested_field:ident, $($param:ident, $py_name:ident, $get_name:ident, $set_name:ident),+) => {
-        #[pymethods]
-        impl $name {
-            $(
-                #[getter($py_name)]
-                fn $get_name(&self) -> f32 {
-                    self.$field.$nested_field.$param
-                }
+// #[pymethods]
+// impl PyDopaGluGABAReceptors {
+//     #[new]
+//     #[pyo3(
+//     signature = (
+//         ampa_modifier=1.0,
+//         nmda_modifier=1.0,
+//     ))]
+//     pub fn new(
+//         ampa_modifier: f32,
+//         nmda_modifier: f32,
+//     ) -> Self {
+//         PyDopaGluGABAReceptors {
+//             receptors: DopaGluGABAReceptors {
+//                 ampa_modifier,
+//                 nmda_modifier,
+//                 ..DopaGluGABAReceptors::default()
+//             },
+//         }
+//     }
 
-                #[setter($py_name)]
-                fn $set_name(&mut self, new_param: f32) {
-                    self.$field.$nested_field.$param = new_param;
-                }
-            )+
-        }
-    };
-}
+//     pub fn get_receptor(
+//         &self,
+//         py: Python,
+//         receptor_type: PyDopaGluGABANeurotransmitterType,
+//     ) -> PyResult<Py<PyAny>> {
+//         match receptor_type {
+//             PyDopaGluGABANeurotransmitterType::Dopamine => {
+//                 let receptor = PyDopamineReceptor {
+//                     dopamine_receptor: self.receptors.dopamine_receptor,
+//                 };
+
+//                 Ok(receptor.into_py(py))
+//             },
+//             PyDopaGluGABANeurotransmitterType::Glutamate => self
+//                 .receptors
+//                 .glu_receptor
+//                 .clone()
+//                 .map(|receptor_value| receptor_value.into_py(py))
+//                 .ok_or_else(|| PyValueError::new_err("Glutamate receptor is not set")),
+//             PyDopaGluGABANeurotransmitterType::GABA => self
+//                 .receptors
+//                 .gaba_receptor
+//                 .clone()
+//                 .map(|receptor_value| receptor_value.into_py(py))
+//                 .ok_or_else(|| PyValueError::new_err("GABA receptor is not set")),
+//         }
+//     }
+
+//     pub fn set_receptor(
+//         &mut self,
+//         py: Python,
+//         receptor_type: PyDopaGluGABANeurotransmitterType,
+//         receptor: Py<PyAny>,
+//     ) -> PyResult<()> {
+//         match receptor_type {
+//             PyDopaGluGABANeurotransmitterType::Dopamine => {
+//                 let receptor = receptor.extract::<PyDopamineReceptor>(py)?;
+//                 self.receptors.dopamine_receptor = receptor.dopamine_receptor;
+//             }
+//             PyDopaGluGABANeurotransmitterType::Glutamate => {
+//                 let receptor = receptor.extract::<PyGlutamateReceptor>(py)?;
+//                 self.receptors.glu_receptor = Some(receptor.glutamate_receptor);
+//             }
+//             PyDopaGluGABANeurotransmitterType::GABA => {
+//                 let receptor = receptor.extract::<PyGABAReceptor>(py)?;
+//                 self.receptors.gaba_receptor = Some(receptor.gaba_receptor);
+//             }
+//         }
+
+//         Ok(())
+//     }
+// }
 
 #[pyclass]
 #[pyo3(name = "ApproximateNeurotransmitter")]
