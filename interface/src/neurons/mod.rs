@@ -16,21 +16,21 @@ pub enum DopaGluGABANeurotransmitterType {
 
 impl NeurotransmitterType for DopaGluGABANeurotransmitterType {}
 
-trait GlutamateGABAChannel {
+pub trait GlutamateGABAChannel {
     fn calculate_current(&mut self, voltage: f32) -> f32;
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct GlutamateReceptor<T: ReceptorKinetics> {
-    ampa_g: f32,
-    ampa_modifier: f32,
-    ampa_receptor: T,
-    ampa_reversal: f32,
-    nmda_g: f32,
-    nmda_modifier: f32,
-    nmda_receptor: T,
-    nmda_reversal: f32,
-    current: f32,
+    pub ampa_g: f32,
+    pub ampa_modifier: f32,
+    pub ampa_receptor: T,
+    pub ampa_reversal: f32,
+    pub nmda_g: f32,
+    pub nmda_modifier: f32,
+    pub nmda_receptor: T,
+    pub nmda_reversal: f32,
+    pub current: f32,
 }
 
 impl<T: ReceptorKinetics> GlutamateGABAChannel for GlutamateReceptor<T> {
@@ -62,10 +62,10 @@ impl<T: ReceptorKinetics> Default for GlutamateReceptor<T> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct GABAReceptor<T: ReceptorKinetics> {
-    g: f32,
-    r: T,
-    reversal: f32,
-    current: f32,
+    pub g: f32,
+    pub r: T,
+    pub reversal: f32,
+    pub current: f32,
 }
 
 impl<T: ReceptorKinetics> GlutamateGABAChannel for GABAReceptor<T> {
@@ -89,14 +89,14 @@ impl<T: ReceptorKinetics> Default for GABAReceptor<T> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct DopamineReceptor<T: ReceptorKinetics> {
-    d1_r: T,
-    d1_enabled: bool,
-    d2_r: T,
-    d2_enabled: bool,
+    pub d1_r: T,
+    pub d1_enabled: bool,
+    pub d2_r: T,
+    pub d2_enabled: bool,
 }
 
 impl<T: ReceptorKinetics> DopamineReceptor<T> {
-    fn apply_r_changes(&mut self, t: f32, dt: f32) {
+    pub fn apply_r_changes(&mut self, t: f32, dt: f32) {
         if self.d1_enabled {
             self.d1_r.apply_r_change(t, dt);
         }
@@ -105,7 +105,7 @@ impl<T: ReceptorKinetics> DopamineReceptor<T> {
         }
     }
 
-    fn get_modifiers(&self, ampa_modifier: &mut f32, nmda_modifier: &mut f32) {
+    pub fn get_modifiers(&self, ampa_modifier: &mut f32, nmda_modifier: &mut f32) {
         let mut d1_modifier = 0.;
         let mut d2_modifier = 0.;
         if self.d2_enabled {
@@ -132,11 +132,11 @@ impl<T: ReceptorKinetics> Default for DopamineReceptor<T> {
 
 #[derive(Clone, Copy, Debug)]
 pub struct DopaGluGABAReceptors<T: ReceptorKinetics> {
-    dopamine_receptor: DopamineReceptor<T>,
-    ampa_modifier: f32,
-    nmda_modifier: f32,
-    glu_receptor: Option<GlutamateReceptor<T>>,
-    gaba_receptor: Option<GlutamateReceptor<T>>,
+    pub dopamine_receptor: DopamineReceptor<T>,
+    pub ampa_modifier: f32,
+    pub nmda_modifier: f32,
+    pub glu_receptor: Option<GlutamateReceptor<T>>,
+    pub gaba_receptor: Option<GABAReceptor<T>>,
 }
 
 impl<T: ReceptorKinetics> DopaGluGABAReceptors<T> {
@@ -156,8 +156,7 @@ impl<T: ReceptorKinetics> DopaGluGABAReceptors<T> {
     
         if let Some(gaba_concentration) = t_total.get(&DopaGluGABANeurotransmitterType::GABA) {
             if let Some(ref mut gaba) = self.gaba_receptor {
-                gaba.ampa_receptor
-                    .apply_r_change(*gaba_concentration, dt);
+                gaba.r.apply_r_change(*gaba_concentration, dt);
             }
         }
     
