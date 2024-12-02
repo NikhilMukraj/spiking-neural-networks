@@ -28,7 +28,12 @@ mod tests {
             iterate_and_spike_electrochemical_kernel(&context);
 
         assert!(kernel_function.is_ok());
-
-        // println!("{}", kernel_function.unwrap().program_source);
     }
+
+    // #[test]
+    // pub fn test_single_quadratic_neuron() {
+    //     // initialize 1x1 grid
+    //     // give constant ampa input, then constant nmda, gaba, etc
+    //     // check against cpu equavilent
+    // }
 }
