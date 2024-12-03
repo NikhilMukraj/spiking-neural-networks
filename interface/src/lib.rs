@@ -1,10 +1,10 @@
 use std::{collections::{hash_map::DefaultHasher, HashMap, HashSet}, hash::{Hash, Hasher}};
 use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, PyList, PyTuple}};
-// mod neurons;
-// use neurons::{
-//     DopaGluGABANeurotransmitterType, DopaGluGABAReceptors, GlutamateReceptor, GABAReceptor,
-//     DopamineReceptor, GlutamateGABAChannel,
-// };
+mod neurons;
+use neurons::{
+    DopaGluGABANeurotransmitterType, DopaGluGABAReceptors, GlutamateReceptor, GABAReceptor,
+    DopamineReceptor, GlutamateGABAChannel,
+};
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
     hodgkin_huxley::HodgkinHuxleyNeuron, 
@@ -107,326 +107,346 @@ impl PyIonotropicNeurotransmitterType {
     }
 }
 
-// #[pyclass]
-// #[pyo3(name = "DopaGluGABANeurotransmitterType")]
-// #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
-// pub enum PyDopaGluGABANeurotransmitterType {
-//     Dopamine,
-//     Glutamate,
-//     GABA,
-// }
+#[pyclass]
+#[pyo3(name = "DopaGluGABANeurotransmitterType")]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum PyDopaGluGABANeurotransmitterType {
+    Dopamine,
+    Glutamate,
+    GABA,
+}
 
-// impl PyDopaGluGABANeurotransmitterType {
-//     pub fn convert_type(&self) -> DopaGluGABANeurotransmitterType {
-//         match self {
-//             PyDopaGluGABANeurotransmitterType::Dopamine => DopaGluGABANeurotransmitterType::Dopamine,
-//             PyDopaGluGABANeurotransmitterType::Glutamate => DopaGluGABANeurotransmitterType::Glutamate,
-//             PyDopaGluGABANeurotransmitterType::GABA => DopaGluGABANeurotransmitterType::GABA,
-//         }
-//     }
-// }
+impl PyDopaGluGABANeurotransmitterType {
+    pub fn convert_type(&self) -> DopaGluGABANeurotransmitterType {
+        match self {
+            PyDopaGluGABANeurotransmitterType::Dopamine => DopaGluGABANeurotransmitterType::Dopamine,
+            PyDopaGluGABANeurotransmitterType::Glutamate => DopaGluGABANeurotransmitterType::Glutamate,
+            PyDopaGluGABANeurotransmitterType::GABA => DopaGluGABANeurotransmitterType::GABA,
+        }
+    }
+}
 
-// #[pymethods]
-// impl PyDopaGluGABANeurotransmitterType {
-//     fn __hash__(&self) -> u64 {
-//         let mut hasher = DefaultHasher::new();
-//         self.hash(&mut hasher);
-//         hasher.finish()
-//     }
-// }
+#[pymethods]
+impl PyDopaGluGABANeurotransmitterType {
+    fn __hash__(&self) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        self.hash(&mut hasher);
+        hasher.finish()
+    }
+}
 
-// #[pyclass]
-// #[pyo3(name = "GlutamateReceptor")]
-// #[derive(Debug, Clone)]
-// pub struct PyGlutamateReceptor {
-//     glutamate_receptor: GlutamateReceptor<ApproximateReceptor>
-// }
+#[pyclass]
+#[pyo3(name = "GlutamateReceptor")]
+#[derive(Debug, Clone)]
+pub struct PyGlutamateReceptor {
+    glutamate_receptor: GlutamateReceptor<ApproximateReceptor>
+}
 
-// implement_basic_getter_and_setter!(
-//     PyGlutamateReceptor, 
-//     glutamate_receptor,
-//     ampa_g, get_ampa_g, set_ampa_g,
-//     ampa_modifier, get_ampa_modifier, set_ampa_modifier,
-//     ampa_reversal, get_ampa_reversal, set_ampa_reversal,
-//     nmda_g, get_nmda_g, set_nmda_g,
-//     nmda_modifier, get_nmda_modifier, set_nmda_modifier,
-//     nmda_reversal, get_nmda_reversal, set_nmda_reversal,
-//     current, get_current, set_current
-// );
+impl_repr!(PyGlutamateReceptor, glutamate_receptor);
 
-// #[pymethods]
-// impl PyGlutamateReceptor {
-//     #[new]
-//     #[pyo3(
-//         signature = (
-//             ampa_g=1.0, ampa_modifier=1.0, ampa_reversal=0.0,
-//             nmda_g=0.6, nmda_modifier=1.0, nmda_reversal=0.0,
-//             current=0.0
-//         )
-//     )]
-//     fn new(
-//         ampa_g: f32,
-//         ampa_modifier: f32,
-//         ampa_reversal: f32,
-//         nmda_g: f32,
-//         nmda_modifier: f32,
-//         nmda_reversal: f32,
-//         current: f32,
-//     ) -> Self {
-//         PyGlutamateReceptor {
-//             glutamate_receptor: GlutamateReceptor {
-//                 ampa_g,
-//                 ampa_modifier,
-//                 ampa_receptor: ApproximateReceptor::default(),
-//                 ampa_reversal,
-//                 nmda_g,
-//                 nmda_modifier,
-//                 nmda_receptor: ApproximateReceptor::default(),
-//                 nmda_reversal,
-//                 current,
-//             },
-//         }
-//     }
+implement_basic_getter_and_setter!(
+    PyGlutamateReceptor, 
+    glutamate_receptor,
+    ampa_g, get_ampa_g, set_ampa_g,
+    ampa_modifier, get_ampa_modifier, set_ampa_modifier,
+    ampa_reversal, get_ampa_reversal, set_ampa_reversal,
+    nmda_g, get_nmda_g, set_nmda_g,
+    nmda_modifier, get_nmda_modifier, set_nmda_modifier,
+    nmda_reversal, get_nmda_reversal, set_nmda_reversal,
+    current, get_current, set_current
+);
 
-//     fn get_ampa_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.glutamate_receptor.ampa_receptor }
-//     }
+#[pymethods]
+impl PyGlutamateReceptor {
+    #[new]
+    #[pyo3(
+        signature = (
+            ampa_g=1.0, ampa_modifier=1.0, ampa_reversal=0.0,
+            nmda_g=0.6, nmda_modifier=1.0, nmda_reversal=0.0,
+            current=0.0
+        )
+    )]
+    fn new(
+        ampa_g: f32,
+        ampa_modifier: f32,
+        ampa_reversal: f32,
+        nmda_g: f32,
+        nmda_modifier: f32,
+        nmda_reversal: f32,
+        current: f32,
+    ) -> Self {
+        PyGlutamateReceptor {
+            glutamate_receptor: GlutamateReceptor {
+                ampa_g,
+                ampa_modifier,
+                ampa_receptor: ApproximateReceptor::default(),
+                ampa_reversal,
+                nmda_g,
+                nmda_modifier,
+                nmda_receptor: ApproximateReceptor::default(),
+                nmda_reversal,
+                current,
+            },
+        }
+    }
 
-//     fn set_ampa_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.glutamate_receptor.ampa_receptor = receptor.receptor;
-//     }
+    fn get_ampa_receptor(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor { receptor: self.glutamate_receptor.ampa_receptor }
+    }
 
-//     fn get_nmda_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.glutamate_receptor.nmda_receptor }
-//     }
+    fn set_ampa_receptor(&mut self, receptor: PyApproximateReceptor) {
+        self.glutamate_receptor.ampa_receptor = receptor.receptor;
+    }
 
-//     fn set_nmda_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.glutamate_receptor.nmda_receptor = receptor.receptor;
-//     }
+    fn get_nmda_receptor(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor { receptor: self.glutamate_receptor.nmda_receptor }
+    }
 
-//     fn calculate_current(&mut self, voltage: f32) -> f32 {
-//         self.glutamate_receptor.calculate_current(voltage)
-//     }
-// }
+    fn set_nmda_receptor(&mut self, receptor: PyApproximateReceptor) {
+        self.glutamate_receptor.nmda_receptor = receptor.receptor;
+    }
 
-// #[pyclass]
-// #[pyo3(name = "GABAReceptor")]
-// #[derive(Clone, Debug)]
-// pub struct PyGABAReceptor {
-//     gaba_receptor: GABAReceptor<ApproximateReceptor>,
-// }
+    fn calculate_current(&mut self, voltage: f32) -> f32 {
+        self.glutamate_receptor.calculate_current(voltage)
+    }
+}
 
-// implement_basic_getter_and_setter!(
-//     PyGABAReceptor,
-//     gaba_receptor,
-//     g, get_g, set_g,
-//     reversal, get_reversal, set_reversal,
-//     current, get_current, set_current
-// );
+#[pyclass]
+#[pyo3(name = "GABAReceptor")]
+#[derive(Clone, Debug)]
+pub struct PyGABAReceptor {
+    gaba_receptor: GABAReceptor<ApproximateReceptor>,
+}
 
-// #[pymethods]
-// impl PyGABAReceptor {
-//     #[new]
-//     #[pyo3(
-//         signature = (
-//             g=1.6, reversal=-80., current=0.
-//         )
-//     )]
-//     fn new(g: f32, reversal: f32, current: f32) -> Self {
-//         PyGABAReceptor {
-//             gaba_receptor: GABAReceptor {
-//                 g,
-//                 reversal,
-//                 current,
-//                 r: ApproximateReceptor::default(),
-//             }
-//         }
-//     }
+impl_repr!(PyGABAReceptor, gaba_receptor);
 
-//     fn get_receptor(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor { receptor: self.gaba_receptor.r }
-//     }
+implement_basic_getter_and_setter!(
+    PyGABAReceptor,
+    gaba_receptor,
+    g, get_g, set_g,
+    reversal, get_reversal, set_reversal,
+    current, get_current, set_current
+);
 
-//     fn set_receptor(&mut self, receptor: PyApproximateReceptor) {
-//         self.gaba_receptor.r = receptor.receptor;
-//     }
+#[pymethods]
+impl PyGABAReceptor {
+    #[new]
+    #[pyo3(
+        signature = (
+            g=1.6, reversal=-80., current=0.
+        )
+    )]
+    fn new(g: f32, reversal: f32, current: f32) -> Self {
+        PyGABAReceptor {
+            gaba_receptor: GABAReceptor {
+                g,
+                reversal,
+                current,
+                r: ApproximateReceptor::default(),
+            }
+        }
+    }
 
-//     fn calculate_current(&mut self, voltage: f32) -> f32 {
-//         self.gaba_receptor.calculate_current(voltage)
-//     }
-// }
+    fn get_receptor(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor { receptor: self.gaba_receptor.r }
+    }
 
-// #[pyclass]
-// #[pyo3(name = "DopamineReceptor")]
-// #[derive(Debug, Clone)]
-// pub struct PyDopamineReceptor {
-//     dopamine_receptor: DopamineReceptor<ApproximateReceptor>,
-// }
+    fn set_receptor(&mut self, receptor: PyApproximateReceptor) {
+        self.gaba_receptor.r = receptor.receptor;
+    }
 
-// #[pymethods]
-// impl PyDopamineReceptor {
-//     #[new]
-//     #[pyo3(
-//         signature = (
-//             d1_enabled = false,
-//             d2_enabled = false
-//         )
-//     )]
-//     fn new(
-//         d1_enabled: bool,
-//         d2_enabled: bool,
-//     ) -> Self {
-//         PyDopamineReceptor {
-//             dopamine_receptor: DopamineReceptor {
-//                 d1_r: ApproximateReceptor::default(),
-//                 d1_enabled,
-//                 d2_r: ApproximateReceptor::default(),
-//                 d2_enabled,
-//             },
-//         }
-//     }
+    fn calculate_current(&mut self, voltage: f32) -> f32 {
+        self.gaba_receptor.calculate_current(voltage)
+    }
+}
 
-//     #[getter]
-//     fn get_d1_enabled(&self) -> bool {
-//         self.dopamine_receptor.d1_enabled
-//     }
+#[pyclass]
+#[pyo3(name = "DopamineReceptor")]
+#[derive(Debug, Clone)]
+pub struct PyDopamineReceptor {
+    dopamine_receptor: DopamineReceptor<ApproximateReceptor>,
+}
 
-//     #[getter]
-//     fn get_d2_enabled(&self) -> bool {
-//         self.dopamine_receptor.d2_enabled
-//     }
+impl_repr!(PyDopamineReceptor, dopamine_receptor);
 
-//     #[setter]
-//     fn set_d1_enabled(&mut self, flag: bool) {
-//         self.dopamine_receptor.d1_enabled = flag;
-//     }
+#[pymethods]
+impl PyDopamineReceptor {
+    #[new]
+    #[pyo3(
+        signature = (
+            d1_enabled = false,
+            d2_enabled = false
+        )
+    )]
+    fn new(
+        d1_enabled: bool,
+        d2_enabled: bool,
+    ) -> Self {
+        PyDopamineReceptor {
+            dopamine_receptor: DopamineReceptor {
+                d1_r: ApproximateReceptor::default(),
+                d1_enabled,
+                d2_r: ApproximateReceptor::default(),
+                d2_enabled,
+            },
+        }
+    }
 
-//     #[setter]
-//     fn set_d2_enabled(&mut self, flag: bool) {
-//         self.dopamine_receptor.d2_enabled = flag;
-//     }
+    #[getter]
+    fn get_d1_enabled(&self) -> bool {
+        self.dopamine_receptor.d1_enabled
+    }
 
-//     fn apply_r_changes(&mut self, t: f32, dt: f32) {
-//         self.dopamine_receptor.apply_r_changes(t, dt);
-//     }
+    #[getter]
+    fn get_d2_enabled(&self) -> bool {
+        self.dopamine_receptor.d2_enabled
+    }
 
-//     fn get_modifiers(&self, ampa_modifier: f32, nmda_modifier: f32) -> (f32, f32) {
-//         let mut local_ampa_modifier = ampa_modifier;
-//         let mut local_nmda_modifier = nmda_modifier;
-//         self.dopamine_receptor
-//             .get_modifiers(&mut local_ampa_modifier, &mut local_nmda_modifier);
+    #[setter]
+    fn set_d1_enabled(&mut self, flag: bool) {
+        self.dopamine_receptor.d1_enabled = flag;
+    }
 
-//         (local_ampa_modifier, local_nmda_modifier)
-//     }
+    #[setter]
+    fn set_d2_enabled(&mut self, flag: bool) {
+        self.dopamine_receptor.d2_enabled = flag;
+    }
 
-//     fn get_d1_r(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor {
-//             receptor: self.dopamine_receptor.d1_r.clone(),
-//         }
-//     }
+    fn apply_r_changes(&mut self, t: f32, dt: f32) {
+        self.dopamine_receptor.apply_r_changes(t, dt);
+    }
 
-//     fn set_d1_r(&mut self, receptor: PyApproximateReceptor) {
-//         self.dopamine_receptor.d1_r = receptor.receptor;
-//     }
+    fn get_modifiers(&self, ampa_modifier: f32, nmda_modifier: f32) -> (f32, f32) {
+        let mut local_ampa_modifier = ampa_modifier;
+        let mut local_nmda_modifier = nmda_modifier;
+        self.dopamine_receptor
+            .get_modifiers(&mut local_ampa_modifier, &mut local_nmda_modifier);
 
-//     fn get_d2_r(&self) -> PyApproximateReceptor {
-//         PyApproximateReceptor {
-//             receptor: self.dopamine_receptor.d2_r.clone(),
-//         }
-//     }
+        (local_ampa_modifier, local_nmda_modifier)
+    }
 
-//     fn set_d2_r(&mut self, receptor: PyApproximateReceptor) {
-//         self.dopamine_receptor.d2_r = receptor.receptor;
-//     }
-// }
+    fn get_d1_r(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor {
+            receptor: self.dopamine_receptor.d1_r,
+        }
+    }
 
-// #[pyclass]
-// #[pyo3(name = "DopaGluGABAReceptors")]
-// #[derive(Clone, Debug)]
-// pub struct PyDopaGluGABAReceptors {
-//     receptors: DopaGluGABAReceptors<ApproximateReceptor>
-// }
+    fn set_d1_r(&mut self, receptor: PyApproximateReceptor) {
+        self.dopamine_receptor.d1_r = receptor.receptor;
+    }
 
-// implement_basic_getter_and_setter!(
-//     PyDopaGluGABAReceptors, 
-//     receptors,
-//     ampa_modifier, get_ampa_modifier, set_ampa_modifier,
-//     nmda_modifier, get_nmda_modifier, set_nmda_modifier
-// );
+    fn get_d2_r(&self) -> PyApproximateReceptor {
+        PyApproximateReceptor {
+            receptor: self.dopamine_receptor.d2_r,
+        }
+    }
 
-// #[pymethods]
-// impl PyDopaGluGABAReceptors {
-//     #[new]
-//     #[pyo3(
-//     signature = (
-//         ampa_modifier=1.0,
-//         nmda_modifier=1.0,
-//     ))]
-//     pub fn new(
-//         ampa_modifier: f32,
-//         nmda_modifier: f32,
-//     ) -> Self {
-//         PyDopaGluGABAReceptors {
-//             receptors: DopaGluGABAReceptors {
-//                 ampa_modifier,
-//                 nmda_modifier,
-//                 ..DopaGluGABAReceptors::default()
-//             },
-//         }
-//     }
+    fn set_d2_r(&mut self, receptor: PyApproximateReceptor) {
+        self.dopamine_receptor.d2_r = receptor.receptor;
+    }
+}
 
-//     pub fn get_receptor(
-//         &self,
-//         py: Python,
-//         receptor_type: PyDopaGluGABANeurotransmitterType,
-//     ) -> PyResult<Py<PyAny>> {
-//         match receptor_type {
-//             PyDopaGluGABANeurotransmitterType::Dopamine => {
-//                 let receptor = PyDopamineReceptor {
-//                     dopamine_receptor: self.receptors.dopamine_receptor,
-//                 };
+#[pyclass]
+#[pyo3(name = "DopaGluGABAReceptors")]
+#[derive(Clone, Debug)]
+pub struct PyDopaGluGABAReceptors {
+    receptors: DopaGluGABAReceptors<ApproximateReceptor>
+}
 
-//                 Ok(receptor.into_py(py))
-//             },
-//             PyDopaGluGABANeurotransmitterType::Glutamate => self
-//                 .receptors
-//                 .glu_receptor
-//                 .clone()
-//                 .map(|receptor_value| receptor_value.into_py(py))
-//                 .ok_or_else(|| PyValueError::new_err("Glutamate receptor is not set")),
-//             PyDopaGluGABANeurotransmitterType::GABA => self
-//                 .receptors
-//                 .gaba_receptor
-//                 .clone()
-//                 .map(|receptor_value| receptor_value.into_py(py))
-//                 .ok_or_else(|| PyValueError::new_err("GABA receptor is not set")),
-//         }
-//     }
+impl_repr!(PyDopaGluGABAReceptors, receptors);
 
-//     pub fn set_receptor(
-//         &mut self,
-//         py: Python,
-//         receptor_type: PyDopaGluGABANeurotransmitterType,
-//         receptor: Py<PyAny>,
-//     ) -> PyResult<()> {
-//         match receptor_type {
-//             PyDopaGluGABANeurotransmitterType::Dopamine => {
-//                 let receptor = receptor.extract::<PyDopamineReceptor>(py)?;
-//                 self.receptors.dopamine_receptor = receptor.dopamine_receptor;
-//             }
-//             PyDopaGluGABANeurotransmitterType::Glutamate => {
-//                 let receptor = receptor.extract::<PyGlutamateReceptor>(py)?;
-//                 self.receptors.glu_receptor = Some(receptor.glutamate_receptor);
-//             }
-//             PyDopaGluGABANeurotransmitterType::GABA => {
-//                 let receptor = receptor.extract::<PyGABAReceptor>(py)?;
-//                 self.receptors.gaba_receptor = Some(receptor.gaba_receptor);
-//             }
-//         }
+implement_basic_getter_and_setter!(
+    PyDopaGluGABAReceptors, 
+    receptors,
+    ampa_modifier, get_ampa_modifier, set_ampa_modifier,
+    nmda_modifier, get_nmda_modifier, set_nmda_modifier
+);
 
-//         Ok(())
-//     }
-// }
+#[pymethods]
+impl PyDopaGluGABAReceptors {
+    #[new]
+    #[pyo3(
+    signature = (
+        ampa_modifier=1.0,
+        nmda_modifier=1.0,
+    ))]
+    pub fn new(
+        ampa_modifier: f32,
+        nmda_modifier: f32,
+    ) -> Self {
+        PyDopaGluGABAReceptors {
+            receptors: DopaGluGABAReceptors {
+                ampa_modifier,
+                nmda_modifier,
+                ..DopaGluGABAReceptors::default()
+            },
+        }
+    }
+
+    pub fn get_receptor(
+        &self,
+        py: Python,
+        receptor_type: PyDopaGluGABANeurotransmitterType,
+    ) -> PyResult<Py<PyAny>> {
+        match receptor_type {
+            PyDopaGluGABANeurotransmitterType::Dopamine => {
+                let receptor = PyDopamineReceptor {
+                    dopamine_receptor: self.receptors.dopamine_receptor,
+                };
+
+                Ok(receptor.into_py(py))
+            },
+            PyDopaGluGABANeurotransmitterType::Glutamate => {
+                match self.receptors.glu_receptor {
+                    Some(val) => {
+                        let receptor = PyGlutamateReceptor {
+                            glutamate_receptor: val,
+                        };
+
+                        Ok(receptor.into_py(py))
+                    },
+                    None => Err(PyValueError::new_err("Glutamate receptor is not set")),
+                }
+            }
+            PyDopaGluGABANeurotransmitterType::GABA => {
+                match self.receptors.gaba_receptor {
+                    Some(val) => {
+                        let receptor = PyGABAReceptor {
+                            gaba_receptor: val,
+                        };
+
+                        Ok(receptor.into_py(py))
+                    },
+                    None => Err(PyValueError::new_err("GABA receptor is not set")),
+                }
+            },
+        }
+    }
+
+    pub fn set_receptor(
+        &mut self,
+        py: Python,
+        receptor_type: PyDopaGluGABANeurotransmitterType,
+        receptor: Py<PyAny>,
+    ) -> PyResult<()> {
+        match receptor_type {
+            PyDopaGluGABANeurotransmitterType::Dopamine => {
+                let receptor = receptor.extract::<PyDopamineReceptor>(py)?;
+                self.receptors.dopamine_receptor = receptor.dopamine_receptor;
+            }
+            PyDopaGluGABANeurotransmitterType::Glutamate => {
+                let receptor = receptor.extract::<PyGlutamateReceptor>(py)?;
+                self.receptors.glu_receptor = Some(receptor.glutamate_receptor);
+            }
+            PyDopaGluGABANeurotransmitterType::GABA => {
+                let receptor = receptor.extract::<PyGABAReceptor>(py)?;
+                self.receptors.gaba_receptor = Some(receptor.gaba_receptor);
+            }
+        }
+
+        Ok(())
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "ApproximateNeurotransmitter")]
@@ -2830,6 +2850,11 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyNeuron>()?;
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
+    m.add_class::<PyDopaGluGABANeurotransmitterType>()?;
+    m.add_class::<PyDopaGluGABAReceptors>()?;
+    m.add_class::<PyGlutamateReceptor>()?;
+    m.add_class::<PyGABAReceptor>()?;
+    m.add_class::<PyDopamineReceptor>()?;
     m.add_class::<PyGraphPosition>()?;
 
     // option to use adjacency list instead of matrix
