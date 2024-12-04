@@ -586,6 +586,8 @@ implement_basic_getter_and_setter!(
     r, get_r, set_r 
 );
 
+impl_repr!(PyApproximateReceptor, receptor);
+
 #[pymethods]
 impl PyApproximateReceptor {
     #[new]
@@ -619,7 +621,6 @@ implement_basic_getter_and_setter!(
 );
 
 impl_repr!(PyApproximateLigandGatedChannel, ligand_gate);
-
 trait BVNMDADefault {
     fn bv_nmda_default() -> Self;
 }
