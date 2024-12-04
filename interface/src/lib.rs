@@ -448,6 +448,31 @@ impl PyDopaGluGABAReceptors {
     }
 }
 
+// #[pyclass]
+// #[pyo3(name = "DopaIzhikevichNeuron")]
+// #[derive(Clone, Debug)]
+// pub struct PyDopaIzhikevichNeuron {
+//     model: DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>
+// }
+
+// implement_basic_getter_and_setter!(
+//     PyDopaIzhikevichNeuron, 
+//     model,
+//     current_voltage, get_current_voltage, set_current_voltage,
+//     a, get_a, set_a, 
+//     b, get_b, set_b, 
+//     c, get_c, set_c, 
+//     d, get_d, set_d, 
+//     dt, get_dt, set_dt, 
+//     v_th, get_v_th, set_v_th, 
+//     v_init, get_v_init, set_v_init, 
+//     w_value, get_w, set_w,
+//     w_init, get_w_init, set_w_init,
+//     gap_conductance, get_gap_conductance, set_gap_conductance,
+//     tau_m, get_tau_m, set_tau_m,
+//     c_m, get_c_m, set_c_m
+// );
+
 #[pyclass]
 #[pyo3(name = "ApproximateNeurotransmitter")]
 #[derive(Clone, Copy)]
