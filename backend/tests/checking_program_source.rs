@@ -5,13 +5,13 @@ mod tests {
     };
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::{
-            integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
-            iterate_and_spike::{
-                ApproximateNeurotransmitter, ApproximateReceptor, IterateAndSpikeGPU,
-                // IterateAndSpike, IonotropicNeurotransmitterType, AMPADefault,
-                // LigandGatedChannel, NeurotransmitterConcentrations, Timestep,
-            }
-        };
+        integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
+        iterate_and_spike::{
+            ApproximateNeurotransmitter, ApproximateReceptor, IterateAndSpikeGPU,
+            // IterateAndSpike, IonotropicNeurotransmitterType, AMPADefault,
+            // LigandGatedChannel, NeurotransmitterConcentrations, Timestep,
+        }
+    };
 
     #[test]
     pub fn test_program_source() {
@@ -29,37 +29,111 @@ mod tests {
         assert!(kernel_function.is_ok());
     }
 
+    // fn create_and_write_buffer<T>(
+    //     context: &Context,
+    //     queue: &CommandQueue,
+    //     size: usize,
+    //     init_value: T,
+    // ) -> Result<Buffer<cl_float>, GPUError>
+    // where
+    //     T: Clone + Into<f32>,
+    // {
+    //     let buffer = unsafe {
+    //         Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+    //             .map_err(|_| GPUError::BufferCreateError)?
+    //     };
+
+    //     let initial_data = vec![init_value.into(); size];
+    //     let write_event = unsafe {
+    //         queue
+    //             .enqueue_write_buffer(&buffer, CL_NON_BLOCKING, 0, &initial_data, &[])
+    //             .map_err(|_| GPUError::BufferWriteError)?
+    //     };
+    
+    //     write_event.wait().map_err(|_| GPUError::WaitError)?;
+    
+    //     Ok(buffer)
+    // }
+
     // #[test]
-    // pub fn test_single_quadratic_neuron() {
+    // pub fn test_single_quadratic_neuron() -> Result<(), SpikingNeuralNetworksError> {
     //     // initialize 1x1 grid
     //     // give constant ampa input, then constant nmda, gaba, etc
     //     // check against cpu equavilent
 
-    //     // let iterations = 1000;
+    //     let iterations = 1000;
         
-    //     // let neuron = QuadraticIntegrateAndFireNeuron::default_impl();
-    //     // neuron.ligand_gates.insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
-    //     // neuron.ligand_gates.insert(IonotropicNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default());
-    //     // neuron.ligand_gates.insert(IonotropicNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default());
+    //     let neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+    //     neuron.ligand_gates.insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default());
+    //     neuron.ligand_gates.insert(IonotropicNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default());
+    //     neuron.ligand_gates.insert(IonotropicNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default());
 
-    //     // neuron.set_dt(1.);
+    //     neuron.set_dt(1.);
 
-    //     // let cpu_neuron = neuron.clone();
+    //     let cpu_neuron = neuron.clone();
 
-    //     // let cell_grid = vec![vec![neuron]];
+    //     let mut ampa_conc = NeurotransmitterConcentrations::new();
+    //     ampa_conc.insert(IonotropicNeurotransmitterType::AMPA, 1.0);
 
-    //     // let mut ampa_conc = NeurotransmitterConcentrations::new();
-    //     // ampa_conc.insert(IonotropicNeurotransmitterType::AMPA, 1.0);
-
-    //     // for _ in 0..iterations {
-    //     //     cpu_neuron.iterate_with_neurotransmitter_and_spike(
-    //     //         0, 
-    //     //         &ampa_conc
-    //     //     );
-    //     // }
+    //     for _ in 0..iterations {
+    //         cpu_neuron.iterate_with_neurotransmitter_and_spike(
+    //             0, 
+    //             &ampa_conc
+    //         );
+    //     }
 
     //     // create 1 length grid for voltage input, init to 0
     //     // create N::number_of_types() length grid, init first index to 1
     //     // should expect only ampa to activate
+
+    //     let cell_grid = vec![vec![neuron]];
+
+    //     let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
+
+    //     let sums_buffer = create_and_write_buffer(&self.context, &self.queue, 1, 0.0)?;
+    //     let t_buffer = create_and_write_buffer(
+    //         &self.context,
+    //         &self.queue,
+    //         IonotropicNeurotransmitterType::number_of_types(),
+    //         0.0,
+    //     )?;
+    //     let index_to_position_buffer = create_and_write_buffer(&self.context, &self.queue, 1, 0.0)?;
+
+    //     for _ in 0..iterations {
+    //         let iterate_event = unsafe {
+    //             let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
+
+    //             for i in iterate_kernel.argument_names.iter() {
+    //                 if i == "inputs" {
+    //                     kernel_execution.set_arg(&sums_buffer);
+    //                 } else if i == "t" {
+    //                     kernel_execution.set_arg(&t_buffer);
+    //                 } else if i == "index_to_position" {
+    //                     kernel_execution.set_arg(&index_to_position_buffer);
+    //                 } else if i == "number_of_types" {
+    //                     kernel_execution.set_arg(&N::number_of_types());
+    //                 } else {
+    //                     match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+    //                         BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+    //                         BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+    //                         BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+    //                     };
+    //                 }
+    //             }
+
+    //             match kernel_execution.set_global_work_size(1)
+    //                 .enqueue_nd_range(&self.queue) {
+    //                     Ok(value) => value,
+    //                     Err(_) => return Err(GPUError::QueueFailure),
+    //                 }
+    //         };
+
+    //         match iterate_event.wait() {
+    //             Ok(_) => {},
+    //             Err(_) => return Err(GPUError::WaitError),
+    //         };
+    //     }
+
+    //     Ok(())
     // }
 }
