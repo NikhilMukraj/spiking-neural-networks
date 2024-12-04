@@ -7,7 +7,9 @@ mod tests {
     use spiking_neural_networks::neuron::{
             integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
             iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType, IterateAndSpike, IterateAndSpikeGPU, LigandGatedChannel, NeurotransmitterConcentrations, Timestep
+                ApproximateNeurotransmitter, ApproximateReceptor, IterateAndSpikeGPU,
+                // IterateAndSpike, IonotropicNeurotransmitterType, AMPADefault,
+                // LigandGatedChannel, NeurotransmitterConcentrations, Timestep,
             }
         };
 
