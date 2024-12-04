@@ -28,6 +28,7 @@ pub struct GlutamateReceptor<T: ReceptorKinetics> {
     pub ampa_reversal: f32,
     pub nmda_g: f32,
     pub nmda_modifier: f32,
+    pub mg: f32,
     pub nmda_receptor: T,
     pub nmda_reversal: f32,
     pub current: f32,
@@ -36,7 +37,8 @@ pub struct GlutamateReceptor<T: ReceptorKinetics> {
 impl<T: ReceptorKinetics> GlutamateGABAChannel for GlutamateReceptor<T> {
     fn calculate_current(&mut self, voltage: f32) -> f32 {
         let ampa_current = self.ampa_g * self.ampa_receptor.get_r().powf(self.ampa_modifier) * (voltage - self.ampa_reversal);
-        let nmda_current = self.nmda_g * self.nmda_receptor.get_r().powf(self.nmda_modifier) * (voltage - self.nmda_reversal);
+        let mg_modifier = 1. / (1. + ((-0.062 * voltage).exp() * self.mg / 3.57));
+        let nmda_current = mg_modifier * self.nmda_g * self.nmda_receptor.get_r().powf(self.nmda_modifier) * (voltage - self.nmda_reversal);
 
         self.current = ampa_current + nmda_current;
 
@@ -52,6 +54,7 @@ impl<T: ReceptorKinetics> Default for GlutamateReceptor<T> {
             ampa_receptor: T::default(),
             ampa_reversal: 0.,
             nmda_g: 0.6,
+            mg: 0.3,
             nmda_modifier: 1.,
             nmda_receptor: T::default(),
             nmda_reversal: 0.,
