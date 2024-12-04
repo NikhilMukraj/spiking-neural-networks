@@ -3,7 +3,7 @@ use pyo3::{exceptions::{PyKeyError, PyValueError}, prelude::*, types::{PyDict, P
 mod neurons;
 use neurons::{
     DopaGluGABANeurotransmitterType, DopaGluGABAReceptors, GlutamateReceptor, GABAReceptor,
-    DopamineReceptor, GlutamateGABAChannel,
+    DopamineReceptor, GlutamateGABAChannel, DopaIzhikevichNeuron,
 };
 use spiking_neural_networks::{
     error::LatticeNetworkError, graph::{AdjacencyMatrix, Graph, GraphPosition}, neuron::{
@@ -136,6 +136,62 @@ impl PyDopaGluGABANeurotransmitterType {
 }
 
 #[pyclass]
+#[pyo3(name = "DopaGluGABAApproximateNeurotransmitters")]
+#[derive(Clone)]
+pub struct PyDopaGluGABAApproximateNeurotransmitters {
+    neurotransmitters: Neurotransmitters<DopaGluGABANeurotransmitterType, ApproximateNeurotransmitter>
+}
+
+impl_repr!(PyDopaGluGABAApproximateNeurotransmitters, neurotransmitters);
+
+#[pymethods]
+impl PyDopaGluGABAApproximateNeurotransmitters {
+    #[new]
+    #[pyo3(signature = (neurotransmitter_types=None))]
+    fn new(neurotransmitter_types: Option<&PyList>) -> PyResult<Self> {
+        let mut neurotransmitters: HashMap<DopaGluGABANeurotransmitterType, ApproximateNeurotransmitter> = HashMap::new();
+
+        if let Some(values) = neurotransmitter_types {
+            for i in values.iter() {
+                let current_type = i.extract::<PyDopaGluGABANeurotransmitterType>()?.convert_type();
+            
+                neurotransmitters.insert(current_type, ApproximateNeurotransmitter::default());
+            }
+        }
+
+        Ok(
+            PyDopaGluGABAApproximateNeurotransmitters {
+                neurotransmitters: Neurotransmitters { neurotransmitters }
+            }
+        )
+    }
+
+    fn __getitem__(&self, neurotransmitter_type: PyDopaGluGABANeurotransmitterType) -> PyResult<PyApproximateNeurotransmitter> {
+        if let Some(value) = self.neurotransmitters.get(&neurotransmitter_type.convert_type()) {
+            Ok(
+                PyApproximateNeurotransmitter { 
+                    neurotransmitter: *value 
+                }
+            )
+        } else {
+            Err(PyKeyError::new_err(format!("{:#?} not found", neurotransmitter_type)))
+        }
+    }
+
+    fn set_neurotransmitter(
+        &mut self, neurotransmitter_type: PyDopaGluGABANeurotransmitterType, neurotransmitter: PyApproximateNeurotransmitter
+    ) {
+        self.neurotransmitters.neurotransmitters.insert(
+            neurotransmitter_type.convert_type(), neurotransmitter.neurotransmitter
+        );
+    }
+
+    fn apply_t_changes(&mut self, voltage: f32, dt: f32) {
+        self.neurotransmitters.apply_t_changes(voltage, dt);
+    }
+}
+
+#[pyclass]
 #[pyo3(name = "GlutamateReceptor")]
 #[derive(Debug, Clone)]
 pub struct PyGlutamateReceptor {
@@ -151,6 +207,7 @@ implement_basic_getter_and_setter!(
     ampa_modifier, get_ampa_modifier, set_ampa_modifier,
     ampa_reversal, get_ampa_reversal, set_ampa_reversal,
     nmda_g, get_nmda_g, set_nmda_g,
+    mg, get_mg, set_mg,
     nmda_modifier, get_nmda_modifier, set_nmda_modifier,
     nmda_reversal, get_nmda_reversal, set_nmda_reversal,
     current, get_current, set_current
@@ -159,10 +216,11 @@ implement_basic_getter_and_setter!(
 #[pymethods]
 impl PyGlutamateReceptor {
     #[new]
+    #[allow(clippy::too_many_arguments)]
     #[pyo3(
         signature = (
             ampa_g=1.0, ampa_modifier=1.0, ampa_reversal=0.0,
-            nmda_g=0.6, nmda_modifier=1.0, nmda_reversal=0.0,
+            nmda_g=0.6, mg=0.33, nmda_modifier=1.0, nmda_reversal=0.0,
             current=0.0
         )
     )]
@@ -171,6 +229,7 @@ impl PyGlutamateReceptor {
         ampa_modifier: f32,
         ampa_reversal: f32,
         nmda_g: f32,
+        mg: f32,
         nmda_modifier: f32,
         nmda_reversal: f32,
         current: f32,
@@ -182,6 +241,7 @@ impl PyGlutamateReceptor {
                 ampa_receptor: ApproximateReceptor::default(),
                 ampa_reversal,
                 nmda_g,
+                mg,
                 nmda_modifier,
                 nmda_receptor: ApproximateReceptor::default(),
                 nmda_reversal,
@@ -448,30 +508,118 @@ impl PyDopaGluGABAReceptors {
     }
 }
 
-// #[pyclass]
-// #[pyo3(name = "DopaIzhikevichNeuron")]
-// #[derive(Clone, Debug)]
-// pub struct PyDopaIzhikevichNeuron {
-//     model: DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>
-// }
+#[pyclass]
+#[pyo3(name = "DopaIzhikevichNeuron")]
+#[derive(Clone, Debug)]
+pub struct PyDopaIzhikevichNeuron {
+    model: DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>
+}
 
-// implement_basic_getter_and_setter!(
-//     PyDopaIzhikevichNeuron, 
-//     model,
-//     current_voltage, get_current_voltage, set_current_voltage,
-//     a, get_a, set_a, 
-//     b, get_b, set_b, 
-//     c, get_c, set_c, 
-//     d, get_d, set_d, 
-//     dt, get_dt, set_dt, 
-//     v_th, get_v_th, set_v_th, 
-//     v_init, get_v_init, set_v_init, 
-//     w_value, get_w, set_w,
-//     w_init, get_w_init, set_w_init,
-//     gap_conductance, get_gap_conductance, set_gap_conductance,
-//     tau_m, get_tau_m, set_tau_m,
-//     c_m, get_c_m, set_c_m
-// );
+implement_basic_getter_and_setter!(
+    PyDopaIzhikevichNeuron, 
+    model,
+    current_voltage, get_current_voltage, set_current_voltage,
+    a, get_a, set_a, 
+    b, get_b, set_b, 
+    c, get_c, set_c, 
+    d, get_d, set_d, 
+    dt, get_dt, set_dt, 
+    v_th, get_v_th, set_v_th, 
+    w_value, get_w, set_w,
+    gap_conductance, get_gap_conductance, set_gap_conductance,
+    tau_m, get_tau_m, set_tau_m,
+    c_m, get_c_m, set_c_m
+);
+impl_repr!(PyDopaIzhikevichNeuron, model);
+
+#[pymethods]
+impl PyDopaIzhikevichNeuron {
+    #[allow(clippy::too_many_arguments)]
+    #[new]
+    #[pyo3(signature = (
+        a=0.02, b=0.2, c=-55., d=8., v_th=30., dt=0.1, current_voltage=-65., 
+        w_value=30., gap_conductance=10., tau_m=1., c_m=100.,
+        synaptic_neurotransmitters=PyDopaGluGABAApproximateNeurotransmitters { 
+            neurotransmitters: Neurotransmitters::<DopaGluGABANeurotransmitterType, ApproximateNeurotransmitter>::default() 
+        },
+        receptors=PyDopaGluGABAReceptors {
+            receptors: DopaGluGABAReceptors::<ApproximateReceptor>::default()
+        }
+    ))]
+    fn new(
+        a: f32, b: f32, c: f32, d: f32, v_th: f32, dt: f32, current_voltage: f32,
+        w_value: f32, gap_conductance: f32, tau_m: f32, c_m: f32,
+        synaptic_neurotransmitters: PyDopaGluGABAApproximateNeurotransmitters, receptors: PyDopaGluGABAReceptors,
+    ) -> Self {
+        PyDopaIzhikevichNeuron {
+            model: DopaIzhikevichNeuron {
+                a,
+                b,
+                c,
+                d,
+                current_voltage,
+                v_th,
+                dt,
+                w_value,
+                gap_conductance,
+                tau_m,
+                c_m,
+                synaptic_neurotransmitters: synaptic_neurotransmitters.neurotransmitters,
+                receptors: receptors.receptors,
+                ..DopaIzhikevichNeuron::default()
+            }
+        }
+    }
+
+    fn iterate_and_spike(&mut self, i: f32) -> bool {
+        self.model.iterate_and_spike(i)
+    }
+
+    #[pyo3(signature = (i, neurotransmitter_concs))]
+    fn iterate_with_neurotransmitter_and_spike(&mut self, i: f32, neurotransmitter_concs: &PyDict) -> PyResult<bool> {
+        let mut processed_neurotransmitter_concs: HashMap<DopaGluGABANeurotransmitterType, f32> = HashMap::new();
+
+        for (key, value) in neurotransmitter_concs.iter() {
+            let current_type = key.extract::<PyDopaGluGABANeurotransmitterType>()?.convert_type();
+            let conc = value.extract::<f32>()?;
+    
+            processed_neurotransmitter_concs.insert(current_type, conc);
+        }
+
+        Ok(self.model.iterate_with_neurotransmitter_and_spike(i, &processed_neurotransmitter_concs))
+    }
+
+    fn get_neurotransmitters(&self) -> PyDopaGluGABAApproximateNeurotransmitters {
+        PyDopaGluGABAApproximateNeurotransmitters { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
+    }
+
+    fn set_neurotransmitters(&mut self, neurotransmitters: PyDopaGluGABAApproximateNeurotransmitters) {
+        self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
+    }
+
+    fn get_receptors(&self) -> PyDopaGluGABAReceptors {
+        PyDopaGluGABAReceptors { receptors: self.model.receptors }
+    }
+
+    fn set_receptors(&mut self, receptors: PyDopaGluGABAReceptors) {
+        self.model.receptors = receptors.receptors;
+    }
+
+    #[getter(last_firing_time)]
+    fn get_last_firing_time(&self) -> Option<usize> {
+        self.model.get_last_firing_time()
+    }
+
+    #[setter(last_firing_time)]
+    fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+        self.model.set_last_firing_time(timestep);
+    }
+
+    #[getter]
+    fn is_spiking(&self) -> bool {
+        self.model.is_spiking
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "ApproximateNeurotransmitter")]
@@ -678,7 +826,6 @@ fn pydict_to_neurotransmitters_concentration(dict: &PyDict) -> PyResult<Neurotra
         neurotransmitter_concs
     )
 }
-
 
 #[pyclass]
 #[pyo3(name = "ApproximateLigandGatedChannels")]
@@ -1325,6 +1472,21 @@ pub struct PyIzhikevichLattice {
 }
 
 impl_lattice!(PyIzhikevichLattice, PyIzhikevichNeuron, "IzhikevichLattice", PySTDP);
+
+#[pyclass]
+#[pyo3(name = "DopaIzhikevichLattice")]
+#[derive(Clone)]
+pub struct PyDopaIzhikevichLattice {
+    lattice: Lattice<
+        DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
+        LatticeAdjacencyMatrix,
+        GridVoltageHistory,
+        STDP,
+        DopaGluGABANeurotransmitterType,
+    >
+}
+
+impl_lattice!(PyDopaIzhikevichLattice, PyDopaIzhikevichNeuron, "DopaIzhikevichLattice", PySTDP);
 
 type LatticeSpikeTrain = PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
@@ -2292,6 +2454,27 @@ impl_network!(
     PyPoissonNeuron, PySTDP, "IzhikevichLattice", "PoissonLattice", "IzhikevichNetwork",
 );
 
+// #[pyclass]
+// #[pyo3(name = "DopaIzhikevichNetwork")]
+// #[derive(Clone)]
+// pub struct PyDopaIzhikevichNetwork {
+//     network: LatticeNetwork<
+//         DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
+//         LatticeAdjacencyMatrix, 
+//         GridVoltageHistory, 
+//         LatticeSpikeTrain,
+//         SpikeTrainGridHistory,
+//         ConnectingAdjacencyMatrix,
+//         STDP,
+//         DopaGluGABANeurotransmitterType,
+//     >
+// }
+
+// impl_network!(
+//     DopaIzhikevichNeuron, PyDopaIzhikevichLattice, PyPoissonLattice, PyDopaIzhikevichNeuron,
+//     PyDopaPoissonNeuron, PySTDP, "DopaIzhikevichLattice", "DopaPoissonLattice", "DopaIzhikevichNetwork",
+// );
+
 #[pyclass]
 #[pyo3(name = "DestexheNeurotransmitter")]
 #[derive(Clone)]
@@ -2877,10 +3060,16 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyHodgkinHuxleyLattice>()?;
     m.add_class::<PyHodgkinHuxleyNetwork>()?;
     m.add_class::<PyDopaGluGABANeurotransmitterType>()?;
+    m.add_class::<PyDopaGluGABAApproximateNeurotransmitters>()?;
     m.add_class::<PyDopaGluGABAReceptors>()?;
     m.add_class::<PyGlutamateReceptor>()?;
     m.add_class::<PyGABAReceptor>()?;
     m.add_class::<PyDopamineReceptor>()?;
+    m.add_class::<PyDopaIzhikevichNeuron>()?;
+    m.add_class::<PyDopaIzhikevichLattice>()?;
+    // m.add_class::<PyDopaPoissonNeuron>()?;
+    // m.add_class::<PyDopaPoissonLattice>()?;
+    // m.add_class::<PyDopaIzhikevichNetwork>()?;
     m.add_class::<PyGraphPosition>()?;
 
     // option to use adjacency list instead of matrix
