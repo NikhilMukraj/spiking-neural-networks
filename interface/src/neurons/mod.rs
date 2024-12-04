@@ -249,7 +249,7 @@ pub struct DopaIzhikevichNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<DopaGluGABANeurotransmitterType, T>,
     /// Dopamine, glutamate, and GABA receptors
-    pub ligand_gates: DopaGluGABAReceptors<R>,
+    pub receptors: DopaGluGABAReceptors<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for DopaIzhikevichNeuron<T, R> {
@@ -270,7 +270,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for DopaIzhikevic
             last_firing_time: None,
             gaussian_params: GaussianParameters::default(),
             synaptic_neurotransmitters: Neurotransmitters::<DopaGluGABANeurotransmitterType, T>::default(),
-            ligand_gates: DopaGluGABAReceptors::<R>::default(),
+            receptors: DopaGluGABAReceptors::<R>::default(),
         }
     }
 }
@@ -331,12 +331,12 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for DopaI
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage);
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors.set_receptor_currents(self.current_voltage);
 
         let dv = self.izhikevich_get_dv_change(input_current);
         let dw = self.izhikevich_get_dw_change();
-        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.receptors.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
         self.w_value += dw;
