@@ -1126,6 +1126,78 @@ impl PyPoissonNeuron {
 }
 
 #[pyclass]
+#[pyo3(name = "DopaPoissonNeuron")]
+#[derive(Clone)]
+pub struct PyDopaPoissonNeuron {
+    model: PoissonNeuron<DopaGluGABANeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+}
+
+implement_basic_getter_and_setter!(
+    PyDopaPoissonNeuron, 
+    model,
+    current_voltage, get_current_voltage, set_current_voltage,
+    v_th, get_v_th, set_v_th,
+    v_resting, get_v_resting, set_v_resting,
+    chance_of_firing, get_chance_of_firing, set_chance_of_firing,
+    dt, get_dt, set_dt
+);
+
+impl_repr!(PyDopaPoissonNeuron, model);
+
+#[pymethods]
+impl PyDopaPoissonNeuron {
+    #[new]
+    #[pyo3(signature = (current_voltage=0., v_th=30., v_resting=0., chance_of_firing=0.01, dt=0.1))]
+    fn new(
+        current_voltage: f32, v_th: f32, v_resting: f32, chance_of_firing: f32, dt: f32
+    ) -> Self {
+        PyDopaPoissonNeuron {
+            model: PoissonNeuron { 
+                current_voltage, 
+                v_th, 
+                v_resting, 
+                last_firing_time: None, 
+                is_spiking: false,
+                synaptic_neurotransmitters: Neurotransmitters::default(), 
+                neural_refractoriness: DeltaDiracRefractoriness::default(), 
+                chance_of_firing, 
+                dt, 
+            }
+        }
+    }
+
+    #[getter]
+    fn get_is_spiking(&self) -> bool {
+        self.model.is_spiking
+    }
+
+    #[setter]
+    fn set_is_spiking(&mut self, flag: bool) {
+        self.model.is_spiking = flag;
+    }
+
+    fn iterate(&mut self) -> bool {
+        self.model.iterate()
+    }
+
+    fn get_refractoriness(&self) -> PyDeltaDiracRefractoriness {
+        PyDeltaDiracRefractoriness { refractoriness: self.model.neural_refractoriness }
+    }
+
+    fn set_refractoriness(&mut self, refractoriness: PyDeltaDiracRefractoriness) {
+        self.model.neural_refractoriness = refractoriness.refractoriness;
+    }
+
+    fn get_neurotransmitters(&self) -> PyDopaGluGABAApproximateNeurotransmitters {
+        PyDopaGluGABAApproximateNeurotransmitters { neurotransmitters: self.model.synaptic_neurotransmitters.clone() }
+    }
+
+    fn set_neurotransmitters(&mut self, neurotransmitters: PyDopaGluGABAApproximateNeurotransmitters) {
+        self.model.synaptic_neurotransmitters = neurotransmitters.neurotransmitters;
+    }
+}
+
+#[pyclass]
 #[pyo3(name = "STDP")]
 #[derive(Clone)]
 pub struct PySTDP {
@@ -1488,6 +1560,110 @@ pub struct PyDopaIzhikevichLattice {
 
 impl_lattice!(PyDopaIzhikevichLattice, PyDopaIzhikevichNeuron, "DopaIzhikevichLattice", PySTDP);
 
+macro_rules! impl_pymethods_for_lattice {
+    ($pyclass_name:ident, $spike_train_type:ident, $spike_train_lattice_type:ty, $repr_name:expr) => {
+        #[pymethods]
+        impl $pyclass_name {
+            #[new]
+            #[pyo3(signature = (id=0))]
+            fn new(id: usize) -> Self {
+                let mut lattice = $pyclass_name { lattice: SpikeTrainLattice::default() };
+                lattice.set_id(id);
+                lattice
+            }
+
+            fn set_dt(&mut self, dt: f32) {
+                self.lattice.set_dt(dt);
+            }
+
+            fn populate(&mut self, neuron: $spike_train_type, num_rows: usize, num_cols: usize) {
+                self.lattice.populate(&neuron.model, num_rows, num_cols);
+            }
+
+            #[getter]
+            fn get_id(&self) -> usize {
+                self.lattice.get_id()
+            }
+
+            #[setter]
+            fn set_id(&mut self, id: usize) {
+                self.lattice.set_id(id)
+            }
+
+            fn get_neuron(&self, row: usize, col: usize) -> PyResult<$spike_train_type> {
+                let neuron = self.lattice.cell_grid.get(row)
+                    .and_then(|row_cells| row_cells.get(col))
+                    .cloned()
+                    .ok_or_else(|| PyKeyError::new_err(format!("Position ({}, {}) not found", row, col)))?;
+
+                Ok($spike_train_type { model: neuron })
+            }
+
+            fn set_neuron(&mut self, row: usize, col: usize, neuron: $spike_train_type) -> PyResult<()> {
+                self.lattice.cell_grid.get_mut(row)
+                    .and_then(|row_cells| row_cells.get_mut(col))
+                    .map(|existing_neuron| *existing_neuron = neuron.model.clone())
+                    .ok_or_else(|| PyKeyError::new_err(format!("Position ({}, {}) not found", row, col)))
+            }
+
+            fn apply(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+                self.lattice.apply(|neuron| {
+                    let py_neuron = $spike_train_type { model: neuron.clone() };
+                    let result = py_callable.call1(py, (py_neuron,)).unwrap();
+                    let updated_py_neuron: $spike_train_type = result.extract(py).unwrap();
+                    *neuron = updated_py_neuron.model;
+                });
+                Ok(())
+            }
+
+            fn apply_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+                let py_callable = function.to_object(py);
+                self.lattice.apply_given_position(|(i, j), neuron| {
+                    let py_neuron = $spike_train_type { model: neuron.clone() };
+                    let result = py_callable.call1(py, ((i, j), py_neuron)).unwrap();
+                    let updated_py_neuron: $spike_train_type = result.extract(py).unwrap();
+                    *neuron = updated_py_neuron.model;
+                });
+                Ok(())
+            }
+
+            fn reset_timing(&mut self) {
+                self.lattice.reset_timing();
+            }
+
+            fn reset_history(&mut self) {
+                self.lattice.grid_history.reset();
+            }
+
+            fn run_lattice(&mut self, iterations: usize) {
+                self.lattice.run_lattice(iterations);
+            }
+
+            #[getter]
+            fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
+                self.lattice.grid_history.history.clone()
+            }
+
+            fn __repr__(&self) -> PyResult<String> {
+                let rows = self.lattice.cell_grid.len();
+                let cols = self.lattice.cell_grid.first().unwrap_or(&vec![]).len();
+
+                Ok(
+                    format!(
+                        "{} {{ ({}x{}), id: {}, update_grid_history: {} }}", 
+                        $repr_name,
+                        rows,
+                        cols,
+                        self.lattice.get_id(),
+                        self.lattice.update_grid_history,
+                    )
+                )
+            }
+        }
+    };
+}
+
 type LatticeSpikeTrain = PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
 #[pyclass]
@@ -1501,145 +1677,162 @@ pub struct PyPoissonLattice {
     >
 }
 
-#[pymethods]
-impl PyPoissonLattice {
-    #[new]
-    #[pyo3(signature = (id=0))]
-    fn new(id: usize) -> Self {
-        let mut lattice = PyPoissonLattice { lattice: SpikeTrainLattice::default() };
+impl_pymethods_for_lattice!(PyPoissonLattice, PyPoissonNeuron, LatticeSpikeTrain, "PoissonLattice");
 
-        lattice.set_id(id);
+type DopaLatticeSpikeTrain = PoissonNeuron<DopaGluGABANeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
 
-        lattice
-    }
-
-    fn set_dt(&mut self, dt: f32) {
-        self.lattice.set_dt(dt);
-    }
-
-    fn populate(&mut self, neuron: PyPoissonNeuron, num_rows: usize, num_cols: usize) {
-        self.lattice.populate(&neuron.model, num_rows, num_cols);
-    }
-
-    #[getter]
-    fn get_id(&self) -> usize {
-        self.lattice.get_id()
-    }
-
-    #[setter]
-    fn set_id(&mut self, id: usize) {
-        self.lattice.set_id(id)
-    }
-
-    fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyPoissonNeuron> {
-        let neuron = match self.lattice.cell_grid.get(row) {
-            Some(row_cells) => match row_cells.get(col) {
-                Some(neuron) => neuron.clone(),
-                None => {
-                    return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
-                }
-            },
-            None => {
-                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
-            }
-        };
-
-        Ok(
-            PyPoissonNeuron { 
-                model: neuron
-            }
-        )
-    }
-
-    fn set_neuron(&mut self, row: usize, col: usize, neuron: PyPoissonNeuron) -> PyResult<()> {
-        let row_cells = match self.lattice.cell_grid.get_mut(row) {
-            Some(row_cells) => row_cells,
-            None => {
-                return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
-            }
-        };
-
-        if let Some(existing_neuron) = row_cells.get_mut(col) {
-            *existing_neuron = neuron.model.clone();
-
-            Ok(())
-        } else {
-            Err(PyKeyError::new_err(format!("Column at {} not found", col)))
-        }
-    }
-    
-    fn apply(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
-        let py_callable = function.to_object(py);
-
-        self.lattice.apply(|neuron| {
-            let py_neuron = PyPoissonNeuron {
-                model: neuron.clone(),
-            };
-            let result = py_callable.call1(py, (py_neuron,)).unwrap();
-            let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
-            *neuron = updated_py_neuron.model;
-        });
-
-        Ok(())
-    }
-
-    fn apply_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
-        let py_callable = function.to_object(py);
-
-        self.lattice.apply_given_position(|(i, j), neuron| {
-            let py_neuron = PyPoissonNeuron {
-                model: neuron.clone(),
-            };
-            let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
-            let updated_py_neuron: PyPoissonNeuron = result.extract(py).unwrap();
-            *neuron = updated_py_neuron.model;
-        });
-
-        Ok(())
-    }
-
-    fn reset_timing(&mut self) {
-        self.lattice.reset_timing();
-    }
-
-    fn reset_history(&mut self) {
-        self.lattice.grid_history.reset();
-    }
-
-    fn run_lattice(&mut self, iterations: usize) {
-        self.lattice.run_lattice(iterations);
-    }
-
-    #[getter]
-    fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
-        self.lattice.grid_history.history.clone()
-    }
-
-    #[getter]
-    fn get_update_grid_history(&self) -> bool {
-        self.lattice.update_grid_history
-    }
-
-    #[setter]
-    fn set_update_grid_history(&mut self, flag: bool) {
-        self.lattice.update_grid_history = flag;
-    }
-
-    fn __repr__(&self) -> PyResult<String> {
-        let rows = self.lattice.cell_grid.len();
-        let cols = self.lattice.cell_grid.first().unwrap_or(&vec![]).len();
-
-        Ok(
-            format!(
-                "PoissonLattice {{ ({}x{}), id: {}, update_grid_history: {} }}", 
-                rows,
-                cols,
-                self.lattice.get_id(),
-                self.lattice.update_grid_history,
-            )
-        )
-    }
+#[pyclass]
+#[pyo3(name = "DopaPoissonLattice")]
+#[derive(Clone)]
+pub struct PyDopaPoissonLattice {
+    lattice: SpikeTrainLattice<
+        DopaGluGABANeurotransmitterType,
+        DopaLatticeSpikeTrain,
+        SpikeTrainGridHistory,
+    >
 }
+
+impl_pymethods_for_lattice!(PyDopaPoissonLattice, PyDopaPoissonNeuron, DopaLatticeSpikeTrain, "DopaPoissonLattice");
+
+// #[pymethods]
+// impl PyDopaPoissonLattice {
+//     #[new]
+//     #[pyo3(signature = (id=0))]
+//     fn new(id: usize) -> Self {
+//         let mut lattice = PyDopaPoissonLattice { lattice: SpikeTrainLattice::default() };
+
+//         lattice.set_id(id);
+
+//         lattice
+//     }
+
+//     fn set_dt(&mut self, dt: f32) {
+//         self.lattice.set_dt(dt);
+//     }
+
+//     fn populate(&mut self, neuron: PyDopaPoissonNeuron, num_rows: usize, num_cols: usize) {
+//         self.lattice.populate(&neuron.model, num_rows, num_cols);
+//     }
+
+//     #[getter]
+//     fn get_id(&self) -> usize {
+//         self.lattice.get_id()
+//     }
+
+//     #[setter]
+//     fn set_id(&mut self, id: usize) {
+//         self.lattice.set_id(id)
+//     }
+
+//     fn get_neuron(&self, row: usize, col: usize) -> PyResult<PyDopaPoissonNeuron> {
+//         let neuron = match self.lattice.cell_grid.get(row) {
+//             Some(row_cells) => match row_cells.get(col) {
+//                 Some(neuron) => neuron.clone(),
+//                 None => {
+//                     return Err(PyKeyError::new_err(format!("Column at {} not found", col)));
+//                 }
+//             },
+//             None => {
+//                 return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+//             }
+//         };
+
+//         Ok(
+//             PyDopaPoissonNeuron { 
+//                 model: neuron
+//             }
+//         )
+//     }
+
+//     fn set_neuron(&mut self, row: usize, col: usize, neuron: PyDopaPoissonNeuron) -> PyResult<()> {
+//         let row_cells = match self.lattice.cell_grid.get_mut(row) {
+//             Some(row_cells) => row_cells,
+//             None => {
+//                 return Err(PyKeyError::new_err(format!("Row at {} not found", row)));
+//             }
+//         };
+
+//         if let Some(existing_neuron) = row_cells.get_mut(col) {
+//             *existing_neuron = neuron.model.clone();
+
+//             Ok(())
+//         } else {
+//             Err(PyKeyError::new_err(format!("Column at {} not found", col)))
+//         }
+//     }
+    
+//     fn apply(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+//         let py_callable = function.to_object(py);
+
+//         self.lattice.apply(|neuron| {
+//             let py_neuron = PyDopaPoissonNeuron {
+//                 model: neuron.clone(),
+//             };
+//             let result = py_callable.call1(py, (py_neuron,)).unwrap();
+//             let updated_py_neuron: PyDopaPoissonNeuron = result.extract(py).unwrap();
+//             *neuron = updated_py_neuron.model;
+//         });
+
+//         Ok(())
+//     }
+
+//     fn apply_given_position(&mut self, py: Python, function: &PyAny) -> PyResult<()> {
+//         let py_callable = function.to_object(py);
+
+//         self.lattice.apply_given_position(|(i, j), neuron| {
+//             let py_neuron = PyDopaPoissonNeuron {
+//                 model: neuron.clone(),
+//             };
+//             let result = py_callable.call1(py, ((i, j), py_neuron,)).unwrap();
+//             let updated_py_neuron: PyDopaPoissonNeuron = result.extract(py).unwrap();
+//             *neuron = updated_py_neuron.model;
+//         });
+
+//         Ok(())
+//     }
+
+//     fn reset_timing(&mut self) {
+//         self.lattice.reset_timing();
+//     }
+
+//     fn reset_history(&mut self) {
+//         self.lattice.grid_history.reset();
+//     }
+
+//     fn run_lattice(&mut self, iterations: usize) {
+//         self.lattice.run_lattice(iterations);
+//     }
+
+//     #[getter]
+//     fn get_history(&self) -> Vec<Vec<Vec<f32>>> {
+//         self.lattice.grid_history.history.clone()
+//     }
+
+//     #[getter]
+//     fn get_update_grid_history(&self) -> bool {
+//         self.lattice.update_grid_history
+//     }
+
+//     #[setter]
+//     fn set_update_grid_history(&mut self, flag: bool) {
+//         self.lattice.update_grid_history = flag;
+//     }
+
+//     fn __repr__(&self) -> PyResult<String> {
+//         let rows = self.lattice.cell_grid.len();
+//         let cols = self.lattice.cell_grid.first().unwrap_or(&vec![]).len();
+
+//         Ok(
+//             format!(
+//                 "DopaPoissonLattice {{ ({}x{}), id: {}, update_grid_history: {} }}", 
+//                 rows,
+//                 cols,
+//                 self.lattice.get_id(),
+//                 self.lattice.update_grid_history,
+//             )
+//         )
+//     }
+// }
 
 #[pyclass]
 #[pyo3(name = "GraphPosition")]
@@ -2454,26 +2647,26 @@ impl_network!(
     PyPoissonNeuron, PySTDP, "IzhikevichLattice", "PoissonLattice", "IzhikevichNetwork",
 );
 
-// #[pyclass]
-// #[pyo3(name = "DopaIzhikevichNetwork")]
-// #[derive(Clone)]
-// pub struct PyDopaIzhikevichNetwork {
-//     network: LatticeNetwork<
-//         DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
-//         LatticeAdjacencyMatrix, 
-//         GridVoltageHistory, 
-//         LatticeSpikeTrain,
-//         SpikeTrainGridHistory,
-//         ConnectingAdjacencyMatrix,
-//         STDP,
-//         DopaGluGABANeurotransmitterType,
-//     >
-// }
+#[pyclass]
+#[pyo3(name = "DopaIzhikevichNetwork")]
+#[derive(Clone)]
+pub struct PyDopaIzhikevichNetwork {
+    network: LatticeNetwork<
+        DopaIzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
+        LatticeAdjacencyMatrix, 
+        GridVoltageHistory, 
+        DopaLatticeSpikeTrain,
+        SpikeTrainGridHistory,
+        ConnectingAdjacencyMatrix,
+        STDP,
+        DopaGluGABANeurotransmitterType,
+    >
+}
 
-// impl_network!(
-//     DopaIzhikevichNeuron, PyDopaIzhikevichLattice, PyPoissonLattice, PyDopaIzhikevichNeuron,
-//     PyDopaPoissonNeuron, PySTDP, "DopaIzhikevichLattice", "DopaPoissonLattice", "DopaIzhikevichNetwork",
-// );
+impl_network!(
+    PyDopaIzhikevichNetwork, PyDopaIzhikevichLattice, PyDopaPoissonLattice, PyDopaIzhikevichNeuron,
+    PyDopaPoissonNeuron, PySTDP, "DopaIzhikevichLattice", "DopaPoissonLattice", "DopaIzhikevichNetwork",
+);
 
 #[pyclass]
 #[pyo3(name = "DestexheNeurotransmitter")]
@@ -3067,9 +3260,9 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyDopamineReceptor>()?;
     m.add_class::<PyDopaIzhikevichNeuron>()?;
     m.add_class::<PyDopaIzhikevichLattice>()?;
-    // m.add_class::<PyDopaPoissonNeuron>()?;
-    // m.add_class::<PyDopaPoissonLattice>()?;
-    // m.add_class::<PyDopaIzhikevichNetwork>()?;
+    m.add_class::<PyDopaPoissonNeuron>()?;
+    m.add_class::<PyDopaPoissonLattice>()?;
+    m.add_class::<PyDopaIzhikevichNetwork>()?;
     m.add_class::<PyGraphPosition>()?;
 
     // option to use adjacency list instead of matrix
