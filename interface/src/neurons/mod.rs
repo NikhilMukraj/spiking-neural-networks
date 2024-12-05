@@ -202,7 +202,7 @@ impl<T: ReceptorKinetics> DopaGluGABAReceptors<T> {
             None => {},
         }
 
-        current / (dt / c_m)
+        current * (dt / c_m)
     }
 }
 
