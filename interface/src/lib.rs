@@ -3282,8 +3282,6 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     // verbose option that prints progress in running simulation
     // should be printed from rust
 
-    // spike train lattice macro
-
     // temp env variable for building pyo3 with custom models
     // builtin models can be listed in a separate file associated with this crate
     // use pest to generate models from file
