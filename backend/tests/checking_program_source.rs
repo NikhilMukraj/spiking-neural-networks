@@ -115,15 +115,29 @@ mod tests {
         let gpu_cell_grid = QuadraticIntegrateAndFireNeuron::convert_to_gpu(&cell_grid, &context, &queue)?;
 
         let sums_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
-        let t_buffer = create_and_write_buffer(
-            &context,
-            &queue,
-            IonotropicNeurotransmitterType::number_of_types(),
-            0.0,
-        )?;
+    
+        let mut t_buffer = unsafe {
+            Buffer::<cl_float>::create(
+                &context, 
+                CL_MEM_READ_WRITE, 
+                IonotropicNeurotransmitterType::number_of_types(), 
+                ptr::null_mut()
+            )
+                .map_err(|_| GPUError::BufferCreateError)?
+        };
+
+        let t_values = vec![1., 0., 0., 0.];
+        let t_buffer_write_event = unsafe {
+            queue
+                .enqueue_write_buffer(&mut t_buffer, CL_NON_BLOCKING, 0, &t_values, &[])
+                .map_err(|_| GPUError::BufferWriteError)?
+        };
+    
+        t_buffer_write_event.wait().map_err(|_| GPUError::WaitError)?;
+
         let index_to_position_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
 
-        // let mut gpu_voltages = vec![];
+        let mut gpu_voltages = vec![];
 
         for _ in 0..iterations {
             let iterate_event = unsafe {
@@ -159,27 +173,32 @@ mod tests {
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
             };
 
-            // match gpu_cell_grid.get("current_voltage").unwrap() {
-            //     BufferGPU::Float(buffer) => {
-            //         let mut read_vector = vec![];
+            match gpu_cell_grid.get("current_voltage").unwrap() {
+                BufferGPU::Float(buffer) => {
+                    let mut read_vector = vec![0.];
 
-            //         let read_event = unsafe {
-            //             match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
-            //                 Ok(value) => value,
-            //                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
-            //             }
-            //         };
+                    let read_event = unsafe {
+                        match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+                            Ok(value) => value,
+                            Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+                        }
+                    };
         
-            //         match read_event.wait() {
-            //             Ok(value) => value,
-            //             Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
-            //         };
+                    match read_event.wait() {
+                        Ok(value) => value,
+                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+                    };
 
-            //         gpu_voltages.push(read_vector[0]);
-            //     },
-            //     _ => unreachable!(),
-            // }
+                    gpu_voltages.push(read_vector[0]);
+                },
+                _ => unreachable!(),
+            }
         }
+
+        // for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
+        //     let error = (cpu_voltage - gpu_voltage).abs();
+        //     assert!(error < 5., "error: {}", error);
+        // }
 
         Ok(())
     }
