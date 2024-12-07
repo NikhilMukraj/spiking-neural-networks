@@ -428,7 +428,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let argument_names = vec![
             String::from("number_of_types"), String::from("inputs"), String::from("t"), String::from("index_to_position"), 
-            String::from("flags"), String::from("current_voltage"), String::from("alpha"), String::from("v_reset"), 
+            String::from("neuro_flags"), String::from("lg_flags"), String::from("current_voltage"), String::from("alpha"), String::from("v_reset"), 
             String::from("v_c"), String::from("integration_constant"), String::from("dt"), 
             String::from("tau_m"), String::from("c_m"), String::from("v_th"), String::from("refractory_count"), 
             String::from("tref"), String::from("is_spiking"),
@@ -471,7 +471,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
             .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
             .collect::<Vec<String>>();
 
-        let uint_args = [String::from("flags"), String::from("index_to_position"), String::from("is_spiking")];
+        let uint_args = [String::from("lg_flags"), String::from("neuro_flags"), String::from("index_to_position"), String::from("is_spiking")];
 
         let mut parsed_argument_names: Vec<String> = argument_names
             .iter()
@@ -515,7 +515,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
                 neurotransmitters_update(
                     index * number_of_types, 
-                    flags,
+                    neuro_flags,
                     is_spiking,
                     dt,
                     {}
@@ -525,7 +525,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     t,
                     current_voltage,
                     dt,
-                    flags,
+                    lg_flags,
                     {}
                 );
 
