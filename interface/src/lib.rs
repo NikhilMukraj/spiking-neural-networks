@@ -204,7 +204,7 @@ implement_basic_getter_and_setter!(
     PyGlutamateReceptor, 
     glutamate_receptor,
     ampa_g, get_ampa_g, set_ampa_g,
-    ampa_modifier, get_ampa_modifier, set_ampa_modifier,
+    inh_modifier, get_inh_modifier, set_inh_modifier,
     ampa_reversal, get_ampa_reversal, set_ampa_reversal,
     nmda_g, get_nmda_g, set_nmda_g,
     mg, get_mg, set_mg,
@@ -219,14 +219,14 @@ impl PyGlutamateReceptor {
     #[allow(clippy::too_many_arguments)]
     #[pyo3(
         signature = (
-            ampa_g=1.0, ampa_modifier=1.0, ampa_reversal=0.0,
+            ampa_g=1.0, inh_modifier=1.0, ampa_reversal=0.0,
             nmda_g=0.6, mg=0.33, nmda_modifier=1.0, nmda_reversal=0.0,
             current=0.0
         )
     )]
     fn new(
         ampa_g: f32,
-        ampa_modifier: f32,
+        inh_modifier: f32,
         ampa_reversal: f32,
         nmda_g: f32,
         mg: f32,
@@ -237,7 +237,7 @@ impl PyGlutamateReceptor {
         PyGlutamateReceptor {
             glutamate_receptor: GlutamateReceptor {
                 ampa_g,
-                ampa_modifier,
+                inh_modifier,
                 ampa_receptor: ApproximateReceptor::default(),
                 ampa_reversal,
                 nmda_g,
@@ -376,13 +376,13 @@ impl PyDopamineReceptor {
         self.dopamine_receptor.apply_r_changes(t, dt);
     }
 
-    fn get_modifiers(&self, ampa_modifier: f32, nmda_modifier: f32) -> (f32, f32) {
-        let mut local_ampa_modifier = ampa_modifier;
+    fn get_modifiers(&self, inh_modifier: f32, nmda_modifier: f32) -> (f32, f32) {
+        let mut local_inh_modifier = inh_modifier;
         let mut local_nmda_modifier = nmda_modifier;
         self.dopamine_receptor
-            .get_modifiers(&mut local_ampa_modifier, &mut local_nmda_modifier);
+            .get_modifiers(&mut local_inh_modifier, &mut local_nmda_modifier);
 
-        (local_ampa_modifier, local_nmda_modifier)
+        (local_inh_modifier, local_nmda_modifier)
     }
 
     fn get_d1_r(&self) -> PyApproximateReceptor {
@@ -418,7 +418,7 @@ impl_repr!(PyDopaGluGABAReceptors, receptors);
 implement_basic_getter_and_setter!(
     PyDopaGluGABAReceptors, 
     receptors,
-    ampa_modifier, get_ampa_modifier, set_ampa_modifier,
+    inh_modifier, get_inh_modifier, set_inh_modifier,
     nmda_modifier, get_nmda_modifier, set_nmda_modifier
 );
 
@@ -427,16 +427,16 @@ impl PyDopaGluGABAReceptors {
     #[new]
     #[pyo3(
     signature = (
-        ampa_modifier=1.0,
+        inh_modifier=1.0,
         nmda_modifier=1.0,
     ))]
     pub fn new(
-        ampa_modifier: f32,
+        inh_modifier: f32,
         nmda_modifier: f32,
     ) -> Self {
         PyDopaGluGABAReceptors {
             receptors: DopaGluGABAReceptors {
-                ampa_modifier,
+                inh_modifier,
                 nmda_modifier,
                 ..DopaGluGABAReceptors::default()
             },
