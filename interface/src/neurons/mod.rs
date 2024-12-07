@@ -23,7 +23,7 @@ pub trait GlutamateGABAChannel {
 #[derive(Clone, Copy, Debug)]
 pub struct GlutamateReceptor<T: ReceptorKinetics> {
     pub ampa_g: f32,
-    pub ampa_modifier: f32,
+    pub inh_modifier: f32,
     pub ampa_receptor: T,
     pub ampa_reversal: f32,
     pub nmda_g: f32,
@@ -36,9 +36,10 @@ pub struct GlutamateReceptor<T: ReceptorKinetics> {
 
 impl<T: ReceptorKinetics> GlutamateGABAChannel for GlutamateReceptor<T> {
     fn calculate_current(&mut self, voltage: f32) -> f32 {
-        let ampa_current = self.ampa_g * self.ampa_receptor.get_r().powf(self.ampa_modifier) * (voltage - self.ampa_reversal);
+        let ampa_current = self.ampa_g * self.ampa_receptor.get_r() * self.inh_modifier * (voltage - self.ampa_reversal);
         let mg_modifier = 1. / (1. + ((-0.062 * voltage).exp() * self.mg / 3.57));
-        let nmda_current = mg_modifier * self.nmda_g * self.nmda_receptor.get_r().powf(self.nmda_modifier) * (voltage - self.nmda_reversal);
+        let nmda_current = mg_modifier * self.nmda_g * self.nmda_receptor.get_r().powf(self.nmda_modifier) 
+            * self.inh_modifier * (voltage - self.nmda_reversal);
 
         self.current = ampa_current + nmda_current;
 
@@ -50,7 +51,7 @@ impl<T: ReceptorKinetics> Default for GlutamateReceptor<T> {
     fn default() -> Self {
         GlutamateReceptor {
             ampa_g: 1.,
-            ampa_modifier: 1.,
+            inh_modifier: 1.,
             ampa_receptor: T::default(),
             ampa_reversal: 0.,
             nmda_g: 0.6,
@@ -108,17 +109,15 @@ impl<T: ReceptorKinetics> DopamineReceptor<T> {
         }
     }
 
-    pub fn get_modifiers(&self, ampa_modifier: &mut f32, nmda_modifier: &mut f32) {
+    pub fn get_modifiers(&self, inh_modifier: &mut f32, nmda_modifier: &mut f32) {
         let mut d1_modifier = 0.;
-        let mut d2_modifier = 0.;
         if self.d2_enabled {
-            *ampa_modifier = 1. + self.d2_r.get_r();
-            d2_modifier = self.d2_r.get_r();
+            *inh_modifier = 1. - self.d2_r.get_r();
         }
         if self.d1_enabled {
-            d1_modifier = self.d1_r.get_r() * 0.5;
+            d1_modifier = self.d1_r.get_r() / 1.5;
         }
-        *nmda_modifier = 1. - d1_modifier + d2_modifier;
+        *nmda_modifier = 1. - d1_modifier;
     }
 }
 
@@ -136,7 +135,7 @@ impl<T: ReceptorKinetics> Default for DopamineReceptor<T> {
 #[derive(Clone, Copy, Debug)]
 pub struct DopaGluGABAReceptors<T: ReceptorKinetics> {
     pub dopamine_receptor: DopamineReceptor<T>,
-    pub ampa_modifier: f32,
+    pub inh_modifier: f32,
     pub nmda_modifier: f32,
     pub glu_receptor: Option<GlutamateReceptor<T>>,
     pub gaba_receptor: Option<GABAReceptor<T>>,
@@ -171,10 +170,10 @@ impl<T: ReceptorKinetics> DopaGluGABAReceptors<T> {
     
     fn set_receptor_currents(&mut self, voltage: f32) {
         self.dopamine_receptor
-            .get_modifiers(&mut self.ampa_modifier, &mut self.nmda_modifier);
+            .get_modifiers(&mut self.inh_modifier, &mut self.nmda_modifier);
     
         if let Some(ref mut glu) = self.glu_receptor {
-            glu.ampa_modifier = self.ampa_modifier;
+            glu.inh_modifier = self.inh_modifier;
             glu.nmda_modifier = self.nmda_modifier;
             let _ = glu.calculate_current(voltage);
         }
@@ -210,7 +209,7 @@ impl<T: ReceptorKinetics> Default for DopaGluGABAReceptors<T> {
     fn default() -> Self {
         DopaGluGABAReceptors {
             dopamine_receptor: DopamineReceptor::<T>::default(),
-            ampa_modifier: 0.,
+            inh_modifier: 0.,
             nmda_modifier: 0.,
             glu_receptor: None,
             gaba_receptor: None,
