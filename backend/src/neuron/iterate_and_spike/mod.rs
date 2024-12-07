@@ -1108,7 +1108,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
 ) {
     match value.get(&i) {
         Some(current_value) => {
-            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+            if let Some(current_flag) = flags.get_mut(&format!("lg${}", i.to_string())) {
                 current_flag.push(1);
             }
 
@@ -1131,7 +1131,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
             }
         },
         None => {
-            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+            if let Some(current_flag) = flags.get_mut(&format!("lg${}", i.to_string())) {
                 current_flag.push(0);
             }
 
@@ -1183,7 +1183,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
         for i in IonotropicNeurotransmitterType::get_all_types() {
-            flags.insert(i.to_string().clone(), vec![]);
+            flags.insert(format!("lg${}", i.to_string()), vec![]);
         }
 
         for row in grid.iter() {
@@ -1259,7 +1259,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let string_types: HashSet<(String, AvailableBufferType)> = IonotropicNeurotransmitterType::get_all_types()
             .into_iter()
-            .map(|i| (i.to_string(), AvailableBufferType::UInt))
+            .map(|i| (format!("lg${}", i.to_string()), AvailableBufferType::UInt))
             .collect();
 
         for key in LigandGatedChannel::<T>::get_all_possible_attribute_names().union(&string_types) {
@@ -1302,7 +1302,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                 let grid_value = &mut ligand_gates_grid[row][col];
                 let flag_index = row * cols + col;
                 for i in IonotropicNeurotransmitterType::get_all_types() {
-                    let i_str = i.to_string();
+                    let i_str = format!("lg${}", i.to_string());
                     let index = row * cols * IonotropicNeurotransmitterType::number_of_types() 
                         + col * IonotropicNeurotransmitterType::number_of_types() + i.type_to_numeric();
     
@@ -1349,7 +1349,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             String::from("__global float* t"),
             String::from("__global float* voltage"), 
             String::from("__global float* dt"), 
-            String::from("__global uint* flags"),
+            String::from("__global uint* lg_flags"),
         ];
         let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
             .iter()
@@ -1362,20 +1362,20 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             __kernel void ligand_gates_update_function(
                 {}
             ) {{
-                if (flags[index]) {{ // AMPA
+                if (lg_flags[index]) {{ // AMPA
                     r[index] = get_r({});
                     current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
                 }}
-                if (flags[index + 1]) {{ // NMDA
+                if (lg_flags[index + 1]) {{ // NMDA
                     r[index + 1] = get_r({});
                     float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57)); 
                     current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
                 }}
-                if (flags[index + 2]) {{ // GABAa 
+                if (lg_flags[index + 2]) {{ // GABAa 
                     r[index + 2] = get_r({});
                     current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
                 }}
-                if (flags[index + 3]) {{ // GABAb
+                if (lg_flags[index + 3]) {{ // GABAb
                     r[index + 3] = get_r({});
                     gabab_g[index + 3] += (gabab_k3[index + 3] * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
                     float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
@@ -1732,7 +1732,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
 ) {
     match value.get(&i) {
         Some(value) => {
-            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+            if let Some(current_flag) = flags.get_mut(&format!("neuro${}", i.to_string())) {
                 current_flag.push(1);
             }
 
@@ -1748,7 +1748,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
             }
         },
         None => {
-            if let Some(current_flag) = flags.get_mut(&i.to_string()) {
+            if let Some(current_flag) = flags.get_mut(&format!("neuro${}", i.to_string())) {
                 current_flag.push(0);
             }
 
@@ -1784,7 +1784,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
         for i in N::get_all_types() {
-            flags.insert(i.to_string().clone(), vec![]);
+            flags.insert(format!("neuro${}", i.to_string()), vec![]);
         }
 
         for row in grid.iter() {
@@ -1852,7 +1852,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let string_types: Vec<String> = N::get_all_types()
             .into_iter()
-            .map(|i| i.to_string())
+            .map(|i| format!("neuro${}", i.to_string()))
             .collect();
 
         if rows == 0 || cols == 0 {
@@ -1865,7 +1865,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let all_neurotransmitter_flag_strings: HashSet<(String, AvailableBufferType)> = N::get_all_types()
             .iter()
-            .map(|i| (i.to_string(), AvailableBufferType::UInt))
+            .map(|i| (format!("neuro${}", i.to_string()), AvailableBufferType::UInt))
             .collect();
 
         for key in T::get_attribute_names().union(&all_neurotransmitter_flag_strings) {
@@ -1908,7 +1908,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                 let grid_value = &mut neurotransmitter_grid[row][col];
                 let flag_index = row * cols + col;
                 for i in N::get_all_types() {
-                    let i_str = i.to_string();
+                    let i_str = format!("neuro${}", i.to_string());
                     let index = row * cols * N::number_of_types() 
                         + col * N::number_of_types() + i.type_to_numeric();
     
@@ -1966,11 +1966,11 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
-                    __global uint* flags,
+                    __global uint* neuro_flags,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
-                        if (flags[index + i]) {{
+                        if (neuro_flags[index + i]) {{
                             t[index + i] = get_t({});
                         }}
                     }}
