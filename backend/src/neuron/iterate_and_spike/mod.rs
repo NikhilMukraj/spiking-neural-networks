@@ -1227,14 +1227,6 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             };  
         }
 
-        // let size = length;
-
-        // for (key, value) in flags.iter() {
-        //     write_buffer!(current_buffer, context, queue, size, value, UInt, last);
-
-        //     buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
-        // }
-
         let mut flags_vec: Vec<u32> = vec![];
 
         for n in 0..flags.len() {
