@@ -1,6 +1,7 @@
 # bayesian inference using a single on/off cue
 # bayesian inference using another memory as a cue
 # bayesian inference using d1/d2
+# option to enable d1 or d2 on exc or inh group
 
 import toml
 import json
