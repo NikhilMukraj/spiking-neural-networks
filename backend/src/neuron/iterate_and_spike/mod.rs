@@ -1108,7 +1108,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
 ) {
     match value.get(&i) {
         Some(current_value) => {
-            if let Some(current_flag) = flags.get_mut(&format!("lg${}", i.to_string())) {
+            if let Some(current_flag) = flags.get_mut(&format!("ligand_gates${}", i.to_string())) {
                 current_flag.push(1);
             }
 
@@ -1131,7 +1131,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
             }
         },
         None => {
-            if let Some(current_flag) = flags.get_mut(&format!("lg${}", i.to_string())) {
+            if let Some(current_flag) = flags.get_mut(&format!("ligand_gates${}", i.to_string())) {
                 current_flag.push(0);
             }
 
@@ -1167,7 +1167,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         // flags that depend on
         // add to list 
 
-        let length = grid.iter().map(|row| row.len()).sum();
+        let length: usize = grid.iter().map(|row| row.len()).sum();
 
         if length == 0 {
             return Ok(HashMap::new());
@@ -1183,7 +1183,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
         for i in IonotropicNeurotransmitterType::get_all_types() {
-            flags.insert(format!("lg${}", i.to_string()), vec![]);
+            flags.insert(format!("ligand_gates${}", i.to_string()), vec![]);
         }
 
         for row in grid.iter() {
@@ -1227,13 +1227,29 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             };  
         }
 
-        let size = length;
+        // let size = length;
 
-        for (key, value) in flags.iter() {
-            write_buffer!(current_buffer, context, queue, size, value, UInt, last);
+        // for (key, value) in flags.iter() {
+        //     write_buffer!(current_buffer, context, queue, size, value, UInt, last);
 
-            buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+        //     buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+        // }
+
+        let mut flags_vec: Vec<u32> = vec![];
+
+        for n in 0..flags.len() {
+            for i in IonotropicNeurotransmitterType::get_all_types() {
+                flags_vec.push(
+                    flags.get(
+                        &format!("ligand_gates${}", i.to_string())
+                    ).unwrap()[n]
+                );
+            }
         }
+
+        write_buffer!(flags_buffer, context, queue, size, &flags_vec, UInt, last);
+
+        buffers.insert(String::from("ligand_gates$flags"), BufferGPU::UInt(flags_buffer));
 
         Ok(buffers)
     }
@@ -1256,11 +1272,11 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
+        let mut current_flags: Vec<bool> = vec![];
 
-        let string_types: HashSet<(String, AvailableBufferType)> = IonotropicNeurotransmitterType::get_all_types()
-            .into_iter()
-            .map(|i| (format!("lg${}", i.to_string()), AvailableBufferType::UInt))
-            .collect();
+        let string_types: HashSet<(String, AvailableBufferType)> = HashSet::from([
+            (String::from("ligand_gates$flags"), AvailableBufferType::UInt)
+        ]);
 
         for key in LigandGatedChannel::<T>::get_all_possible_attribute_names().union(&string_types) {
             if !string_types.contains(key) {
@@ -1287,13 +1303,20 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                     }
                 }
             } else {
-                let mut current_contents = vec![0; rows * cols];
+                let mut current_contents = vec![0; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
                 read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
-                flags.insert(
-                    key.0.clone(), 
-                    current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
-                );
+                current_flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
+            }
+        }
+
+        for n in 0..(rows * cols) {
+            for (n_type, i) in IonotropicNeurotransmitterType::get_all_types().iter().enumerate() {
+                let current_index = n * IonotropicNeurotransmitterType::number_of_types() + n_type;
+                match flags.entry(format!("ligand_gates${}", i.to_string())) {
+                    Entry::Vacant(entry) => { entry.insert(vec![current_flags[current_index]]); },
+                    Entry::Occupied(mut entry) => { entry.get_mut().push(current_flags[current_index]); }
+                }
             }
         }
 
@@ -1302,7 +1325,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                 let grid_value = &mut ligand_gates_grid[row][col];
                 let flag_index = row * cols + col;
                 for i in IonotropicNeurotransmitterType::get_all_types() {
-                    let i_str = format!("lg${}", i.to_string());
+                    let i_str = format!("ligand_gates${}", i.to_string());
                     let index = row * cols * IonotropicNeurotransmitterType::number_of_types() 
                         + col * IonotropicNeurotransmitterType::number_of_types() + i.type_to_numeric();
     
@@ -1911,7 +1934,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         for n in 0..(rows * cols) {
             for (n_type, i) in N::get_all_types().iter().enumerate() {
                 let current_index = n * N::number_of_types() + n_type;
-                match flags.entry(format!("neuro${}", i.to_string())) {
+                match flags.entry(format!("neurotransmitters${}", i.to_string())) {
                     Entry::Vacant(entry) => { entry.insert(vec![current_flags[current_index]]); },
                     Entry::Occupied(mut entry) => { entry.get_mut().push(current_flags[current_index]); }
                 }
@@ -1923,7 +1946,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                 let grid_value = &mut neurotransmitter_grid[row][col];
                 let flag_index = row * cols + col;
                 for i in N::get_all_types() {
-                    let i_str = format!("neuro${}", i.to_string());
+                    let i_str = format!("neurotransmitters${}", i.to_string());
                     let index = row * cols * N::number_of_types() 
                         + col * N::number_of_types() + i.type_to_numeric();
     
