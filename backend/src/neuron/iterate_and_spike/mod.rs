@@ -3,7 +3,7 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap, HashSet},
+    collections::{hash_map::{Entry, Keys, Values, ValuesMut}, HashMap, HashSet},
     fmt::Debug,
     hash::Hash,
 };
@@ -1732,7 +1732,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
 ) {
     match value.get(&i) {
         Some(value) => {
-            if let Some(current_flag) = flags.get_mut(&format!("neuro${}", i.to_string())) {
+            if let Some(current_flag) = flags.get_mut(&format!("neurotransmitters${}", i.to_string())) {
                 current_flag.push(1);
             }
 
@@ -1748,7 +1748,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
             }
         },
         None => {
-            if let Some(current_flag) = flags.get_mut(&format!("neuro${}", i.to_string())) {
+            if let Some(current_flag) = flags.get_mut(&format!("neurotransmitters${}", i.to_string())) {
                 current_flag.push(0);
             }
 
@@ -1771,7 +1771,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     pub fn convert_to_gpu(
         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        let length = grid.iter().map(|row| row.len()).sum();
+        let length: usize = grid.iter().map(|row| row.len()).sum();
 
         if length == 0 {
             return Ok(HashMap::new());
@@ -1784,7 +1784,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
         for i in N::get_all_types() {
-            flags.insert(format!("neuro${}", i.to_string()), vec![]);
+            flags.insert(format!("neurotransmitters${}", i.to_string()), vec![]);
         }
 
         for row in grid.iter() {
@@ -1828,13 +1828,21 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             }
         }
 
-        let size = length;
+        let mut flags_vec: Vec<u32> = vec![];
 
-        for (key, value) in flags.iter() {
-            write_buffer!(current_buffer, context, queue, size, value, UInt, last);
-
-            buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+        for n in 0..flags.len() {
+            for i in N::get_all_types() {
+                flags_vec.push(
+                    flags.get(
+                        &format!("neurotransmitters${}", i.to_string())
+                    ).unwrap()[n]
+                );
+            }
         }
+
+        write_buffer!(flags_buffer, context, queue, size, &flags_vec, UInt, last);
+
+        buffers.insert(String::from("neurotransmitters$flags"), BufferGPU::UInt(flags_buffer));
 
         Ok(buffers)
     }
@@ -1848,11 +1856,12 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
         cols: usize,
     ) -> Result<(), GPUError> {
         let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
+        let mut current_flags: Vec<bool> = vec![];
         let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
 
-        let string_types: Vec<String> = N::get_all_types()
+        let string_types: Vec<String> = T::get_attribute_names()
             .into_iter()
-            .map(|i| format!("neuro${}", i.to_string()))
+            .map(|i| i.0)
             .collect();
 
         if rows == 0 || cols == 0 {
@@ -1863,13 +1872,12 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             return Ok(());
         }
 
-        let all_neurotransmitter_flag_strings: HashSet<(String, AvailableBufferType)> = N::get_all_types()
-            .iter()
-            .map(|i| (format!("neuro${}", i.to_string()), AvailableBufferType::UInt))
-            .collect();
+        let neurotransmitter_flags: HashSet<(String, AvailableBufferType)> = HashSet::from([
+            (String::from("neurotransmitters$flags"), AvailableBufferType::UInt)
+        ]);
 
-        for key in T::get_attribute_names().union(&all_neurotransmitter_flag_strings) {
-            if !string_types.contains(&key.0) {
+        for key in T::get_attribute_names().union(&neurotransmitter_flags) {
+            if string_types.contains(&key.0) {
                 match key.1 {
                     AvailableBufferType::Float => {
                         let mut current_contents = vec![0.; rows * cols * N::number_of_types()];
@@ -1893,13 +1901,20 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                     }
                 }
             } else {
-                let mut current_contents = vec![0; rows * cols];
+                let mut current_contents = vec![0; rows * cols * N::number_of_types()];
                 read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
-                flags.insert(
-                    key.0.clone(), 
-                    current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>() // uint to bool
-                );
+                current_flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
+            }
+        }
+
+        for n in 0..(rows * cols) {
+            for (n_type, i) in N::get_all_types().iter().enumerate() {
+                let current_index = n * N::number_of_types() + n_type;
+                match flags.entry(format!("neuro${}", i.to_string())) {
+                    Entry::Vacant(entry) => { entry.insert(vec![current_flags[current_index]]); },
+                    Entry::Occupied(mut entry) => { entry.get_mut().push(current_flags[current_index]); }
+                }
             }
         }
 
