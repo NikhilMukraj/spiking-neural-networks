@@ -250,6 +250,7 @@ macro_rules! impl_iterate_and_spike {
     };
 }
 
+/// A quadratic integrate and fire neuron
 #[derive(Debug, Clone, IterateAndSpikeBase)]
 pub struct QuadraticIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Membrane potential (mV)
