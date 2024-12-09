@@ -514,14 +514,16 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 }}
 
                 neurotransmitters_update(
-                    index * number_of_types, 
+                    index, 
+                    number_of_types,
                     neuro_flags,
                     is_spiking,
                     dt,
                     {}
                 );
                 ligand_gates_update_function(
-                    index * number_of_types,
+                    index,
+                    number_of_types,
                     t,
                     current_voltage,
                     dt,
