@@ -1361,6 +1361,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
     pub fn get_ligand_gated_channels_update_function() -> String {
         let mut kernel_args = vec![
             String::from("uint index"), 
+            String::from("uint number_of_types"),
             String::from("__global float* t"),
             String::from("__global float* voltage"), 
             String::from("__global float* dt"), 
@@ -1377,34 +1378,34 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             __kernel void ligand_gates_update_function(
                 {}
             ) {{
-                if (lg_flags[index]) {{ // AMPA
-                    r[index] = get_r({});
-                    current[index] = g[index] * r[index] * (voltage[index] - reversal[index]); 
+                if (lg_flags[index * number_of_types]) {{ // AMPA
+                    r[index * number_of_types] = get_r({});
+                    current[index * number_of_types] = g[index * number_of_types] * r[index * number_of_types] * (voltage[index] - reversal[index * number_of_types]); 
                 }}
-                if (lg_flags[index + 1]) {{ // NMDA
-                    r[index + 1] = get_r({});
-                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index + 1] / 3.57)); 
-                    current[index + 1] = modifier * g[index + 1] * r[index + 1] * (voltage[index] - reversal[index + 1]);
+                if (lg_flags[index * number_of_types + 1]) {{ // NMDA
+                    r[index * number_of_types + 1] = get_r({});
+                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index * number_of_types + 1] / 3.57)); 
+                    current[index * number_of_types + 1] = modifier * g[index * number_of_types + 1] * r[index * number_of_types + 1] * (voltage[index] - reversal[index * number_of_types + 1]);
                 }}
-                if (lg_flags[index + 2]) {{ // GABAa 
-                    r[index + 2] = get_r({});
-                    current[index + 2] = g[index + 2] * r[index + 2] * (voltage[index] - reversal[index + 2]); 
+                if (lg_flags[index * number_of_types + 2]) {{ // GABAa 
+                    r[index * number_of_types + 2] = get_r({});
+                    current[index * number_of_types + 2] = g[index * number_of_types + 2] * r[index * number_of_types + 2] * (voltage[index] - reversal[index * number_of_types + 2]); 
                 }}
-                if (lg_flags[index + 3]) {{ // GABAb
-                    r[index + 3] = get_r({});
-                    gabab_g[index + 3] += (gabab_k3[index + 3] * r[index + 3] - gabab_k4[index + 3] * gabab_g[index + 3]) * dt[index];
-                    float bottom = pow(gabab_g[index + 3], gabab_n[index + 3]) * gabab_kd[index + 3];
-                    float top = pow(gabab_g[index + 3], gabab_n[index + 3]);
+                if (lg_flags[index * number_of_types + 3]) {{ // GABAb
+                    r[index * number_of_types + 3] = get_r({});
+                    gabab_g[index * number_of_types + 3] += (gabab_k3[index * number_of_types + 3] * r[index * number_of_types + 3] - gabab_k4[index * number_of_types + 3] * gabab_g[index * number_of_types + 3]) * dt[index];
+                    float bottom = pow(gabab_g[index * number_of_types + 3], gabab_n[index * number_of_types + 3]) * gabab_kd[index * number_of_types + 3];
+                    float top = pow(gabab_g[index * number_of_types + 3], gabab_n[index * number_of_types + 3]);
                     float modifier =  top / bottom;
-                    current[index + 3] = modifier * g[index + 3] * r[index + 3] * (voltage[index] - reversal[index + 3]);
+                    current[index * number_of_types + 3] = modifier * g[index * number_of_types + 3] * r[index * number_of_types + 3] * (voltage[index] - reversal[index * number_of_types * number_of_types + 3]);
                 }}
             }}
             "#,
             kernel_args,
-            get_receptor_args::<T>("[index]"),
-            get_receptor_args::<T>("[index + 1]"),
-            get_receptor_args::<T>("[index + 2]"),
-            get_receptor_args::<T>("[index + 3]"),
+            get_receptor_args::<T>("[index * number_of_types]"),
+            get_receptor_args::<T>("[index * number_of_types + 1]"),
+            get_receptor_args::<T>("[index * number_of_types + 2]"),
+            get_receptor_args::<T>("[index * number_of_types + 3]"),
         )
     }
 }
@@ -1987,7 +1988,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             .map(|i| {
                 let split_result = i.split('$').collect::<Vec<&str>>();
                 let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
-                format!("{}[index + i]", arg_name)
+                format!("{}[index * number_of_types + i]", arg_name)
             })
             .collect::<Vec<String>>()
             .join(",\n");
@@ -1996,12 +1997,13 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             r#"
                 __kernel void neurotransmitters_update(
                     uint index,
+                    uint number_of_types,
                     __global uint* neuro_flags,
                     {}
                 ) {{
                     for (int i = 0; i < 4; i++) {{
-                        if (neuro_flags[index + i]) {{
-                            t[index + i] = get_t({});
+                        if (neuro_flags[index * number_of_types + i]) {{
+                            t[index * number_of_types + i] = get_t({});
                         }}
                     }}
                 }}
