@@ -154,6 +154,16 @@ mod tests {
                         kernel_execution.set_arg(&index_to_position_buffer);
                     } else if i == "number_of_types" {
                         kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
+                    } else if i == "neuro_flags" {
+                        match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            _ => unreachable!("Could not retrieve neurotransmitter flags"),
+                        };
+                    } else if i == "lg_flags" {
+                        match &gpu_cell_grid.get("ligand_gates$flags").expect("Could not retrieve receptor flags") {
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            _ => unreachable!("Could not retrieve receptor flags"),
+                        };
                     } else {
                         match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
