@@ -81,13 +81,13 @@ def fill_defaults(parsed):
     if 'inh_n' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['inh_n'] = 3
 
-    if 'distortion' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['distortion'] = 0.15
-
     if 'dt' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['dt'] = 1
     if 'c_m' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['c_m'] = 25
+
+    if 'distortion' not in parsed['variables']:
+        parsed['variables']['distortion'] = [0.15]
 
     if 'prob_of_exc_to_inh' not in parsed['variables']:
         parsed['variables']['prob_of_exc_to_inh'] = [0.5]
@@ -110,3 +110,7 @@ def fill_defaults(parsed):
 
     # single on/off cue versus entire group
     # d1/d2
+
+# keys should just be list(parsed_toml['variables'].keys())
+# simplify expr after
+combinations = list(itertools.product(*[parsed_toml['variables'][key] for key in keys]))
