@@ -89,6 +89,7 @@ __kernel void get_neurotransmitter_inputs(
     __global const uint *connections, 
     __global const float *weights, 
     __global const uint *index_to_position,
+    __global const uint *flags,
     __global const float *t,
     uint n, 
     uint number_of_types,
