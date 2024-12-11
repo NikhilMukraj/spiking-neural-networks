@@ -502,18 +502,6 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];
 
-                if (refractory_count[index] > 0.0f) {{
-                    current_voltage[index] = v_reset[index];
-                    refractory_count[index] -= 1.0f; 
-                    is_spiking[index] = 0;
-                }} else if (current_voltage[index] >= v_th[index]) {{
-                    current_voltage[index] = v_reset[index];
-                    is_spiking[index] = 1;
-                    refractory_count[index] = tref[index] / dt[index];
-                }} else {{
-                    is_spiking[index] = 0;
-                }}
-
                 neurotransmitters_update(
                     index, 
                     number_of_types,
@@ -537,9 +525,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
                     ) 
                     * (dt[index] / tau_m[index]);
-                float receptor_current = {}current[index] + {}current[index + 1] 
-                     + {}current[index + 2] + {}current[index + 3];
-                current_voltage[index] += receptor_current * (dt[index] / c_m[index]);
+                float receptor_current = -({}current[index * number_of_types] + {}current[index * number_of_types + 1] 
+                    + {}current[index * number_of_types + 2] + {}current[index * number_of_types + 3]) * (dt[index] / c_m[index]);
 
                 current_voltage[index] += dv + receptor_current;
 
