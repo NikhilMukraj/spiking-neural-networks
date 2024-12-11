@@ -1229,7 +1229,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut flags_vec: Vec<u32> = vec![];
 
-        for n in 0..flags.len() {
+        for n in 0..length {
             for i in IonotropicNeurotransmitterType::get_all_types() {
                 flags_vec.push(
                     flags.get(
@@ -1846,7 +1846,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
 
         let mut flags_vec: Vec<u32> = vec![];
 
-        for n in 0..flags.len() {
+        for n in 0..length {
             for i in N::get_all_types() {
                 flags_vec.push(
                     flags.get(
