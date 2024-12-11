@@ -110,7 +110,7 @@ mod tests {
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),
             };
 
-        let iterate_kernel = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context)?;
+        let iterate_kernel = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrochemical_kernel(&context)?;
 
         let gpu_cell_grid = QuadraticIntegrateAndFireNeuron::convert_electrochemical_to_gpu(&cell_grid, &context, &queue)?;
 
@@ -138,8 +138,6 @@ mod tests {
         let index_to_position_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
 
         let mut gpu_voltages = vec![];
-
-        println!("{:#?}", gpu_cell_grid.keys());
 
         for _ in 0..iterations {
             let iterate_event = unsafe {
@@ -185,7 +183,7 @@ mod tests {
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
             };
 
-            match gpu_cell_grid.get("ligand_gates$r").unwrap() {
+            match gpu_cell_grid.get("current_voltage").unwrap() {
                 BufferGPU::Float(buffer) => {
                     let mut read_vector = vec![0.];
 
@@ -207,11 +205,9 @@ mod tests {
             }
         }
 
-        // println!("{:#?}", gpu_voltages);
-
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
-            assert!(error < 5., "error: {}", error);
+            assert!(error < 5., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
         }
 
         Ok(())
