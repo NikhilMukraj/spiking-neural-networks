@@ -66,6 +66,9 @@ def fill_defaults(parsed):
     
     if 'measure_snr' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['measure_snr'] = False
+
+    if 'distortion_on_only' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['distortion_on_only'] = False
     
     if 'first_window' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['first_window'] = 1_000
@@ -396,7 +399,7 @@ for current_state in tqdm(all_states):
                 pattern1, 
                 current_state['distortion'],
                 parse_toml['simulation_parameters']['main_firing_rate'],
-                True,
+                parse_toml['simulation_parameters']['distortion_on_only'],
             )
         )
 
@@ -408,4 +411,3 @@ for current_state in tqdm(all_states):
         )
 
         # check accuracy on bayesian pattern and main pattern
-        
