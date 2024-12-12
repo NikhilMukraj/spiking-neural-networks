@@ -14,6 +14,7 @@
   - [ ] Emotional cue modulates selection of memory
   - [ ] Existing memory modulates selection of memory
   - [ ] Could vary ionotropic neurotransmitters
+    - Should see changes in accuracy
 - [ ] Bayesian inference with gain modulation
   - [ ] Emotional cue modulates select of memory with dopamine mechanism
   - [ ] Existing memory modulates selection of memory with dopamine mechanism
