@@ -114,3 +114,5 @@ def fill_defaults(parsed):
 # keys should just be list(parsed_toml['variables'].keys())
 # simplify expr after
 combinations = list(itertools.product(*[parsed_toml['variables'][key] for key in keys]))
+
+# accuracy should check against the main input and the bayesian cue
