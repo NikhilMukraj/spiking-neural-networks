@@ -54,11 +54,12 @@ mod tests {
         Ok(buffer)
     }
 
-    #[test]
-    pub fn test_single_quadratic_neuron() -> Result<(), SpikingNeuralNetworksError> {
+    fn iterate_neuron(t_values_tuple: &(f32, f32, f32)) -> Result<(Vec<f32>, Vec<f32>), SpikingNeuralNetworksError> {
         // initialize 1x1 grid
         // give constant ampa input, then constant nmda, gaba, etc
         // check against cpu equavilent
+
+        let t_values = vec![t_values_tuple.0, t_values_tuple.1, t_values_tuple.2, 0.];
 
         let iterations = 1000;
         
@@ -71,15 +72,17 @@ mod tests {
 
         let mut cpu_neuron = neuron.clone();
 
-        let mut ampa_conc = NeurotransmitterConcentrations::new();
-        ampa_conc.insert(IonotropicNeurotransmitterType::AMPA, 1.0);
+        let mut neurotransmitter_conc = NeurotransmitterConcentrations::new();
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::AMPA, t_values_tuple.0);
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::NMDA, t_values_tuple.1);
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::GABAa, t_values_tuple.2);
         
         let mut cpu_voltages = vec![];
 
         for _ in 0..iterations {
             cpu_neuron.iterate_with_neurotransmitter_and_spike(
                 0., 
-                &ampa_conc
+                &neurotransmitter_conc
             );
             cpu_voltages.push(cpu_neuron.current_voltage);
         }
@@ -126,7 +129,6 @@ mod tests {
                 .map_err(|_| GPUError::BufferCreateError)?
         };
 
-        let t_values = vec![1., 0., 0., 0.];
         let t_buffer_write_event = unsafe {
             queue
                 .enqueue_write_buffer(&mut t_buffer, CL_NON_BLOCKING, 0, &t_values, &[])
@@ -204,6 +206,49 @@ mod tests {
                 _ => unreachable!(),
             }
         }
+
+        Ok((cpu_voltages, gpu_voltages))
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_ampa() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 0., 0.))?;
+
+        for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
+            let error = (cpu_voltage - gpu_voltage).abs();
+            assert!(error < 5., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_nmda() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 1., 0.))?;
+
+        for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
+            let error = (cpu_voltage - gpu_voltage).abs();
+            assert!(error < 5., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_gabaa() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 0., 1.))?;
+
+        for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
+            let error = (cpu_voltage - gpu_voltage).abs();
+            assert!(error < 5., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_ampa_nmda() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 1., 0.))?;
 
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
