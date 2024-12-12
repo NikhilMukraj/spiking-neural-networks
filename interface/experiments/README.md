@@ -13,6 +13,7 @@
 - [ ] Bayesian inference with no gain modulation
   - [ ] Emotional cue modulates selection of memory
   - [ ] Existing memory modulates selection of memory
+  - [ ] Could vary ionotropic neurotransmitters
 - [ ] Bayesian inference with gain modulation
   - [ ] Emotional cue modulates select of memory with dopamine mechanism
   - [ ] Existing memory modulates selection of memory with dopamine mechanism
@@ -22,6 +23,7 @@
   - [ ] Simulating multiple memories biasing each other with dopamine modulation
   - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
 - [ ] Liquid state machine
+  - [ ] Basic liquid dynamics
   - [ ] STDP based learning of MNIST
   - [ ] Varying ionotropic neurotransmitters
     - [ ] Glutamate clearance
