@@ -15,7 +15,7 @@ from pipeline_setup import get_weights, weights_ie, check_uniqueness
 from pipeline_setup import calculate_correlation, skewed_random, setup_neuron
 from pipeline_setup import reset_spike_train, get_spike_train_setup_function
 from pipeline_setup import get_spike_train_same_firing_rate_setup, get_noisy_spike_train_setup_function
-from pieline_setup import find_peaks_above_threshold, acc, signal_to_noise
+from pieline_setup import find_peaks_above_threshold, acc, signal_to_noise, determine_accuracy
 import lixirnet as ln
 
 
@@ -187,7 +187,11 @@ all_states = [dict(zip(list(parsed_toml['variables'].keys(), combination))) for 
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
-        pattern1, pattern2 = np.random.choice(range(num_patterns), 2, replace=False)
+        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+            pattern1, pattern2 = np.random.choice(range(num_patterns), 2, replace=False)
+        else:
+            pattern1 = np.random.choice(range(num_patterns))
+            pattern2 = pattern1
 
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
         gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gabaa_clearance'])
@@ -245,6 +249,9 @@ for current_state in tqdm(all_states):
         network.set_dt(1)
         network.parallel = True
 
+        network.electrical_synapse = False
+        network.chemical_synapse = True
+
         if parsed_toml['main_1_on']:
             main_firing_rate = current_state['main_firing_rate']
         else:
@@ -275,4 +282,105 @@ for current_state in tqdm(all_states):
         for _ in range(parse_toml['simulation_parameters']['iterations1']):
             network.run_lattices(1)
 
+        hist = network.get_lattice(1).history
+        data = [i.flatten() for i in np.array(hist)]
+        peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+        first_window = parsed_toml['simulation_parameters']['iterations1'] - parsed_toml['simulation_parameters']['first_window'] 
+
+        current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
+        firing_max = current_pred_pattern.max()
+
+        first_acc = determine_accuracy(
+            pattern2,
+            num_patterns,
+            first_window,
+            peaks,
+            parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+            parsed_toml['simulation_parameters']['get_all_accuracies'],
+        )
+
+        if parsed_toml['main_2_on']:
+            main_firing_rate = current_state['main_firing_rate']
+        else:
+            main_firing_rate = 0
+
+        network.apply_spike_train_lattice_given_position(
+            2, 
+            get_spike_train_setup_function(
+                pattern1, 
+                current_state['distortion'],
+                main_firing_rate,
+                parse_toml['simulation_parameters']['distortion_on_only'],
+            )
+        )
+
+        if parsed_toml['bayesian_2_on']:
+            bayesian_firing_rate = current_state['bayesian_firing_rate']
+        else:
+            bayesian_firing_rate = 0
+
+        network.apply_spike_train_lattice(
+            3, 
+            get_spike_train_same_firing_rate_setup(
+                bayesian_firing_rate,
+            )
+        )
+
+        for _ in range(parsed_toml['simulation_parameters']['iterations2']):
+            network.run_lattices(1)
+
+        hist = network.get_lattice(1).history
+        data = [i.flatten() for i in np.array(hist)]
+        peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+        second_window = parsed_toml['simulation_parameters']['iterations2'] - parsed_toml['simulation_parameters']['second_window'] 
+
+        current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
+        firing_max = current_pred_pattern.max()
+
+        if parsed_toml['simulation_parameters']['second_cue'] == False:
+            pattern2 = pattern1
+
+        if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            second_acc = determine_accuracy(
+                pattern2,
+                num_patterns,
+                second_window,
+                peaks,
+                parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                parsed_toml['simulation_parameters']['get_all_accuracies'],
+            )
+        else:
+            second_acc = 0
+
+        current_state['trial'] = trial
+        current_state['pattern1'] = pattern1
+        current_state['pattern2'] = pattern2
+
+        key = generate_key(parsed_toml, current_state)
+
+        current_value = {}
+        current_value['first_acc'] = first_acc
+        current_value['second_acc'] = second_acc
+
+        if parsed_toml['simulation_parameters']['measure_snr']:
+            signal = np.array([np.array(i).mean() for i in hist])
+
+            current_value['first_snr'] = float(signal_to_noise(signal[:parsed_toml['simulation_parameters']['iterations1']]))
+            if parsed_toml['simulation_parameters']['iterations2'] != 0:
+                current_value['second_snr'] = float(signal_to_noise(signal[parsed_toml['simulation_parameters']['iterations1']:]))
+            else:
+                current_value['second_snr'] = None
+
+        if parsed_toml['simulation_parameters']['peaks_on']:
+            current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
+
+        simulation_output[key] = current_value
+
         # check accuracy on bayesian pattern and main pattern
+
+with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
+    json.dump(simulation_output, file, indent=4)
+
+print("\033[92mFinished simulation\033[0m")
