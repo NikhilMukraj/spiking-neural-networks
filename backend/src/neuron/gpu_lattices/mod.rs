@@ -425,12 +425,12 @@ where
                     .set_arg(&gpu_graph.weights)
                     .set_arg(&gpu_graph.index_to_position);
 
-                match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer") {
+                match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
                     _ => unreachable!("gap_condutance must be float"),
                 };
 
-                match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer") {
+                match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
                     _ => unreachable!("current_voltage must be float"),
                 };
@@ -564,7 +564,7 @@ where
 
     // maybe turn on and off gap junctions depending on whether electrical synapses is on
     pub fn run_lattice_chemical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
-        let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
+        let gpu_cell_grid = T::convert_electrochemical_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
 
         let gpu_graph = self.graph.convert_to_gpu(&self.context, &self.queue, &self.cell_grid)?;
 
@@ -694,9 +694,14 @@ where
                     .set_arg(&gpu_graph.weights)
                     .set_arg(&gpu_graph.index_to_position);
 
-                match &gpu_cell_grid.get("t").expect("Could not retrieve buffer") {
+                match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    _ => unreachable!("neurotransmitters$flags"),
+                };
+
+                match &gpu_cell_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                    _ => unreachable!("t must be float"),
+                    _ => unreachable!("neurotransmitters$t must be float"),
                 };
 
                 kernel_execution.set_arg(&gpu_graph.size)
@@ -729,6 +734,16 @@ where
                         kernel_execution.set_arg(&gpu_graph.index_to_position);
                     } else if i == "number_of_types" {
                         kernel_execution.set_arg(&N::number_of_types());
+                    } else if i == "neuro_flags" {
+                        match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            _ => unreachable!("Could not retrieve neurotransmitter flags"),
+                        };
+                    } else if i == "lg_flags" {
+                        match &gpu_cell_grid.get("ligand_gates$flags").expect("Could not retrieve receptor flags") {
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            _ => unreachable!("Could not retrieve receptor flags"),
+                        };
                     } else {
                         match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
