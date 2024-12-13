@@ -155,4 +155,60 @@ def signal_to_noise(a, axis=0, ddof=0):
     m = a.mean(axis)
     sd = a.std(axis=axis, ddof=ddof)
     return np.where(sd == 0, 0, m / sd)
-    
+
+def determine_accuracy(
+    desired_pattern_index, 
+    num_patterns,
+    window, 
+    peaks, 
+    use_correlation_as_accuracy=True, 
+    get_all_accuracies=False
+):
+    if not use_correlation_as_accuracy:
+        if not get_all_accuracies:
+            current_acc = try_max(
+                [acc(patterns[desired_pattern_index], np.array([len([j for j in i if j >= window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
+            )
+            current_acc_inv = try_max(
+                [acc(np.logical_not(patterns[desired_pattern_index]).astype(int), np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
+            )
+
+            current_acc = max(current_acc, current_acc_inv)
+        else:
+            accs = []
+            for pattern_index in range(num_patterns):
+                current_acc = try_max(
+                    [
+                        acc(
+                            patterns[pattern_index], 
+                            np.array([len([j for j in i if j >= window]) for i in peaks]), 
+                            threshold=i
+                        ) 
+                        for i in range(0, firing_max)
+                    ]
+                )
+
+                current_acc_inv = try_max(
+                    [
+                        acc(
+                            np.logical_not(patterns[pattern_index]).astype(int), 
+                            np.array([len([j for j in i if j >= window]) for i in peaks]), 
+                            threshold=i
+                        ) 
+                        for i in range(0, firing_max)
+                    ]
+                )
+
+                accs.append(max(current_acc, current_acc_inv))
+
+            current_acc = [float(i) for i in accs]
+    else:
+        correlation_coefficients = []
+        for pattern_index in range(num_patterns):
+            correlation_coefficients.append(
+                np.corrcoef(patterns[pattern_index], np.array([len([j for j in i if j >= window]) for i in peaks]))[0, 1]
+            )
+            
+        current_acc = bool(desired_pattern_index == np.argmax(correlation_coefficients))
+
+    return current_acc
