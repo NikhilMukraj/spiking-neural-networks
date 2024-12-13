@@ -116,7 +116,7 @@ __kernel void get_neurotransmitter_inputs(
             if (counts[gid + t_index] != 0.0f) {
                 res[gid + t_index] /= counts[gid + t_index];
             } else {
-                res[gid + t_index] = 0;
+                res[gid + t_index] = 0.0f;
             }
         }
     }
