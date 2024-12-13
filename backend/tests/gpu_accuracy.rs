@@ -6,9 +6,10 @@ mod tests {
     use spiking_neural_networks::{
         error::SpikingNeuralNetworksError,
         neuron::{
-            integrate_and_fire::SimpleLeakyIntegrateAndFire,
-            gpu_lattices::LatticeGPU,
-            Lattice
+            gpu_lattices::LatticeGPU, integrate_and_fire::{
+                QuadraticIntegrateAndFireNeuron, 
+                SimpleLeakyIntegrateAndFire
+            }, Lattice
         }
     };
 
@@ -97,6 +98,42 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_chemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+    
+        let iterations = 1000;
+        let (num_rows, num_cols) = (2, 2);
+
+        let mut lattice = Lattice::default_impl();
+
+        lattice.electrical_synapse = false;
+        lattice.chemical_synapse = true;
+        
+        lattice.populate(
+            &base_neuron, 
+            num_rows, 
+            num_cols, 
+        );
+    
+        lattice.connect(&connection_conditional, None);
+
+        lattice.apply(|neuron: &mut _| {
+            let mut rng = rand::thread_rng();
+            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        });
+    
+        lattice.update_grid_history = true;
+    
+        let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
+    
+        lattice.run_lattice(iterations)?;
+    
+        gpu_lattice.run_lattice(iterations)?;
 
         Ok(())
     }
