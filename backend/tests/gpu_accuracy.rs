@@ -9,7 +9,7 @@ mod tests {
             gpu_lattices::LatticeGPU, integrate_and_fire::{
                 QuadraticIntegrateAndFireNeuron, 
                 SimpleLeakyIntegrateAndFire
-            }, Lattice
+            }, iterate_and_spike::{AMPADefault, ApproximateNeurotransmitter, IonotropicNeurotransmitterType, LigandGatedChannel}, Lattice
         }
     };
 
@@ -104,7 +104,13 @@ mod tests {
 
     #[test]
     pub fn test_chemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
-        let base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+        let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+
+        base_neuron.ligand_gates
+            .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+            .expect("Valid neurotransmitter pairing");
+        base_neuron.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
     
         let iterations = 1000;
         let (num_rows, num_cols) = (2, 2);
@@ -134,6 +140,21 @@ mod tests {
         lattice.run_lattice(iterations)?;
     
         gpu_lattice.run_lattice(iterations)?;
+
+        for (cpu_cell_grid, gpu_cell_grid) in lattice.grid_history.history.iter()
+            .zip(gpu_lattice.grid_history.history.iter()) {
+            for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+                for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                    let error = (voltage1 - voltage2).abs();
+                    assert!(
+                        error <= 2., "error: {}, voltage1: {}, voltage2: {}", 
+                        error,
+                        voltage1,
+                        voltage2,
+                    );
+                }
+            }
+        }
 
         Ok(())
     }
