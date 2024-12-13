@@ -307,12 +307,6 @@ def find_peaks_above_threshold(series, threshold):
     
     return filtered_peaks
 
-def try_max(a):
-    if len(a) == 0:
-        return 0
-    else:
-        return max(a)
-
 def acc(true_pattern, pred_pattern, threshold=10): 
     current_pred_pattern = pred_pattern
     current_pred_pattern[pred_pattern < threshold] = 0 
@@ -323,7 +317,7 @@ def signal_to_noise(a, axis=0, ddof=0):
     a = np.asanyarray(a)
     m = a.mean(axis)
     sd = a.std(axis=axis, ddof=ddof)
-    return np.where(sd == 0, 0, m/sd)
+    return np.where(sd == 0, 0, m / sd)
 
 # keys should just be list(parsed_toml['variables'].keys())
 # simplify expr after
