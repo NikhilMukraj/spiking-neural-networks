@@ -34,6 +34,15 @@ def fill_defaults(parsed):
     if 'iterations2' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['iterations2'] = 3_000
 
+    if 'bayesian_1_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['bayesian_1_on'] = True
+    if 'bayesian_2_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['bayesian_2_on'] = True
+    if 'main_1_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['main_1_on'] = True
+    if 'main_2_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['main_2_on'] = True
+
     if 'peaks_on' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['peaks_on'] = False
     
@@ -236,21 +245,34 @@ for current_state in tqdm(all_states):
         network.set_dt(1)
         network.parallel = True
 
+        if parsed_toml['main_1_on']:
+            main_firing_rate = current_state['main_firing_rate']
+        else:
+            main_firing_rate = 0
+
         network.apply_spike_train_lattice_given_position(
             2, 
             get_spike_train_setup_function(
                 pattern1, 
                 current_state['distortion'],
-                parse_toml['simulation_parameters']['main_firing_rate'],
+                main_firing_rate,
                 parse_toml['simulation_parameters']['distortion_on_only'],
             )
         )
 
+        if parsed_toml['bayesian_1_on']:
+            bayesian_firing_rate = current_state['bayesian_firing_rate']
+        else:
+            bayesian_firing_rate = 0
+
         network.apply_spike_train_lattice(
             3, 
             get_spike_train_same_firing_rate_setup(
-                parse_toml['simulation_parameters']['bayesian_firing_rate'],
+                bayesian_firing_rate,
             )
         )
+
+        for _ in range(parse_toml['simulation_parameters']['iterations1']):
+            network.run_lattices(1)
 
         # check accuracy on bayesian pattern and main pattern
