@@ -1,3 +1,5 @@
 # testing args for bayesian inf simulation
 # test different distortions and accuracy for bayesian cue and regular cue
+# bayesian is not main should be true
+# iterations can be smaller maybe 3k to 5k ms
 # should expect high distortion gives way to regular cue
