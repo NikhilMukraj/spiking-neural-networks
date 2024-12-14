@@ -8,7 +8,7 @@ mod tests {
     extern crate spiking_neural_networks;
     use rand::Rng;
     use spiking_neural_networks::{graph::AdjacencyList, neuron::{
-        integrate_and_fire::IzhikevichNeuron, plasticity::STDP, GridVoltageHistory, Lattice
+        integrate_and_fire::IzhikevichNeuron, plasticity::STDP, GridVoltageHistory, Lattice, RunLattice
     }};
 
     // fn sparse_connection(x: (usize, usize), y: (usize, usize)) -> bool {

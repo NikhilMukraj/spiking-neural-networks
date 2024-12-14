@@ -9,7 +9,7 @@ mod tests {
     use rand::Rng;
     use spiking_neural_networks::neuron::{
         integrate_and_fire::IzhikevichNeuron,
-        Lattice,
+        Lattice, RunLattice
     };
 
     fn sparse_connection(x: (usize, usize), y: (usize, usize)) -> bool {
