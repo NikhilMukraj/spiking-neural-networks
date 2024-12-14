@@ -450,6 +450,21 @@ macro_rules! impl_apply {
 
 pub (crate) use impl_apply;
 
+/// Run lattice trait for encapsulating lattice behavior
+pub trait RunLattice {
+    fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError>;
+}
+
+/// Run spike lattice trait for encapsulating spike train lattice behavior
+pub trait RunSpikeTrainLattice {
+    fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError>;
+}
+
+/// Run network trait for encapsulating network behavior
+pub trait RunNetwork {
+    fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError>;
+}
+
 /// Electrical inputs for internal calculations
 pub type InternalElectricalInputs = HashMap<(usize, usize), f32>;
 
@@ -472,7 +487,7 @@ pub type InternalChemicalInputs<N> = HashMap<(usize, usize), NeurotransmitterCon
 /// # use spiking_neural_networks::{
 /// #     neuron::{
 /// #         integrate_and_fire::IzhikevichNeuron,
-/// #         Lattice
+/// #         Lattice, RunLattice
 /// #     },
 /// #     error::SpikingNeuralNetworksError,
 /// # };
@@ -998,20 +1013,6 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         Ok(())
     }
 
-    /// Runs lattice given reward and dispatches correct run lattice method based on
-    /// electrical and chemical synapses flag
-    pub fn run_lattice(
-        &mut self,
-        iterations: usize,
-    ) -> Result<(), GraphError> {
-        match (self.electrical_synapse, self.chemical_synapse) {
-            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(iterations),
-            (true, false) => self.run_lattice_electrical_synapses_only(iterations),
-            (false, true) => self.run_lattice_chemical_synapses_only(iterations),
-            (false, false) => Ok(()),
-        }
-    }
-
     fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
         (0..num_rows)
             .map(|_| {
@@ -1108,6 +1109,29 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
         match output {
             Ok(_) => Ok(()),
             Err(e) => Err(e)
+        }
+    }
+}
+
+impl<N, T, U, V, W> RunLattice for Lattice<T, U, V, W, N>
+where
+    N: NeurotransmitterType,
+    T: IterateAndSpike<N = N>,
+    U: Graph<K = (usize, usize), V = f32>,
+    V: LatticeHistory,
+    W: Plasticity<T, T, f32>,
+{
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag
+    fn run_lattice(
+        &mut self,
+        iterations: usize,
+    ) -> Result<(), SpikingNeuralNetworksError> {
+        match (self.electrical_synapse, self.chemical_synapse) {
+            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(iterations).map_err(Into::into),
+            (true, false) => self.run_lattice_electrical_synapses_only(iterations).map_err(Into::into),
+            (false, true) => self.run_lattice_chemical_synapses_only(iterations).map_err(Into::into),
+            (false, false) => Ok(()),
         }
     }
 }
@@ -1218,13 +1242,6 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
         self.internal_clock += 1;
     }
 
-    /// Iterates simulation for the given amount of time
-    pub fn run_lattice(&mut self, iterations: usize) {
-        for _ in 0..iterations {
-            self.iterate();
-        }
-    }
-
     pub fn populate(&mut self, base_spike_train: &T, num_rows: usize, num_cols: usize) {
         self.cell_grid = (0..num_rows)
             .map(|_| {
@@ -1238,6 +1255,16 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
     }
 }
 
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> RunSpikeTrainLattice for SpikeTrainLattice<N, T, U> {
+    /// Iterates simulation for the given amount of time
+    fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
+        for _ in 0..iterations {
+            self.iterate();
+        }
+
+        Ok(())
+    }
+}
 
 fn check_position<T>(
     cell_grid: &[Vec<T>],
@@ -2424,14 +2451,26 @@ where
 
         Ok(())
     }
+}
 
+impl<T, U, V, W, X, Y, Z, N> RunNetwork for LatticeNetwork<T, U, V, W, X, Y, Z, N>
+where
+    T: IterateAndSpike<N=N>,
+    U: Graph<K=(usize, usize), V=f32>,
+    V: LatticeHistory,
+    W: SpikeTrain<N=N>,
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<K=GraphPosition, V=f32>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    N: NeurotransmitterType,
+{
     /// Runs lattice given reward and dispatches correct run lattice method based on
     /// electrical and chemical synapses flag
-    pub fn run_lattices(&mut self, iterations: usize) -> Result<(), GraphError> {
+    fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
         match (self.electrical_synapse, self.chemical_synapse) {
-            (true, true) => self.run_lattices_with_electrical_and_chemical_synapses(iterations),
-            (true, false) => self.run_lattices_electrical_synapses_only(iterations),
-            (false, true) => self.run_lattices_chemical_synapses_only(iterations),
+            (true, true) => self.run_lattices_with_electrical_and_chemical_synapses(iterations).map_err(Into::into),
+            (true, false) => self.run_lattices_electrical_synapses_only(iterations).map_err(Into::into),
+            (false, true) => self.run_lattices_chemical_synapses_only(iterations).map_err(Into::into),
             (false, false) => Ok(()),
         }
     }
@@ -2970,22 +3009,11 @@ where
 
     /// Runs lattice given reward and dispatches correct run lattice method based on
     /// electrical and chemical synapses flag
-    pub fn run_lattice(&mut self, reward: f32) -> Result<(), GraphError> {
+    pub fn run_lattice_with_reward(&mut self, reward: f32) -> Result<(), GraphError> {
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, true) => self.run_lattice_with_electrical_and_chemical_synapses(reward),
             (true, false) => self.run_lattice_electrical_synapses_only(reward),
             (false, true) => self.run_lattice_chemical_synapses_only(reward),
-            (false, false) => Ok(()),
-        }
-    }
-
-    /// Runs lattice given reward and dispatches correct run lattice method based on
-    /// electrical and chemical synapses flag without a reward signal
-    pub fn run_lattice_without_reward(&mut self) -> Result<(), GraphError> {
-        match (self.electrical_synapse, self.chemical_synapse) {
-            (true, true) => self.run_lattice_with_electrical_and_chemical_synapses_without_reward(),
-            (true, false) => self.run_lattice_electrical_synapses_only_without_reward(),
-            (false, true) => self.run_lattice_chemical_synapses_only_without_reward(),
             (false, false) => Ok(()),
         }
     }
@@ -3072,6 +3100,33 @@ where
     }
 } 
 
+impl<S, T, U, V, W, N> RunLattice for RewardModulatedLattice<S, T, U, V, W, N> 
+where 
+    S: RewardModulatedWeight,
+    T: IterateAndSpike<N=N>,
+    U: Graph<K=(usize, usize), V=S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
+{
+    /// Runs lattice given reward and dispatches correct run lattice method based on
+    /// electrical and chemical synapses flag without a reward signal
+    fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
+        for _ in 0..iterations {
+            let result = match (self.electrical_synapse, self.chemical_synapse) {
+                (true, true) => self.run_lattice_with_electrical_and_chemical_synapses_without_reward(),
+                (true, false) => self.run_lattice_electrical_synapses_only_without_reward(),
+                (false, true) => self.run_lattice_chemical_synapses_only_without_reward(),
+                (false, false) => Ok(()),
+            };
+    
+            result.map_err(Into::<SpikingNeuralNetworksError>::into)?;
+        }
+
+        Ok(())
+    }
+}
+
 impl<S, T, U, V, W, N> Agent for RewardModulatedLattice<S, T, U, V, W, N> 
 where 
     S: RewardModulatedWeight,
@@ -3082,14 +3137,14 @@ where
     N: NeurotransmitterType,
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
-        match self.run_lattice(reward) {
+        match self.run_lattice_with_reward(reward) {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
     }
 
     fn update(&mut self) -> Result<(), AgentError> {
-        match self.run_lattice_without_reward() {
+        match self.run_lattice(1) {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
@@ -5039,7 +5094,7 @@ where
 
     /// Runs lattice given reward and dispatches correct run lattice method based on
     /// electrical and chemical synapses flag
-    pub fn run_lattices(&mut self, reward: f32) -> Result<(), GraphError> {
+    pub fn run_lattices_with_reward(&mut self, reward: f32) -> Result<(), GraphError> {
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, true) => self.run_lattices_with_electrical_and_chemical_synapses(reward),
             (true, false) => self.run_lattices_electrical_synapses_only(reward),
@@ -5047,16 +5102,37 @@ where
             (false, false) => Ok(()),
         }
     }
+}
 
+impl<S, T, U, V, W, X, Y, Z, R, C, N> RunNetwork for RewardModulatedLatticeNetwork<S, T, U, V, W, X, Y, Z, R, C, N>
+where
+    S: RewardModulatedWeight,
+    T: IterateAndSpike<N=N>, 
+    U: Graph<K=(usize, usize), V=f32>, 
+    V: LatticeHistory, 
+    W: SpikeTrain<N=N>, 
+    X: SpikeTrainLatticeHistory,
+    Y: Graph<K=GraphPosition, V=RewardModulatedConnection<S>>,
+    Z: Plasticity<T, T, f32> + Plasticity<W, T, f32>,
+    R: RewardModulator<T, T, S> + RewardModulator<W, T, S>,
+    C: Graph<K=(usize, usize), V=S>,
+    N: NeurotransmitterType,
+{
     /// Runs lattice given reward and dispatches correct run lattice method based on
     /// electrical and chemical synapses flag without a reward signal
-    pub fn run_lattices_without_reward(&mut self) -> Result<(), GraphError> {
-        match (self.electrical_synapse, self.chemical_synapse) {
-            (true, true) => self.run_lattices_with_electrical_and_chemical_synapses_without_reward(),
-            (true, false) => self.run_lattices_electrical_synapses_only_without_reward(),
-            (false, true) => self.run_lattices_chemical_synapses_only_without_reward(),
-            (false, false) => Ok(()),
+    fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
+        for _ in 0..iterations {
+            let result = match (self.electrical_synapse, self.chemical_synapse) {
+                (true, true) => self.run_lattices_with_electrical_and_chemical_synapses_without_reward(),
+                (true, false) => self.run_lattices_electrical_synapses_only_without_reward(),
+                (false, true) => self.run_lattices_chemical_synapses_only_without_reward(),
+                (false, false) => Ok(()),
+            };
+
+            result.map_err(Into::<SpikingNeuralNetworksError>::into)?;
         }
+
+        Ok(())
     }
 }
 
@@ -5075,14 +5151,14 @@ where
     N: NeurotransmitterType,
 {
     fn update_and_apply_reward(&mut self, reward: f32) -> Result<(), AgentError> {
-        match self.run_lattices(reward) {
+        match self.run_lattices_with_reward(reward) {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
     }
 
     fn update(&mut self) -> Result<(), AgentError> {
-        match self.run_lattices_without_reward() {
+        match self.run_lattices(1) {
             Ok(()) => Ok(()),
             Err(e) => Err(AgentError::AgentIterationFailure(format!("Agent error: {}", e))),
         }
