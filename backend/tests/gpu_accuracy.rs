@@ -9,7 +9,12 @@ mod tests {
             gpu_lattices::LatticeGPU, integrate_and_fire::{
                 QuadraticIntegrateAndFireNeuron, 
                 SimpleLeakyIntegrateAndFire
-            }, iterate_and_spike::{AMPADefault, ApproximateNeurotransmitter, IonotropicNeurotransmitterType, LigandGatedChannel}, Lattice
+            }, 
+            iterate_and_spike::{
+                AMPADefault, ApproximateNeurotransmitter, 
+                IonotropicNeurotransmitterType, LigandGatedChannel
+            }, 
+            Lattice, RunLattice
         }
     };
 

@@ -15,7 +15,7 @@ mod tests {
     use spiking_neural_networks::neuron::{
         integrate_and_fire::IzhikevichNeuron,
         spike_train::PoissonNeuron,
-        SpikeTrainLattice, Lattice, LatticeNetwork, SpikeHistory
+        SpikeTrainLattice, Lattice,  RunNetwork, LatticeNetwork, SpikeHistory
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
     
