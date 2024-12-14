@@ -11,7 +11,7 @@ use spiking_neural_networks::{
         }, 
         plasticity::{BCMActivity, BCM}, 
         spike_train::{BCMPoissonNeuron, DeltaDiracRefractoriness}, 
-        GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice
+        GridVoltageHistory, Lattice, LatticeNetwork, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice
     },
     graph::AdjacencyMatrix, 
     error::SpikingNeuralNetworksError,

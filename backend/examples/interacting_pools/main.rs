@@ -5,7 +5,7 @@ use spiking_neural_networks::{
     neuron::{
         integrate_and_fire::IzhikevichNeuron, 
         plasticity::STDP,
-        Lattice, LatticeNetwork, AverageVoltageHistory
+        Lattice, RunNetwork, LatticeNetwork, AverageVoltageHistory
     },
     graph::AdjacencyMatrix,
     error::SpikingNeuralNetworksError, 

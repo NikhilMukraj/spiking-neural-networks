@@ -12,7 +12,7 @@ use spiking_neural_networks::{
             ApproximateNeurotransmitter, NeurotransmitterType}, 
         spike_train::{DeltaDiracRefractoriness, PresetSpikeTrain}, 
         plasticity::STDP,
-        Lattice, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice
+        Lattice, LatticeNetwork, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice
     },
     error::SpikingNeuralNetworksError, 
 };

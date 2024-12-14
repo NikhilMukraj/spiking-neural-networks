@@ -8,7 +8,7 @@ extern crate spiking_neural_networks;
 use spiking_neural_networks::{
     error::SpikingNeuralNetworksError,
     neuron::{
-        Lattice,
+        Lattice, RunLattice,
         integrate_and_fire::IzhikevichNeuron,
     }
 };

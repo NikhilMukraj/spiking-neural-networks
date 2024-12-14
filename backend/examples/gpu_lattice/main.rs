@@ -5,7 +5,7 @@ use spiking_neural_networks::{
     neuron::{
         integrate_and_fire::SimpleLeakyIntegrateAndFire,
         gpu_lattices::LatticeGPU,
-        Lattice
+        Lattice, RunLattice
     }
 };
 

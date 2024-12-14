@@ -9,7 +9,7 @@ use spiking_neural_networks::{
     neuron::{
         integrate_and_fire::IzhikevichNeuron,
         spike_train::PoissonNeuron, 
-        Lattice, LatticeNetwork, SpikeTrainLattice
+        Lattice, RunNetwork, LatticeNetwork, SpikeTrainLattice
     },
 };
 
