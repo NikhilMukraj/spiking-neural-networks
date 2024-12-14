@@ -34,6 +34,9 @@ def fill_defaults(parsed):
     if 'iterations2' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['iterations2'] = 3_000
 
+    if 'bayesian_is_not_main' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['bayesian_is_not_main'] = True
+
     if 'bayesian_1_on' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['bayesian_1_on'] = True
     if 'bayesian_2_on' not in parsed['simulation_parameters']:
@@ -292,13 +295,22 @@ for current_state in tqdm(all_states):
         firing_max = current_pred_pattern.max()
 
         first_acc = determine_accuracy(
-            pattern2,
+            pattern1,
             num_patterns,
             first_window,
             peaks,
             parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
             parsed_toml['simulation_parameters']['get_all_accuracies'],
         )
+        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+            bayesian_first_acc = determine_accuracy(
+                pattern2,
+                num_patterns,
+                first_window,
+                peaks,
+                parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                parsed_toml['simulation_parameters']['get_all_accuracies'],
+            )
 
         if parsed_toml['main_2_on']:
             main_firing_rate = current_state['main_firing_rate']
@@ -344,15 +356,25 @@ for current_state in tqdm(all_states):
 
         if parsed_toml['simulation_parameters']['iterations2'] != 0:
             second_acc = determine_accuracy(
-                pattern2,
+                pattern1,
                 num_patterns,
                 second_window,
                 peaks,
                 parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
+            if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+                bayesian_second_acc = determine_accuracy(
+                    pattern2,
+                    num_patterns,
+                    first_window,
+                    peaks,
+                    parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                    parsed_toml['simulation_parameters']['get_all_accuracies'],
+                )
         else:
             second_acc = 0
+            bayesian_second_acc = 0
 
         current_state['trial'] = trial
         current_state['pattern1'] = pattern1
@@ -362,7 +384,13 @@ for current_state in tqdm(all_states):
 
         current_value = {}
         current_value['first_acc'] = first_acc
-        current_value['second_acc'] = second_acc
+        if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            current_value['second_acc'] = second_acc
+
+        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+            current_value['bayesian_first_acc'] = bayesian_first_acc
+            if parsed_toml['simulation_parameters']['iterations2'] != 0:
+                current_value['bayesian_second_acc'] = bayesian_second_acc
 
         if parsed_toml['simulation_parameters']['measure_snr']:
             signal = np.array([np.array(i).mean() for i in hist])
@@ -377,8 +405,6 @@ for current_state in tqdm(all_states):
             current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
 
         simulation_output[key] = current_value
-
-        # check accuracy on bayesian pattern and main pattern
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
