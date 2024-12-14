@@ -5,13 +5,13 @@ use opencl3::{
     kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, 
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
-use crate::{error::GPUError, graph::{Graph, GraphToGPU}};
+use crate::{error::{GPUError, SpikingNeuralNetworksError}, graph::{Graph, GraphToGPU}};
 use super::{
     iterate_and_spike::{
         BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
         KernelFunction, NeurotransmitterTypeGPU
     }, 
-    GridVoltageHistory,
+    GridVoltageHistory, RunLattice,
 };
 use super::plasticity::Plasticity;
 use super::{Lattice, LatticeHistory, Position, impl_apply};
@@ -851,13 +851,21 @@ where
 
         Ok(())
     }
+}
 
-    pub fn run_lattice(&mut self, iterations: usize) -> Result<(), GPUError> {
+impl<T, U, V, N> RunLattice for LatticeGPU<T, U, V, N>
+where
+    T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
+    U: Graph<K = (usize, usize), V = f32> + GraphToGPU,
+    V: LatticeHistory + LatticeHistoryGPU,
+    N: NeurotransmitterTypeGPU,
+{
+    fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
         match (self.electrical_synapse, self.chemical_synapse) {
+            (true, false) => self.run_lattice_electrical_synapses(iterations).map_err(Into::into),
+            (false, true) => self.run_lattice_chemical_synapses(iterations).map_err(Into::into),
+            (true, true) => todo!("Not implemented yet"),
             (false, false) => Ok(()),
-            (true, false) => self.run_lattice_electrical_synapses(iterations),
-            (false, true) => self.run_lattice_chemical_synapses(iterations),
-            (true, true) => todo!("Not implemented yet")
         }
     }
 }
