@@ -1,1 +1,3 @@
 # testing args for bayesian inf simulation
+# test different distortions and accuracy for bayesian cue and regular cue
+# should expect high distortion gives way to regular cue
