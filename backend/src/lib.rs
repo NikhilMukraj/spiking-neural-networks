@@ -48,7 +48,7 @@
 //!     neuron::{
 //!         integrate_and_fire::IzhikevichNeuron, 
 //!         plasticity::STDP,
-//!         Lattice, LatticeNetwork, AverageVoltageHistory
+//!         Lattice, RunNetwork, LatticeNetwork, AverageVoltageHistory
 //!     },
 //!     graph::AdjacencyMatrix,
 //!     error::SpikingNeuralNetworksError, 
@@ -112,7 +112,7 @@
 //!             ApproximateNeurotransmitter, NeurotransmitterType}, 
 //!         spike_train::{DeltaDiracRefractoriness, PresetSpikeTrain}, 
 //!         plasticity::STDP,
-//!         Lattice, LatticeNetwork, SpikeTrainGridHistory, SpikeTrainLattice
+//!         Lattice, LatticeNetwork, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice
 //!     },
 //!     error::SpikingNeuralNetworksError, 
 //! };
