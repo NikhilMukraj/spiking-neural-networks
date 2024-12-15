@@ -1,5 +1,5 @@
 mod tests {
-    use std::ptr;
+    use std::{collections::HashMap, ptr};
 
     use opencl3::{
         command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
@@ -54,7 +54,14 @@ mod tests {
         Ok(buffer)
     }
 
-    fn iterate_neuron(t_values_tuple: &(f32, f32, f32)) -> Result<(Vec<f32>, Vec<f32>), SpikingNeuralNetworksError> {
+    type FullNeuronType = QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
+    type GetGPUAttribute = dyn Fn(&HashMap<String, BufferGPU>, &CommandQueue, &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError>;
+
+    fn iterate_neuron(
+        t_values_tuple: &(f32, f32, f32),
+        cpu_get_attribute: &dyn Fn(&FullNeuronType, &mut Vec<f32>),
+        gpu_get_attribute: &GetGPUAttribute,
+    ) -> Result<(Vec<f32>, Vec<f32>), SpikingNeuralNetworksError> {
         // initialize 1x1 grid
         // give constant ampa input, then constant nmda, gaba, etc
         // check against cpu equavilent
@@ -67,6 +74,9 @@ mod tests {
         neuron.ligand_gates.insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())?;
         neuron.ligand_gates.insert(IonotropicNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default())?;
         neuron.ligand_gates.insert(IonotropicNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default())?;
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
 
         neuron.set_dt(1.);
 
@@ -77,14 +87,14 @@ mod tests {
         neurotransmitter_conc.insert(IonotropicNeurotransmitterType::NMDA, t_values_tuple.1);
         neurotransmitter_conc.insert(IonotropicNeurotransmitterType::GABAa, t_values_tuple.2);
         
-        let mut cpu_voltages = vec![];
+        let mut cpu_tracker = vec![];
 
         for _ in 0..iterations {
             cpu_neuron.iterate_with_neurotransmitter_and_spike(
                 0., 
                 &neurotransmitter_conc
             );
-            cpu_voltages.push(cpu_neuron.current_voltage);
+            cpu_get_attribute(&cpu_neuron, &mut cpu_tracker);
         }
 
         // create 1 length grid for voltage input, init to 0
@@ -139,7 +149,7 @@ mod tests {
 
         let index_to_position_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
 
-        let mut gpu_voltages = vec![];
+        let mut gpu_tracker = vec![];
 
         for _ in 0..iterations {
             let iterate_event = unsafe {
@@ -185,34 +195,44 @@ mod tests {
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
             };
 
-            match gpu_cell_grid.get("current_voltage").unwrap() {
-                BufferGPU::Float(buffer) => {
-                    let mut read_vector = vec![0.];
-
-                    let read_event = unsafe {
-                        match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
-                            Ok(value) => value,
-                            Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
-                        }
-                    };
-        
-                    match read_event.wait() {
-                        Ok(value) => value,
-                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
-                    };
-
-                    gpu_voltages.push(read_vector[0]);
-                },
-                _ => unreachable!(),
-            }
+            gpu_get_attribute(&gpu_cell_grid, &queue, &mut gpu_tracker)?;
         }
 
-        Ok((cpu_voltages, gpu_voltages))
+        Ok((cpu_tracker, gpu_tracker))
+    }
+
+    fn get_voltage(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
+        tracker.push(neuron.current_voltage);
+    }
+
+    fn get_gpu_voltage(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+        match gpu_cell_grid.get("current_voltage").unwrap() {
+            BufferGPU::Float(buffer) => {
+                let mut read_vector = vec![0.];
+
+                let read_event = unsafe {
+                    match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+                        Ok(value) => value,
+                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+                    }
+                };
+    
+                match read_event.wait() {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+                };
+
+                gpu_tracker.push(read_vector[0]);
+            },
+            _ => unreachable!(),
+        }
+
+        Ok(())
     }
 
     #[test]
     pub fn test_single_quadratic_neuron_ampa() -> Result<(), SpikingNeuralNetworksError> {
-        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 0., 0.))?;
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 0., 0.), &get_voltage, &get_gpu_voltage)?;
 
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
@@ -224,7 +244,7 @@ mod tests {
 
     #[test]
     pub fn test_single_quadratic_neuron_nmda() -> Result<(), SpikingNeuralNetworksError> {
-        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 1., 0.))?;
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 1., 0.), &get_voltage, &get_gpu_voltage)?;
 
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
@@ -236,7 +256,7 @@ mod tests {
 
     #[test]
     pub fn test_single_quadratic_neuron_gabaa() -> Result<(), SpikingNeuralNetworksError> {
-        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 0., 1.))?;
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(0., 0., 1.), &get_voltage, &get_gpu_voltage)?;
 
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
@@ -248,12 +268,77 @@ mod tests {
 
     #[test]
     pub fn test_single_quadratic_neuron_ampa_nmda() -> Result<(), SpikingNeuralNetworksError> {
-        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 1., 0.))?;
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(&(1., 1., 0.), &get_voltage, &get_gpu_voltage)?;
 
         for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
             let error = (cpu_voltage - gpu_voltage).abs();
             assert!(error < 5., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
         }
+
+        Ok(())
+    }
+
+    // check that spiking works as intended
+    // if it does, the clamp function may be an issue or the t_max value
+    // #[test]
+    // pub fn test_single_quadratic_neuron_is_spiking() -> Result<(), SpikingNeuralNetworksError> {
+    //     Ok(())
+    // }
+
+    fn get_ampa_neurotransmitter(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
+        let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&IonotropicNeurotransmitterType::AMPA)
+            .expect("Could not get neurotransmitter")
+            .t;
+
+        tracker.push(ampa_neurotransmitter);
+    }
+
+    fn gpu_get_ampa_neurotransmitter(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+        match gpu_cell_grid.get("neurotransmitters$t").unwrap() {
+            BufferGPU::Float(buffer) => {
+                let mut read_vector = vec![0., 0., 0., 0.];
+
+                let read_event = unsafe {
+                    match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+                        Ok(value) => value,
+                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+                    }
+                };
+    
+                match read_event.wait() {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+                };
+
+                gpu_tracker.push(read_vector[0]);
+            },
+            _ => unreachable!(),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_neurotransmitters() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_ampas, gpu_ampas) = iterate_neuron(
+            &(1., 0., 0.), 
+            &get_ampa_neurotransmitter, 
+            &gpu_get_ampa_neurotransmitter
+        )?;
+
+        // println!("{:#?}", cpu_ampas.iter().sum::<f32>());
+        // println!("{:#?}", gpu_ampas.iter().sum::<f32>());
+
+        let cpu_sum = cpu_ampas.iter().sum::<f32>();
+        let gpu_sum = gpu_ampas.iter().sum::<f32>();
+        let error = (cpu_sum - gpu_sum).abs();
+
+        assert!(error < 5., "error: {} ({} - {})", error, cpu_sum, gpu_sum);
+
+        // for (n, (cpu_ampa, gpu_ampa)) in cpu_ampas.iter().zip(gpu_ampas).enumerate() {
+        //     let error = (cpu_ampa - gpu_ampa).abs();
+        //     assert!(error < 0.1, "timestep: {} | error: {} ({} - {})", n, error, cpu_ampa, gpu_ampa);
+        // }
 
         Ok(())
     }
