@@ -103,21 +103,19 @@ __kernel void get_neurotransmitter_inputs(
             int presynaptic_index = index_to_position[i] * number_of_types;
             // int postsynaptic_index = index_to_position[gid]; // maybe use this instead of just gid
             for (int t_index = 0; t_index < number_of_types; t_index++) {
-                if (flags[t_index] == 1) {
-                    res[gid + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
-                    counts[gid + t_index]++;
+                if (flags[presynaptic_index + t_index] == 1) {
+                    res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
+                    counts[gid * number_of_types + t_index]++;
                 }
             }
         }
     }
 
     for (int t_index = 0; t_index < number_of_types; t_index++) {
-        if (flags[gid + t_index] == 1) {
-            if (counts[gid + t_index] != 0.0f) {
-                res[gid + t_index] /= counts[gid + t_index];
-            } else {
-                res[gid + t_index] = 0.0f;
-            }
+        if (counts[gid * number_of_types + t_index] != 0.0f) {
+            res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+        } else {
+            res[gid * number_of_types + t_index] = 0.0f;
         }
     }
 }
