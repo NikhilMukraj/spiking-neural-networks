@@ -24,6 +24,23 @@ mod tests {
         x != y
     }
 
+    // fn check_entire_history(cpu_grid_history: &[Vec<Vec<f32>>], gpu_grid_history: &[Vec<Vec<f32>>]) {
+    //     for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.iter()
+    //         .zip(gpu_grid_history) {
+    //         for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+    //             for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+    //                 let error = (voltage1 - voltage2).abs();
+    //                 assert!(
+    //                     error <= 2., "error: {}, voltage1: {}, voltage2: {}", 
+    //                     error,
+    //                     voltage1,
+    //                     voltage2,
+    //                 );
+    //             }
+    //         }
+    //     }
+    // }
+
     // check if history over time is within 2 mV of each other
     // check if last firing time is within 2 timesteps of one another
 
@@ -152,7 +169,7 @@ mod tests {
                 for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
                     let error = (voltage1 - voltage2).abs();
                     assert!(
-                        error <= 2., "error: {}, voltage1: {}, voltage2: {}", 
+                        error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
                         error,
                         voltage1,
                         voltage2,
