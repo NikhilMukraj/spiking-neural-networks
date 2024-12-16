@@ -3,3 +3,16 @@
 # bayesian is not main should be true
 # iterations can be smaller maybe 3k to 5k ms
 # should expect high distortion gives way to regular cue
+
+[simulation_parameters]
+iterations1 = 5000
+iterations2 = 5000
+a = -1
+b = 0
+bayesian_is_not_main = true
+
+# weights scalar for inh and exc
+
+[variables]
+distortion = [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75]
+# spike train weights for each
