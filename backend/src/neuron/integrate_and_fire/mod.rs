@@ -436,7 +436,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         ];
 
         let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
-        let neurotransmitter_args = T::get_attribute_names_ordered()
+        let neurotransmitter_args = T::get_attribute_names_as_vector()
             .iter()
             .map(|i| (
                 i.1, 
@@ -557,7 +557,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
 
         let mut kernel_function_arguments = argument_names.clone();
         kernel_function_arguments.extend(
-                T::get_attribute_names_ordered().iter()
+                T::get_attribute_names_as_vector().iter()
                     .map(|i| i.0.clone())
                     .collect::<Vec<String>>()
             );
