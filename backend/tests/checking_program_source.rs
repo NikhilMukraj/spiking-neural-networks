@@ -26,8 +26,6 @@ mod tests {
             iterate_and_spike_electrochemical_kernel(&context);
 
         assert!(kernel_function.is_ok());
-
-        println!("{}", kernel_function.unwrap().program_source);
     }
 
     fn create_and_write_buffer<T>(
