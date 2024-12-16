@@ -64,14 +64,20 @@ mod tests {
     pub fn test_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters1 = Neurotransmitters::default();
         neurotransmitters1.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter {
+                t_max: 0.5,
+                ..ApproximateNeurotransmitter::ampa_default()
+            }
         );
         neurotransmitters1.insert(
             IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
         let mut neurotransmitters2 = Neurotransmitters::default();
         neurotransmitters2.insert(
-            IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
+            IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter {
+                clearance_constant: 0.02,
+                ..ApproximateNeurotransmitter::nmda_default()
+            }
         );
         let mut neurotransmitters3 = Neurotransmitters::default();
         neurotransmitters3.insert(
@@ -133,5 +139,5 @@ mod tests {
         Ok(())
     }
 
-    // test 2x3 grid and 0x0 grid
+    // test 2x3 grid
 }
