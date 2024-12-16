@@ -832,6 +832,24 @@ where
                 };
             }
 
+            let counts_buffer_write_event = unsafe { 
+                match self.queue.enqueue_write_buffer(
+                    &mut counts_buffer, 
+                    CL_NON_BLOCKING, 
+                    0, 
+                    &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
+                    &[]
+                ) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::BufferWriteError),
+                }
+            };
+        
+            match counts_buffer_write_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
+
             self.internal_clock += 1;
         }
 
