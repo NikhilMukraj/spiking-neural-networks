@@ -192,10 +192,12 @@ pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics + Default {
     fn set_attribute(&mut self, attribute: &str, value: BufferType);
     /// Retrieves all attribute names
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
+    /// Retrieves all attribute names as a vector
+    fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)>;
     /// Retrieves all attribute names in an ordered fashion
     fn get_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
-    fn get_update_function() -> (Vec<String>, String);
+    fn get_update_function() -> ((Vec<String>, Vec<String>), String);
 }
 
 /// Neurotransmitter concentration based off of approximation 
@@ -333,26 +335,35 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         }
     }
 
+    fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {
+        vec![
+            (String::from("neurotransmitters$t"), AvailableBufferType::Float), 
+            (String::from("neurotransmitters$t_max"), AvailableBufferType::Float), 
+            (String::from("neurotransmitters$clearance_constant"), AvailableBufferType::Float),
+        ]
+    }
+
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
-        HashSet::from(
-            [
-                (String::from("neurotransmitters$t"), AvailableBufferType::Float), 
-                (String::from("neurotransmitters$t_max"), AvailableBufferType::Float), 
-                (String::from("neurotransmitters$clearance_constant"), AvailableBufferType::Float),
-            ]
+        HashSet::from_iter(
+            Self::get_attribute_names_as_vector()
         )
     }
 
     fn get_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)> {
-        Self::get_attribute_names().into_iter().collect()
+        Self::get_attribute_names_as_vector().into_iter().collect()
     }
 
-    fn get_update_function() -> (Vec<String>, String) {
+    fn get_update_function() -> ((Vec<String>, Vec<String>), String) {
         (
-            vec![
-                String::from("is_spiking"), String::from("dt"), String::from("neurotransmitters$t"),
-                String::from("neurotransmitters$t_max"), String::from("neurotransmitters$clearance_constant"),
-            ],
+            (
+                vec![
+                    String::from("is_spiking"), String::from("dt"), 
+                ],
+                vec![
+                    String::from("neurotransmitters$t"),
+                    String::from("neurotransmitters$t_max"), String::from("neurotransmitters$clearance_constant"),
+                ]
+            ),
             String::from("
                 float get_t(
                     float is_spiking, 
@@ -361,11 +372,11 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
                     float neurotransmitters_t_max,
                     float neurotransmitters_clearance_constant
                 ) { 
-                    float is_spiking_modifier = 0;
+                    float is_spiking_modifier = 0.0f;
                     if (is_spiking) {
-                        is_spiking_modifier = 1;
+                        is_spiking_modifier = 1.0f;
                     }
-                    float new_t = dt * -neurotransmitters_clearance_constant * neurotransmitters_t + 
+                    float new_t = neurotransmitters_t + dt * -neurotransmitters_clearance_constant * neurotransmitters_t + 
                         (is_spiking_modifier * neurotransmitters_t_max);
 
                     return clamp(new_t, 0.0f, neurotransmitters_t_max);
@@ -1969,7 +1980,10 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     }
 
     pub fn get_neurotransmitter_update_kernel_code() -> String {
-        let kernel_args = T::get_update_function().0
+        let mut raw_args =  T::get_update_function().0.0;
+        raw_args.extend(T::get_update_function().0.1);
+
+        let kernel_args = raw_args
             .iter()
             .map(|i| {
                 let split_result = i.split('$').collect::<Vec<&str>>();
@@ -1983,7 +1997,16 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
             .collect::<Vec<String>>()
             .join(",\n");
 
-        let func_args = T::get_update_function().0
+        let func_args_from_neuron = T::get_update_function().0.0
+            .iter()
+            .map(|i| {
+                let split_result = i.split('$').collect::<Vec<&str>>();
+                let arg_name = split_result.get(1).unwrap_or(&split_result[0]);
+                format!("{}[index]", arg_name)
+            })
+            .collect::<Vec<String>>()
+            .join(",\n");
+        let func_args = T::get_update_function().0.1
             .iter()
             .map(|i| {
                 let split_result = i.split('$').collect::<Vec<&str>>();
@@ -2001,14 +2024,18 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                     __global uint* neuro_flags,
                     {}
                 ) {{
-                    for (int i = 0; i < 4; i++) {{
-                        if (neuro_flags[index * number_of_types + i]) {{
-                            t[index * number_of_types + i] = get_t({});
+                    for (int i = 0; i < number_of_types; i++) {{
+                        if (neuro_flags[index * number_of_types + i] == 1) {{
+                            t[index * number_of_types + i] = get_t(
+                                {},
+                                {}
+                            );
                         }}
                     }}
                 }}
             "#,
             kernel_args,
+            func_args_from_neuron,
             func_args,
         )
     }
