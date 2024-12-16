@@ -26,6 +26,8 @@ mod tests {
             iterate_and_spike_electrochemical_kernel(&context);
 
         assert!(kernel_function.is_ok());
+
+        println!("{}", kernel_function.unwrap().program_source);
     }
 
     fn create_and_write_buffer<T>(
@@ -278,12 +280,55 @@ mod tests {
         Ok(())
     }
 
-    // check that spiking works as intended
-    // if it does, the clamp function may be an issue or the t_max value
-    // #[test]
-    // pub fn test_single_quadratic_neuron_is_spiking() -> Result<(), SpikingNeuralNetworksError> {
-    //     Ok(())
-    // }
+    fn get_is_spiking(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
+        if neuron.is_spiking {
+            tracker.push(1.);
+        } else {
+            tracker.push(0.);
+        }
+    }
+
+    fn gpu_get_is_spiking(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+        match gpu_cell_grid.get("is_spiking").unwrap() {
+            BufferGPU::UInt(buffer) => {
+                let mut read_vector = vec![0];
+
+                let read_event = unsafe {
+                    match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+                        Ok(value) => value,
+                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+                    }
+                };
+    
+                match read_event.wait() {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+                };
+
+                gpu_tracker.push(read_vector[0] as f32);
+            },
+            _ => unreachable!(),
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_single_quadratic_neuron_is_spiking() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_spikings, gpu_spikings) = iterate_neuron(
+            &(1., 0., 0.), 
+            &get_is_spiking, 
+            &gpu_get_is_spiking,
+        )?;
+
+        let cpu_sum = cpu_spikings.iter().sum::<f32>();
+        let gpu_sum = gpu_spikings.iter().sum::<f32>();
+        let error = (cpu_sum - gpu_sum).abs();
+
+        assert!(error < 2., "error: {} ({} - {})", error, cpu_sum, gpu_sum);
+
+        Ok(())
+    }
 
     fn get_ampa_neurotransmitter(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
         let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&IonotropicNeurotransmitterType::AMPA)
@@ -326,19 +371,16 @@ mod tests {
             &gpu_get_ampa_neurotransmitter
         )?;
 
-        // println!("{:#?}", cpu_ampas.iter().sum::<f32>());
-        // println!("{:#?}", gpu_ampas.iter().sum::<f32>());
-
         let cpu_sum = cpu_ampas.iter().sum::<f32>();
         let gpu_sum = gpu_ampas.iter().sum::<f32>();
         let error = (cpu_sum - gpu_sum).abs();
 
         assert!(error < 5., "error: {} ({} - {})", error, cpu_sum, gpu_sum);
 
-        // for (n, (cpu_ampa, gpu_ampa)) in cpu_ampas.iter().zip(gpu_ampas).enumerate() {
-        //     let error = (cpu_ampa - gpu_ampa).abs();
-        //     assert!(error < 0.1, "timestep: {} | error: {} ({} - {})", n, error, cpu_ampa, gpu_ampa);
-        // }
+        for (n, (cpu_ampa, gpu_ampa)) in cpu_ampas.iter().zip(gpu_ampas).enumerate() {
+            let error = (cpu_ampa - gpu_ampa).abs();
+            assert!(error < 0.1, "timestep: {} | error: {} ({} - {})", n, error, cpu_ampa, gpu_ampa);
+        }
 
         Ok(())
     }
