@@ -1,3 +1,5 @@
+import numpy as np
+import scipy
 import toml
 
 
@@ -29,7 +31,7 @@ def parse_toml(f):
 
     return parsed_data
 
-def generate_key_helper(key, parsed, given_key):
+def generate_key_helper(current_state, key, parsed, given_key):
     if len(parsed['variables'][given_key]) != 1:
         key.append(f'{given_key}: {current_state[given_key]}')
 
@@ -97,7 +99,7 @@ def reset_spike_train(neuron):
 
     return neuron
 
-def get_spike_train_setup_function(pattern_index, distortion, firing_rate, stay_unflipped=False):
+def get_spike_train_setup_function(patterns, pattern_index, distortion, firing_rate, exc_n, stay_unflipped=False):
     def setup_spike_train(pos, neuron):
         x, y = pos
         index = x * exc_n + y
@@ -144,7 +146,7 @@ def find_peaks_above_threshold(series, threshold):
     
     return filtered_peaks
 
-def acc(true_pattern, pred_pattern, threshold=10): 
+def acc(true_pattern, pred_pattern, exc_n, threshold=10): 
     current_pred_pattern = pred_pattern
     current_pred_pattern[pred_pattern < threshold] = 0 
     current_pred_pattern[pred_pattern >= threshold] = 1
@@ -157,20 +159,35 @@ def signal_to_noise(a, axis=0, ddof=0):
     return np.where(sd == 0, 0, m / sd)
 
 def determine_accuracy(
+    patterns,
     desired_pattern_index, 
     num_patterns,
     window, 
     peaks, 
+    exc_n,
     use_correlation_as_accuracy=True, 
     get_all_accuracies=False
 ):
     if not use_correlation_as_accuracy:
         if not get_all_accuracies:
             current_acc = try_max(
-                [acc(patterns[desired_pattern_index], np.array([len([j for j in i if j >= window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
+                [
+                    acc(
+                        patterns[desired_pattern_index],
+                        np.array([len([j for j in i if j >= window]) for i in peaks]), 
+                        exc_n=exc_n,
+                        threshold=i
+                    ) for i in range(0, firing_max)
+                ]
             )
             current_acc_inv = try_max(
-                [acc(np.logical_not(patterns[desired_pattern_index]).astype(int), np.array([len([j for j in i if j >= second_window]) for i in peaks]), threshold=i) for i in range(0, firing_max)]
+                [
+                    acc(np.logical_not(patterns[desired_pattern_index]).astype(int), 
+                        np.array([len([j for j in i if j >= second_window]) for i in peaks]), 
+                        exc_n=exc_n,
+                        threshold=i
+                    ) for i in range(0, firing_max)
+                ]
             )
 
             current_acc = max(current_acc, current_acc_inv)
@@ -182,6 +199,7 @@ def determine_accuracy(
                         acc(
                             patterns[pattern_index], 
                             np.array([len([j for j in i if j >= window]) for i in peaks]), 
+                            exc_n=exc_n,
                             threshold=i
                         ) 
                         for i in range(0, firing_max)
@@ -193,6 +211,7 @@ def determine_accuracy(
                         acc(
                             np.logical_not(patterns[pattern_index]).astype(int), 
                             np.array([len([j for j in i if j >= window]) for i in peaks]), 
+                            exc_n=exc_n,
                             threshold=i
                         ) 
                         for i in range(0, firing_max)
