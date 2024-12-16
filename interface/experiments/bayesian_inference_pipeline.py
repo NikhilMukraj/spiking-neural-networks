@@ -10,12 +10,12 @@ import itertools
 import numpy as np
 import scipy
 from tqdm import tqdm
-from pipeline_setup import parse_toml, try_max
+from pipeline_setup import parse_toml, try_max, generate_key_helper
 from pipeline_setup import get_weights, weights_ie, check_uniqueness
 from pipeline_setup import calculate_correlation, skewed_random, setup_neuron
 from pipeline_setup import reset_spike_train, get_spike_train_setup_function
 from pipeline_setup import get_spike_train_same_firing_rate_setup, get_noisy_spike_train_setup_function
-from pieline_setup import find_peaks_above_threshold, acc, signal_to_noise, determine_accuracy
+from pipeline_setup import find_peaks_above_threshold, acc, signal_to_noise, determine_accuracy
 import lixirnet as ln
 
 
@@ -135,21 +135,15 @@ def generate_key(parsed, current_state):
     key.append(f'pattern1: {current_state["pattern1"]}')
     key.append(f'pattern2: {current_state["pattern2"]}')
 
-    generate_key_helper(key, parsed, 'main_firing_rate')
-    generate_key_helper(key, parsed, 'bayesian_firing_rate')
-
-    generate_key_helper(key, parsed, 'distortion')
-
-    generate_key_helper(key, parsed, 'prob_of_exc_to_inh')
-    generate_key_helper(key, parsed, 'exc_to_inh')
-    generate_key_helper(key, parsed, 'spike_train_to_exc')
-
-    generate_key_helper(key, parsed, 'nmda_g')
-    generate_key_helper(key, parsed, 'ampa_g')
-    generate_key_helper(key, parsed, 'gabaa_g')
-
-    generate_key_helper(key, parsed, 'glutamate_clearance')
-    generate_key_helper(key, parsed, 'gabaa_clearance')
+    fields = [
+        'main_firing_rate', 'bayesian_firing_rate', 'distortion',
+        'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
+        'nmda_g', 'ampa_g', 'gabaa_g',
+        'glutamate_clearance', 'gabaa_clearance'
+    ]
+    
+    for field in fields:
+        generate_key_helper(current_state, key, parsed, field)
 
     return ', '.join(key)
 
@@ -184,9 +178,11 @@ w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scala
 
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
-all_states = [dict(zip(list(parsed_toml['variables'].keys(), combination))) for combination in combinations]
+all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for combination in combinations]
 
-# accuracy should check against the main input and the bayesian cue
+print(json.dumps(parsed_toml, indent=4))
+
+simulation_output = {}
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
@@ -214,6 +210,18 @@ for current_state in tqdm(all_states):
 
         poisson = ln.DopaPoissonNeuron()
         poisson.set_neurotransmitters(exc_neurotransmitters)
+
+        receptors = ln.DopaGluGABAReceptors()
+        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
+        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
+
+        exc_neuron = ln.DopaIzhikevichNeuron()
+        exc_neuron.set_neurotransmitters(exc_neurotransmitters)
+        exc_neuron.set_receptors(receptors)
+
+        inh_neuron = ln.DopaIzhikevichNeuron()
+        inh_neuron.set_neurotransmitters(inh_neurotransmitters)
+        inh_neuron.set_receptors(receptors)
 
         inh_lattice = ln.DopaIzhikevichLattice(0)
         inh_lattice.populate(inh_neuron, inh_n, inh_n)
@@ -255,7 +263,7 @@ for current_state in tqdm(all_states):
         network.electrical_synapse = False
         network.chemical_synapse = True
 
-        if parsed_toml['main_1_on']:
+        if parsed_toml['simulation_parameters']['main_1_on']:
             main_firing_rate = current_state['main_firing_rate']
         else:
             main_firing_rate = 0
@@ -263,14 +271,16 @@ for current_state in tqdm(all_states):
         network.apply_spike_train_lattice_given_position(
             2, 
             get_spike_train_setup_function(
+                patterns,
                 pattern1, 
                 current_state['distortion'],
                 main_firing_rate,
-                parse_toml['simulation_parameters']['distortion_on_only'],
+                exc_n,
+                parsed_toml['simulation_parameters']['distortion_on_only'],
             )
         )
 
-        if parsed_toml['bayesian_1_on']:
+        if parsed_toml['simulation_parameters']['bayesian_1_on']:
             bayesian_firing_rate = current_state['bayesian_firing_rate']
         else:
             bayesian_firing_rate = 0
@@ -282,7 +292,7 @@ for current_state in tqdm(all_states):
             )
         )
 
-        for _ in range(parse_toml['simulation_parameters']['iterations1']):
+        for _ in range(parsed_toml['simulation_parameters']['iterations1']):
             network.run_lattices(1)
 
         hist = network.get_lattice(1).history
@@ -295,24 +305,28 @@ for current_state in tqdm(all_states):
         firing_max = current_pred_pattern.max()
 
         first_acc = determine_accuracy(
+            patterns,
             pattern1,
             num_patterns,
             first_window,
             peaks,
+            exc_n,
             parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
             parsed_toml['simulation_parameters']['get_all_accuracies'],
         )
         if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
             bayesian_first_acc = determine_accuracy(
+                patterns,
                 pattern2,
                 num_patterns,
                 first_window,
                 peaks,
+                exc_n,
                 parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
 
-        if parsed_toml['main_2_on']:
+        if parsed_toml['simulation_parameters']['main_2_on']:
             main_firing_rate = current_state['main_firing_rate']
         else:
             main_firing_rate = 0
@@ -320,14 +334,16 @@ for current_state in tqdm(all_states):
         network.apply_spike_train_lattice_given_position(
             2, 
             get_spike_train_setup_function(
+                patterns,
                 pattern1, 
                 current_state['distortion'],
                 main_firing_rate,
-                parse_toml['simulation_parameters']['distortion_on_only'],
+                exc_n,
+                parsed_toml['simulation_parameters']['distortion_on_only'],
             )
         )
 
-        if parsed_toml['bayesian_2_on']:
+        if parsed_toml['simulation_parameters']['bayesian_2_on']:
             bayesian_firing_rate = current_state['bayesian_firing_rate']
         else:
             bayesian_firing_rate = 0
@@ -351,24 +367,25 @@ for current_state in tqdm(all_states):
         current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
         firing_max = current_pred_pattern.max()
 
-        if parsed_toml['simulation_parameters']['second_cue'] == False:
-            pattern2 = pattern1
-
         if parsed_toml['simulation_parameters']['iterations2'] != 0:
             second_acc = determine_accuracy(
+                patterns,
                 pattern1,
                 num_patterns,
                 second_window,
                 peaks,
+                exc_n,
                 parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
             if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
                 bayesian_second_acc = determine_accuracy(
+                    patterns,
                     pattern2,
                     num_patterns,
                     first_window,
                     peaks,
+                    exc_n,
                     parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                     parsed_toml['simulation_parameters']['get_all_accuracies'],
                 )
