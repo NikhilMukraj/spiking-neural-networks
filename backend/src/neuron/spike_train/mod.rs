@@ -280,6 +280,23 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 
 // impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
 //     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+//         let program_source = format!(r#"
+//         __kernel void poisson_neuron_electrical_kernel(
+//             {}
+//         ) {{
+//             int gid = get_global_id(0);
+//             int index = index_to_position[gid];
+
+//             is_spiking[index] = rand() < chance_of_firing[index];
+
+//             if (is_spiking[index]) {{
+//                 current_voltage[index] = v_th[index];
+//             }} else {{
+//                 current_voltage[index] = v_resting[index];
+//             }}
+//         }}
+//         "#);
+
 //         todo!()
 //     }
 
