@@ -5,7 +5,7 @@ use opencl3::{
     kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, 
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
-use crate::{error::{GPUError, SpikingNeuralNetworksError}, graph::{Graph, GraphToGPU}};
+use crate::{error::{GPUError, SpikingNeuralNetworksError}, graph::{Graph, GraphGPU, GraphToGPU}};
 use super::{
     iterate_and_spike::{
         BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
@@ -97,6 +97,14 @@ __kernel void get_neurotransmitter_inputs(
     __global float *res
 ) {
     int gid = get_global_id(0);
+
+    for (int t_index = 0; t_index < number_of_types; t_index++) {
+        int idx = gid * number_of_types + t_index;
+        res[idx] = 0.0f;
+        counts[idx] = 0.0f;
+    }
+
+    barrier(CLK_GLOBAL_MEM_FENCE);
 
     for (int i = 0; i < n; i++) {
         if (connections[i * n + gid] == 1) {
@@ -258,6 +266,33 @@ __kernel void set_last_firing_time(
 
 const LAST_FIRING_TIME_KERNEL_NAME: &str = "set_last_firing_time";
 
+fn create_and_write_buffer<T>(
+    context: &Context,
+    queue: &CommandQueue,
+    size: usize,
+    init_value: T,
+) -> Result<Buffer<cl_float>, GPUError>
+where
+    T: Clone + Into<f32>,
+{
+    let mut buffer = unsafe {
+        Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+            .map_err(|_| GPUError::BufferCreateError)?
+    };
+
+    let initial_data = vec![init_value.into(); size];
+    let write_event = unsafe {
+        queue
+            .enqueue_write_buffer(&mut buffer, CL_NON_BLOCKING, 0, &initial_data, &[])
+            .map_err(|_| GPUError::BufferWriteError)?
+    };
+
+    write_event.wait().map_err(|_| GPUError::WaitError)?;
+
+    Ok(buffer)
+}
+
+/// An implementation of a lattice that can run on the GPU
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
@@ -372,6 +407,88 @@ where
         // self.plasticity.set_dt(dt);
     }
 
+    unsafe fn execute_last_firing_time(
+        &self, gpu_graph: &GraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>
+    ) -> Result<(), GPUError> {
+        let last_firing_time_event = unsafe {
+            match ExecuteKernel::new(&self.last_firing_time_kernel)
+                .set_arg(&gpu_graph.index_to_position)
+                .set_arg(
+                    match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
+                        BufferGPU::UInt(buffer) => buffer,
+                        _ => unreachable!("is_spiking cannot be float or optional unsigned integer"),
+                    }
+                )
+                .set_arg(
+                    match &gpu_cell_grid.get("last_firing_time").expect("Could not retrieve buffer: last_firing_time") {
+                        BufferGPU::OptionalUInt(buffer) => buffer,
+                        _ => unreachable!("last_firing_time cannot be float or mandatory unsigned integer"),
+                    }
+                )
+                .set_arg(&(self.internal_clock as i32))
+                .set_global_work_size(gpu_graph.size)
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+        };
+
+        match last_firing_time_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(())
+    }
+
+    unsafe fn execute_grid_history(
+        &self, 
+        gpu_graph: &GraphGPU, 
+        gpu_cell_grid: &HashMap<String, BufferGPU>, 
+        gpu_grid_history: &HashMap<String, BufferGPU>,
+    ) -> Result<(), GPUError> {
+        let update_history_event = unsafe {
+            let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
+
+            for i in self.grid_history_kernel.argument_names.iter() {
+                if i == "iteration" {
+                    kernel_execution.set_arg(&self.internal_clock);
+                } else if i == "size" {
+                    kernel_execution.set_arg(&gpu_graph.size);
+                } else if i == "index_to_position" {
+                    kernel_execution.set_arg(&gpu_graph.index_to_position);
+                } else if gpu_cell_grid.contains_key(i) {
+                    match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
+                } else if gpu_grid_history.contains_key(i) {
+                    match &gpu_grid_history.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
+                } else {
+                    unreachable!("Unkown argument in history kernel");
+                }
+            }
+
+            match kernel_execution.set_global_work_size(gpu_graph.size)
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+        };
+
+        match update_history_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(())
+    }
+
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
     pub fn run_lattice_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
@@ -381,30 +498,7 @@ where
 
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context)?;
 
-        let mut sums_buffer = unsafe {
-            match Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut()) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError),
-            }
-        };
-
-        let sums_write_event = unsafe { 
-            match self.queue.enqueue_write_buffer(
-                &mut sums_buffer, 
-                CL_NON_BLOCKING, 
-                0, 
-                &(0..gpu_graph.size).map(|_| 0.).collect::<Vec<f32>>(), 
-                &[]
-            ) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-    
-        match sums_write_event.wait() {
-            Ok(_) => {},
-            Err(_) => return Err(GPUError::WaitError),
-        };
+        let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
 
         let rows = self.cell_grid.len();
         let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
@@ -442,7 +536,10 @@ where
                     }
             };
 
-            gap_junctions_event.wait().expect("Could not wait");
+            match gap_junctions_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
 
             let iterate_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
@@ -473,73 +570,14 @@ where
                 Err(_) => return Err(GPUError::WaitError),
             };
 
-            let last_firing_time_event = unsafe {
-                match ExecuteKernel::new(&self.last_firing_time_kernel)
-                    .set_arg(&gpu_graph.index_to_position)
-                    .set_arg(
-                        match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
-                            BufferGPU::UInt(buffer) => buffer,
-                            _ => unreachable!("is_spiking cannot be float or optional unsigned integer"),
-                        }
-                    )
-                    .set_arg(
-                        match &gpu_cell_grid.get("last_firing_time").expect("Could not retrieve buffer: last_firing_time") {
-                            BufferGPU::OptionalUInt(buffer) => buffer,
-                            _ => unreachable!("last_firing_time cannot be float or mandatory unsigned integer"),
-                        }
-                    )
-                    .set_arg(&(self.internal_clock as i32))
-                    .set_global_work_size(gpu_graph.size)
-                    .enqueue_nd_range(&self.queue) {
-                        Ok(value) => value,
-                        Err(_) => return Err(GPUError::QueueFailure),
-                    }
-            };
-
-            match last_firing_time_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
+            unsafe {
+                self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
             };
 
             if self.update_grid_history {
-                let update_history_event = unsafe {
-                    let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
-
-                    for i in self.grid_history_kernel.argument_names.iter() {
-                        if i == "iteration" {
-                            kernel_execution.set_arg(&self.internal_clock);
-                        } else if i == "size" {
-                            kernel_execution.set_arg(&gpu_graph.size);
-                        } else if i == "index_to_position" {
-                            kernel_execution.set_arg(&gpu_graph.index_to_position);
-                        } else if gpu_cell_grid.contains_key(i) {
-                            match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                            };
-                        } else if gpu_grid_history.contains_key(i) {
-                            match &gpu_grid_history.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                            };
-                        } else {
-                            unreachable!("Unkown argument in history kernel");
-                        }
-                    }
-    
-                    match kernel_execution.set_global_work_size(gpu_graph.size)
-                        .enqueue_nd_range(&self.queue) {
-                            Ok(value) => value,
-                            Err(_) => return Err(GPUError::QueueFailure),
-                        }
-                };
-
-                match update_history_event.wait() {
-                    Ok(_) => {},
-                    Err(_) => return Err(GPUError::WaitError),
-                };
+                unsafe {
+                    self.execute_grid_history(&gpu_graph, &gpu_cell_grid, &gpu_grid_history)?;
+                }
             }
 
             self.internal_clock += 1;
@@ -568,84 +606,15 @@ where
 
         let iterate_kernel = T::iterate_and_spike_electrochemical_kernel(&self.context)?;
 
-        let mut sums_buffer = unsafe {
-            match Buffer::<cl_float>::create(&self.context, CL_MEM_READ_WRITE, gpu_graph.size, ptr::null_mut()) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError),
-            }
-        };
+        let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
 
-        let sums_write_event = unsafe { 
-            match self.queue.enqueue_write_buffer(
-                &mut sums_buffer, 
-                CL_NON_BLOCKING, 
-                0, 
-                &(0..gpu_graph.size).map(|_| 0.).collect::<Vec<f32>>(), 
-                &[]
-            ) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-    
-        match sums_write_event.wait() {
-            Ok(_) => {},
-            Err(_) => return Err(GPUError::WaitError),
-        };
+        let t_sums_buffer = create_and_write_buffer(
+            &self.context, &self.queue, gpu_graph.size * N::number_of_types(), 0.0
+        )?;
 
-        let mut t_sums_buffer = unsafe {
-            match Buffer::<cl_float>::create(
-                    &self.context, CL_MEM_READ_WRITE, gpu_graph.size * N::number_of_types(), ptr::null_mut()
-                ) {
-                    Ok(value) => value,
-                    Err(_) => return Err(GPUError::BufferCreateError),
-                }
-        };
-
-        let t_sums_write_event = unsafe { 
-            match self.queue.enqueue_write_buffer(
-                &mut t_sums_buffer, 
-                CL_NON_BLOCKING, 
-                0, 
-                &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
-                &[]
-            ) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-    
-        match t_sums_write_event.wait() {
-            Ok(_) => {},
-            Err(_) => return Err(GPUError::WaitError),
-        };
-
-        let mut counts_buffer = unsafe {
-            match Buffer::<cl_float>::create(
-                    &self.context, CL_MEM_READ_WRITE, gpu_graph.size * N::number_of_types(), ptr::null_mut()
-                ) {
-                    Ok(value) => value,
-                    Err(_) => return Err(GPUError::BufferCreateError),
-                }
-        };
-
-        let counts_buffer_write_event = unsafe { 
-            match self.queue.enqueue_write_buffer(
-                &mut counts_buffer, 
-                CL_NON_BLOCKING, 
-                0, 
-                &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
-                &[]
-            ) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-    
-        match counts_buffer_write_event.wait() {
-            Ok(_) => {},
-            Err(_) => return Err(GPUError::WaitError),
-        };
+        let counts_buffer = create_and_write_buffer(
+            &self.context, &self.queue, gpu_graph.size * N::number_of_types(), 0.0
+        )?;
 
         let rows = self.cell_grid.len();
         let cols = self.cell_grid.first().unwrap_or(&vec![]).len();
@@ -657,33 +626,38 @@ where
         };
 
         for _ in 0..iterations {
-            // let gap_junctions_event = unsafe {
-            //     let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
+            if self.electrical_synapse {
+                let gap_junctions_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
 
-            //     kernel_execution.set_arg(&gpu_graph.connections)
-            //         .set_arg(&gpu_graph.weights)
-            //         .set_arg(&gpu_graph.index_to_position);
+                    kernel_execution.set_arg(&gpu_graph.connections)
+                        .set_arg(&gpu_graph.weights)
+                        .set_arg(&gpu_graph.index_to_position);
 
-            //     match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer") {
-            //         BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-            //         _ => unreachable!("gap_condutance must be float"),
-            //     };
+                    match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("gap_condutance must be float"),
+                    };
 
-            //     match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer") {
-            //         BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-            //         _ => unreachable!("current_voltage must be float"),
-            //     };
+                    match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("current_voltage must be float"),
+                    };
 
-            //     match kernel_execution.set_arg(&gpu_graph.size)
-            //         .set_arg(&sums_buffer)
-            //         .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
-            //         .enqueue_nd_range(&self.queue) {
-            //             Ok(value) => value,
-            //             Err(_) => return Err(GPUError::QueueFailure),
-            //         }
-            // };
+                    match kernel_execution.set_arg(&gpu_graph.size)
+                        .set_arg(&sums_buffer)
+                        .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
 
-            // gap_junctions_event.wait().expect("Could not wait");
+                match gap_junctions_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+            }
 
             let chemical_synapses_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&self.chemical_incoming_connections_kernel);
@@ -763,110 +737,15 @@ where
                 Err(_) => return Err(GPUError::WaitError),
             };
 
-            let last_firing_time_event = unsafe {
-                match ExecuteKernel::new(&self.last_firing_time_kernel)
-                    .set_arg(&gpu_graph.index_to_position)
-                    .set_arg(
-                        match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
-                            BufferGPU::UInt(buffer) => buffer,
-                            _ => unreachable!("is_spiking cannot be float or optional unsigned integer"),
-                        }
-                    )
-                    .set_arg(
-                        match &gpu_cell_grid.get("last_firing_time").expect("Could not retrieve buffer: last_firing_time") {
-                            BufferGPU::OptionalUInt(buffer) => buffer,
-                            _ => unreachable!("last_firing_time cannot be float or mandatory unsigned integer"),
-                        }
-                    )
-                    .set_arg(&(self.internal_clock as i32))
-                    .set_global_work_size(gpu_graph.size)
-                    .enqueue_nd_range(&self.queue) {
-                        Ok(value) => value,
-                        Err(_) => return Err(GPUError::QueueFailure),
-                    }
-            };
-
-            match last_firing_time_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
+            unsafe {
+                self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
             };
 
             if self.update_grid_history {
-                let update_history_event = unsafe {
-                    let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
-
-                    for i in self.grid_history_kernel.argument_names.iter() {
-                        if i == "iteration" {
-                            kernel_execution.set_arg(&self.internal_clock);
-                        } else if i == "size" {
-                            kernel_execution.set_arg(&gpu_graph.size);
-                        } else if i == "index_to_position" {
-                            kernel_execution.set_arg(&gpu_graph.index_to_position);
-                        } else if gpu_cell_grid.contains_key(i) {
-                            match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                            };
-                        } else if gpu_grid_history.contains_key(i) {
-                            match &gpu_grid_history.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                            };
-                        } else {
-                            unreachable!("Unkown argument in history kernel");
-                        }
-                    }
-    
-                    match kernel_execution.set_global_work_size(gpu_graph.size)
-                        .enqueue_nd_range(&self.queue) {
-                            Ok(value) => value,
-                            Err(_) => return Err(GPUError::QueueFailure),
-                        }
-                };
-
-                match update_history_event.wait() {
-                    Ok(_) => {},
-                    Err(_) => return Err(GPUError::WaitError),
-                };
+                unsafe {
+                    self.execute_grid_history(&gpu_graph, &gpu_cell_grid, &gpu_grid_history)?;
+                }
             }
-
-            let counts_buffer_write_event = unsafe { 
-                match self.queue.enqueue_write_buffer(
-                    &mut counts_buffer, 
-                    CL_NON_BLOCKING, 
-                    0, 
-                    &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
-                    &[]
-                ) {
-                    Ok(value) => value,
-                    Err(_) => return Err(GPUError::BufferWriteError),
-                }
-            };
-        
-            match counts_buffer_write_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
-            };
-
-            let t_sums_write_event = unsafe { 
-                match self.queue.enqueue_write_buffer(
-                    &mut t_sums_buffer, 
-                    CL_NON_BLOCKING, 
-                    0, 
-                    &(0..(gpu_graph.size * N::number_of_types())).map(|_| 0.).collect::<Vec<f32>>(), 
-                    &[]
-                ) {
-                    Ok(value) => value,
-                    Err(_) => return Err(GPUError::BufferWriteError),
-                }
-            };
-        
-            match t_sums_write_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
-            };
 
             self.internal_clock += 1;
         }
@@ -898,7 +777,7 @@ where
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattice_electrical_synapses(iterations).map_err(Into::into),
             (false, true) => self.run_lattice_chemical_synapses(iterations).map_err(Into::into),
-            (true, true) => todo!("Not implemented yet"),
+            (true, true) => self.run_lattice_chemical_synapses(iterations).map_err(Into::into),
             (false, false) => Ok(()),
         }
     }
