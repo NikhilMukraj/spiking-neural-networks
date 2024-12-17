@@ -262,6 +262,52 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 // modify neurotransmitter based on is_spiking
 // have associated neural refractoriness function
 
+// impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
+//     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+//         todo!()
+//     }
+
+//     fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+//         todo!()
+//     }
+
+//     fn convert_to_gpu(
+//         cell_grid: &[Vec<Self>], 
+//         context: &Context,
+//         queue: &CommandQueue,
+//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+//         todo!()
+//     }
+
+//     fn convert_to_cpu(
+//         cell_grid: &mut Vec<Vec<Self>>,
+//         buffers: &HashMap<String, BufferGPU>,
+//         rows: usize,
+//         cols: usize,
+//         queue: &CommandQueue,
+//     ) -> Result<(), GPUError> {
+//         todo!()
+//     }
+
+//     fn convert_electrochemical_to_gpu(
+//         cell_grid: &[Vec<Self>], 
+//         context: &Context,
+//         queue: &CommandQueue,
+//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+//         todo!()
+//     }
+
+//     fn convert_electrochemical_to_cpu(
+//         cell_grid: &mut Vec<Vec<Self>>,
+//         buffers: &HashMap<String, BufferGPU>,
+//         rows: usize,
+//         cols: usize,
+//         queue: &CommandQueue,
+//     ) -> Result<(), GPUError> {
+//         todo!()
+//     }
+// }
+
 /// A preset spike train that has a set of designated firing times and an internal clock,
 /// the internal clock is updated every iteration by `dt` and once the internal clock reaches one of the 
 /// firing times the neuron fires, the internal clock is reset and the clock will iterate until the
