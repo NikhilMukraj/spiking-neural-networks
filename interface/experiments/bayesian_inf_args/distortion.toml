@@ -10,6 +10,8 @@ bayesian_is_not_main = true
 use_correlation_as_accuracy = true
 measure_snr = true
 
+distortion_on_only = true
+
 iterations1 = 5000
 iterations2 = 0
 a = -1
