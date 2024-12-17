@@ -95,6 +95,10 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
     fn get_refractoriness_function(&self) -> &Self::U;
 }
 
+// pub trait SpikeTrainGPU: SpikeTrain {
+
+// }
+
 /// A Poisson neuron
 #[derive(Debug, Clone, SpikeTrainBase)]
 pub struct PoissonNeuron<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {
@@ -210,6 +214,11 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 
     impl_default_spike_train_methods!();
 }
+
+// gpu implementation of spike train
+// randomly emit spike in kernel
+// modify neurotransmitter based on is_spiking
+// have associated neural refractoriness function
 
 /// A preset spike train that has a set of designated firing times and an internal clock,
 /// the internal clock is updated every iteration by `dt` and once the internal clock reaches one of the 
