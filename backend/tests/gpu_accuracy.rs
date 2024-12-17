@@ -126,54 +126,115 @@ mod tests {
 
     #[test]
     pub fn test_chemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
-        let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+        for _ in 0..3 {
+            let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
 
-        base_neuron.ligand_gates
-            .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
-            .expect("Valid neurotransmitter pairing");
-        base_neuron.synaptic_neurotransmitters
-            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
-    
-        let iterations = 1000;
-        let (num_rows, num_cols) = (2, 2);
-
-        let mut lattice = Lattice::default_impl();
-
-        lattice.electrical_synapse = false;
-        lattice.chemical_synapse = true;
+            base_neuron.ligand_gates
+                .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+                .expect("Valid neurotransmitter pairing");
+            base_neuron.synaptic_neurotransmitters
+                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
         
-        lattice.populate(
-            &base_neuron, 
-            num_rows, 
-            num_cols, 
-        );
-    
-        lattice.connect(&connection_conditional, None);
+            let iterations = 1000;
+            let (num_rows, num_cols) = (2, 2);
 
-        lattice.apply(|neuron: &mut _| {
-            let mut rng = rand::thread_rng();
-            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
-        });
-    
-        lattice.update_grid_history = true;
-    
-        let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
-    
-        lattice.run_lattice(iterations)?;
-    
-        gpu_lattice.run_lattice(iterations)?;
+            let mut lattice = Lattice::default_impl();
 
-        for (cpu_cell_grid, gpu_cell_grid) in lattice.grid_history.history.iter()
-            .zip(gpu_lattice.grid_history.history.iter()) {
-            for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
-                for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
-                    let error = (voltage1 - voltage2).abs();
-                    assert!(
-                        error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
-                        error,
-                        voltage1,
-                        voltage2,
-                    );
+            lattice.electrical_synapse = false;
+            lattice.chemical_synapse = true;
+            
+            lattice.populate(
+                &base_neuron, 
+                num_rows, 
+                num_cols, 
+            );
+        
+            lattice.connect(&connection_conditional, None);
+
+            lattice.apply(|neuron: &mut _| {
+                let mut rng = rand::thread_rng();
+                neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+            });
+        
+            lattice.update_grid_history = true;
+        
+            let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
+        
+            lattice.run_lattice(iterations)?;
+        
+            gpu_lattice.run_lattice(iterations)?;
+
+            for (cpu_cell_grid, gpu_cell_grid) in lattice.grid_history.history.iter()
+                .zip(gpu_lattice.grid_history.history.iter()) {
+                for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+                    for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                        let error = (voltage1 - voltage2).abs();
+                        assert!(
+                            error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+                            error,
+                            voltage1,
+                            voltage2,
+                        );
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_electrochemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        for _ in 0..3 {
+            let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+
+            base_neuron.ligand_gates
+                .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+                .expect("Valid neurotransmitter pairing");
+            base_neuron.synaptic_neurotransmitters
+                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        
+            let iterations = 1000;
+            let (num_rows, num_cols) = (2, 2);
+
+            let mut lattice = Lattice::default_impl();
+
+            lattice.electrical_synapse = true;
+            lattice.chemical_synapse = true;
+            
+            lattice.populate(
+                &base_neuron, 
+                num_rows, 
+                num_cols, 
+            );
+        
+            lattice.connect(&connection_conditional, None);
+
+            lattice.apply(|neuron: &mut _| {
+                let mut rng = rand::thread_rng();
+                neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+            });
+        
+            lattice.update_grid_history = true;
+        
+            let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
+        
+            lattice.run_lattice(iterations)?;
+        
+            gpu_lattice.run_lattice(iterations)?;
+
+            for (cpu_cell_grid, gpu_cell_grid) in lattice.grid_history.history.iter()
+                .zip(gpu_lattice.grid_history.history.iter()) {
+                for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+                    for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                        let error = (voltage1 - voltage2).abs();
+                        assert!(
+                            error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+                            error,
+                            voltage1,
+                            voltage2,
+                        );
+                    }
                 }
             }
         }
