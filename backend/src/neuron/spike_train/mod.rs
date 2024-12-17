@@ -10,6 +10,17 @@ use super::iterate_and_spike::{
 use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
 use super::plasticity::BCMActivity;
 use super::intermediate_delegate::NeurotransmittersIntermediate;
+#[cfg(feature = "gpu")]
+use opencl3::{
+    context::Context, command_queue::CommandQueue
+};
+#[cfg(feature = "gpu")]
+use std::collections::HashMap;
+#[cfg(feature = "gpu")]
+use super::iterate_and_spike::{KernelFunction, BufferGPU};
+#[cfg(feature = "gpu")]
+use crate::error::GPUError;
+
 
 /// Handles dynamics of spike train effect on another neuron given the current timestep
 /// of the simulation (neural refractoriness function), when the spike train spikes
@@ -95,9 +106,40 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
     fn get_refractoriness_function(&self) -> &Self::U;
 }
 
-// pub trait SpikeTrainGPU: SpikeTrain {
-
-// }
+#[cfg(feature = "gpu")]
+pub trait SpikeTrainGPU: SpikeTrain {
+    /// Returns the compiled kernel for electrical outputs
+    fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    /// Returns the compiled kernel for chemical outputs
+    fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    fn convert_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts buffers back to a grid of neurons
+    fn convert_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError>;
+    /// Converts a grid of the neuron type to a vector of buffers with necessary chemical data
+    fn convert_electrochemical_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts buffers back to a grid of neurons with necessary chemical data
+    fn convert_electrochemical_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError>;
+}
 
 /// A Poisson neuron
 #[derive(Debug, Clone, SpikeTrainBase)]
