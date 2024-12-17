@@ -50,17 +50,17 @@ the cues can also either be a pattern cue with some distortion or a random noisy
 If the cue is enabled in both the first and second phase, the pattern will be different for each cue.
 The variables of the simulation, the neurotransmitter decay or clearance values, the conductances of the ionotropic channels, or the weights themselves, can be varied for a set amount of trials. Presenting a cue with high inhibition may lead to the total activity of the network decaying over time to zero, resulting in the state not being maintained. Low inhibition with no cue may result in spontaneous activity lacking an input, which can simulate hallucination.
 
-### `[simulation_parameters]`
+### Schizophrenia Simulation `[simulation_parameters]`
 
 ---
 
-### Required Fields
+### Schizophrenia Simulation Required Fields
 
 | Field        | Type    | Description                                    |
 |--------------|---------|------------------------------------------------|
 | `filename`   | string  | Path to the file where results will be saved. |
 
-### Optional Fields
+### Schizophrenia Simulation Optional Fields
 
 The following fields have default values if not specified in the TOML file:
 
@@ -96,11 +96,11 @@ The following fields have default values if not specified in the TOML file:
 
 ---
 
-### `[variables]`
+### Schizophrenia Simulation `[variables]`
 
 ---
 
-### Variable Fields
+### Schizophrenia Simulation Variable Fields
 
 The following variables will be combined in every possible way, for how ever many specified trials,
 simulation parameters will hold constant while these states change
@@ -127,7 +127,7 @@ synchronizing the glutamate clearance values
 
 ---
 
-### Example Argument File
+### Schizophrenia Simulation Example Argument File
 
 ```toml
 [simulation_parameters]
@@ -156,3 +156,19 @@ prob_of_exc_to_inh = [1]
 glutamate_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
 gabaa_clearance = [0.001]
 ```
+
+## Bayesian Inference Pipeline
+
+...
+
+### Bayesian Inference `[simulation_parameters]`
+
+### Bayesian Inference Required Fields
+
+### Bayesian Inference Optional Fields
+
+### Bayesian Inference `[variables]`
+
+### Bayesian Inference Variable Fields
+
+### Bayesian Inference Example Argument File
