@@ -23,6 +23,11 @@ mod tests {
         let context = Context::from_device(&device).expect("Context::from_device failed");
 
         let kernel_function = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::
+            iterate_and_spike_electrical_kernel(&context);
+
+        assert!(kernel_function.is_ok());
+
+        let kernel_function = QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::
             iterate_and_spike_electrochemical_kernel(&context);
 
         assert!(kernel_function.is_ok());
