@@ -10,12 +10,20 @@ use super::plasticity::BCMActivity;
 use super::intermediate_delegate::NeurotransmittersIntermediate;
 #[cfg(feature = "gpu")]
 use opencl3::{
-    context::Context, command_queue::CommandQueue
+    context::Context, command_queue::CommandQueue,
+    types::{cl_float, cl_uint, cl_int, CL_BLOCKING, CL_NON_BLOCKING},
+    memory::{Buffer, CL_MEM_READ_WRITE}, 
 };
+#[cfg(feature = "gpu")]
+use std::ptr;
 #[cfg(feature = "gpu")]
 use std::collections::HashMap;
 #[cfg(feature = "gpu")]
-use super::iterate_and_spike::{KernelFunction, BufferGPU};
+use super::iterate_and_spike::{
+    KernelFunction, BufferGPU, NeurotransmitterKineticsGPU,
+    create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
+    read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
+};
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
 
@@ -278,68 +286,168 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 //     return(*seed);
 // }
 
-// impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
-//     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
-//         let program_source = format!(r#"
-//         __kernel void poisson_neuron_electrical_kernel(
-//             {}
-//         ) {{
-//             int gid = get_global_id(0);
-//             int index = index_to_position[gid];
+impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
+    fn iterate_and_spike_electrical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        // let program_source = format!(r#"
+        // __kernel void poisson_neuron_electrical_kernel(
+        //     {}
+        // ) {{
+        //     int gid = get_global_id(0);
+        //     int index = index_to_position[gid];
 
-//             is_spiking[index] = rand() < chance_of_firing[index];
+        //     is_spiking[index] = rand() < chance_of_firing[index];
 
-//             if (is_spiking[index]) {{
-//                 current_voltage[index] = v_th[index];
-//             }} else {{
-//                 current_voltage[index] = v_resting[index];
-//             }}
-//         }}
-//         "#);
+        //     if (is_spiking[index]) {{
+        //         current_voltage[index] = v_th[index];
+        //     }} else {{
+        //         current_voltage[index] = v_resting[index];
+        //     }}
+        // }}
+        // "#);
 
-//         todo!()
-//     }
+        todo!()
+    }
 
-//     fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
-//         todo!()
-//     }
+    fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
+        todo!()
+    }
 
-//     fn convert_to_gpu(
-//         cell_grid: &[Vec<Self>], 
-//         context: &Context,
-//         queue: &CommandQueue,
-//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-//         todo!()
-//     }
+    fn convert_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if cell_grid.is_empty() {
+            return Ok(HashMap::new());
+        }
 
-//     fn convert_to_cpu(
-//         cell_grid: &mut Vec<Vec<Self>>,
-//         buffers: &HashMap<String, BufferGPU>,
-//         rows: usize,
-//         cols: usize,
-//         queue: &CommandQueue,
-//     ) -> Result<(), GPUError> {
-//         todo!()
-//     }
+        let mut buffers = HashMap::new();
 
-//     fn convert_electrochemical_to_gpu(
-//         cell_grid: &[Vec<Self>], 
-//         context: &Context,
-//         queue: &CommandQueue,
-//     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-//         todo!()
-//     }
+        create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
+        create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
+        create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
+        create_float_buffer!(chance_of_firing_buffer, context, queue, cell_grid, chance_of_firing);
 
-//     fn convert_electrochemical_to_cpu(
-//         cell_grid: &mut Vec<Vec<Self>>,
-//         buffers: &HashMap<String, BufferGPU>,
-//         rows: usize,
-//         cols: usize,
-//         queue: &CommandQueue,
-//     ) -> Result<(), GPUError> {
-//         todo!()
-//     }
-// }
+        create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
+
+        create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
+
+        buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
+        buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
+        buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
+        buffers.insert(String::from("chance_of_firing"), BufferGPU::Float(chance_of_firing_buffer));
+        buffers.insert(String::from("last_firing_time"), BufferGPU::OptionalUInt(last_firing_time_buffer));
+        buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
+
+        Ok(buffers)
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    fn convert_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            cell_grid.clear();
+
+            return Ok(());
+        }
+
+        let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
+        let mut dt: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut chance_of_firing: Vec<f32> = vec![0.0; rows * cols];
+        let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
+        let mut is_spiking: Vec<u32> = vec![0; rows * cols];
+
+        read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
+        read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
+        read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "chance_of_firing", &mut chance_of_firing, Float);
+        read_and_set_buffer!(buffers, queue, "last_firing_time", &mut last_firing_time, OptionalUInt);
+        read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
+
+        for i in 0..rows {
+            for j in 0..cols {
+                let idx = i * cols + j;
+                let cell = &mut cell_grid[i][j];
+
+                cell.current_voltage = current_voltage[idx];
+                cell.dt = dt[idx];
+                cell.v_th = v_th[idx];
+                cell.chance_of_firing = chance_of_firing[idx];
+
+                cell.last_firing_time = if last_firing_time[idx] == -1 {
+                    None
+                } else {
+                    Some(last_firing_time[idx] as usize)
+                };
+                cell.is_spiking = is_spiking[idx] == 1;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn convert_electrochemical_to_gpu(
+        cell_grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if cell_grid.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut buffers = Self::convert_to_gpu(cell_grid, context, queue)?;
+
+        let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+            .collect();
+
+        let neurotransmitter_buffers = Neurotransmitters::<N, T>::convert_to_gpu(
+            &neurotransmitters, context, queue
+        )?;
+
+        buffers.extend(neurotransmitter_buffers);
+
+        Ok(buffers)
+    }
+
+    fn convert_electrochemical_to_cpu(
+        cell_grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            cell_grid.clear();
+
+            return Ok(());
+        }
+
+        let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+            .collect();
+
+        Self::convert_to_cpu(cell_grid, buffers, rows, cols, queue)?;
+        
+        Neurotransmitters::<N, T>::convert_to_cpu(
+            &mut neurotransmitters, buffers, queue, rows, cols
+        )?;
+
+        for (i, row) in cell_grid.iter_mut().enumerate() {
+            for (j, cell) in row.iter_mut().enumerate() {
+                cell.synaptic_neurotransmitters = neurotransmitters[i][j].clone();
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// A preset spike train that has a set of designated firing times and an internal clock,
 /// the internal clock is updated every iteration by `dt` and once the internal clock reaches one of the 
