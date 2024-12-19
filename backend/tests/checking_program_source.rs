@@ -1,6 +1,5 @@
 mod tests {
     use std::{collections::HashMap, ptr};
-
     use opencl3::{
         command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
     };
@@ -33,7 +32,7 @@ mod tests {
         assert!(kernel_function.is_ok());
     }
 
-    fn create_and_write_buffer<T>(
+    unsafe fn create_and_write_buffer<T>(
         context: &Context,
         queue: &CommandQueue,
         size: usize,
@@ -132,7 +131,9 @@ mod tests {
 
         let gpu_cell_grid = QuadraticIntegrateAndFireNeuron::convert_electrochemical_to_gpu(&cell_grid, &context, &queue)?;
 
-        let sums_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
+        let sums_buffer = unsafe {
+            create_and_write_buffer(&context, &queue, 1, 0.0)?
+        };
     
         let mut t_buffer = unsafe {
             Buffer::<cl_float>::create(
@@ -152,7 +153,9 @@ mod tests {
     
         t_buffer_write_event.wait().map_err(|_| GPUError::WaitError)?;
 
-        let index_to_position_buffer = create_and_write_buffer(&context, &queue, 1, 0.0)?;
+        let index_to_position_buffer = unsafe {
+            create_and_write_buffer(&context, &queue, 1, 0.0)?
+        };
 
         let mut gpu_tracker = vec![];
 
