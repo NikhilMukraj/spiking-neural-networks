@@ -13,6 +13,7 @@ use opencl3::{
     context::Context, command_queue::CommandQueue,
     types::{cl_float, cl_uint, cl_int, CL_BLOCKING, CL_NON_BLOCKING},
     memory::{Buffer, CL_MEM_READ_WRITE}, 
+    kernel::Kernel, program::Program,
 };
 #[cfg(feature = "gpu")]
 use std::ptr;
@@ -21,6 +22,7 @@ use std::collections::HashMap;
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
     KernelFunction, BufferGPU, NeurotransmitterKineticsGPU,
+    generate_unique_prefix, AvailableBufferType,
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
 };
@@ -120,9 +122,9 @@ where
     Self::N: NeurotransmitterTypeGPU
 {
     /// Returns the compiled kernel for electrical outputs
-    fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     /// Returns the compiled kernel for chemical outputs
-    fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     // gets the kernel to calculate the neural refractoriness connections
     // fn refractoriness_kernel(context: &Context) -> Result<?>;
     /// Converts a grid of the spike train type to a vector of buffers
@@ -277,39 +279,192 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 // have associated neural refractoriness function
 
 // scale the rand
-// int rand(int* seed) // 1 <= *seed < m
-// {
-//     int const a = 16807; //ie 7**5
-//     int const m = 2147483647; //ie 2**31-1
+const RAND_KERNEL: &str = r#"
+    float rand(uint seed) {
+        uint a = 1664525;
+        uint c = 1013904223;
+        uint m = 0xFFFFFFFF; // 2^32
+        
+        uint x = (a * seed + c) & m;
 
-//     *seed = (long(*seed * a))%m;
-//     return(*seed);
-// }
+        return (float) x;
+    }
+"#;
 
 impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
-    fn iterate_and_spike_electrical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
-        // let program_source = format!(r#"
-        // __kernel void poisson_neuron_electrical_kernel(
-        //     {}
-        // ) {{
-        //     int gid = get_global_id(0);
-        //     int index = index_to_position[gid];
+    fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+        let kernel_name = String::from("poisson_neuron_electrical_kernel");
+        let argument_names = vec![
+            String::from("index_to_position"), String::from("seed"), String::from("current_voltage"), String::from("dt"), 
+            String::from("v_resting"), String::from("v_th"), String::from("chance_of_firing"), String::from("is_spiking")
+        ];
 
-        //     is_spiking[index] = rand() < chance_of_firing[index];
+        let uint_args = [String::from("is_spiking"), String::from("index_to_position")];
 
-        //     if (is_spiking[index]) {{
-        //         current_voltage[index] = v_th[index];
-        //     }} else {{
-        //         current_voltage[index] = v_resting[index];
-        //     }}
-        // }}
-        // "#);
+        let processed_argument_names: Vec<String> = argument_names.iter()
+            .map(|i| {
+                if uint_args.contains(i) {
+                    format!("__global float *{}", i)
+                } else {
+                    format!("__global uint *{}", i)
+                }
+            })
+            .collect();
 
-        todo!()
+        let program_source = format!(r#"
+            {}
+
+            __kernel void poisson_neuron_electrical_kernel(
+                {}
+            ) {{
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
+
+                float new_seed = rand(seed[index]);
+                seed[index] = new_seed;
+                float random_number = ((float) new_seed / 0xFFFFFFFF);
+                is_spiking[index] = random_number < chance_of_firing[index];
+
+                if (is_spiking[index]) {{
+                    current_voltage[index] = v_th[index];
+                }} else {{
+                    current_voltage[index] = v_resting[index];
+                }}
+            }}
+            "#,
+            RAND_KERNEL,
+            processed_argument_names.join(",\n")
+        );
+
+        let spike_train_program = match Program::create_and_build_from_source(context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let kernel = match Kernel::create(&spike_train_program, &kernel_name) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
+
+        Ok(
+            KernelFunction { 
+                kernel, 
+                program_source, 
+                kernel_name, 
+                argument_names, 
+            }
+        )
     }
 
-    fn iterate_and_spike_electrochemical_kernel(_context: &Context) -> Result<KernelFunction, GPUError> {
-        todo!()
+    fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+        let kernel_name = String::from("poisson_neuron_electrochemical_kernel");
+        let argument_names = vec![
+            String::from("number_of_types"), String::from("index_to_position"),  String::from("neuro_flags"),
+            String::from("seed"), String::from("current_voltage"), String::from("dt"), 
+            String::from("v_resting"), String::from("v_th"), String::from("chance_of_firing"), 
+            String::from("is_spiking")
+        ];
+
+        let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
+        let neurotransmitter_args = T::get_attribute_names_as_vector()
+            .iter()
+            .map(|i| (
+                i.1, 
+                format!(
+                    "{}{}", neuro_prefix,
+                    i.0.split("$").collect::<Vec<&str>>()[1],
+                )
+            ))
+            .collect::<Vec<(AvailableBufferType, String)>>();
+        let neurotransmitter_arg_names = neurotransmitter_args.iter()
+            .map(|i| i.1.clone())
+            .collect::<Vec<String>>();
+
+        let parsed_neurotransmitter_args = neurotransmitter_args.iter()
+            .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
+            .collect::<Vec<String>>();
+
+        let uint_args = [
+            String::from("neuro_flags"), String::from("index_to_position"), 
+            String::from("is_spiking"), String::from("seed"),
+        ];
+
+        let mut parsed_argument_names: Vec<String> = argument_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| {
+                let qualifier = if i < 3 { "__global const " } else { "__global " };
+                let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
+                format!("{}{}* {}", qualifier, type_decl, name)
+            })
+            .collect::<Vec<_>>();
+
+        parsed_argument_names[0] = String::from("uint number_of_types");
+
+        parsed_argument_names.extend(parsed_neurotransmitter_args);
+
+        let program_source = format!(r#"
+            {}
+            {}
+            {}
+
+            __kernel void poisson_neuron_electrochemical_kernel(
+                {}
+            ) {{
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
+
+                float new_seed = rand(seed[index]);
+                seed[index] = new_seed;
+                float random_number = ((float) new_seed / 0xFFFFFFFF);
+                is_spiking[index] = random_number < chance_of_firing[index];
+
+                if (is_spiking[index]) {{
+                    current_voltage[index] = v_th[index];
+                }} else {{
+                    current_voltage[index] = v_resting[index];
+                }}
+
+                neurotransmitters_update(
+                    index, 
+                    number_of_types,
+                    neuro_flags,
+                    is_spiking,
+                    dt,
+                    {}
+                );
+            }}
+            "#,
+            RAND_KERNEL,
+            T::get_update_function().1,
+            Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
+            parsed_argument_names.join(",\n"),
+            neurotransmitter_arg_names.join(",\n"),
+        );
+
+        let spike_train_program = match Program::create_and_build_from_source(context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let kernel = match Kernel::create(&spike_train_program, &kernel_name) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
+
+        let mut full_argument_names = argument_names.clone();
+        full_argument_names.extend(
+            T::get_attribute_names_as_vector().iter()
+                .map(|i| i.0.clone())
+                .collect::<Vec<_>>()
+        );
+
+        Ok(
+            KernelFunction { 
+                kernel, 
+                program_source, 
+                kernel_name, 
+                argument_names: full_argument_names, 
+            }
+        )
     }
 
     fn convert_to_gpu(
@@ -326,18 +481,38 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         create_float_buffer!(current_voltage_buffer, context, queue, cell_grid, current_voltage);
         create_float_buffer!(dt_buffer, context, queue, cell_grid, dt);
         create_float_buffer!(v_th_buffer, context, queue, cell_grid, v_th);
+        create_float_buffer!(v_resting, context, queue, cell_grid, v_resting);
         create_float_buffer!(chance_of_firing_buffer, context, queue, cell_grid, chance_of_firing);
 
         create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
 
         create_uint_buffer!(is_spiking_buffer, context, queue, cell_grid, is_spiking, last);
 
+        let size = cell_grid.iter().flat_map(|inner| inner.iter()).collect::<Vec<_>>().len();
+
+        let mut seed_buffer = unsafe {
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+                .map_err(|_| GPUError::BufferCreateError)?
+        };
+
+        let initial_data: Vec<u32> = (0..size).map(|_| rand::thread_rng().gen_range(0..0xFFFFFFFF))
+            .collect();
+        let write_event = unsafe {
+            queue
+                .enqueue_write_buffer(&mut seed_buffer, CL_NON_BLOCKING, 0, &initial_data, &[])
+                .map_err(|_| GPUError::BufferWriteError)?
+        };
+    
+        write_event.wait().map_err(|_| GPUError::WaitError)?;
+
         buffers.insert(String::from("current_voltage"), BufferGPU::Float(current_voltage_buffer));
         buffers.insert(String::from("dt"), BufferGPU::Float(dt_buffer));
         buffers.insert(String::from("v_th"), BufferGPU::Float(v_th_buffer));
+        buffers.insert(String::from("v_resting"), BufferGPU::Float(v_resting));
         buffers.insert(String::from("chance_of_firing"), BufferGPU::Float(chance_of_firing_buffer));
         buffers.insert(String::from("last_firing_time"), BufferGPU::OptionalUInt(last_firing_time_buffer));
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
+        buffers.insert(String::from("seed"), BufferGPU::UInt(seed_buffer));
 
         Ok(buffers)
     }
@@ -359,6 +534,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         let mut current_voltage: Vec<f32> = vec![0.0; rows * cols];
         let mut dt: Vec<f32> = vec![0.0; rows * cols];
         let mut v_th: Vec<f32> = vec![0.0; rows * cols];
+        let mut v_resting: Vec<f32> = vec![0.0; rows * cols];
         let mut chance_of_firing: Vec<f32> = vec![0.0; rows * cols];
         let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
         let mut is_spiking: Vec<u32> = vec![0; rows * cols];
@@ -366,6 +542,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         read_and_set_buffer!(buffers, queue, "current_voltage", &mut current_voltage, Float);
         read_and_set_buffer!(buffers, queue, "dt", &mut dt, Float);
         read_and_set_buffer!(buffers, queue, "v_th", &mut v_th, Float);
+        read_and_set_buffer!(buffers, queue, "v_resting", &mut v_resting, Float);
         read_and_set_buffer!(buffers, queue, "chance_of_firing", &mut chance_of_firing, Float);
         read_and_set_buffer!(buffers, queue, "last_firing_time", &mut last_firing_time, OptionalUInt);
         read_and_set_buffer!(buffers, queue, "is_spiking", &mut is_spiking, UInt);
@@ -378,6 +555,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 cell.current_voltage = current_voltage[idx];
                 cell.dt = dt[idx];
                 cell.v_th = v_th[idx];
+                cell.v_resting = v_resting[idx];
                 cell.chance_of_firing = chance_of_firing[idx];
 
                 cell.last_firing_time = if last_firing_time[idx] == -1 {
