@@ -50,7 +50,7 @@ the cues can also either be a pattern cue with some distortion or a random noisy
 If the cue is enabled in both the first and second phase, the pattern will be different for each cue.
 The variables of the simulation, the neurotransmitter decay or clearance values, the conductances of the ionotropic channels, or the weights themselves, can be varied for a set amount of trials. Presenting a cue with high inhibition may lead to the total activity of the network decaying over time to zero, resulting in the state not being maintained. Low inhibition with no cue may result in spontaneous activity lacking an input, which can simulate hallucination.
 
-![Schizophrenia figure](schizophrenia_pipeline_fig.png)
+![Schizophrenia figure](figures/schizophrenia_pipeline_fig.png)
 
 Cue ($C$) feeds input into excitatory group ($E$) using glutamate (blue), excitatory group feeds into inhibitory group ($I$) using glutamate,
 inhibitory group feeds back into excitatory group using GABA (purple).
