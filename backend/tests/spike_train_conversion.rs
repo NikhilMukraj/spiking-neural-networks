@@ -160,12 +160,14 @@ mod tests {
             IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
 
-        cell_grid[0][0].synaptic_neurotransmitters = neurotransmitters;
+        cell_grid[0][0].synaptic_neurotransmitters = neurotransmitters.clone();
 
         let mut cpu_conversion = cell_grid.clone();
 
         for row in cell_grid.iter_mut() {
             for i in row.iter_mut() {
+                i.v_resting = -80.;
+                i.v_th = 25.;
                 if rand::thread_rng().gen_range(0.0f32..1.0) < 0.5 {
                     i.current_voltage = i.v_resting;
                 } else {
@@ -191,13 +193,13 @@ mod tests {
             )
             .expect("CommandQueue::create_default failed");
 
-        let gpu_conversion = PoissonNeuron::convert_to_gpu(
+        let gpu_conversion = PoissonNeuron::convert_electrochemical_to_gpu(
             &cell_grid,
             &context,
             &queue,
         )?;
 
-        PoissonNeuron::convert_to_cpu(
+        PoissonNeuron::convert_electrochemical_to_cpu(
             &mut cpu_conversion,
             &gpu_conversion,
             2,
@@ -210,6 +212,14 @@ mod tests {
                 assert_eq!(
                     actual.current_voltage, 
                     expected.current_voltage,
+                );
+                assert_eq!(
+                    actual.v_resting, 
+                    expected.v_resting,
+                );
+                assert_eq!(
+                    actual.v_th, 
+                    expected.v_th,
                 );
                 assert_eq!(
                     actual.chance_of_firing, 
