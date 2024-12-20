@@ -279,15 +279,15 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 // have associated neural refractoriness function
 
 // scale the rand
-const RAND_KERNEL: &str = r#"
-    float rand(uint seed) {
+const RAND_FUNCTION: &str = r#"
+    uint rand(uint seed) {
         uint a = 1664525;
         uint c = 1013904223;
         uint m = 0xFFFFFFFF; // 2^32
         
         uint x = (a * seed + c) & m;
 
-        return (float) x;
+        return x;
     }
 "#;
 
@@ -299,14 +299,14 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             String::from("v_resting"), String::from("v_th"), String::from("chance_of_firing"), String::from("is_spiking")
         ];
 
-        let uint_args = [String::from("is_spiking"), String::from("index_to_position")];
+        let uint_args = [String::from("is_spiking"), String::from("seed"), String::from("index_to_position")];
 
         let processed_argument_names: Vec<String> = argument_names.iter()
             .map(|i| {
                 if uint_args.contains(i) {
-                    format!("__global float *{}", i)
-                } else {
                     format!("__global uint *{}", i)
+                } else {
+                    format!("__global float *{}", i)
                 }
             })
             .collect();
@@ -320,19 +320,23 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];
 
-                float new_seed = rand(seed[index]);
+                uint new_seed = rand(seed[index]);
                 seed[index] = new_seed;
                 float random_number = ((float) new_seed / 0xFFFFFFFF);
-                is_spiking[index] = random_number < chance_of_firing[index];
+                if (random_number < chance_of_firing[index]) {{
+                    is_spiking[index] = 1;
+                }} else {{
+                    is_spiking[index] = 0;
+                }}
 
-                if (is_spiking[index]) {{
+                if (is_spiking[index] == 1) {{
                     current_voltage[index] = v_th[index];
                 }} else {{
                     current_voltage[index] = v_resting[index];
                 }}
             }}
             "#,
-            RAND_KERNEL,
+            RAND_FUNCTION,
             processed_argument_names.join(",\n")
         );
 
@@ -416,9 +420,13 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 float new_seed = rand(seed[index]);
                 seed[index] = new_seed;
                 float random_number = ((float) new_seed / 0xFFFFFFFF);
-                is_spiking[index] = random_number < chance_of_firing[index];
+                if (random_number < chance_of_firing[index]) {{
+                    is_spiking[index] = 1;
+                }} else {{
+                    is_spiking[index] = 0;
+                }}
 
-                if (is_spiking[index]) {{
+                if (is_spiking[index] == 1) {{
                     current_voltage[index] = v_th[index];
                 }} else {{
                     current_voltage[index] = v_resting[index];
@@ -434,7 +442,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 );
             }}
             "#,
-            RAND_KERNEL,
+            RAND_FUNCTION,
             T::get_update_function().1,
             Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
             parsed_argument_names.join(",\n"),
@@ -497,6 +505,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
         let initial_data: Vec<u32> = (0..size).map(|_| rand::thread_rng().gen_range(0..0xFFFFFFFF))
             .collect();
+
         let write_event = unsafe {
             queue
                 .enqueue_write_buffer(&mut seed_buffer, CL_NON_BLOCKING, 0, &initial_data, &[])
