@@ -12,6 +12,7 @@ use crate::error::GraphError;
 use super::neuron::iterate_and_spike::IterateAndSpikeGPU;
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
+use opencl3::event::Event;
 #[cfg(feature = "gpu")]
 use opencl3::{
     memory::{Buffer, CL_MEM_READ_WRITE}, 
@@ -88,16 +89,16 @@ pub struct GraphGPU {
 
 #[cfg(feature = "gpu")]
 /// Handles conversion of graph of CPU to graph on GPU
-pub trait GraphToGPU {
+pub trait GraphToGPU<G> {
     /// Converts graph to graph on GPU
     fn convert_to_gpu<T: IterateAndSpikeGPU>(
         &self, 
         context: &Context, 
         queue: &CommandQueue, 
         cell_grid: &[Vec<T>],
-    ) -> Result<GraphGPU, GPUError>;
+    ) -> Result<G, GPUError>;
     /// Converts from graph on GPU to graph on CPU
-    fn convert_from_gpu(&mut self, gpu_graph: GraphGPU, queue: &CommandQueue) -> Result<(), GPUError>;
+    fn convert_from_gpu(&mut self, gpu_graph: G, queue: &CommandQueue) -> Result<(), GPUError>;
 }
 
 /// A graph implemented as an adjacency matrix where the positions of each node
@@ -291,7 +292,7 @@ impl<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Deb
 }
 
 #[cfg(feature = "gpu")]
-impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
+impl GraphToGPU<GraphGPU> for AdjacencyMatrix<(usize, usize), f32> {
     fn convert_to_gpu<T: IterateAndSpikeGPU>(
         &self, 
         context: &Context, 
@@ -326,44 +327,14 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
             .map(|pos| (pos.0 * grid_row_length + pos.1) as u32)
             .collect();
 
-        let mut connections_buffer = unsafe {
-            match Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size * size, ptr::null_mut()) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError)
-            }
-        };
-        let mut weights_buffer = unsafe {
-            match Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, size * size, ptr::null_mut()) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError)
-            }
-        };
-        let mut index_to_position_buffer = unsafe {
-            match Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut()) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferCreateError)
-            }
-        };
-
-        let _connections_write_event = unsafe { 
-            match queue.enqueue_write_buffer(&mut connections_buffer, CL_BLOCKING, 0, &connections, &[]) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-        let _weights_write_event = unsafe { 
-            match queue.enqueue_write_buffer(&mut weights_buffer, CL_BLOCKING, 0, &weights, &[]) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-        let index_to_position_write_event = unsafe { 
-            match queue.enqueue_write_buffer(&mut index_to_position_buffer, CL_BLOCKING, 0, &index_to_position, &[]) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferWriteError),
-            }
-        };
-
+        let mut connections_buffer = create_buffer::<cl_uint>(context, size * size)?;
+        let mut weights_buffer = create_buffer::<cl_float>(context, size * size)?;
+        let mut index_to_position_buffer = create_buffer::<cl_uint>(context, size)?;
+        let _connections_write_event = write_to_buffer(queue, &mut connections_buffer, &connections)?;
+        let _weights_write_event = write_to_buffer(queue, &mut weights_buffer, &weights)?;
+        let index_to_position_write_event =
+            write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)?;
+    
         match index_to_position_write_event.wait() {
             Ok(_) => {},
             Err(_) => return Err(GPUError::WaitError),
@@ -419,6 +390,139 @@ impl GraphToGPU for AdjacencyMatrix<(usize, usize), f32> {
         self.matrix = matrix;  
 
         Ok(()) 
+    }
+}
+
+
+#[cfg(feature = "gpu")]
+/// An implementation of a connecting graph that works on a GPU where the weights are floats
+pub struct ConnectingGraphGPU {
+    pub connections: Buffer<cl_uint>,
+    pub weights: Buffer<cl_float>,
+    pub index_to_position: Buffer<cl_uint>,
+    pub associated_lattices: Buffer<cl_uint>,
+    pub associated_lattice_sizes: Buffer<cl_uint>,
+    pub size: usize,
+}
+
+#[cfg(feature = "gpu")]
+/// Handles conversion of a connecting graph of CPU to graph on GPU
+pub trait ConnectingGraphToGPU<G> {
+    /// Converts graph to graph on GPU
+    fn convert_to_gpu<T: IterateAndSpikeGPU>(
+        &self, 
+        context: &Context, 
+        queue: &CommandQueue, 
+        cell_grids: &HashMap<usize, &[Vec<T>]>,
+    ) -> Result<G, GPUError>;
+    /// Converts from graph on GPU to graph on CPU
+    fn convert_from_gpu(&mut self, gpu_graph: G, queue: &CommandQueue) -> Result<(), GPUError>;
+}
+
+fn create_buffer<T>(
+    context: &Context,
+    size: usize,
+) -> Result<Buffer<T>, GPUError> {
+    unsafe {
+        Buffer::<T>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+            .map_err(|_| GPUError::BufferCreateError)
+    }
+}
+
+fn write_to_buffer<T>(
+    queue: &CommandQueue,
+    buffer: &mut Buffer<T>,
+    data: &[T],
+) -> Result<Event, GPUError> {
+    unsafe {
+        queue.enqueue_write_buffer(buffer, CL_BLOCKING, 0, data, &[])
+            .map_err(|_| GPUError::BufferWriteError)
+    }
+}
+
+impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition, f32> {
+    fn convert_to_gpu<T: IterateAndSpikeGPU>(
+        &self, 
+        context: &Context, 
+        queue: &CommandQueue, 
+        cell_grids: &HashMap<usize, &[Vec<T>]>,
+    ) -> Result<ConnectingGraphGPU, GPUError> {
+        let size = self.index_to_position.len();
+
+        let weights: Vec<f32> = self.matrix.clone()
+            .into_iter()
+            .flatten()
+            .map(|i| i.unwrap_or(0.))
+            .collect();
+        let connections: Vec<u32> = self.matrix.clone()
+            .into_iter()
+            .flatten()
+            .map(|i| match i {
+                Some(_) => 1,
+                None => 0,
+            })
+            .collect();
+
+        let mut cpu_index_to_position: Vec<_> = self.index_to_position.iter().collect();
+        cpu_index_to_position.sort_by_key(|&(key, _)| key);
+        let cpu_index_to_position: Vec<_> = cpu_index_to_position.iter()
+            .map(|&(_, value)| value)
+            .collect();
+
+        let mut index_to_position: Vec<u32> = vec![];
+        let mut associated_lattices: Vec<u32> = vec![];
+        let mut associated_lattice_sizes: Vec<u32> = vec![];
+
+        for graph_pos in cpu_index_to_position {
+            let current_cell_grid = cell_grids.get(&graph_pos.id)
+                .expect("Valid cell grid");
+            let current_row_length = current_cell_grid.first()
+                .unwrap_or(&vec![]).len();
+            let current_col_length = current_cell_grid.len();
+            let index_to_pos_value = (
+                graph_pos.pos.0 * current_row_length + graph_pos.pos.1
+                ) as u32;
+
+            index_to_position.push(index_to_pos_value);
+            associated_lattices.push(graph_pos.id as u32);
+            associated_lattice_sizes.push((current_row_length * current_col_length) as u32);
+        }
+
+        let mut connections_buffer = create_buffer::<cl_uint>(context, size * size)?;
+        let mut weights_buffer = create_buffer::<cl_float>(context, size * size)?;
+        let mut associated_lattices_buffer = create_buffer::<cl_uint>(context, size)?;
+        let mut associated_lattice_sizes_buffer = create_buffer::<cl_uint>(context, size)?;
+        let mut index_to_position_buffer = create_buffer::<cl_uint>(context, size)?;
+
+        let _connections_write_event = write_to_buffer(queue, &mut connections_buffer, &connections)?;
+        let _weights_write_event = write_to_buffer(queue, &mut weights_buffer, &weights)?;
+        let _associated_lattices_write_event =
+            write_to_buffer(queue, &mut associated_lattices_buffer, &associated_lattices)?;
+        let _associated_lattice_sizes_write_event =
+            write_to_buffer(queue, &mut associated_lattice_sizes_buffer, &associated_lattice_sizes)?;
+        let index_to_position_write_event =
+            write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)?;
+
+
+        match index_to_position_write_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(
+            ConnectingGraphGPU { 
+                connections: connections_buffer, 
+                weights: weights_buffer, 
+                index_to_position: index_to_position_buffer, 
+                associated_lattices: associated_lattices_buffer,
+                associated_lattice_sizes: associated_lattice_sizes_buffer,
+                size,
+            }
+        )
+    }
+
+    fn convert_from_gpu(&mut self, _gpu_graph: ConnectingGraphGPU, _queue: &CommandQueue) -> Result<(), GPUError> {
+        todo!()
     }
 }
 
