@@ -295,7 +295,7 @@ where
 /// An implementation of a lattice that can run on the GPU
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
-    U: Graph<K=(usize, usize), V=f32> + GraphToGPU, 
+    U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
     V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterTypeGPU,
 > {
@@ -318,7 +318,7 @@ pub struct LatticeGPU<
 impl<T, U, V, N> LatticeGPU<T, U, V, N>
 where
     T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
-    U: Graph<K = (usize, usize), V = f32> + GraphToGPU,
+    U: Graph<K = (usize, usize), V = f32> + GraphToGPU<GraphGPU>,
     V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterTypeGPU,
 {
@@ -769,7 +769,7 @@ where
 impl<T, U, V, N> RunLattice for LatticeGPU<T, U, V, N>
 where
     T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
-    U: Graph<K = (usize, usize), V = f32> + GraphToGPU,
+    U: Graph<K = (usize, usize), V = f32> + GraphToGPU<GraphGPU>,
     V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterTypeGPU,
 {
