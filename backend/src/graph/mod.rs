@@ -521,8 +521,46 @@ impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition,
         )
     }
 
-    fn convert_from_gpu(&mut self, _gpu_graph: ConnectingGraphGPU, _queue: &CommandQueue) -> Result<(), GPUError> {
-        todo!()
+    #[allow(clippy::needless_range_loop)]
+    fn convert_from_gpu(&mut self, gpu_graph: ConnectingGraphGPU, queue: &CommandQueue) -> Result<(), GPUError> {
+        let length = gpu_graph.size;
+
+        let mut connections: Vec<cl_uint> = vec![0; length * length];
+        let mut weights: Vec<cl_float> = vec![0.0; length * length];
+
+        let _connections_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.connections, CL_NON_BLOCKING, 0, &mut connections, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+        let weights_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.weights, CL_NON_BLOCKING, 0, &mut weights, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+    
+        match weights_read_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        let mut matrix: Vec<Vec<Option<f32>>> = vec![vec![None; length]; length];
+        for i in 0..length {
+            for j in 0..length {
+                let idx = i * length + j;
+                matrix[i][j] = if connections[idx] == 1 {
+                    Some(weights[idx])
+                } else {
+                    None
+                };
+            }
+        }
+
+        self.matrix = matrix;  
+
+        Ok(()) 
     }
 }
 
