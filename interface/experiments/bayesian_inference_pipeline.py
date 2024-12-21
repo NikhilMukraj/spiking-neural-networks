@@ -36,6 +36,9 @@ def fill_defaults(parsed):
 
     if 'bayesian_is_not_main' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['bayesian_is_not_main'] = True
+    
+    if 'bayesian_is_full_memory' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['bayesian_is_full_memory'] = False
 
     if 'bayesian_1_on' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['bayesian_1_on'] = True
@@ -240,10 +243,34 @@ for current_state in tqdm(all_states):
         spike_train_lattice = ln.DopaPoissonLattice(2)
         spike_train_lattice.populate(poisson, exc_n, exc_n)
 
-        cue_lattice = ln.DopaPoissonLattice(3)
-        cue_lattice.populate(poisson, 1, 1)
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            inh_lattice_2 = ln.DopaIzhikevichLattice(3)
+            inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
+            inh_lattice.apply(setup_neuron)
 
-        network = ln.DopaIzhikevichNetwork.generate_network([exc_lattice, inh_lattice], [spike_train_lattice, cue_lattice])
+            exc_lattice_2 = ln.DopaIzhikevichLattice(4)
+            exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
+            exc_lattice_2.apply(setup_neuron)
+            position_to_index_2 = exc_lattice_2.position_to_index
+            exc_lattice_2.connect(
+                lambda x, y: bool(w_2[position_to_index_2[x]][position_to_index_2[y]] != 0), 
+                lambda x, y: w_2[position_to_index_2[x]][position_to_index_2[y]],
+            )
+            exc_lattice_2.update_grid_history = True
+
+            cue_lattice = ln.DopaPoissonLattice(5)
+            cue_lattice.populate(poisson, exc_n, exc_n)
+        else:
+            cue_lattice = ln.DopaPoissonLattice(3)
+            cue_lattice.populate(poisson, 1, 1)
+
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            network = ln.DopaIzhikevichNetwork.generate_network(
+                [exc_lattice, inh_lattice, exc_lattice_2, inh_lattice_2], 
+                [spike_train_lattice, cue_lattice],
+            )
+        else:
+            network = ln.DopaIzhikevichNetwork.generate_network([exc_lattice, inh_lattice], [spike_train_lattice, cue_lattice])
         network.connect(
             0, 1, 
             lambda x, y: True, 
@@ -255,7 +282,28 @@ for current_state in tqdm(all_states):
             lambda x, y: current_state['exc_to_inh'],
         )
         network.connect(2, 1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
-        network.connect(3, 1, lambda x, y: bool(patterns[pattern2][y[0] * exc_n + y[1]] == 1), lambda x, y: current_state['bayesian_to_exc'])
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            network.connect(
+                3, 4, 
+                lambda x, y: True, 
+                lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
+            )
+            network.connect(
+                4, 3, 
+                lambda x, y: np.random.uniform() <= 1, 
+                lambda x, y: 1,
+            )
+
+            network.connect(5, 4, lambda x, y: x == y, lambda x, y: 4)
+
+            network.connect(
+                4, 
+                1, 
+                lambda x, y: bool(patterns[pattern1][x[0] * exc_n + x[1]] == patterns_2[pattern2][y[0] * exc_n + y[1]]), 
+                lambda x, y: 4
+            )
+        else:
+            network.connect(3, 1, lambda x, y: bool(patterns[pattern2][y[0] * exc_n + y[1]] == 1), lambda x, y: current_state['bayesian_to_exc'])
 
         network.set_dt(1)
         network.parallel = True
