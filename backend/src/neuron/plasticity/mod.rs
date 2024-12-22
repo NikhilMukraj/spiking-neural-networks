@@ -4,7 +4,7 @@ use super::iterate_and_spike_traits::Timestep;
 
 /// Handles plasticity rules given the two neurons and whether to 
 /// update weights based on the given neuron
-pub trait Plasticity<T, U, V>: Timestep + Default + Send + Sync {
+pub trait Plasticity<T, U, V>: Timestep + Clone + Default + Send + Sync {
     /// Modifies the weight between given two neurons
     fn update_weight(&self, weight: &mut V, presynaptic: &T, postsynaptic: &U);
     // Determines whether to update weights given the neuron
