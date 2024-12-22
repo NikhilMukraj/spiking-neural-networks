@@ -786,6 +786,50 @@ where
     }
 }
 
+// const INTERNALS_NETWORK_INPUTS_KERNEL: &str = r#"
+// __kernel void calculate_network_internal_electrical_inputs(
+//     __global const uint *connections, 
+//     __global const float *weights, 
+//     __global const uint *index_to_position,
+//     __global const uint *associated_lattices,
+//     __global const uint *associated_lattice_sizes,
+//     __global const float *gap_conductances,
+//     __global const float *voltages,
+//     uint total_lattices,
+//     uint n, 
+//     __global float *res
+// ) {
+//     int gid = get_global_id(0);
+
+//     uint current_lattice = associated_lattices[index_to_position[gid]];
+//     uint skip_index = 0;
+//     for (int i = 0; i < current_lattice; i++) {
+//         skip_index += associated_lattice_sizes[i] * associated_lattice_sizes[i];
+//     }
+
+//     float sum = 0.0f;
+//     float count = 0.0f;
+//     uint current_size = associated_lattice_sizes[index_to_position[gid];
+//     for (int i = 0; i < current_size]; i++) {
+//         if (connections[skip_index + i * current_size + gid] == 1) {
+//             int presynaptic_index = index_to_position[i];
+//             int postsynaptic_index = index_to_position[gid];
+//             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
+//             sum += weights[skip_index + i * current_size + gid] * gap_junction;
+//             count++;
+//         }
+//     }
+    
+//     if (count != 0.0f) {
+//         res[gid] = sum / count;
+//     } else {
+//         res[gid] = 0;
+//     }
+// }
+// "#;
+
+// const INTERNALS_NETWORK_INPUTS_KERNEL_NAME: &str = "calculate_network_internal_electrical_inputs";
+
 /// An implementation of a lattice network that is compatible with the GPU
 #[allow(dead_code)]
 pub struct LatticeNetworkGPU<
@@ -932,6 +976,14 @@ where
         let cell_vector_size = cell_vector.first().unwrap_or(&vec![]).len();
 
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
+
+        // connections and weights are concated together
+        // index to position should also probably be concated 
+        // but positions take into account position in lattices
+        // check what happens if index_to_position is removed and just gid and i are used
+        // for _ in 0..iterations {
+
+        // }
 
         T::convert_electrochemical_to_cpu(
             &mut cell_vector, 
