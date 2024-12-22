@@ -6,15 +6,16 @@ mod tests {
     use spiking_neural_networks::{
         error::SpikingNeuralNetworksError,
         neuron::{
-            gpu_lattices::LatticeGPU, integrate_and_fire::{
-                QuadraticIntegrateAndFireNeuron, 
-                SimpleLeakyIntegrateAndFire
+            gpu_lattices::{
+                LatticeGPU, LatticeNetworkGPU,
             }, 
-            iterate_and_spike::{
+            integrate_and_fire::{
+                QuadraticIntegrateAndFireNeuron, 
+                SimpleLeakyIntegrateAndFire,
+            }, iterate_and_spike::{
                 AMPADefault, ApproximateNeurotransmitter, 
                 IonotropicNeurotransmitterType, LigandGatedChannel
-            }, 
-            Lattice, RunLattice
+            }, Lattice, LatticeNetwork, RunLattice, RunNetwork,
         }
     };
 
@@ -238,6 +239,57 @@ mod tests {
                 }
             }
         }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_isolated_lattices_electrical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = SimpleLeakyIntegrateAndFire {
+            gap_conductance: 0.1,
+            ..SimpleLeakyIntegrateAndFire::default_impl()
+        };
+    
+        let iterations = 1000;
+
+        let mut lattice1 = Lattice::default_impl();
+        
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        );
+    
+        lattice1.connect(&connection_conditional, None);
+        lattice1.apply(|neuron: &mut _| {
+            let mut rng = rand::thread_rng();
+            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        });
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default_impl();
+
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        );
+
+        lattice2.connect(&connection_conditional, None);
+        lattice2.apply(|neuron: &mut _| {
+            let mut rng = rand::thread_rng();
+            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        });
+        lattice2.update_grid_history = true;
+
+        let mut network = LatticeNetwork::default_impl();
+        network.parallel = true;
+        network.add_lattice(lattice1)?;
+        network.add_lattice(lattice2)?;
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
+
+        gpu_network.run_lattices(iterations)?;
 
         Ok(())
     }
