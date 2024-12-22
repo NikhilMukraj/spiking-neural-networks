@@ -980,7 +980,6 @@ where
         // connections and weights are concated together
         // index to position should also probably be concated 
         // but positions take into account position in lattices
-        // check what happens if index_to_position is removed and just gid and i are used
         // for _ in 0..iterations {
 
         // }
