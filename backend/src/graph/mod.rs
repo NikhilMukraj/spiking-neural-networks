@@ -34,7 +34,7 @@ pub struct GraphPosition {
 }
 
 /// Implementation of a basic graph
-pub trait Graph: Default + Send + Sync {
+pub trait Graph: Default + Clone + Send + Sync {
     /// Key type
     type K: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy;
     /// Weight type
@@ -327,13 +327,18 @@ impl GraphToGPU<GraphGPU> for AdjacencyMatrix<(usize, usize), f32> {
             .map(|pos| (pos.0 * grid_row_length + pos.1) as u32)
             .collect();
 
-        let mut connections_buffer = create_buffer::<cl_uint>(context, size * size)?;
-        let mut weights_buffer = create_buffer::<cl_float>(context, size * size)?;
-        let mut index_to_position_buffer = create_buffer::<cl_uint>(context, size)?;
-        let _connections_write_event = write_to_buffer(queue, &mut connections_buffer, &connections)?;
-        let _weights_write_event = write_to_buffer(queue, &mut weights_buffer, &weights)?;
+        let mut connections_buffer = 
+            unsafe { create_buffer::<cl_uint>(context, size * size)? };
+        let mut weights_buffer = 
+            unsafe { create_buffer::<cl_float>(context, size * size)? };
+        let mut index_to_position_buffer = 
+            unsafe { create_buffer::<cl_uint>(context, size)? };
+        let _connections_write_event = 
+            unsafe { write_to_buffer(queue, &mut connections_buffer, &connections)? };
+        let _weights_write_event = 
+            unsafe { write_to_buffer(queue, &mut weights_buffer, &weights)? };
         let index_to_position_write_event =
-            write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)?;
+            unsafe { write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)? };
     
         match index_to_position_write_event.wait() {
             Ok(_) => {},
@@ -419,7 +424,8 @@ pub trait ConnectingGraphToGPU<G> {
     fn convert_from_gpu(&mut self, gpu_graph: G, queue: &CommandQueue) -> Result<(), GPUError>;
 }
 
-fn create_buffer<T>(
+#[cfg(feature = "gpu")]
+unsafe fn create_buffer<T>(
     context: &Context,
     size: usize,
 ) -> Result<Buffer<T>, GPUError> {
@@ -429,7 +435,8 @@ fn create_buffer<T>(
     }
 }
 
-fn write_to_buffer<T>(
+#[cfg(feature = "gpu")]
+unsafe fn write_to_buffer<T>(
     queue: &CommandQueue,
     buffer: &mut Buffer<T>,
     data: &[T],
@@ -440,6 +447,7 @@ fn write_to_buffer<T>(
     }
 }
 
+#[cfg(feature = "gpu")]
 impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition, f32> {
     fn convert_to_gpu<T: IterateAndSpikeGPU>(
         &self, 
@@ -488,21 +496,20 @@ impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition,
             associated_lattice_sizes.push((current_row_length * current_col_length) as u32);
         }
 
-        let mut connections_buffer = create_buffer::<cl_uint>(context, size * size)?;
-        let mut weights_buffer = create_buffer::<cl_float>(context, size * size)?;
-        let mut associated_lattices_buffer = create_buffer::<cl_uint>(context, size)?;
-        let mut associated_lattice_sizes_buffer = create_buffer::<cl_uint>(context, size)?;
-        let mut index_to_position_buffer = create_buffer::<cl_uint>(context, size)?;
+        let mut connections_buffer = unsafe { create_buffer::<cl_uint>(context, size * size)? };
+        let mut weights_buffer = unsafe { create_buffer::<cl_float>(context, size * size)? };
+        let mut associated_lattices_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
+        let mut associated_lattice_sizes_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
+        let mut index_to_position_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
 
-        let _connections_write_event = write_to_buffer(queue, &mut connections_buffer, &connections)?;
-        let _weights_write_event = write_to_buffer(queue, &mut weights_buffer, &weights)?;
+        let _connections_write_event = unsafe { write_to_buffer(queue, &mut connections_buffer, &connections)? };
+        let _weights_write_event = unsafe { write_to_buffer(queue, &mut weights_buffer, &weights)? };
         let _associated_lattices_write_event =
-            write_to_buffer(queue, &mut associated_lattices_buffer, &associated_lattices)?;
+            unsafe { write_to_buffer(queue, &mut associated_lattices_buffer, &associated_lattices)? };
         let _associated_lattice_sizes_write_event =
-            write_to_buffer(queue, &mut associated_lattice_sizes_buffer, &associated_lattice_sizes)?;
+            unsafe { write_to_buffer(queue, &mut associated_lattice_sizes_buffer, &associated_lattice_sizes)? };
         let index_to_position_write_event =
-            write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)?;
-
+            unsafe { write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)? };
 
         match index_to_position_write_event.wait() {
             Ok(_) => {},
