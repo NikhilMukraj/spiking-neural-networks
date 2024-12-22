@@ -221,7 +221,7 @@ where
 }
 
 /// Handles history of a lattice
-pub trait LatticeHistory: Default + Send + Sync {
+pub trait LatticeHistory: Default + Clone + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: IterateAndSpike>(&mut self, state: &[Vec<T>]);
     /// Resets history
@@ -602,6 +602,28 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     pub fn set_dt(&mut self, dt: f32) {
         self.apply(|neuron| neuron.set_dt(dt));
         self.plasticity.set_dt(dt);
+    }
+
+    /// Retrieves the individual cells as an immutable reference
+    pub fn get_cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
+    }
+
+    /// Sets a cell grid (cell grid must be the same dimensions as exsting grid)
+    pub fn set_cell_grid(&mut self, cell_grid: Vec<Vec<T>>) -> Result<(), GraphError> {
+        for (row, expected_row) in cell_grid.iter().zip(self.cell_grid.iter()) {
+            if row.len() != expected_row.len() {
+                return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+            }
+        }
+
+        if cell_grid.len() != self.cell_grid.len() {
+            return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+        }
+
+        self.cell_grid = cell_grid;
+
+        Ok(())
     }
     
     /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
@@ -1146,7 +1168,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
 }
 
 /// Handles history of a spike train lattice
-pub trait SpikeTrainLatticeHistory: Default + Send + Sync {
+pub trait SpikeTrainLatticeHistory: Default + Clone + Send + Sync {
     /// Stores the current state of the lattice given the cell grid
     fn update<T: SpikeTrain>(&mut self, state: &[Vec<T>]);
     /// Resets history
@@ -1222,6 +1244,11 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
     pub fn set_dt(&mut self, dt: f32) {
         self.apply(|neuron| neuron.set_dt(dt));
     } 
+
+    /// Retrieves the individual cells as an immutable reference
+    pub fn get_cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
+    }
 
     /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
@@ -1554,6 +1581,11 @@ where
         self.lattices.values_mut()
     }
 
+    /// Returns an immutable set of [`Lattice`]s
+    pub fn get_lattices(&self) -> &HashMap<usize, Lattice<T, U, V, Z, N>> {
+        &self.lattices
+    }
+
     /// Returns a reference to [`Lattice`] given the identifier
     pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Z, N>> {
         self.lattices.get(id)
@@ -1562,6 +1594,11 @@ where
     /// Returns a mutable reference to a [`Lattice`] given the identifier
     pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Z, N>> {
         self.lattices.get_mut(id)
+    }
+
+    /// Returns an immutable set of [`SpikeTrainLattice`]s
+    pub fn get_spike_train_lattices(&self) -> &HashMap<usize, SpikeTrainLattice<N, W, X>> {
+        &self.spike_train_lattices
     }
 
     /// Returns a reference to [`SpikeTrainLattice`] given the identifier
