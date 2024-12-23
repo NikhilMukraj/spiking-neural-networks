@@ -231,3 +231,18 @@ def determine_accuracy(
         current_acc = bool(desired_pattern_index == np.argmax(correlation_coefficients))
 
     return current_acc
+
+def generate_patterns(num, p_on, num_patterns, correlation_threshold):
+    not_unique = True
+    too_correlated = True
+    while not_unique or too_correlated:
+        patterns = []
+        for i in range(num_patterns):
+            p = np.random.binomial(1, p_on, num)
+
+            patterns.append(p)
+
+        not_unique = check_uniqueness(patterns)    
+        too_correlated = calculate_correlation(np.array(patterns) / num).sum() > correlation_threshold
+
+    return patterns
