@@ -189,6 +189,13 @@ print(json.dumps(parsed_toml, indent=4))
 
 simulation_output = {}
 
+i1 = 0
+e1 = 1
+c1 = 2
+c2 = 3
+i2 = 4
+e2 = 5
+
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
         if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
@@ -228,11 +235,11 @@ for current_state in tqdm(all_states):
         inh_neuron.set_neurotransmitters(inh_neurotransmitters)
         inh_neuron.set_receptors(receptors)
 
-        inh_lattice = ln.DopaIzhikevichLattice(0)
+        inh_lattice = ln.DopaIzhikevichLattice(i1)
         inh_lattice.populate(inh_neuron, inh_n, inh_n)
         inh_lattice.apply(setup_neuron)
 
-        exc_lattice = ln.DopaIzhikevichLattice(1)
+        exc_lattice = ln.DopaIzhikevichLattice(e1)
         exc_lattice.populate(exc_neuron, exc_n, exc_n)
         exc_lattice.apply(setup_neuron)
         position_to_index = exc_lattice.position_to_index
@@ -242,15 +249,18 @@ for current_state in tqdm(all_states):
         )
         exc_lattice.update_grid_history = True
 
-        spike_train_lattice = ln.DopaPoissonLattice(2)
+        spike_train_lattice = ln.DopaPoissonLattice(c1)
         spike_train_lattice.populate(poisson, exc_n, exc_n)
 
+        cue_lattice = ln.DopaPoissonLattice(c2)
+        cue_lattice.populate(poisson, exc_n, exc_n)
+
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            inh_lattice_2 = ln.DopaIzhikevichLattice(3)
+            inh_lattice_2 = ln.DopaIzhikevichLattice(i2)
             inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
             inh_lattice.apply(setup_neuron)
 
-            exc_lattice_2 = ln.DopaIzhikevichLattice(4)
+            exc_lattice_2 = ln.DopaIzhikevichLattice(e2)
             exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
             exc_lattice_2.apply(setup_neuron)
             position_to_index_2 = exc_lattice_2.position_to_index
@@ -259,12 +269,6 @@ for current_state in tqdm(all_states):
                 lambda x, y: w_2[position_to_index_2[x]][position_to_index_2[y]],
             )
             exc_lattice_2.update_grid_history = True
-
-            cue_lattice = ln.DopaPoissonLattice(5)
-            cue_lattice.populate(poisson, exc_n, exc_n)
-        else:
-            cue_lattice = ln.DopaPoissonLattice(3)
-            cue_lattice.populate(poisson, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network = ln.DopaIzhikevichNetwork.generate_network(
@@ -278,39 +282,39 @@ for current_state in tqdm(all_states):
             )
 
         network.connect(
-            0, 1, 
+            i1, e1, 
             lambda x, y: True, 
             lambda x, y: w_ie[int(position_to_index[y] / exc_n), position_to_index[y] % exc_n],
         )
         network.connect(
-            1, 0, 
+            e1, i1, 
             lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
             lambda x, y: current_state['exc_to_inh'],
         )
-        network.connect(2, 1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
+        network.connect(c1, e1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network.connect(
-                3, 4, 
+                i2, e2, 
                 lambda x, y: True, 
                 lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
             )
             network.connect(
-                4, 3, 
+                e2, i2, 
                 lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
                 lambda x, y: current_state['exc_to_inh'],
             )
 
-            network.connect(5, 4, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
+            network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
             network.connect(
-                4, 
-                1, 
+                e2, 
+                e1, 
                 lambda x, y: bool(patterns[pattern1][x[0] * exc_n + x[1]] == patterns_2[pattern2][y[0] * exc_n + y[1]]), 
                 lambda x, y: current_state['bayesian_to_exc']
             )
         else:
-            network.connect(3, 1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
+            network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
         network.set_dt(1)
         network.parallel = True
@@ -324,7 +328,7 @@ for current_state in tqdm(all_states):
             main_firing_rate = 0
 
         network.apply_spike_train_lattice_given_position(
-            2, 
+            c1, 
             get_spike_train_setup_function(
                 patterns,
                 pattern1, 
@@ -342,7 +346,7 @@ for current_state in tqdm(all_states):
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network.apply_spike_train_lattice_given_position(
-                5, 
+                c2, 
                 get_spike_train_setup_function(
                     patterns_2,
                     pattern2, 
@@ -354,7 +358,7 @@ for current_state in tqdm(all_states):
             )
         else:
             network.apply_spike_train_lattice_given_position(
-                3, 
+                c2, 
                 get_spike_train_setup_function(
                     patterns,
                     pattern2, 
@@ -368,7 +372,7 @@ for current_state in tqdm(all_states):
         for _ in range(parsed_toml['simulation_parameters']['iterations1']):
             network.run_lattices(1)
 
-        hist = network.get_lattice(1).history
+        hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
         peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
 
@@ -405,7 +409,7 @@ for current_state in tqdm(all_states):
             main_firing_rate = 0
 
         network.apply_spike_train_lattice_given_position(
-            2, 
+            c1, 
             get_spike_train_setup_function(
                 patterns,
                 pattern1, 
@@ -423,7 +427,7 @@ for current_state in tqdm(all_states):
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network.apply_spike_train_lattice_given_position(
-                5, 
+                c2, 
                 get_spike_train_setup_function(
                     patterns_2,
                     pattern2, 
@@ -435,7 +439,7 @@ for current_state in tqdm(all_states):
             )
         else:
             network.apply_spike_train_lattice_given_position(
-                3, 
+                c2, 
                 get_spike_train_setup_function(
                     patterns,
                     pattern2, 
@@ -449,7 +453,7 @@ for current_state in tqdm(all_states):
         for _ in range(parsed_toml['simulation_parameters']['iterations2']):
             network.run_lattices(1)
 
-        hist = network.get_lattice(1).history
+        hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
         peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
 
