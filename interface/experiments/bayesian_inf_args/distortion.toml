@@ -22,7 +22,7 @@ inh_weights_scalar = 1
 skew = 0.1
 c_m = 25
 
-trials = 15
+trials = 15 # may need a large amount of trials for good results, like 30 or so
 
 filename = "bayesian_inf_varied_distortion.json"
 
