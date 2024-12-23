@@ -11,7 +11,7 @@ import numpy as np
 import scipy
 from tqdm import tqdm
 from pipeline_setup import parse_toml, try_max, generate_key_helper
-from pipeline_setup import get_weights, weights_ie, check_uniqueness
+from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_patterns
 from pipeline_setup import calculate_correlation, skewed_random, setup_neuron
 from pipeline_setup import reset_spike_train, get_spike_train_setup_function
 from pipeline_setup import get_spike_train_same_firing_rate_setup, get_noisy_spike_train_setup_function
@@ -165,21 +165,16 @@ inh_n = parsed_toml['simulation_parameters']['inh_n']
 p_on = 0.5
 num_patterns = parsed_toml['simulation_parameters']['num_patterns']
 
-not_unique = True
-too_correlated = True
-while not_unique or too_correlated:
-    patterns = []
-    for i in range(num_patterns):
-        p = np.random.binomial(1, p_on, num)
-        # p = p * 2 - 1
-
-        patterns.append(p)
-
-    not_unique = check_uniqueness(patterns)    
-    too_correlated = calculate_correlation(np.array(patterns) / num).sum() > parsed_toml['simulation_parameters']['correlation_threshold']
+patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+if parsed_toml['simulation_parameters']['memory_biases_memory']:
+    bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
 
 w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
 w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+
+if parsed_toml['simulation_parameters']['memory_biases_memory']:
+    w_2 = get_weights(num, bayesian_memory_patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
+    w_ie_2 = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
 
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
@@ -203,6 +198,9 @@ for current_state in tqdm(all_states):
         else:
             pattern1 = np.random.choice(range(num_patterns))
             pattern2 = pattern1
+
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            bayesian_memory_pattern = np.random.choice(range(num_patterns))
 
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
         gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gabaa_clearance'])
@@ -310,7 +308,7 @@ for current_state in tqdm(all_states):
             network.connect(
                 e2, 
                 e1, 
-                lambda x, y: bool(patterns[pattern1][x[0] * exc_n + x[1]] == patterns_2[pattern2][y[0] * exc_n + y[1]]), 
+                lambda x, y: bool(patterns[pattern2][x[0] * exc_n + x[1]] == bayesian_memory_patterns[bayesian_memory_pattern][y[0] * exc_n + y[1]]), 
                 lambda x, y: current_state['bayesian_to_exc']
             )
         else:
@@ -348,8 +346,8 @@ for current_state in tqdm(all_states):
             network.apply_spike_train_lattice_given_position(
                 c2, 
                 get_spike_train_setup_function(
-                    patterns_2,
-                    pattern2, 
+                    bayesian_memory_patterns,
+                    bayesian_memory_pattern, 
                     current_state['bayesian_distortion'],
                     bayesian_firing_rate,
                     exc_n,
@@ -403,6 +401,25 @@ for current_state in tqdm(all_states):
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
 
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            hist = network.get_lattice(e2).history
+            data = [i.flatten() for i in np.array(hist)]
+            peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+            current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
+            firing_max = current_pred_pattern.max()
+
+            bayesian_memory_first_acc = determine_accuracy(
+                bayesian_memory_patterns,
+                bayesian_memory_pattern,
+                num_patterns,
+                first_window,
+                peaks,
+                exc_n,
+                parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                parsed_toml['simulation_parameters']['get_all_accuracies'],
+            )
+
         if parsed_toml['simulation_parameters']['main_2_on']:
             main_firing_rate = current_state['main_firing_rate']
         else:
@@ -429,8 +446,8 @@ for current_state in tqdm(all_states):
             network.apply_spike_train_lattice_given_position(
                 c2, 
                 get_spike_train_setup_function(
-                    patterns_2,
-                    pattern2, 
+                    bayesian_memory_patterns,
+                    bayesian_memory_pattern, 
                     current_state['bayesian_distortion'],
                     bayesian_firing_rate,
                     exc_n,
@@ -484,9 +501,30 @@ for current_state in tqdm(all_states):
                     parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                     parsed_toml['simulation_parameters']['get_all_accuracies'],
                 )
+            
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                hist = network.get_lattice(e2).history
+                data = [i.flatten() for i in np.array(hist)]
+                peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+                current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
+                firing_max = current_pred_pattern.max()
+
+                bayesian_memory_second_acc = determine_accuracy(
+                    bayesian_memory_patterns,
+                    bayesian_memory_pattern,
+                    num_patterns,
+                    first_window,
+                    peaks,
+                    exc_n,
+                    parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                    parsed_toml['simulation_parameters']['get_all_accuracies'],
+                )
         else:
             second_acc = 0
             bayesian_second_acc = 0
+
+            bayesian_memory_second_acc = 0
 
         current_state['trial'] = trial
         current_state['pattern1'] = pattern1
@@ -496,8 +534,13 @@ for current_state in tqdm(all_states):
 
         current_value = {}
         current_value['first_acc'] = first_acc
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            current_value['memory_biases_memory_first_acc'] = bayesian_memory_first_acc
         if parsed_toml['simulation_parameters']['iterations2'] != 0:
             current_value['second_acc'] = second_acc
+
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                current_value['memory_biases_memory_second_acc'] = bayesian_memory_second_acc
 
         if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
             current_value['bayesian_first_acc'] = bayesian_first_acc
