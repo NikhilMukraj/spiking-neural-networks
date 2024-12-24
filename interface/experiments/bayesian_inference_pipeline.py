@@ -308,7 +308,9 @@ for current_state in tqdm(all_states):
             network.connect(
                 e2, 
                 e1, 
-                lambda x, y: bool(patterns[pattern2][x[0] * exc_n + x[1]] == bayesian_memory_patterns[bayesian_memory_pattern][y[0] * exc_n + y[1]]), 
+                lambda x, y: bool(
+                    bayesian_memory_patterns[bayesian_memory_pattern][x[0] * exc_n + x[1]] == patterns[pattern2][y[0] * exc_n + y[1]] 
+                ), 
                 lambda x, y: current_state['bayesian_to_exc']
             )
         else:
