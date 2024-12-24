@@ -957,19 +957,22 @@ where
         let mut lattice_sizes: Vec<u32> = vec![];
         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
 
-        for (key, value) in &self.lattices {
-            let current_cell_grid = value.get_cell_grid();
+        let mut lattice_iterator: Vec<(&usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter().collect();
+        lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+
+        for (key, value) in &lattice_iterator {
+            let current_cell_grid = value.cell_grid();
             for row in current_cell_grid {
                 for i in row {
                     cell_vector.push(i.clone());
-                    lattice_ids.push(*key as u32);
+                    lattice_ids.push(**key as u32);
                 }
             }
             
             let rows = current_cell_grid.len();
             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
             lattice_sizes.push((rows * cols) as u32);
-            lattice_sizes_map.insert(*key, (rows, cols));
+            lattice_sizes_map.insert(**key, (rows, cols));
         }
 
         let mut cell_vector = vec![cell_vector];
