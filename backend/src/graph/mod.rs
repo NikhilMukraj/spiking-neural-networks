@@ -398,7 +398,6 @@ impl GraphToGPU<GraphGPU> for AdjacencyMatrix<(usize, usize), f32> {
     }
 }
 
-
 #[cfg(feature = "gpu")]
 /// An implementation of a connecting graph that works on a GPU where the weights are floats
 pub struct ConnectingGraphGPU {
@@ -570,6 +569,28 @@ impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition,
         Ok(()) 
     }
 }
+
+#[cfg(feature = "gpu")]
+pub struct InterleavingGraphGPU {
+    pub connections: Buffer<cl_uint>,
+    pub weights: Buffer<cl_float>,
+    pub index_to_position: Buffer<cl_uint>,
+    pub associated_lattices: Buffer<cl_uint>,
+    pub associated_lattice_sizes: Buffer<cl_uint>,
+    pub size: usize,
+}
+
+// impl InterleavingGraphGPU {
+    // trait for getting cell grid and getting internal graph (maybe as tuple)
+    // get one large adj mat and use that to represent connections
+    // pub fn convert_to_gpu(lattices: HashMap<usize, T>, connecting_graph: U) {
+
+    // }
+
+    // pub fn convert_to_cpu(&self) {
+
+    // }
+// }
 
 /// A graph implemented as an adjacency list
 /// 
