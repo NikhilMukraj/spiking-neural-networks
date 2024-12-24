@@ -605,7 +605,7 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     }
 
     /// Retrieves the individual cells as an immutable reference
-    pub fn get_cell_grid(&self) -> &[Vec<T>] {
+    pub fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
     }
 
@@ -2640,6 +2640,11 @@ where
     /// Sets id of lattice [`Graph`] given an id
     pub fn set_id(&mut self, id: usize) {
         self.graph.set_id(id);
+    }
+
+    /// Retrieves the individual cells as an immutable reference
+    pub fn cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
     }
 
     /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
