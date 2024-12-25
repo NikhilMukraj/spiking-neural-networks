@@ -174,7 +174,7 @@ w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scala
 
 if parsed_toml['simulation_parameters']['memory_biases_memory']:
     w_2 = get_weights(num, bayesian_memory_patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
-    w_ie_2 = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+    w_ie_2 = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], bayesian_memory_patterns, num_patterns)
 
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
