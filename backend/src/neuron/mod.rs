@@ -536,7 +536,7 @@ pub struct Lattice<
     N: NeurotransmitterType,
 > {
     /// Grid of neurons
-    pub cell_grid: Vec<Vec<T>>,
+    cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
     pub graph: U,
     /// History of grid
@@ -1196,7 +1196,7 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
 #[derive(Debug, Clone)]
 pub struct SpikeTrainLattice<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> {
     /// Grid of spike trains
-    pub cell_grid: Vec<Vec<T>>,
+    cell_grid: Vec<Vec<T>>,
     /// History of grid states
     pub grid_history: U,
     /// Whether to update grid history
@@ -2564,7 +2564,7 @@ pub struct RewardModulatedLattice<
     N: NeurotransmitterType,
 > {
     /// Grid of neurons
-    pub cell_grid: Vec<Vec<T>>,
+    cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
     pub graph: U,
     /// History of grid
