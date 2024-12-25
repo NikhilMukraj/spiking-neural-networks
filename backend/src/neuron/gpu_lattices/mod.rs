@@ -303,7 +303,7 @@ pub struct LatticeGPU<
     V: LatticeHistory + LatticeHistoryGPU,
     N: NeurotransmitterTypeGPU,
 > {
-    pub cell_grid: Vec<Vec<T>>,
+    cell_grid: Vec<Vec<T>>,
     graph: U,
     electrical_incoming_connections_kernel: Kernel,
     chemical_incoming_connections_kernel: Kernel,
@@ -326,6 +326,11 @@ where
     N: NeurotransmitterTypeGPU,
 {
     impl_apply!();
+
+    /// Retrieves an immutable reference to the grid of cells
+    pub fn cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
+    }
 
     // Generates a GPU lattice given a lattice and a device
     pub fn from_lattice_given_device< 
@@ -877,7 +882,7 @@ where
             Err(_) => return Err(GPUError::GetDeviceFailure),
         };
 
-        let queue =  match CommandQueue::create_default_with_properties(
+        let queue = match CommandQueue::create_default_with_properties(
             &context, 
             CL_QUEUE_PROFILING_ENABLE,
             CL_QUEUE_SIZE,
