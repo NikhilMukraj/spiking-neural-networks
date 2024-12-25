@@ -305,11 +305,33 @@ for current_state in tqdm(all_states):
 
             network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
+            e2_to_e1_mapping = {}
+            current_pointer = -1
+
+            for n1, i in enumerate(bayesian_memory_patterns[bayesian_memory_pattern]):
+                if i == 0:
+                    continue
+
+                to_iterate = list(enumerate(patterns[pattern2]))[current_pointer+1:]
+
+                if len(to_iterate) == 0:
+                    break
+
+                for n2, j in to_iterate:
+                    if j == 0:
+                        continue
+
+                    current_pointer = n2
+                    break
+
+                e2_to_e1_mapping[n1] = current_pointer
+
             network.connect(
                 e2, 
                 e1, 
                 lambda x, y: bool(
-                    bayesian_memory_patterns[bayesian_memory_pattern][x[0] * exc_n + x[1]] == patterns[pattern2][y[0] * exc_n + y[1]] 
+                    x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                    y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
                 ), 
                 lambda x, y: current_state['bayesian_to_exc']
             )
