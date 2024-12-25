@@ -538,7 +538,7 @@ pub struct Lattice<
     /// Grid of neurons
     cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
-    pub graph: U,
+    graph: U,
     /// History of grid
     pub grid_history: V,
     /// Whether to update graph's history of weights
@@ -607,6 +607,11 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
     /// Retrieves the individual cells as an immutable reference
     pub fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
+    }
+
+    /// Retrieves the graph as an immutable reference
+    pub fn graph(&self) -> &U {
+        &self.graph
     }
 
     /// Sets a cell grid (cell grid must be the same dimensions as exsting grid)
@@ -1246,7 +1251,7 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
     } 
 
     /// Retrieves the individual cells as an immutable reference
-    pub fn get_cell_grid(&self) -> &[Vec<T>] {
+    pub fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
     }
 
@@ -2645,6 +2650,11 @@ where
     /// Retrieves the individual cells as an immutable reference
     pub fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
+    }
+
+    /// Retrieves the graph as an immutable reference
+    pub fn graph(&self) -> &U {
+        &self.graph
     }
 
     /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
