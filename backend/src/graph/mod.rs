@@ -12,6 +12,7 @@ use crate::error::GraphError;
 use super::neuron::iterate_and_spike::IterateAndSpikeGPU;
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
+#[cfg(feature = "gpu")]
 use opencl3::event::Event;
 #[cfg(feature = "gpu")]
 use opencl3::{
@@ -576,59 +577,257 @@ pub struct InterleavingGraphGPU {
     pub weights: Buffer<cl_float>,
     pub index_to_position: Buffer<cl_uint>,
     pub associated_lattices: Buffer<cl_uint>,
-    pub associated_lattice_sizes: Buffer<cl_uint>,
+    pub lattice_sizes_map: HashMap<usize, (usize, usize)>,
+    pub ordered_keys: Vec<usize>,
     pub size: usize,
 }
 
-// #[cfg(feature = "gpu")]
-// impl InterleavingGraphGPU {
-//     // trait for getting cell grid and getting internal graph (maybe as tuple)
-//     // get one large adj mat and use that to represent connections
-//     pub fn convert_to_gpu<T: IterateAndSpikeGPU, U: Graph<Position, f32>, V: Graph<GraphPosition, f32>>(
-//         lattices: &HashMap<usize, (&[Vec<T>], &U)>, connecting_graph: &V
-//     ) -> Self {
-//         let mut lattice_ids: Vec<u32> = vec![];
-//         let mut lattice_sizes: Vec<u32> = vec![];
-//         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
-//         let mut index_to_position: Vec<u32> = vec![];
+#[cfg(feature = "gpu")]
+impl InterleavingGraphGPU {
+    fn calculate_index<T: IterateAndSpikeGPU>(
+        id: usize,
+        row: usize, 
+        col: usize,
+        lattices: &HashMap<usize, &[Vec<T>]>, 
+        lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
+        ordered_keys: &Vec<usize>,
+    ) -> usize {
+        let current_group = lattices.get(&id).unwrap();
+                    
+        let mut skip_index = 0;
+        for i in ordered_keys {
+            if *i >= id {
+                break;
+            }
+            let current_size = lattice_sizes_map.get(i).unwrap();
+            skip_index += current_size.0 * current_size.1;
+        }
 
-//         let mut lattice_iterator: Vec<(&usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter().collect();
-//         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        let row_len = current_group.first().unwrap_or(&vec![]).len();
+        
+        skip_index + row * row_len + col
+    }
 
-//         for (key, value) in &lattice_iterator {
-//             let mut skip_index = 0;
+    // trait for getting cell grid and getting internal graph (maybe as tuple)
+    // get one large adj mat and use that to represent connections
+    pub fn convert_to_gpu<T: IterateAndSpikeGPU, U: Graph<K=Position, V=f32>, V: Graph<K=GraphPosition, V=f32>>(
+        context: &Context, 
+        queue: &CommandQueue,
+        lattices: &HashMap<usize, (&[Vec<T>], &U)>, 
+        connecting_graph: &V
+    ) -> Result<Self, GPUError> {
+        let mut associated_lattices: Vec<u32> = vec![];
+        let mut associated_lattice_sizes: Vec<u32> = vec![];
+        let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+        let mut index_to_position: Vec<u32> = vec![];
+        let mut cell_tracker: Vec<(usize, usize, usize)> = vec![];
 
-//             for i in 0..lattice_sizes {
-//                 skip_index += i * i;
-//             }
+        #[allow(clippy::type_complexity)]
+        let mut lattice_iterator: Vec<(usize, (&[Vec<T>], &U))> = lattices.iter()
+            .map(|(&key, &value)| (key, value))
+            .collect();
+        lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        let ordered_keys: Vec<_> = lattice_iterator.iter().map(|i| i.0).collect();
 
-//             for i in 0..rows {
-//                 for j in 0..cols {
-//                     index_to_position.push(skip_index + i * rows + j);
-//                 }
-//             }
+        for (key, value) in &lattice_iterator {
+            let mut skip_index = 0;
 
-//             let current_cell_grid = value.cell_grid();    
-//             let rows = current_cell_grid.len();
-//             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
-//             lattice_sizes.push((rows * cols) as u32);
-//             lattice_sizes_map.insert(**key, (rows, cols));
-//         }
+            for i in associated_lattice_sizes.iter() {
+                skip_index += i;
+            }
 
-//         let mut weights: Vec<f32> = (0..(index_to_position.len() * index_to_position.len()))
-//             .map(|i| 0.)
-//             .collect();
-//         let mut connections: Vec<u32> = (0..(index_to_position.len() * index_to_position.len()))
-//             .map(|i| 1)
-//             .collect();
+            let current_cell_grid = value.0;    
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
 
-//         // iterate through each neuron and get all connections internally and on connecting graph
-//     }
+            for i in 0..rows {
+                for j in 0..cols {
+                    index_to_position.push(skip_index + (i * rows + j) as u32);
+                    cell_tracker.push((*key, i, j));
+                }
+            }
 
-//     // pub fn convert_to_cpu(&self) {
+            associated_lattices.push(*key as u32);
+            associated_lattice_sizes.push((rows * cols) as u32);
+            lattice_sizes_map.insert(*key, (rows, cols));
+        }
 
-//     // }
-// }
+        let size = index_to_position.len();
+
+        let mut weights: Vec<Vec<f32>> = (0..size)
+            .map(|_| (0..size).map(|_| 0.).collect())
+            .collect();
+        let mut connections: Vec<Vec<u32>> = (0..size)
+            .map(|_| (0..size).map(|_| 0).collect())
+            .collect();
+
+        let immutable_lattices: HashMap<_, _> = lattices.iter()
+            .map(|(&key, &(vecs, _))| (key, vecs))
+            .collect();
+
+        for (id, row, col) in cell_tracker.iter() {
+            for (id_post, row_post, col_post) in cell_tracker.iter() {
+                let index = Self::calculate_index(
+                    *id, *row, *col, &immutable_lattices, &lattice_sizes_map, &ordered_keys
+                );
+                let index_post = Self::calculate_index(
+                    *id, *row_post, *col_post, &immutable_lattices, &lattice_sizes_map, &ordered_keys
+                );
+
+                if *id == *id_post {
+                    match lattices.get(id).unwrap().1.lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
+                        Ok(Some(val)) => { 
+                            connections[index][index_post] = 1;
+                            weights[index][index_post] = val; 
+                        },
+                        Ok(None) | Err(_) => {},
+                    }
+                } else {
+                    match connecting_graph.lookup_weight(
+                        &GraphPosition { id: *id, pos: (*row, *col) },
+                        &GraphPosition { id: *id_post, pos: (*row_post, *col_post) }
+                    ) {
+                        Ok(Some(val)) => {
+                            connections[index][index_post] = 1;
+                            weights[index][index_post] = val; 
+                        }
+                        Ok(None) | Err(_) => {},
+                    }
+                }
+            }
+        }
+
+        let weights: Vec<f32> = weights.into_iter().flat_map(|inner| inner.into_iter()).collect();
+        let connections: Vec<u32> = connections.into_iter().flat_map(|inner| inner.into_iter()).collect();
+
+        let mut connections_buffer = unsafe { create_buffer::<cl_uint>(context, size * size)? };
+        let mut weights_buffer = unsafe { create_buffer::<cl_float>(context, size * size)? };
+        let mut associated_lattices_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
+        let mut index_to_position_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
+
+        let _connections_write_event = unsafe { write_to_buffer(queue, &mut connections_buffer, &connections)? };
+        let _weights_write_event = unsafe { write_to_buffer(queue, &mut weights_buffer, &weights)? };
+        let _associated_lattices_write_event =
+            unsafe { write_to_buffer(queue, &mut associated_lattices_buffer, &associated_lattices)? };
+        let index_to_position_write_event =
+            unsafe { write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)? };
+
+        match index_to_position_write_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(
+            InterleavingGraphGPU {
+                connections: connections_buffer,
+                weights: weights_buffer,
+                index_to_position: index_to_position_buffer,
+                associated_lattices: associated_lattices_buffer,
+                lattice_sizes_map,
+                ordered_keys,
+                size,
+            }
+        )
+    }
+
+    pub fn convert_to_cpu<T: IterateAndSpikeGPU, U: Graph<K=Position, V=f32>, V: Graph<K=GraphPosition, V=f32>>(
+        queue: &CommandQueue,
+        gpu_graph: &InterleavingGraphGPU,
+        lattices: &mut HashMap<usize, (&[Vec<T>], &mut U)>, 
+        connecting_graph: &mut V
+    ) -> Result<(), GPUError> {
+        let length = gpu_graph.size;
+
+        let mut connections: Vec<cl_uint> = vec![0; length * length];
+        let mut weights: Vec<cl_float> = vec![0.0; length * length];
+        let mut associated_lattices: Vec<u32> = vec![];
+        let mut index_to_position: Vec<u32> = vec![];
+
+        let _associated_lattices_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.associated_lattices, CL_NON_BLOCKING, 0, &mut associated_lattices, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+        let _index_to_position_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.index_to_position, CL_NON_BLOCKING, 0, &mut index_to_position, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+        let _connections_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.connections, CL_NON_BLOCKING, 0, &mut connections, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+        let weights_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.weights, CL_NON_BLOCKING, 0, &mut weights, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
+    
+        match weights_read_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        let mut processed_index_to_position: Vec<GraphPosition> = vec![];
+
+        for key in &gpu_graph.ordered_keys {
+            let current_cell_grid = lattices.get(key).unwrap().0;    
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+
+            for i in 0..rows {
+                for j in 0..cols {
+                    processed_index_to_position.push(
+                        GraphPosition { id: *key, pos: (i, j) }
+                    );
+                }
+            }
+        }
+
+        let processed_weights: Vec<Vec<f32>> = weights.chunks(index_to_position.len())
+            .map(|chunk| chunk.to_vec()).collect();
+        let processed_connections: Vec<Vec<u32>> = connections.chunks(index_to_position.len())
+            .map(|chunk| chunk.to_vec()).collect();
+
+        let immutable_lattices: HashMap<_, _> = lattices.iter()
+            .map(|(&key, &(vecs, _))| (key, vecs))
+            .collect();
+
+        for i in processed_index_to_position.iter() {
+            for j in processed_index_to_position.iter() {
+                let index = Self::calculate_index(
+                    i.id, i.pos.0, i.pos.1, &immutable_lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                );
+                let index_post = Self::calculate_index(
+                    j.id, j.pos.0, j.pos.1, &immutable_lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                );
+
+                if i.id == j.id {
+                    let current_graph: &mut U = lattices.get_mut(&i.id).unwrap().1;
+                    current_graph.add_node(i.pos);
+                    current_graph.add_node(j.pos);
+
+                    if processed_connections[index][index_post] != 1 {
+                        current_graph.edit_weight(&i.pos, &j.pos, Some(processed_weights[index][index_post])).unwrap();
+                    } else {
+                        current_graph.edit_weight(&i.pos, &j.pos, None).unwrap();
+                    }
+                } else if processed_connections[index][index_post] != 1 {
+                    connecting_graph.edit_weight(i, j, Some(processed_weights[index][index_post])).unwrap();
+                } else {
+                    connecting_graph.edit_weight(i, j, None).unwrap();
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
 
 /// A graph implemented as an adjacency list
 /// 
