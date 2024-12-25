@@ -57,6 +57,14 @@ def fill_defaults(parsed):
 
     if 'distortion_on_only' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['distortion_on_only'] = False
+
+    if 'd1' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['d1'] = False
+    if 'd2' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['d2'] = False
+
+    if parsed['simulation_parameters']['d1'] and parsed['simulation_parameters']['d2']:
+        raise ValueError('D1 and D2 cannot both be active, must be one or the other or neither')
     
     if 'first_window' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['first_window'] = 1_000
