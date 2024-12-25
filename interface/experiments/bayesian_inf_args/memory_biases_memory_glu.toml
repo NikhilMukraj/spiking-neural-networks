@@ -1,5 +1,5 @@
 [simulation_parameters]
-peaks_on = true
+peaks_on = false
 bayesian_is_not_main = true
 use_correlation_as_accuracy = true
 measure_snr = true
@@ -24,7 +24,7 @@ filename = "memory_biases_memory_glu.json"
 [variables]
 spike_train_to_exc = [5]
 # memory biasing memory seems to easily out compete c1, need to test different weights
-bayesian_to_exc = [0.0, 1.5] 
+bayesian_to_exc = [0.0, 0.3] 
 prob_of_exc_to_inh = [1]
 distortion = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 bayesian_distortion = [0]
