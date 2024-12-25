@@ -78,7 +78,7 @@ mod tests {
     
         gpu_lattice.run_lattice(iterations)?;
     
-        for (row1, row2) in lattice.cell_grid.iter().zip(gpu_lattice.cell_grid.iter()) {
+        for (row1, row2) in lattice.cell_grid().iter().zip(gpu_lattice.cell_grid().iter()) {
             for (neuron1, neuron2) in row1.iter().zip(row2.iter()) {
                 let error = (neuron1.current_voltage - neuron2.current_voltage).abs();
                 assert!(
@@ -86,10 +86,10 @@ mod tests {
                     error,
                     neuron1.current_voltage,
                     neuron2.current_voltage,
-                    lattice.cell_grid.iter()
+                    lattice.cell_grid().iter()
                         .map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<f32>>())
                         .collect::<Vec<Vec<f32>>>(),
-                    gpu_lattice.cell_grid.iter()
+                    gpu_lattice.cell_grid().iter()
                         .map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<f32>>())
                         .collect::<Vec<Vec<f32>>>(),
                 );
@@ -245,9 +245,9 @@ mod tests {
 
     #[test]
     pub fn test_isolated_lattices_electrical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
-        let base_neuron = SimpleLeakyIntegrateAndFire {
+        let base_neuron = QuadraticIntegrateAndFireNeuron {
             gap_conductance: 0.1,
-            ..SimpleLeakyIntegrateAndFire::default_impl()
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
     
         let iterations = 1000;
@@ -268,6 +268,7 @@ mod tests {
         lattice1.update_grid_history = true;
 
         let mut lattice2 = Lattice::default_impl();
+        lattice2.set_id(1);
 
         lattice2.populate(
             &base_neuron, 
