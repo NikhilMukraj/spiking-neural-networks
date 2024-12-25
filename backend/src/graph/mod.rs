@@ -580,16 +580,54 @@ pub struct InterleavingGraphGPU {
     pub size: usize,
 }
 
+// #[cfg(feature = "gpu")]
 // impl InterleavingGraphGPU {
-    // trait for getting cell grid and getting internal graph (maybe as tuple)
-    // get one large adj mat and use that to represent connections
-    // pub fn convert_to_gpu(lattices: HashMap<usize, T>, connecting_graph: U) {
+//     // trait for getting cell grid and getting internal graph (maybe as tuple)
+//     // get one large adj mat and use that to represent connections
+//     pub fn convert_to_gpu<T: IterateAndSpikeGPU, U: Graph<Position, f32>, V: Graph<GraphPosition, f32>>(
+//         lattices: &HashMap<usize, (&[Vec<T>], &U)>, connecting_graph: &V
+//     ) -> Self {
+//         let mut lattice_ids: Vec<u32> = vec![];
+//         let mut lattice_sizes: Vec<u32> = vec![];
+//         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+//         let mut index_to_position: Vec<u32> = vec![];
 
-    // }
+//         let mut lattice_iterator: Vec<(&usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter().collect();
+//         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
 
-    // pub fn convert_to_cpu(&self) {
+//         for (key, value) in &lattice_iterator {
+//             let mut skip_index = 0;
 
-    // }
+//             for i in 0..lattice_sizes {
+//                 skip_index += i * i;
+//             }
+
+//             for i in 0..rows {
+//                 for j in 0..cols {
+//                     index_to_position.push(skip_index + i * rows + j);
+//                 }
+//             }
+
+//             let current_cell_grid = value.cell_grid();    
+//             let rows = current_cell_grid.len();
+//             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+//             lattice_sizes.push((rows * cols) as u32);
+//             lattice_sizes_map.insert(**key, (rows, cols));
+//         }
+
+//         let mut weights: Vec<f32> = (0..(index_to_position.len() * index_to_position.len()))
+//             .map(|i| 0.)
+//             .collect();
+//         let mut connections: Vec<u32> = (0..(index_to_position.len() * index_to_position.len()))
+//             .map(|i| 1)
+//             .collect();
+
+//         // iterate through each neuron and get all connections internally and on connecting graph
+//     }
+
+//     // pub fn convert_to_cpu(&self) {
+
+//     // }
 // }
 
 /// A graph implemented as an adjacency list
