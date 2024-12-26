@@ -222,7 +222,7 @@ for current_state in tqdm(all_states):
         inh_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         inh_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.GABA, gaba_neuro)
 
-        dopa_neurotransmitters = ln.DopaGluGABAAproximateNeurotransmitters()
+        dopa_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         dopa_neurotransmitters.set_neurotransmitters(ln.DopaGluGABANeurotransmitterType.Dopamine, dopa_neuro)
 
         glu = ln.GlutamateReceptor()
