@@ -229,8 +229,8 @@ for current_state in tqdm(all_states):
         gabaa = ln.GABAReceptor()
         dopamine_rs = ln.DopamineReceptor()
 
-        dopamine_rs.d1_on = parsed_toml['simulation_parameters']['d1']
-        dopamine_rs.d2_on = parsed_toml['simulation_parameters']['d2']
+        dopamine_rs.d1_enabled = parsed_toml['simulation_parameters']['d1']
+        dopamine_rs.d2_enabled = parsed_toml['simulation_parameters']['d2']
 
         glu.ampa_g = current_state['nmda_g']
         glu.nmda_g = current_state['ampa_g']
@@ -242,6 +242,7 @@ for current_state in tqdm(all_states):
         receptors = ln.DopaGluGABAReceptors()
         receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
         receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
+        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Dopamine, dopamine_rs)
 
         exc_neuron = ln.DopaIzhikevichNeuron()
         exc_neuron.set_neurotransmitters(exc_neurotransmitters)
