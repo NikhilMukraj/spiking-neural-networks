@@ -648,6 +648,3 @@ with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
 
 print("\033[92mFinished simulation\033[0m")
-
-# calculate second memory accuracy if memory biases memory
-# test distortion to make sure that everything is running as intended
