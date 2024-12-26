@@ -164,7 +164,7 @@ gabaa_clearance = [0.001]
 
 ## Bayesian Inference Pipeline
 
-...
+![Bayesian inference figure](figures/bayesian_inf.svg)
 
 ### Bayesian Inference `[simulation_parameters]`
 
