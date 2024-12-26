@@ -136,6 +136,8 @@ def fill_defaults(parsed):
         parsed['variables']['glutamate_clearance'] = [0.001]
     if 'gabaa_clearance' not in parsed['variables']:
         parsed['variables']['gabaa_clearance'] = [0.001]
+    if 'dopamine_clearance' not in parsed['variables']:
+        parsed['variables']['dopamine_clearance'] = [0.001]
 
     # single on/off cue versus entire group
     # d1/d2
@@ -152,7 +154,7 @@ def generate_key(parsed, current_state):
         'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
         'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
         'nmda_g', 'ampa_g', 'gabaa_g',
-        'glutamate_clearance', 'gabaa_clearance'
+        'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
     ]
     
     for field in fields:
