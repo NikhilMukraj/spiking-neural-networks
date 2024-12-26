@@ -170,6 +170,12 @@ impl LatticeHistoryGPU for GridVoltageHistory {
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
+        // refactor this to take in another array that specifies the associated lattice with 
+        // the index to position as well as a number representing the target lattice to 
+        // track the history of
+        // also needs a skip index as input to the kernel to know where the desired lattice is
+        // if this is a single gpu lattice then skip index is 0
+
         let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
             String::from("iteration"), String::from("size")
