@@ -733,24 +733,18 @@ impl InterleavingGraphGPU {
     pub fn convert_to_cpu<T: IterateAndSpikeGPU, U: Graph<K=Position, V=f32>, V: Graph<K=GraphPosition, V=f32>>(
         queue: &CommandQueue,
         gpu_graph: &InterleavingGraphGPU,
-        lattices: &mut HashMap<usize, (&[Vec<T>], &mut U)>, 
+        lattices: &mut HashMap<usize, (&[Vec<T>], U)>, 
         connecting_graph: &mut V
     ) -> Result<(), GPUError> {
         let length = gpu_graph.size;
 
         let mut connections: Vec<cl_uint> = vec![0; length * length];
         let mut weights: Vec<cl_float> = vec![0.0; length * length];
-        let mut associated_lattices: Vec<u32> = vec![];
-        let mut index_to_position: Vec<u32> = vec![];
+        let mut associated_lattices: Vec<u32> = vec![0; length];
+        let mut index_to_position: Vec<u32> = vec![0; length];
 
         let _associated_lattices_read_event = unsafe {
             match queue.enqueue_read_buffer(&gpu_graph.associated_lattices, CL_NON_BLOCKING, 0, &mut associated_lattices, &[]) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferReadError),
-            }
-        };
-        let _index_to_position_read_event = unsafe {
-            match queue.enqueue_read_buffer(&gpu_graph.index_to_position, CL_NON_BLOCKING, 0, &mut index_to_position, &[]) {
                 Ok(value) => value,
                 Err(_) => return Err(GPUError::BufferReadError),
             }
@@ -761,14 +755,20 @@ impl InterleavingGraphGPU {
                 Err(_) => return Err(GPUError::BufferReadError),
             }
         };
-        let weights_read_event = unsafe {
+        let _weights_read_event = unsafe {
             match queue.enqueue_read_buffer(&gpu_graph.weights, CL_NON_BLOCKING, 0, &mut weights, &[]) {
                 Ok(value) => value,
                 Err(_) => return Err(GPUError::BufferReadError),
             }
         };
+        let index_to_position_read_event = unsafe {
+            match queue.enqueue_read_buffer(&gpu_graph.index_to_position, CL_NON_BLOCKING, 0, &mut index_to_position, &[]) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferReadError),
+            }
+        };
     
-        match weights_read_event.wait() {
+        match index_to_position_read_event.wait() {
             Ok(_) => {},
             Err(_) => return Err(GPUError::WaitError),
         };
@@ -808,19 +808,23 @@ impl InterleavingGraphGPU {
                 );
 
                 if i.id == j.id {
-                    let current_graph: &mut U = lattices.get_mut(&i.id).unwrap().1;
+                    let current_graph = &mut lattices.get_mut(&i.id).unwrap().1;
                     current_graph.add_node(i.pos);
                     current_graph.add_node(j.pos);
 
                     if processed_connections[index][index_post] != 1 {
-                        current_graph.edit_weight(&i.pos, &j.pos, Some(processed_weights[index][index_post])).unwrap();
-                    } else {
                         current_graph.edit_weight(&i.pos, &j.pos, None).unwrap();
+                    } else {
+                        current_graph.edit_weight(&i.pos, &j.pos, Some(processed_weights[index][index_post])).unwrap();
                     }
                 } else if processed_connections[index][index_post] != 1 {
-                    connecting_graph.edit_weight(i, j, Some(processed_weights[index][index_post])).unwrap();
-                } else {
+                    connecting_graph.add_node(*i);
+                    connecting_graph.add_node(*j);
                     connecting_graph.edit_weight(i, j, None).unwrap();
+                } else {
+                    connecting_graph.add_node(*i);
+                    connecting_graph.add_node(*j);
+                    connecting_graph.edit_weight(i, j, Some(processed_weights[index][index_post])).unwrap();
                 }
             }
         }
