@@ -7,7 +7,10 @@ use opencl3::{
 };
 use crate::{
     error::{GPUError, SpikingNeuralNetworksError}, 
-    graph::{ConnectingGraphGPU, Graph, GraphGPU, GraphToGPU, ConnectingGraphToGPU, GraphPosition}
+    graph::{
+        ConnectingGraphGPU, ConnectingGraphToGPU, Graph, GraphGPU, 
+        GraphPosition, GraphToGPU, InterleavingGraphGPU
+    }
 };
 use super::{
     iterate_and_spike::{
@@ -141,18 +144,19 @@ __kernel void add_grid_voltage_history(
     __global const float *current_voltage,
     __global float *history,
     int iteration,
-    int size
+    int size,
+    int skip_index
 ) {
     int gid = get_global_id(0);
     uint index = index_to_position[gid];
 
-    history[iteration * size + index] = current_voltage[index]; 
+    history[skip_index + iteration * size + index] = current_voltage[index]; 
 }
 "#;
 
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
 pub trait LatticeHistoryGPU: LatticeHistory {
-    fn get_kernel(&self, context: &Context) -> Result<KernelFunction, GPUError>;
+    fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
     fn add_from_gpu(
         &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
@@ -160,7 +164,7 @@ pub trait LatticeHistoryGPU: LatticeHistory {
 }
 
 impl LatticeHistoryGPU for GridVoltageHistory {
-    fn get_kernel(&self, context: &Context) -> Result<KernelFunction, GPUError> {
+    fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let history_program = match Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "") {
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
@@ -170,15 +174,9 @@ impl LatticeHistoryGPU for GridVoltageHistory {
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
-        // refactor this to take in another array that specifies the associated lattice with 
-        // the index to position as well as a number representing the target lattice to 
-        // track the history of
-        // also needs a skip index as input to the kernel to know where the desired lattice is
-        // if this is a single gpu lattice then skip index is 0
-
         let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
-            String::from("iteration"), String::from("size")
+            String::from("iteration"), String::from("size"), String::from("skip_index"),
         ];
 
         Ok(
@@ -391,7 +389,7 @@ where
                 chemical_incoming_connections_kernel,
                 last_firing_time_kernel,
                 internal_clock: 0,
-                grid_history_kernel: lattice.grid_history.get_kernel(&context)?,
+                grid_history_kernel: V::get_kernel(&context)?,
                 grid_history: lattice.grid_history,
                 update_grid_history: lattice.update_grid_history,
                 electrical_synapse: lattice.electrical_synapse,
@@ -469,6 +467,8 @@ where
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
                     kernel_execution.set_arg(&gpu_graph.size);
+                } else if i == "skip_index" {
+                    kernel_execution.set_arg(&0);
                 } else if i == "index_to_position" {
                     kernel_execution.set_arg(&gpu_graph.index_to_position);
                 } else if gpu_cell_grid.contains_key(i) {
@@ -797,49 +797,39 @@ where
     }
 }
 
-// const INTERNALS_NETWORK_INPUTS_KERNEL: &str = r#"
-// __kernel void calculate_network_internal_electrical_inputs(
-//     __global const uint *connections, 
-//     __global const float *weights, 
-//     __global const uint *index_to_position,
-//     __global const uint *associated_lattices,
-//     __global const uint *associated_lattice_sizes,
-//     __global const float *gap_conductances,
-//     __global const float *voltages,
-//     uint total_lattices,
-//     uint n, 
-//     __global float *res
-// ) {
-//     int gid = get_global_id(0);
+const NETWORK_ELECTRICAL_INPUTS_KERNEL: &str = r#"
+__kernel void calculate_network_electrical_inputs(
+    __global const uint *connections, 
+    __global const float *weights, 
+    __global const uint *index_to_position,
+    __global const float *gap_conductances,
+    __global const float *voltages,
+    uint n, 
+    __global float *res
+) {
+    int gid = get_global_id(0);
 
-//     uint current_lattice = associated_lattices[index_to_position[gid]];
-//     uint skip_index = 0;
-//     for (int i = 0; i < current_lattice; i++) {
-//         skip_index += associated_lattice_sizes[i] * associated_lattice_sizes[i];
-//     }
-
-//     float sum = 0.0f;
-//     float count = 0.0f;
-//     uint current_size = associated_lattice_sizes[index_to_position[gid];
-//     for (int i = 0; i < current_size]; i++) {
-//         if (connections[skip_index + i * current_size + gid] == 1) {
-//             int presynaptic_index = index_to_position[i];
-//             int postsynaptic_index = index_to_position[gid];
-//             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
-//             sum += weights[skip_index + i * current_size + gid] * gap_junction;
-//             count++;
-//         }
-//     }
+    float sum = 0.0f;
+    float count = 0.0f;
+    for (int i = 0; i < n; i++) {
+        if (connections[i * n + gid] == 1) {
+            int presynaptic_index = index_to_position[i];
+            int postsynaptic_index = index_to_position[gid];
+            float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
+            sum += weights[i * n + gid] * gap_junction;
+            count++;
+        }
+    }
     
-//     if (count != 0.0f) {
-//         res[gid] = sum / count;
-//     } else {
-//         res[gid] = 0;
-//     }
-// }
-// "#;
+    if (count != 0.0f) {
+        res[gid] = sum / count;
+    } else {
+        res[gid] = 0;
+    }
+}
+"#;
 
-// const INTERNALS_NETWORK_INPUTS_KERNEL_NAME: &str = "calculate_network_internal_electrical_inputs";
+const NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_electrical_inputs";
 
 /// An implementation of a lattice network that is compatible with the GPU
 #[allow(dead_code)]
@@ -857,11 +847,11 @@ pub struct LatticeNetworkGPU<
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<N, W, X>>,
     connecting_graph: C,
     electrical_incoming_connections_kernel: Kernel,
-    chemical_incoming_connections_kernel: Kernel,
+    // chemical_incoming_connections_kernel: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
-    grid_history_kernels: HashMap<usize, KernelFunction>,
+    grid_history_kernel: KernelFunction,
     pub electrical_synapse: bool,
     pub chemical_synapse: bool,
     internal_clock: usize,
@@ -897,14 +887,14 @@ where
             Err(_) => return Err(GPUError::GetDeviceFailure),
         };
 
-        // let electrical_incoming_connections_program = match Program::create_and_build_from_source(&context, INPUTS_KERNEL, ""){
-        //     Ok(value) => value,
-        //     Err(_) => return Err(GPUError::ProgramCompileFailure),
-        // };
-        // let electrical_incoming_connections_kernel = match Kernel::create(&electrical_incoming_connections_program, INPUTS_KERNEL_NAME) {
-        //     Ok(value) => value,
-        //     Err(_) => return Err(GPUError::KernelCompileFailure),
-        // };
+        let electrical_incoming_connections_program = match Program::create_and_build_from_source(&context, NETWORK_ELECTRICAL_INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let electrical_incoming_connections_kernel = match Kernel::create(&electrical_incoming_connections_program, NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
         // let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
         //     Ok(value) => value,
@@ -929,14 +919,12 @@ where
                 lattices: lattice_network.get_lattices().clone(), 
                 spike_train_lattices: lattice_network.get_spike_train_lattices().clone(),
                 connecting_graph: lattice_network.get_connecting_graph().clone(), 
+                last_firing_time_kernel, 
+                electrical_incoming_connections_kernel, 
+                // chemical_incoming_connections_kernel: todo!(), 
+                grid_history_kernel: V::get_kernel(&context)?,
                 context, 
                 queue, 
-                last_firing_time_kernel, 
-                electrical_incoming_connections_kernel: todo!(), 
-                #[allow(unreachable_code)]
-                chemical_incoming_connections_kernel: todo!(), 
-                #[allow(unreachable_code)]
-                grid_history_kernels: todo!(),
                 electrical_synapse: lattice_network.electrical_synapse, 
                 chemical_synapse: lattice_network.chemical_synapse, 
                 internal_clock: lattice_network.internal_clock
@@ -957,7 +945,92 @@ where
         Self::from_network_given_device(lattice_network, &device)
     }
 
-    fn run_lattices_with_electrical_synapses(&mut self, _iterations: usize) -> Result<(), GPUError> {
+    unsafe fn execute_last_firing_time(
+        &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>
+    ) -> Result<(), GPUError> {
+        let last_firing_time_event = unsafe {
+            match ExecuteKernel::new(&self.last_firing_time_kernel)
+                .set_arg(&gpu_graph.index_to_position)
+                .set_arg(
+                    match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
+                        BufferGPU::UInt(buffer) => buffer,
+                        _ => unreachable!("is_spiking cannot be float or optional unsigned integer"),
+                    }
+                )
+                .set_arg(
+                    match &gpu_cell_grid.get("last_firing_time").expect("Could not retrieve buffer: last_firing_time") {
+                        BufferGPU::OptionalUInt(buffer) => buffer,
+                        _ => unreachable!("last_firing_time cannot be float or mandatory unsigned integer"),
+                    }
+                )
+                .set_arg(&(self.internal_clock as i32))
+                .set_global_work_size(gpu_graph.size)
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+        };
+
+        match last_firing_time_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(())
+    }
+
+    unsafe fn execute_grid_history(
+        &self, 
+        skip_index: u32,
+        gpu_graph: &InterleavingGraphGPU, 
+        gpu_cell_grid: &HashMap<String, BufferGPU>, 
+        gpu_grid_history: &HashMap<String, BufferGPU>,
+    ) -> Result<(), GPUError> {
+        let update_history_event = unsafe {
+            let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
+
+            for i in self.grid_history_kernel.argument_names.iter() {
+                if i == "iteration" {
+                    kernel_execution.set_arg(&self.internal_clock);
+                } else if i == "size" {
+                    kernel_execution.set_arg(&gpu_graph.size);
+                } else if i == "skip_index" {
+                    kernel_execution.set_arg(&skip_index);
+                } else if i == "index_to_position" {
+                    kernel_execution.set_arg(&gpu_graph.index_to_position);
+                } else if gpu_cell_grid.contains_key(i) {
+                    match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
+                } else if gpu_grid_history.contains_key(i) {
+                    match &gpu_grid_history.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
+                } else {
+                    unreachable!("Unkown argument in history kernel");
+                }
+            }
+
+            match kernel_execution.set_global_work_size(gpu_graph.size)
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+        };
+
+        match update_history_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(())
+    }
+
+    fn run_lattices_with_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         // concat cell grids into a single 1d vector of cell grids
         // create a new vector that keeps track of which lattices and positions each cell belongs to
         // use those vectors to write the new values back to the cpu and execute the connections kernel
@@ -968,7 +1041,9 @@ where
         let mut lattice_sizes: Vec<u32> = vec![];
         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
 
-        let mut lattice_iterator: Vec<(&usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter().collect();
+        let mut lattice_iterator: Vec<(usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
 
         for (key, value) in &lattice_iterator {
@@ -976,14 +1051,14 @@ where
             for row in current_cell_grid {
                 for i in row {
                     cell_vector.push(i.clone());
-                    lattice_ids.push(**key as u32);
+                    lattice_ids.push(*key as u32);
                 }
             }
             
             let rows = current_cell_grid.len();
             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
             lattice_sizes.push((rows * cols) as u32);
-            lattice_sizes_map.insert(**key, (rows, cols));
+            lattice_sizes_map.insert(*key, (rows, cols));
         }
 
         let mut cell_vector = vec![cell_vector];
@@ -991,12 +1066,117 @@ where
 
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
 
-        // connections and weights are concated together
-        // index to position should also probably be concated 
-        // but positions take into account position in lattices
-        // for _ in 0..iterations {
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
+            &self.context, &self.queue, &self.lattices, &self.connecting_graph
+        )?;
 
-        // }
+        let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context)?;
+
+        let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
+
+        let mut gpu_grid_histories = HashMap::new();
+
+        for (key, value) in &self.lattices {
+            if value.update_grid_history {
+                let rows = value.cell_grid().len();
+                let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
+
+                gpu_grid_histories.insert(
+                    key,
+                    value.grid_history.clone().to_gpu(&self.context, iterations, (rows, cols))?,
+                );
+            }
+        }
+
+        for _ in 0..iterations {
+            let gap_junctions_event = unsafe {
+                let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
+
+                kernel_execution.set_arg(&gpu_graph.connections)
+                    .set_arg(&gpu_graph.weights)
+                    .set_arg(&gpu_graph.index_to_position);
+
+                match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
+                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                    _ => unreachable!("gap_condutance must be float"),
+                };
+
+                match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
+                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                    _ => unreachable!("current_voltage must be float"),
+                };
+
+                match kernel_execution.set_arg(&gpu_graph.size)
+                    .set_arg(&sums_buffer)
+                    .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                    .enqueue_nd_range(&self.queue) {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::QueueFailure),
+                    }
+            };
+
+            match gap_junctions_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
+
+            let iterate_event = unsafe {
+                let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
+
+                for i in iterate_kernel.argument_names.iter() {
+                    if i == "inputs" {
+                        kernel_execution.set_arg(&sums_buffer);
+                    } else if i == "index_to_position" {
+                        kernel_execution.set_arg(&gpu_graph.index_to_position);
+                    } else {
+                        match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                            BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                            BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                        };
+                    }
+                }
+
+                match kernel_execution.set_global_work_size(gpu_graph.size)
+                    .enqueue_nd_range(&self.queue) {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::QueueFailure),
+                    }
+            };
+
+            match iterate_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
+
+            unsafe {
+                self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
+            };
+
+            for (key, value) in self.lattices.iter() {
+                if value.update_grid_history {
+                    let mut skip_index = 0;
+                    for i in gpu_graph.ordered_keys.iter() {
+                        if *i >= *key {
+                            break;
+                        }
+                        let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
+                        skip_index += current_size.0 * current_size.1;
+                    }
+                    
+                    unsafe {
+                        self.execute_grid_history(
+                            skip_index as u32,
+                            &gpu_graph, 
+                            &gpu_cell_grid, 
+                            gpu_grid_histories.get(key).unwrap()
+                        )?;
+                    }
+                }
+            }
+            
+            self.internal_clock += 1;
+        }
 
         T::convert_electrochemical_to_cpu(
             &mut cell_vector, 
@@ -1027,9 +1207,35 @@ where
             }
         }
 
+        let updates: Vec<(usize, (usize, usize), _)> = self.lattices.iter()
+            .filter_map(|(key, value)| {
+                if value.update_grid_history {
+                    let rows = value.cell_grid().len();
+                    let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
+                    Some((*key, (rows, cols), gpu_grid_histories.remove(key).unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (key, (rows, cols), grid_history) in updates {
+            let value = self.lattices.get_mut(&key).unwrap();
+            value.grid_history.add_from_gpu(
+                &self.queue,
+                grid_history,
+                iterations,
+                (rows, cols),
+            )?;
+        }
+
         for (key, value) in self.lattices.iter_mut() {
             value.set_cell_grid(reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
         }
+
+        InterleavingGraphGPU::convert_to_cpu(
+            &self.queue, &gpu_graph, &mut self.lattices, &mut self.connecting_graph
+        )?;
 
         Ok(())
     }
