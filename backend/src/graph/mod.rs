@@ -9,7 +9,12 @@ use std::{
 };
 use crate::error::GraphError;
 #[cfg(feature = "gpu")]
-use super::neuron::iterate_and_spike::IterateAndSpikeGPU;
+use super::neuron::{
+    iterate_and_spike::{IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterTypeGPU},
+    plasticity::Plasticity,
+    gpu_lattices::LatticeHistoryGPU,
+    Lattice, LatticeHistory
+};
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
 #[cfg(feature = "gpu")]
@@ -584,11 +589,17 @@ pub struct InterleavingGraphGPU {
 
 #[cfg(feature = "gpu")]
 impl InterleavingGraphGPU {
-    fn calculate_index<T: IterateAndSpikeGPU>(
+    fn calculate_index<
+        T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
+        U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
+        V: LatticeHistory + LatticeHistoryGPU,
+        P: Plasticity<T, T, f32>,
+        N: NeurotransmitterTypeGPU,
+    >(
         id: usize,
         row: usize, 
         col: usize,
-        lattices: &HashMap<usize, &[Vec<T>]>, 
+        lattices: &HashMap<usize, Lattice<T, U, V, P, N>>, 
         lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         ordered_keys: &Vec<usize>,
     ) -> usize {
@@ -603,18 +614,25 @@ impl InterleavingGraphGPU {
             skip_index += current_size.0 * current_size.1;
         }
 
-        let row_len = current_group.first().unwrap_or(&vec![]).len();
+        let row_len = current_group.cell_grid().first().unwrap_or(&vec![]).len();
         
         skip_index + row * row_len + col
     }
 
     // trait for getting cell grid and getting internal graph (maybe as tuple)
     // get one large adj mat and use that to represent connections
-    pub fn convert_to_gpu<T: IterateAndSpikeGPU, U: Graph<K=Position, V=f32>, V: Graph<K=GraphPosition, V=f32>>(
+    pub fn convert_to_gpu<
+        T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
+        U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
+        V: LatticeHistory + LatticeHistoryGPU,
+        Z: Graph<K=GraphPosition, V=f32>,
+        P: Plasticity<T, T, f32>,
+        N: NeurotransmitterTypeGPU,
+    >(
         context: &Context, 
         queue: &CommandQueue,
-        lattices: &HashMap<usize, (&[Vec<T>], &U)>, 
-        connecting_graph: &V
+        lattices: &HashMap<usize, Lattice<T, U, V, P, N>>, 
+        connecting_graph: &Z
     ) -> Result<Self, GPUError> {
         let mut associated_lattices: Vec<u32> = vec![];
         let mut associated_lattice_sizes: Vec<u32> = vec![];
@@ -623,8 +641,8 @@ impl InterleavingGraphGPU {
         let mut cell_tracker: Vec<(usize, usize, usize)> = vec![];
 
         #[allow(clippy::type_complexity)]
-        let mut lattice_iterator: Vec<(usize, (&[Vec<T>], &U))> = lattices.iter()
-            .map(|(&key, &value)| (key, value))
+        let mut lattice_iterator: Vec<(usize, &Lattice<T, U, V, P, N>)> = lattices.iter()
+            .map(|(&key, value)| (key, value))
             .collect();
         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
         let ordered_keys: Vec<_> = lattice_iterator.iter().map(|i| i.0).collect();
@@ -636,7 +654,7 @@ impl InterleavingGraphGPU {
                 skip_index += i;
             }
 
-            let current_cell_grid = value.0;    
+            let current_cell_grid = value.cell_grid();    
             let rows = current_cell_grid.len();
             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
 
@@ -661,21 +679,17 @@ impl InterleavingGraphGPU {
             .map(|_| (0..size).map(|_| 0).collect())
             .collect();
 
-        let immutable_lattices: HashMap<_, _> = lattices.iter()
-            .map(|(&key, &(vecs, _))| (key, vecs))
-            .collect();
-
         for (id, row, col) in cell_tracker.iter() {
             for (id_post, row_post, col_post) in cell_tracker.iter() {
                 let index = Self::calculate_index(
-                    *id, *row, *col, &immutable_lattices, &lattice_sizes_map, &ordered_keys
+                    *id, *row, *col, lattices, &lattice_sizes_map, &ordered_keys
                 );
                 let index_post = Self::calculate_index(
-                    *id, *row_post, *col_post, &immutable_lattices, &lattice_sizes_map, &ordered_keys
+                    *id, *row_post, *col_post, lattices, &lattice_sizes_map, &ordered_keys
                 );
 
                 if *id == *id_post {
-                    match lattices.get(id).unwrap().1.lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
+                    match lattices.get(id).unwrap().graph().lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
                         Ok(Some(val)) => { 
                             connections[index][index_post] = 1;
                             weights[index][index_post] = val; 
@@ -730,11 +744,18 @@ impl InterleavingGraphGPU {
         )
     }
 
-    pub fn convert_to_cpu<T: IterateAndSpikeGPU, U: Graph<K=Position, V=f32>, V: Graph<K=GraphPosition, V=f32>>(
+    pub fn convert_to_cpu<
+        T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
+        U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
+        V: LatticeHistory + LatticeHistoryGPU,
+        Z: Graph<K=GraphPosition, V=f32>,
+        P: Plasticity<T, T, f32>,
+        N: NeurotransmitterTypeGPU,
+    >(
         queue: &CommandQueue,
         gpu_graph: &InterleavingGraphGPU,
-        lattices: &mut HashMap<usize, (&[Vec<T>], U)>, 
-        connecting_graph: &mut V
+        lattices: &mut HashMap<usize, Lattice<T, U, V, P, N>>, 
+        connecting_graph: &mut Z
     ) -> Result<(), GPUError> {
         let length = gpu_graph.size;
 
@@ -776,7 +797,7 @@ impl InterleavingGraphGPU {
         let mut processed_index_to_position: Vec<GraphPosition> = vec![];
 
         for key in &gpu_graph.ordered_keys {
-            let current_cell_grid = lattices.get(key).unwrap().0;    
+            let current_cell_grid = lattices.get(key).unwrap().cell_grid();    
             let rows = current_cell_grid.len();
             let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
 
@@ -794,21 +815,19 @@ impl InterleavingGraphGPU {
         let processed_connections: Vec<Vec<u32>> = connections.chunks(index_to_position.len())
             .map(|chunk| chunk.to_vec()).collect();
 
-        let immutable_lattices: HashMap<_, _> = lattices.iter()
-            .map(|(&key, &(vecs, _))| (key, vecs))
-            .collect();
+        let mut graphs: HashMap<usize, U> = HashMap::new();
 
         for i in processed_index_to_position.iter() {
             for j in processed_index_to_position.iter() {
                 let index = Self::calculate_index(
-                    i.id, i.pos.0, i.pos.1, &immutable_lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                    i.id, i.pos.0, i.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
                 );
                 let index_post = Self::calculate_index(
-                    j.id, j.pos.0, j.pos.1, &immutable_lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                    j.id, j.pos.0, j.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
                 );
 
                 if i.id == j.id {
-                    let current_graph = &mut lattices.get_mut(&i.id).unwrap().1;
+                    let current_graph = graphs.entry(i.id).or_default();
                     current_graph.add_node(i.pos);
                     current_graph.add_node(j.pos);
 
@@ -827,6 +846,10 @@ impl InterleavingGraphGPU {
                     connecting_graph.edit_weight(i, j, Some(processed_weights[index][index_post])).unwrap();
                 }
             }
+        }
+
+        for (key, value) in graphs.into_iter() {
+            lattices.get_mut(&key).unwrap().set_graph(value).expect("Valid graph mutation");
         }
 
         Ok(())
@@ -909,8 +932,6 @@ impl<
     }
 
     fn lookup_weight(&self, presynaptic: &T, postsynaptic: &T) -> Result<Option<U>, GraphError> {
-        // println!("{:#?} {:#?}", presynaptic, postsynaptic);
-
         if !self.incoming_connections.contains_key(postsynaptic) {
             return Err(GraphError::PostsynapticNotFound(format!("{:#?}", postsynaptic)));
         }
