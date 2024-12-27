@@ -80,20 +80,26 @@ mod tests {
                 Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
             };
 
-        let lattices: HashMap<_, _> = network.get_lattices()
-            .iter()
-            .map(|(key, value)| (*key, (value.cell_grid(), value.graph())))
-            .collect();
-
         let connecting_graph = network.get_connecting_graph();
 
-        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(&context, &queue, &lattices, connecting_graph)?;
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(&context, &queue, network.get_lattices(), connecting_graph)?;
 
         let mut editable_connecting_graph = AdjacencyMatrix::<GraphPosition, f32>::default();
-        let mut editable_lattices: HashMap<usize, (_, _)> = network.get_lattices()
+        let mut editable_lattices: HashMap<usize, _> = network.get_all_lattice_ids()
             .iter()
-            .map(|(key, value)| 
-                (*key, (value.cell_grid(), AdjacencyMatrix::<(usize, usize), f32>::default()))
+            .map(|key| 
+                (*key, {
+                    let lattice_to_copy = network.get_lattice(key).unwrap();
+                    let mut current_lattice = Lattice::default_impl();
+                    current_lattice.set_id(*key);
+                    current_lattice.populate(
+                        &base_neuron, 
+                        lattice_to_copy.cell_grid().len(),
+                        lattice_to_copy.cell_grid().first().unwrap_or(&vec![]).len(),
+                    );
+
+                    current_lattice
+                })
             )
             .collect();
 
@@ -108,8 +114,8 @@ mod tests {
         }
 
         for i in network.get_all_ids() {
-            let actual_index_to_position = &editable_lattices.get(&i).unwrap().1.index_to_position;
-            let expected_index_to_position = &lattices.get(&i).unwrap().1.index_to_position;
+            let actual_index_to_position = &editable_lattices.get(&i).unwrap().graph().index_to_position;
+            let expected_index_to_position = &network.get_lattice(&i).unwrap().graph().index_to_position;
             assert_eq!(
                 actual_index_to_position, 
                 expected_index_to_position,
@@ -117,9 +123,9 @@ mod tests {
 
             for pre in actual_index_to_position.values() {
                 for post in actual_index_to_position.values() {
-                    let actual_weight = editable_lattices.get(&i).unwrap().1.lookup_weight(pre, post)
+                    let actual_weight = editable_lattices.get(&i).unwrap().graph().lookup_weight(pre, post)
                         .unwrap();
-                    let expected_weight = lattices.get(&i).unwrap().1.lookup_weight(pre, post)
+                    let expected_weight = network.get_lattice(&i).unwrap().graph().lookup_weight(pre, post)
                         .unwrap();
 
                     assert_eq!(actual_weight, expected_weight);
