@@ -288,6 +288,9 @@ mod tests {
         network.add_lattice(lattice1)?;
         network.add_lattice(lattice2)?;
 
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+
         let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
 
         gpu_network.run_lattices(iterations)?;
