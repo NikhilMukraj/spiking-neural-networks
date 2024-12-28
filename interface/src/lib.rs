@@ -329,25 +329,38 @@ pub struct PyDopamineReceptor {
 
 impl_repr!(PyDopamineReceptor, dopamine_receptor);
 
+implement_basic_getter_and_setter!(
+    PyDopamineReceptor, 
+    dopamine_receptor,
+    s_d1, get_s_d1, set_s_d1,
+    s_d2, get_s_d2, set_s_d2
+);
+
 #[pymethods]
 impl PyDopamineReceptor {
     #[new]
     #[pyo3(
         signature = (
             d1_enabled = false,
-            d2_enabled = false
+            d2_enabled = false,
+            s_d1 = 1. / 1.5,
+            s_d2 = 1.
         )
     )]
     fn new(
         d1_enabled: bool,
         d2_enabled: bool,
+        s_d1: f32,
+        s_d2: f32,
     ) -> Self {
         PyDopamineReceptor {
             dopamine_receptor: DopamineReceptor {
                 d1_r: ApproximateReceptor::default(),
                 d1_enabled,
+                s_d1,
                 d2_r: ApproximateReceptor::default(),
                 d2_enabled,
+                s_d2,
             },
         }
     }
