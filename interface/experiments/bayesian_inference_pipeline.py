@@ -132,6 +132,11 @@ def fill_defaults(parsed):
     if 'gabaa_g' not in parsed['variables']:
         parsed['variables']['gabaa_g'] = [1.2]
 
+    if 's_d1' not in parsed['variables']:
+        parsed['variables']['s_d1'] = [1]
+    if 's_d2' not in parsed['variables']:
+        parsed['variables']['s_d2'] = [1 / 1.5]
+
     if 'glutamate_clearance' not in parsed['variables']:
         parsed['variables']['glutamate_clearance'] = [0.001]
     if 'gabaa_clearance' not in parsed['variables']:
@@ -140,7 +145,6 @@ def fill_defaults(parsed):
         parsed['variables']['dopamine_clearance'] = [0.001]
 
     # single on/off cue versus entire group
-    # d1/d2
 
 def generate_key(parsed, current_state):
     key = []
@@ -153,7 +157,7 @@ def generate_key(parsed, current_state):
     fields = [
         'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
         'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
-        'nmda_g', 'ampa_g', 'gabaa_g',
+        'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2'
         'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
     ]
     
@@ -231,6 +235,9 @@ for current_state in tqdm(all_states):
 
         dopamine_rs.d1_enabled = parsed_toml['simulation_parameters']['d1']
         dopamine_rs.d2_enabled = parsed_toml['simulation_parameters']['d2']
+
+        dopamine_rs.s_d1 = current_state['s_d1']
+        dopamine_rs.s_d2 = current_state['s_d2']
 
         glu.ampa_g = current_state['nmda_g']
         glu.nmda_g = current_state['ampa_g']
