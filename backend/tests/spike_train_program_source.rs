@@ -336,4 +336,6 @@ mod tests {
 
         Ok(())
     }    
+
+    // test refractoriness functionality
 }
