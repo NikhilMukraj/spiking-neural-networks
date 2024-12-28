@@ -95,8 +95,10 @@ impl<T: ReceptorKinetics> Default for GABAReceptor<T> {
 pub struct DopamineReceptor<T: ReceptorKinetics> {
     pub d1_r: T,
     pub d1_enabled: bool,
+    pub s_d1: f32,
     pub d2_r: T,
     pub d2_enabled: bool,
+    pub s_d2: f32,
 }
 
 impl<T: ReceptorKinetics> DopamineReceptor<T> {
@@ -112,10 +114,10 @@ impl<T: ReceptorKinetics> DopamineReceptor<T> {
     pub fn get_modifiers(&self, inh_modifier: &mut f32, nmda_modifier: &mut f32) {
         let mut d1_modifier = 0.;
         if self.d2_enabled {
-            *inh_modifier = 1. - self.d2_r.get_r();
+            *inh_modifier = 1. - (self.d2_r.get_r() * self.s_d2);
         }
         if self.d1_enabled {
-            d1_modifier = self.d1_r.get_r() / 1.5;
+            d1_modifier = self.d1_r.get_r() * self.s_d1;
         }
         *nmda_modifier = 1. - d1_modifier;
     }
@@ -126,8 +128,10 @@ impl<T: ReceptorKinetics> Default for DopamineReceptor<T> {
         DopamineReceptor {
             d1_r: T::default(),
             d1_enabled: false,
+            s_d1: 1. / 1.5,
             d2_r: T::default(),
             d2_enabled: false,
+            s_d2: 1.,
         }
     }
 }
