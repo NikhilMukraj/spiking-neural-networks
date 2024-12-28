@@ -114,6 +114,10 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
     fn get_refractoriness_function(&self) -> &Self::U;
 }
 
+// pub trait NeuralRefractorinessGPU: NeuralRefractoriness {
+//     fn refractoriness_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+// }
+
 #[cfg(feature = "gpu")]
 /// Handles spike train dyanmics on the GPU
 pub trait SpikeTrainGPU: SpikeTrain 
