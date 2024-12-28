@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::{Values, ValuesMut}, HashMap};
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
     context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
@@ -945,6 +945,58 @@ where
         Self::from_network_given_device(lattice_network, &device)
     }
 
+    
+    /// Resets the clock and last firing times for the entire network
+    pub fn reset_timing(&mut self) {
+        self.internal_clock = 0;
+
+        self.lattices.values_mut()
+            .for_each(|i| i.reset_timing());
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.reset_timing());
+    }
+    
+    /// Resets all grid histories in the network
+    pub fn reset_grid_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.grid_history.reset());
+    }
+
+    /// Resets all graph histories in the network (including connecting graph)
+    pub fn reset_graph_history(&mut self) {
+        self.lattices.values_mut()
+            .for_each(|i| i.graph.reset_history());
+
+        self.connecting_graph.reset_history();
+    }
+
+    /// Returns the set of [`Lattice`]s in the hashmap of lattices
+    pub fn lattices_values(&self) -> Values<usize, Lattice<T, U, V, Y, N>> {
+        self.lattices.values()
+    }
+
+    /// Returns a mutable set [`Lattice`]s in the hashmap of lattices
+    pub fn lattices_values_mut(&mut self) -> ValuesMut<usize, Lattice<T, U, V, Y, N>> {
+        self.lattices.values_mut()
+    }
+
+    /// Returns an immutable set of [`Lattice`]s
+    pub fn get_lattices(&self) -> &HashMap<usize, Lattice<T, U, V, Y, N>> {
+        &self.lattices
+    }
+
+    /// Returns a reference to [`Lattice`] given the identifier
+    pub fn get_lattice(&self, id: &usize) -> Option<&Lattice<T, U, V, Y, N>> {
+        self.lattices.get(id)
+    }
+
+    /// Returns a mutable reference to a [`Lattice`] given the identifier
+    pub fn get_mut_lattice(&mut self, id: &usize) -> Option<&mut Lattice<T, U, V, Y, N>> {
+        self.lattices.get_mut(id)
+    }
+
     unsafe fn execute_last_firing_time(
         &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>
     ) -> Result<(), GPUError> {
@@ -982,6 +1034,7 @@ where
     unsafe fn execute_grid_history(
         &self, 
         skip_index: u32,
+        size: u32,
         gpu_graph: &InterleavingGraphGPU, 
         gpu_cell_grid: &HashMap<String, BufferGPU>, 
         gpu_grid_history: &HashMap<String, BufferGPU>,
@@ -993,7 +1046,7 @@ where
                 if i == "iteration" {
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
-                    kernel_execution.set_arg(&gpu_graph.size);
+                    kernel_execution.set_arg(&size);
                 } else if i == "skip_index" {
                     kernel_execution.set_arg(&skip_index);
                 } else if i == "index_to_position" {
@@ -1163,10 +1216,14 @@ where
                         let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
                         skip_index += current_size.0 * current_size.1;
                     }
+
+                    let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
+                    let current_size = dim.0 * dim.1;
                     
                     unsafe {
                         self.execute_grid_history(
                             skip_index as u32,
+                            current_size as u32,
                             &gpu_graph, 
                             &gpu_cell_grid, 
                             gpu_grid_histories.get(key).unwrap()
