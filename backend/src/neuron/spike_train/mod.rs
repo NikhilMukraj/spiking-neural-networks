@@ -87,6 +87,83 @@ fn delta_dirac_effect(k: f32, a: f32, time_difference: f32, v_resting: f32, dt: 
 
 impl_default_neural_refractoriness!(DeltaDiracRefractoriness, delta_dirac_effect);
 
+#[cfg(feature = "gpu")]
+impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
+    fn get_refractoriness_gpu_function() -> Result<(Vec<String>, String), GPUError> {
+        let args = vec![
+            String::from("timestep"), String::from("last_firing_time"),
+            String::from("v_max"), String::from("v_resting"), 
+            String::from("k"), String::from("dt"),
+        ];
+
+        let program_source = String::from(r#"
+            float get_effect(
+                int timestep,
+                int last_firing_time,
+                float v_max,
+                float v_resting,
+                float k, 
+                float dt
+            ) {
+                float a = v_max - v_resting;
+                float time_difference = timestep - last_firing_time;
+
+                return a * exp((-1.0f / (k / dt)) * time_difference * time_difference) + v_resting;
+            }
+        "#);
+
+        Ok((args, program_source))
+    }
+    
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if grid.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        let mut buffers = HashMap::new();
+
+        create_float_buffer!(k_buffer, context, queue, grid, k, last);
+
+        buffers.insert(String::from("neural_refactoriness$k"), BufferGPU::Float(k_buffer));
+
+        Ok(buffers)
+    }
+    
+    #[allow(clippy::needless_range_loop)]
+    fn convert_to_cpu(
+        grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            grid.clear();
+
+            return Ok(());
+        }
+
+        let mut k: Vec<f32> = vec![0.0; rows * cols];
+
+        read_and_set_buffer!(buffers, queue, "neural_refractoriness$k", &mut k, Float);
+
+        for i in 0..rows {
+            for j in 0..cols {
+                let idx = i * cols + j;
+                let value = &mut grid[i][j];
+
+                value.k = k[idx];
+            }
+        }
+
+        Ok(())
+    }
+}
+
 /// Calculates refactoriness based on exponential decay
 #[derive(Debug, Clone, Copy)]
 pub struct ExponentialDecayRefractoriness {
@@ -114,15 +191,28 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
     fn get_refractoriness_function(&self) -> &Self::U;
 }
 
-// pub trait NeuralRefractorinessGPU: NeuralRefractoriness {
-//     fn refractoriness_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
-// }
+#[cfg(feature = "gpu")]
+pub trait NeuralRefractorinessGPU: NeuralRefractoriness {
+    fn get_refractoriness_gpu_function() -> Result<(Vec<String>, String), GPUError>;
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], 
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    fn convert_to_cpu(
+        grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError>;
+}
 
 #[cfg(feature = "gpu")]
 /// Handles spike train dyanmics on the GPU
 pub trait SpikeTrainGPU: SpikeTrain 
 where 
-    // Self::U: NeuralRefractorinessGPU
+    Self::U: NeuralRefractorinessGPU,
     Self::N: NeurotransmitterTypeGPU
 {
     /// Returns the compiled kernel for electrical outputs
@@ -295,7 +385,7 @@ const RAND_FUNCTION: &str = r#"
     }
 "#;
 
-impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractoriness> SpikeTrainGPU for PoissonNeuron<N, T, U> {
+impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for PoissonNeuron<N, T, U> {
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("poisson_neuron_electrical_kernel");
         let argument_names = vec![
@@ -526,6 +616,16 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         buffers.insert(String::from("last_firing_time"), BufferGPU::OptionalUInt(last_firing_time_buffer));
         buffers.insert(String::from("is_spiking"), BufferGPU::UInt(is_spiking_buffer));
         buffers.insert(String::from("seed"), BufferGPU::UInt(seed_buffer));
+
+        let refractoriness: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.neural_refractoriness.clone()).collect())
+            .collect();
+
+        let refractoriness_buffers = U::convert_to_gpu(
+            &refractoriness, context, queue
+        )?;
+
+        buffers.extend(refractoriness_buffers);
 
         Ok(buffers)
     }
