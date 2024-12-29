@@ -79,6 +79,8 @@ mod tests {
             vec![PoissonNeuron::default(), PoissonNeuron::default()],
         ];
 
+        cell_grid[0][1].neural_refractoriness.k = 1.;
+
         let mut cpu_conversion = cell_grid.clone();
 
         for row in cell_grid.iter_mut() {
@@ -148,6 +150,8 @@ mod tests {
             vec![PoissonNeuron::default(), PoissonNeuron::default()],
             vec![PoissonNeuron::default(), PoissonNeuron::default()],
         ];
+
+        cell_grid[0][1].neural_refractoriness.k = 1.;
 
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
