@@ -465,6 +465,20 @@ pub trait RunNetwork {
     fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError>;
 }
 
+/// Trait to retrieve cell grid
+pub trait CellGrid {
+    type T: IterateAndSpike;
+    /// Retrieves a reference to the cell grid
+    fn cell_grid(&self) -> &[Vec<Self::T>];
+}
+
+/// Trait to retrieve spike train grid
+pub trait SpikeTrainGrid {
+    type T: SpikeTrain;
+    /// Retrieves a reference to the spike train grid
+    fn spike_train_grid(&self) -> &[Vec<Self::T>];
+}
+
 /// Electrical inputs for internal calculations
 pub type InternalElectricalInputs = HashMap<(usize, usize), f32>;
 
@@ -1163,6 +1177,21 @@ where
     }
 }
 
+impl<N, T, U, V, W> CellGrid for Lattice<T, U, V, W, N>
+where
+    N: NeurotransmitterType,
+    T: IterateAndSpike<N = N>,
+    U: Graph<K = (usize, usize), V = f32>,
+    V: LatticeHistory,
+    W: Plasticity<T, T, f32>,
+{
+    type T = T;
+    
+    fn cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
+    }
+}
+
 impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> UnsupervisedAgent for Lattice<T, U, V, W, N> {
     fn update(&mut self) -> Result<(), AgentError> {
         match self.run_lattice(1) {
@@ -1250,11 +1279,6 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
         self.apply(|neuron| neuron.set_dt(dt));
     } 
 
-    /// Retrieves the individual cells as an immutable reference
-    pub fn cell_grid(&self) -> &[Vec<T>] {
-        &self.cell_grid
-    }
-
     /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
         self.cell_grid.iter_mut()
@@ -1295,6 +1319,14 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> R
         }
 
         Ok(())
+    }
+}
+
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> SpikeTrainGrid for SpikeTrainLattice<N, T, U> {
+    type T = T;
+    
+    fn spike_train_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
     }
 }
 
@@ -3176,6 +3208,22 @@ where
         }
 
         Ok(())
+    }
+}
+
+impl<S, T, U, V, W, N> CellGrid for RewardModulatedLattice<S, T, U, V, W, N> 
+where 
+    S: RewardModulatedWeight,
+    T: IterateAndSpike<N=N>,
+    U: Graph<K=(usize, usize), V=S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
+{
+    type T = T;
+
+    fn cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
     }
 }
 
