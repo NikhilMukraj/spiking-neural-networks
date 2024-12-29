@@ -133,7 +133,7 @@ def fill_defaults(parsed):
         parsed['variables']['gabaa_g'] = [1.2]
 
     if 's_d1' not in parsed['variables']:
-        parsed['variables']['s_d1'] = [1 / 1.5]
+        parsed['variables']['s_d1'] = [1]
     if 's_d2' not in parsed['variables']:
         parsed['variables']['s_d2'] = [0.025]
 
