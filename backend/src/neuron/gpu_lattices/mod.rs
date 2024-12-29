@@ -13,14 +13,10 @@ use crate::{
     }
 };
 use super::{
-    iterate_and_spike::{
+    impl_apply, iterate_and_spike::{
         BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
         KernelFunction, NeurotransmitterTypeGPU,
-    }, 
-    spike_train::SpikeTrainGPU,
-    plasticity::Plasticity,
-    GridVoltageHistory, RunLattice, RunNetwork, SpikeTrainLatticeHistory,
-    Lattice, LatticeHistory, Position, LatticeNetwork, SpikeTrainLattice, impl_apply
+    }, plasticity::Plasticity, spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, RunLattice, RunNetwork, SpikeTrainLattice, SpikeTrainLatticeHistory
 };
 use std::ptr;
 
@@ -837,10 +833,11 @@ pub struct LatticeNetworkGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
     V: LatticeHistory + LatticeHistoryGPU,
-    W: SpikeTrainGPU<N=N>,
+    W: SpikeTrainGPU<N=N, U=R>,
     X: SpikeTrainLatticeHistory,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
+    R: NeuralRefractorinessGPU,
     C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
 > {
     lattices: HashMap<usize, Lattice<T, U, V, Y, N>>,
@@ -857,16 +854,17 @@ pub struct LatticeNetworkGPU<
     internal_clock: usize,
 }
 
-impl<T, U, V, W, X, Y, N, C> LatticeNetworkGPU<T, U, V, W, X, Y, N, C>
+impl<T, U, V, W, X, Y, N, R, C> LatticeNetworkGPU<T, U, V, W, X, Y, N, R, C>
 where
-    T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
-    U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
+    T: IterateAndSpike<N=N> + IterateAndSpikeGPU,
+    U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>,
     V: LatticeHistory + LatticeHistoryGPU,
-    W: SpikeTrainGPU<N=N>,
+    W: SpikeTrainGPU<N=N, U=R>,
     X: SpikeTrainLatticeHistory,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
-    C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
+    R: NeuralRefractorinessGPU,
+    C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>,
 {
     // Generates a GPU lattice network given a network and a device
     pub fn from_network_given_device(
@@ -1142,6 +1140,7 @@ where
         }
 
         for _ in 0..iterations {
+            // when calculating spike train effects, pass in timestep as int
             let gap_junctions_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
 
@@ -1298,15 +1297,16 @@ where
     }
 }
 
-impl<T, U, V, W, X, Y, N, C> RunNetwork for LatticeNetworkGPU<T, U, V, W, X, Y, N, C>
+impl<T, U, V, W, X, Y, N, R, C> RunNetwork for LatticeNetworkGPU<T, U, V, W, X, Y, N, R, C>
 where
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
     V: LatticeHistory + LatticeHistoryGPU,
-    W: SpikeTrainGPU<N=N>,
+    W: SpikeTrainGPU<N=N, U=R>,
     X: SpikeTrainLatticeHistory,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
+    R: NeuralRefractorinessGPU,
     C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
 {
     fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
