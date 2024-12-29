@@ -164,6 +164,23 @@ gabaa_clearance = [0.001]
 
 ## Bayesian Inference Pipeline
 
+### Full Neuron Model
+
+$
+C_m \frac{dv}{dt} = 0.04 v^2 + 5 v + 140 - u + I_{syn} \\
+\tau_m \frac{du}{dt} = a ( b v - u ) \\
+r_x = -c_y t_y dt + H(v_{th}) t_{y_{max}} \\
+M_{D_1} = 1 - r_{D_1} s_{D_1} \\
+M_{D_2} = 1 - r_{D_2} s_{D_2} \\
+I_{AMPA} = g_{AMPA} M_{D_2} r_{AMPA} (v - E_{AMPA}) \\
+B(v) = \frac{1}{1 + \frac{e ^ (-0.062 v) [{Mg}^{2+}]}{3.75}} \\
+I_{NMDA} = g_{NMDA} M_{D_2} r_{NMDA} ^ {M_{D_1}} B(v) (v - E_{NMDA}) \\
+I_{GABAa} = g_{GABAa} r_{GABAa} (v - E_{GABAa}) \\
+I_{syn} = I_{AMPA} + I_{NMDA} + I_{GABAa}
+$
+
+### Architecture
+
 ![Bayesian inference figure](figures/bayesian_inf.svg)
 
 ### Bayesian Inference `[simulation_parameters]`
