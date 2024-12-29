@@ -133,9 +133,9 @@ def fill_defaults(parsed):
         parsed['variables']['gabaa_g'] = [1.2]
 
     if 's_d1' not in parsed['variables']:
-        parsed['variables']['s_d1'] = [1]
+        parsed['variables']['s_d1'] = [1 / 1.5]
     if 's_d2' not in parsed['variables']:
-        parsed['variables']['s_d2'] = [1 / 1.5]
+        parsed['variables']['s_d2'] = [0.025]
 
     if 'glutamate_clearance' not in parsed['variables']:
         parsed['variables']['glutamate_clearance'] = [0.001]
@@ -157,7 +157,7 @@ def generate_key(parsed, current_state):
     fields = [
         'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
         'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
-        'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2'
+        'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2',
         'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
     ]
     
