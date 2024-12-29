@@ -128,7 +128,7 @@ impl<T: ReceptorKinetics> Default for DopamineReceptor<T> {
         DopamineReceptor {
             d1_r: T::default(),
             d1_enabled: false,
-            s_d1: 1. / 1.5,
+            s_d1: 1.,
             d2_r: T::default(),
             d2_enabled: false,
             s_d2: 0.05,
