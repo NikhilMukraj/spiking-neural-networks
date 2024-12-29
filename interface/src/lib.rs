@@ -344,7 +344,7 @@ impl PyDopamineReceptor {
             d1_enabled = false,
             d2_enabled = false,
             s_d1 = 1. / 1.5,
-            s_d2 = 1.
+            s_d2 = 0.05
         )
     )]
     fn new(
