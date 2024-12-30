@@ -29,3 +29,5 @@ s_d2 = [0.05]
 prob_of_exc_to_inh = [1]
 distortion = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
 bayesian_distortion = [0]
+
+# could also rerun with 0.05 / 2 for s_d2 and 1 for bayesian_to_exc
