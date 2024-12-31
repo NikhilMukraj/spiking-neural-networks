@@ -11,9 +11,7 @@ use crate::error::GraphError;
 #[cfg(feature = "gpu")]
 use super::neuron::{
     iterate_and_spike::{IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterTypeGPU},
-    plasticity::Plasticity,
-    gpu_lattices::LatticeHistoryGPU,
-    Lattice, LatticeHistory
+    CellGrid, InternalGraph,
 };
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
@@ -22,7 +20,7 @@ use opencl3::event::Event;
 #[cfg(feature = "gpu")]
 use opencl3::{
     memory::{Buffer, CL_MEM_READ_WRITE}, 
-    types::{cl_float, cl_uint, CL_BLOCKING, CL_NON_BLOCKING}, 
+    types::{cl_float, cl_uint, cl_int, CL_BLOCKING, CL_NON_BLOCKING}, 
     command_queue::CommandQueue, context::Context,
 };
 #[cfg(feature = "gpu")]
@@ -580,7 +578,7 @@ impl ConnectingGraphToGPU<ConnectingGraphGPU> for AdjacencyMatrix<GraphPosition,
 pub struct InterleavingGraphGPU {
     pub connections: Buffer<cl_uint>,
     pub weights: Buffer<cl_float>,
-    pub index_to_position: Buffer<cl_uint>,
+    pub index_to_position: Buffer<cl_int>,
     pub associated_lattices: Buffer<cl_uint>,
     pub lattice_sizes_map: HashMap<usize, (usize, usize)>,
     pub ordered_keys: Vec<usize>,
@@ -591,15 +589,13 @@ pub struct InterleavingGraphGPU {
 impl InterleavingGraphGPU {
     fn calculate_index<
         T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
-        U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
-        V: LatticeHistory + LatticeHistoryGPU,
-        P: Plasticity<T, T, f32>,
         N: NeurotransmitterTypeGPU,
+        C: CellGrid<T=T>,
     >(
         id: usize,
         row: usize, 
         col: usize,
-        lattices: &HashMap<usize, Lattice<T, U, V, P, N>>, 
+        lattices: &HashMap<usize, C>, 
         lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         ordered_keys: &Vec<usize>,
     ) -> usize {
@@ -619,29 +615,28 @@ impl InterleavingGraphGPU {
         skip_index + row * row_len + col
     }
 
-    // trait for getting cell grid and getting internal graph (maybe as tuple)
-    // get one large adj mat and use that to represent connections
+    // modify to take in hashmap of spike train lattices
+    // spike train lattices are denoted in index to position as negative indexes
     pub fn convert_to_gpu<
         T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
         U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
-        V: LatticeHistory + LatticeHistoryGPU,
         Z: Graph<K=GraphPosition, V=f32>,
-        P: Plasticity<T, T, f32>,
         N: NeurotransmitterTypeGPU,
+        C: CellGrid<T=T> + InternalGraph<T=U>,
     >(
         context: &Context, 
         queue: &CommandQueue,
-        lattices: &HashMap<usize, Lattice<T, U, V, P, N>>, 
+        lattices: &HashMap<usize, C>, 
         connecting_graph: &Z
     ) -> Result<Self, GPUError> {
         let mut associated_lattices: Vec<u32> = vec![];
         let mut associated_lattice_sizes: Vec<u32> = vec![];
         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
-        let mut index_to_position: Vec<u32> = vec![];
+        let mut index_to_position: Vec<i32> = vec![];
         let mut cell_tracker: Vec<(usize, usize, usize)> = vec![];
 
         #[allow(clippy::type_complexity)]
-        let mut lattice_iterator: Vec<(usize, &Lattice<T, U, V, P, N>)> = lattices.iter()
+        let mut lattice_iterator: Vec<(usize, &C)> = lattices.iter()
             .map(|(&key, value)| (key, value))
             .collect();
         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
@@ -660,7 +655,7 @@ impl InterleavingGraphGPU {
 
             for i in 0..rows {
                 for j in 0..cols {
-                    index_to_position.push(skip_index + (i * rows + j) as u32);
+                    index_to_position.push(skip_index as i32 + (i * rows + j) as i32);
                     cell_tracker.push((*key, i, j));
                 }
             }
@@ -689,7 +684,7 @@ impl InterleavingGraphGPU {
                 );
 
                 if *id == *id_post {
-                    match lattices.get(id).unwrap().graph().lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
+                    match lattices.get(id).unwrap().internal_graph().lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
                         Ok(Some(val)) => { 
                             connections[index][index_post] = 1;
                             weights[index][index_post] = val; 
@@ -717,7 +712,7 @@ impl InterleavingGraphGPU {
         let mut connections_buffer = unsafe { create_buffer::<cl_uint>(context, size * size)? };
         let mut weights_buffer = unsafe { create_buffer::<cl_float>(context, size * size)? };
         let mut associated_lattices_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
-        let mut index_to_position_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
+        let mut index_to_position_buffer = unsafe { create_buffer::<cl_int>(context, size)? };
 
         let _connections_write_event = unsafe { write_to_buffer(queue, &mut connections_buffer, &connections)? };
         let _weights_write_event = unsafe { write_to_buffer(queue, &mut weights_buffer, &weights)? };
@@ -747,14 +742,13 @@ impl InterleavingGraphGPU {
     pub fn convert_to_cpu<
         T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
         U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
-        V: LatticeHistory + LatticeHistoryGPU,
         Z: Graph<K=GraphPosition, V=f32>,
-        P: Plasticity<T, T, f32>,
         N: NeurotransmitterTypeGPU,
+        C: CellGrid<T=T> + InternalGraph<T=U>,
     >(
         queue: &CommandQueue,
         gpu_graph: &InterleavingGraphGPU,
-        lattices: &mut HashMap<usize, Lattice<T, U, V, P, N>>, 
+        lattices: &mut HashMap<usize, C>, 
         connecting_graph: &mut Z
     ) -> Result<(), GPUError> {
         let length = gpu_graph.size;
@@ -762,7 +756,7 @@ impl InterleavingGraphGPU {
         let mut connections: Vec<cl_uint> = vec![0; length * length];
         let mut weights: Vec<cl_float> = vec![0.0; length * length];
         let mut associated_lattices: Vec<u32> = vec![0; length];
-        let mut index_to_position: Vec<u32> = vec![0; length];
+        let mut index_to_position: Vec<i32> = vec![0; length];
 
         let _associated_lattices_read_event = unsafe {
             match queue.enqueue_read_buffer(&gpu_graph.associated_lattices, CL_NON_BLOCKING, 0, &mut associated_lattices, &[]) {
@@ -849,7 +843,7 @@ impl InterleavingGraphGPU {
         }
 
         for (key, value) in graphs.into_iter() {
-            lattices.get_mut(&key).unwrap().set_graph(value).expect("Valid graph mutation");
+            lattices.get_mut(&key).unwrap().set_internal_graph(value).expect("Valid graph mutation");
         }
 
         Ok(())
