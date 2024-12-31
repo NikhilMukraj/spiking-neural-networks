@@ -297,17 +297,22 @@ for current_state in tqdm(all_states):
             cue_lattice = ln.DopaPoissonLattice(c2)
             cue_lattice.populate(poisson, exc_n, exc_n)
 
-            # if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                # dopa_neuron = ln.DopaIzhikevichNeuron()
-                # dopa_neuron.set_neurotransmitters(dopa_neurotransmitters)
-                # dopa_neuron.set_receptors(receptors)
+            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                dopa_neuron = ln.DopaIzhikevichNeuron()
+                dopa_neuron.set_neurotransmitters(dopa_neurotransmitters)
+                dopa_neuron.set_receptors(receptors)
 
-                # d_intermediate = ln.DopaPoissonLattice(d)
-                # d_intermediate.populate(dopa_neuron, exc_n, exc_n)
+                d_intermediate = ln.DopaPoissonLattice(d)
+                d_intermediate.populate(dopa_neuron, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            current_lattices = [exc_lattice, inh_lattice, exc_lattice_2, inh_lattice_2]
+
+            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                current_lattices.append(d_intermediate)
+
             network = ln.DopaIzhikevichNetwork.generate_network(
-                [exc_lattice, inh_lattice, exc_lattice_2, inh_lattice_2], 
+                current_lattices, 
                 [spike_train_lattice, cue_lattice],
             )
         else:
@@ -339,27 +344,19 @@ for current_state in tqdm(all_states):
         network.connect(c1, e1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            network.connect(
-                i2, e2, 
-                lambda x, y: True, 
-                lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
-            )
-            network.connect(
-                e2, i2, 
-                lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
-                lambda x, y: current_state['exc_to_inh'],
-            )
-
-            network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
-
             e2_to_e1_mapping = {}
             current_pointer = -1
+
+            if parsed_toml['simulation_parameters']['d2']:
+                patterns_to_use = [np.logical_not(i).astype(int) for i in patterns]
+            else:
+                patterns_to_use = patterns  
 
             for n1, i in enumerate(bayesian_memory_patterns[bayesian_memory_pattern]):
                 if i == 0:
                     continue
 
-                to_iterate = list(enumerate(patterns[pattern2]))[current_pointer+1:]
+                to_iterate = list(enumerate(patterns_to_use[pattern2]))[current_pointer+1:]
 
                 if len(to_iterate) == 0:
                     break
@@ -374,14 +371,47 @@ for current_state in tqdm(all_states):
                 e2_to_e1_mapping[n1] = current_pointer
 
             network.connect(
-                e2, 
-                e1, 
-                lambda x, y: bool(
-                    x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
-                    y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
-                ), 
-                lambda x, y: current_state['bayesian_to_exc']
+                i2, e2, 
+                lambda x, y: True, 
+                lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
             )
+            network.connect(
+                e2, i2, 
+                lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
+                lambda x, y: current_state['exc_to_inh'],
+            )
+
+            network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
+
+            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                network.connect(
+                    e2, 
+                    d, 
+                    lambda x, y: bool(
+                        x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                        y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
+                    ), 
+                    lambda x, y: current_state['bayesian_to_exc']
+                )
+                network.connect(
+                    d, 
+                    e1, 
+                    lambda x, y: bool(
+                        x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                        y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
+                    ), 
+                    lambda x, y: current_state['bayesian_to_exc']
+                )
+            else:
+                network.connect(
+                    e2, 
+                    e1, 
+                    lambda x, y: bool(
+                        x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                        y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
+                    ), 
+                    lambda x, y: current_state['bayesian_to_exc']
+                )
         else:
             network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
