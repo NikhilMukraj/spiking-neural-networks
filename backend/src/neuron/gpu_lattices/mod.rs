@@ -784,6 +784,10 @@ where
     N: NeurotransmitterTypeGPU,
 {
     fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
+        if self.cell_grid.is_empty() || self.cell_grid.first().unwrap_or(&vec![]).is_empty() {
+            return Ok(());
+        }
+
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattice_electrical_synapses(iterations).map_err(Into::into),
             (false, true) => self.run_lattice_chemical_synapses(iterations).map_err(Into::into),
@@ -797,7 +801,7 @@ const NETWORK_ELECTRICAL_INPUTS_KERNEL: &str = r#"
 __kernel void calculate_network_electrical_inputs(
     __global const uint *connections, 
     __global const float *weights, 
-    __global const uint *index_to_position,
+    __global const int *index_to_position,
     __global const float *gap_conductances,
     __global const float *voltages,
     uint n, 
@@ -1141,6 +1145,7 @@ where
 
         for _ in 0..iterations {
             // when calculating spike train effects, pass in timestep as int
+            // use this kernel if no spike trains, otherwise use one that accounts for it
             let gap_junctions_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
 
@@ -1172,6 +1177,7 @@ where
                 Err(_) => return Err(GPUError::WaitError),
             };
 
+            // only execute if there exists lattices, same with spike train lattices
             let iterate_event = unsafe {
                 let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
 
@@ -1310,6 +1316,10 @@ where
     C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
 {
     fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
+        if self.lattices.is_empty() && self.spike_train_lattices.is_empty() {
+            return Ok(());
+        }
+
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattices_with_electrical_synapses(iterations).map_err(Into::into),
             (false, true) => todo!(),
