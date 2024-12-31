@@ -196,6 +196,8 @@ all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for 
 
 print(json.dumps(parsed_toml, indent=4))
 
+np.seterr(divide='ignore', invalid='ignore')
+
 simulation_output = {}
 
 i1 = 0
@@ -204,6 +206,7 @@ c1 = 2
 c2 = 3
 i2 = 4
 e2 = 5
+d = 6
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
@@ -293,6 +296,14 @@ for current_state in tqdm(all_states):
 
             cue_lattice = ln.DopaPoissonLattice(c2)
             cue_lattice.populate(poisson, exc_n, exc_n)
+
+            # if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                # dopa_neuron = ln.DopaIzhikevichNeuron()
+                # dopa_neuron.set_neurotransmitters(dopa_neurotransmitters)
+                # dopa_neuron.set_receptors(receptors)
+
+                # d_intermediate = ln.DopaPoissonLattice(d)
+                # d_intermediate.populate(dopa_neuron, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network = ln.DopaIzhikevichNetwork.generate_network(
