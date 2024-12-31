@@ -479,6 +479,15 @@ pub trait SpikeTrainGrid {
     fn spike_train_grid(&self) -> &[Vec<Self::T>];
 }
 
+/// Trait to retrieve an internal graph
+pub trait InternalGraph {
+    type T: Graph<K=Position, V=f32>;
+    /// Retrieves a reference to the internal graph
+    fn internal_graph(&self) -> &Self::T;
+    /// Sets the internal graph if it is a valid graph for the given lattice
+    fn set_internal_graph(&mut self, new_graph: Self::T) -> Result<(), GraphError>;
+}
+
 /// Electrical inputs for internal calculations
 pub type InternalElectricalInputs = HashMap<(usize, usize), f32>;
 
@@ -1189,6 +1198,25 @@ where
     
     fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
+    }
+}
+
+impl<N, T, U, V, W> InternalGraph for Lattice<T, U, V, W, N>
+where
+    N: NeurotransmitterType,
+    T: IterateAndSpike<N = N>,
+    U: Graph<K = (usize, usize), V = f32>,
+    V: LatticeHistory,
+    W: Plasticity<T, T, f32>,
+{
+    type T = U;
+    
+    fn internal_graph(&self) -> &U {
+        self.graph()
+    }
+
+    fn set_internal_graph(&mut self, new_graph: Self::T) -> Result<(), GraphError> {
+        self.set_graph(new_graph)
     }
 }
 
