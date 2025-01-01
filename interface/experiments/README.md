@@ -22,6 +22,8 @@
 - [ ] Small world simulation
   - [ ] Simulating multiple memories biasing each other with no dopamine modulation
   - [ ] Simulating multiple memories biasing each other with dopamine modulation
+    - D2 antagonism could be modeled by lowering dopamine concentration overall ($t_{max}$ or clearance) or receptor max or modulating $s_{D_2}$, D2 hyperactivity should cause hallucination
+  - [ ] Should check to see how easily changes propagate throughout the network and how much time it takes
   - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
 - [ ] Liquid state machine
   - [ ] Basic liquid dynamics
