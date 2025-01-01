@@ -582,6 +582,8 @@ pub struct InterleavingGraphGPU {
     pub associated_lattices: Buffer<cl_uint>,
     pub lattice_sizes_map: HashMap<usize, (usize, usize)>,
     pub ordered_keys: Vec<usize>,
+    // pub spike_train_ordered_keys: Vec<usize>,
+    // pub spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)>,
     pub size: usize,
 }
 
@@ -623,10 +625,13 @@ impl InterleavingGraphGPU {
         Z: Graph<K=GraphPosition, V=f32>,
         N: NeurotransmitterTypeGPU,
         C: CellGrid<T=T> + InternalGraph<T=U>,
+        // S: SpikeTrainGPU<N=N>,
+        // G: CellGrid<T=S>,
     >(
         context: &Context, 
         queue: &CommandQueue,
-        lattices: &HashMap<usize, C>, 
+        lattices: &HashMap<usize, C>,
+        // spike_train_lattices: &HashMap<usize, G>, 
         connecting_graph: &Z
     ) -> Result<Self, GPUError> {
         let mut associated_lattices: Vec<u32> = vec![];
@@ -635,12 +640,17 @@ impl InterleavingGraphGPU {
         let mut index_to_position: Vec<i32> = vec![];
         let mut cell_tracker: Vec<(usize, usize, usize)> = vec![];
 
-        #[allow(clippy::type_complexity)]
         let mut lattice_iterator: Vec<(usize, &C)> = lattices.iter()
             .map(|(&key, value)| (key, value))
             .collect();
         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
         let ordered_keys: Vec<_> = lattice_iterator.iter().map(|i| i.0).collect();
+
+        // let mut spike_train_lattice_iterator: Vec<(usize, &G)> = spike_train_lattices.iter()
+        //     .map(|(&key, value)| (key, value))
+        //     .collect();
+        // spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        // let spike_train_ordered_keys: Vec<_> = spike_train_lattice_iterator.iter().map(|i| i.0).collect();
 
         for (key, value) in &lattice_iterator {
             let mut skip_index = 0;
@@ -745,10 +755,13 @@ impl InterleavingGraphGPU {
         Z: Graph<K=GraphPosition, V=f32>,
         N: NeurotransmitterTypeGPU,
         C: CellGrid<T=T> + InternalGraph<T=U>,
+        // S: SpikeTrainGPU<N=N>,
+        // G: CellGrid<T=S>,
     >(
         queue: &CommandQueue,
         gpu_graph: &InterleavingGraphGPU,
         lattices: &mut HashMap<usize, C>, 
+        // spike_train_lattices: &mut HashMap<usize, G>, 
         connecting_graph: &mut Z
     ) -> Result<(), GPUError> {
         let length = gpu_graph.size;
