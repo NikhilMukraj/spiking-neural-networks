@@ -41,6 +41,9 @@
       - [ ] Dopamine modifier for NMDA
   - [ ] Small world simulation where liquid and memory interact
 - [ ] Repeat experiments with more detailed ion channel models and vary ion channel conductances
+  - [ ] Hodgkin-Huxley
+  - [ ] Morris-Lecar
+  - [ ] Two-compartment Model
   - [ ] Could also vary $Mg^{2+}$
 
 ## Schizophrenia Simulation Pipeline
