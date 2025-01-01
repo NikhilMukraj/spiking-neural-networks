@@ -6,28 +6,30 @@
 - [x] Varying ionotropic neurotransmitters
   - [x] Glutamate clearance
   - [x] GABA clearance
-  - [ ] NMDA/AMPA clearance
+  - [X] NMDA/AMPA clearance
   - [ ] NMDA, AMPA, GABAa $g_max$
 - [ ] $D_1$ and $D_2$ model implementation for gain modulation on NMDA and AMPA
-  - [ ] Method to vary effect of dopamine concentration (probably through NMDA and AMPA modifier)
+  - [X] Method to vary effect of dopamine concentration (probably through NMDA and AMPA modifier)
+  - [ ] $D_1$ modulation through glutamate concentration variation
 - [ ] Bayesian inference with no gain modulation
-  - [ ] Emotional cue modulates selection of memory
-  - [ ] Existing memory modulates selection of memory
+  - [X] Emotional cue modulates selection of memory
+  - [X] Existing memory modulates selection of memory
   - [ ] Could vary ionotropic neurotransmitters
     - Should see changes in accuracy
 - [ ] Bayesian inference with gain modulation
-  - [ ] Emotional cue modulates select of memory with dopamine mechanism
-  - [ ] Existing memory modulates selection of memory with dopamine mechanism
+  - [X] Emotional cue modulates select of memory with dopamine mechanism
+  - [X] Existing memory modulates selection of memory with dopamine mechanism
   - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
 - [ ] Small world simulation
   - [ ] Simulating multiple memories biasing each other with no dopamine modulation
   - [ ] Simulating multiple memories biasing each other with dopamine modulation
-    - D2 antagonism could be modeled by lowering dopamine concentration overall ($t_{max}$ or clearance) or receptor max or modulating $s_{D_2}$, D2 hyperactivity should cause hallucination
+    - $D_2$ antagonism could be modeled by lowering dopamine concentration overall ($t_{max}$ or clearance) or receptor max or modulating $s_{D_2}$, $D_2$ hyperactivity should cause hallucination
   - [ ] Should check to see how easily changes propagate throughout the network and how much time it takes
   - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
 - [ ] Liquid state machine
   - [ ] Basic liquid dynamics
   - [ ] STDP based learning of MNIST
+    - Readout has plastic connections to liquid, average neural activity of readout is used to classify
   - [ ] Varying ionotropic neurotransmitters
     - [ ] Glutamate clearance
     - [ ] GABA clearance
