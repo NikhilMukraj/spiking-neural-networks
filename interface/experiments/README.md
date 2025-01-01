@@ -1,5 +1,10 @@
 # README
 
+## Current Todo List
+
+- [ ] Bayesian inference with varied ionotropic neurotransmitters
+- [ ] Basic liquid implementation
+
 ## Todo
 
 - [x] Simulation pipeline for simulating a presentation of a cue and state transitioning
