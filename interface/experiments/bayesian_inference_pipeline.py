@@ -302,7 +302,7 @@ for current_state in tqdm(all_states):
                 dopa_neuron.set_neurotransmitters(dopa_neurotransmitters)
                 dopa_neuron.set_receptors(receptors)
 
-                d_intermediate = ln.DopaPoissonLattice(d)
+                d_intermediate = ln.DopaIzhikevichLattice(d)
                 d_intermediate.populate(dopa_neuron, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
