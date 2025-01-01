@@ -1320,6 +1320,11 @@ where
             return Ok(());
         }
 
+        if self.lattices.values().all(|i| i.cell_grid.is_empty()) && 
+            self.spike_train_lattices.values().all(|i| i.cell_grid.is_empty()) {
+                return Ok(());
+        }
+
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattices_with_electrical_synapses(iterations).map_err(Into::into),
             (false, true) => todo!(),
