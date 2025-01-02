@@ -82,7 +82,9 @@ mod tests {
 
         let connecting_graph = network.get_connecting_graph();
 
-        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(&context, &queue, network.get_lattices(), connecting_graph)?;
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
+            &context, &queue, network.get_lattices(), network.get_spike_train_lattices(), connecting_graph
+        )?;
 
         let mut editable_connecting_graph = AdjacencyMatrix::<GraphPosition, f32>::default();
         let mut editable_lattices: HashMap<usize, _> = network.get_all_lattice_ids()
@@ -135,4 +137,19 @@ mod tests {
 
         Ok(())
     }
+
+    // #[test]
+    // pub fn test_graph_conversion_connected_lattices() -> Result<(), SpikingNeuralNetworksError> {
+
+    // }
+
+    // #[test]
+    // pub fn test_graph_conversion_spike_train_lattices() -> Result<(), SpikingNeuralNetworksError> {
+        
+    // }
+
+    // #[test]
+    // pub fn test_graph_conversion_spike_train_and_regular_lattices() -> Result<(), SpikingNeuralNetworksError> {
+
+    // }
 }
