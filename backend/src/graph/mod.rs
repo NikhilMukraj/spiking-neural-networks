@@ -11,7 +11,8 @@ use crate::error::GraphError;
 #[cfg(feature = "gpu")]
 use super::neuron::{
     iterate_and_spike::{IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterTypeGPU},
-    CellGrid, InternalGraph,
+    spike_train::{SpikeTrainGPU, NeuralRefractorinessGPU},
+    CellGrid, InternalGraph, SpikeTrainGrid,
 };
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
@@ -579,11 +580,11 @@ pub struct InterleavingGraphGPU {
     pub connections: Buffer<cl_uint>,
     pub weights: Buffer<cl_float>,
     pub index_to_position: Buffer<cl_int>,
-    pub associated_lattices: Buffer<cl_uint>,
+    pub is_spike_train: Buffer<cl_uint>,
     pub lattice_sizes_map: HashMap<usize, (usize, usize)>,
     pub ordered_keys: Vec<usize>,
-    // pub spike_train_ordered_keys: Vec<usize>,
-    // pub spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)>,
+    pub spike_train_ordered_keys: Vec<usize>,
+    pub spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)>,
     pub size: usize,
 }
 
@@ -617,6 +618,35 @@ impl InterleavingGraphGPU {
         skip_index + row * row_len + col
     }
 
+    fn calculate_index_spike_train<
+        T: SpikeTrainGPU<N=N, U=R>, 
+        R: NeuralRefractorinessGPU,
+        N: NeurotransmitterTypeGPU,
+        C: SpikeTrainGrid<T=T>,
+    >(
+        id: usize,
+        row: usize, 
+        col: usize,
+        lattices: &HashMap<usize, C>, 
+        lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
+        ordered_keys: &Vec<usize>,
+    ) -> usize {
+        let current_group = lattices.get(&id).unwrap();
+                    
+        let mut skip_index = 0;
+        for i in ordered_keys {
+            if *i >= id {
+                break;
+            }
+            let current_size = lattice_sizes_map.get(i).unwrap();
+            skip_index += current_size.0 * current_size.1;
+        }
+
+        let row_len = current_group.spike_train_grid().first().unwrap_or(&vec![]).len();
+        
+        skip_index + row * row_len + col
+    }
+
     // modify to take in hashmap of spike train lattices
     // spike train lattices are denoted in index to position as negative indexes
     pub fn convert_to_gpu<
@@ -625,20 +655,23 @@ impl InterleavingGraphGPU {
         Z: Graph<K=GraphPosition, V=f32>,
         N: NeurotransmitterTypeGPU,
         C: CellGrid<T=T> + InternalGraph<T=U>,
-        // S: SpikeTrainGPU<N=N>,
-        // G: CellGrid<T=S>,
+        S: SpikeTrainGPU<N=N, U=R>,
+        R: NeuralRefractorinessGPU,
+        G: SpikeTrainGrid<T=S>,
     >(
         context: &Context, 
         queue: &CommandQueue,
         lattices: &HashMap<usize, C>,
-        // spike_train_lattices: &HashMap<usize, G>, 
+        spike_train_lattices: &HashMap<usize, G>, 
         connecting_graph: &Z
     ) -> Result<Self, GPUError> {
-        let mut associated_lattices: Vec<u32> = vec![];
         let mut associated_lattice_sizes: Vec<u32> = vec![];
+        let mut associated_spike_train_lattice_sizes: Vec<u32> = vec![];
         let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+        let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
         let mut index_to_position: Vec<i32> = vec![];
-        let mut cell_tracker: Vec<(usize, usize, usize)> = vec![];
+        let mut is_spike_train: Vec<u32> = vec![];
+        let mut cell_tracker: Vec<(usize, usize, usize, bool)> = vec![];
 
         let mut lattice_iterator: Vec<(usize, &C)> = lattices.iter()
             .map(|(&key, value)| (key, value))
@@ -646,11 +679,11 @@ impl InterleavingGraphGPU {
         lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
         let ordered_keys: Vec<_> = lattice_iterator.iter().map(|i| i.0).collect();
 
-        // let mut spike_train_lattice_iterator: Vec<(usize, &G)> = spike_train_lattices.iter()
-        //     .map(|(&key, value)| (key, value))
-        //     .collect();
-        // spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
-        // let spike_train_ordered_keys: Vec<_> = spike_train_lattice_iterator.iter().map(|i| i.0).collect();
+        let mut spike_train_lattice_iterator: Vec<(usize, &G)> = spike_train_lattices.iter()
+            .map(|(&key, value)| (key, value))
+            .collect();
+        spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        let spike_train_ordered_keys: Vec<_> = spike_train_lattice_iterator.iter().map(|i| i.0).collect();
 
         for (key, value) in &lattice_iterator {
             let mut skip_index = 0;
@@ -666,13 +699,36 @@ impl InterleavingGraphGPU {
             for i in 0..rows {
                 for j in 0..cols {
                     index_to_position.push(skip_index as i32 + (i * rows + j) as i32);
-                    cell_tracker.push((*key, i, j));
+                    is_spike_train.push(0);
+                    cell_tracker.push((*key, i, j, false));
                 }
             }
 
-            associated_lattices.push(*key as u32);
             associated_lattice_sizes.push((rows * cols) as u32);
             lattice_sizes_map.insert(*key, (rows, cols));
+        }
+
+        for (key, value) in &spike_train_lattice_iterator {
+            let mut skip_index = 0;
+
+            for i in associated_lattice_sizes.iter() {
+                skip_index += i;
+            }
+
+            let current_cell_grid = value.spike_train_grid();    
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+
+            for i in 0..rows {
+                for j in 0..cols {
+                    index_to_position.push(skip_index as i32 + (i * rows + j) as i32);
+                    is_spike_train.push(1);
+                    cell_tracker.push((*key, i, j, false));
+                }
+            }
+
+            associated_spike_train_lattice_sizes.push((rows * cols) as u32);
+            spike_train_lattice_sizes_map.insert(*key, (rows, cols));
         }
 
         let size = index_to_position.len();
@@ -684,11 +740,22 @@ impl InterleavingGraphGPU {
             .map(|_| (0..size).map(|_| 0).collect())
             .collect();
 
-        for (id, row, col) in cell_tracker.iter() {
-            for (id_post, row_post, col_post) in cell_tracker.iter() {
-                let index = Self::calculate_index(
-                    *id, *row, *col, lattices, &lattice_sizes_map, &ordered_keys
-                );
+        for (id, row, col, current_is_spike_train) in cell_tracker.iter() {
+            for (id_post, row_post, col_post, current_is_spike_train_post) in cell_tracker.iter() {
+                if *current_is_spike_train_post {
+                    continue;
+                }
+
+                let index = if !current_is_spike_train {
+                    Self::calculate_index(
+                        *id, *row, *col, lattices, &lattice_sizes_map, &ordered_keys
+                    )
+                } else {
+                    Self::calculate_index_spike_train(
+                        *id, *row, *col, 
+                        spike_train_lattices, &spike_train_lattice_sizes_map, &spike_train_ordered_keys
+                    )
+                };
                 let index_post = Self::calculate_index(
                     *id, *row_post, *col_post, lattices, &lattice_sizes_map, &ordered_keys
                 );
@@ -721,13 +788,13 @@ impl InterleavingGraphGPU {
 
         let mut connections_buffer = unsafe { create_buffer::<cl_uint>(context, size * size)? };
         let mut weights_buffer = unsafe { create_buffer::<cl_float>(context, size * size)? };
-        let mut associated_lattices_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
         let mut index_to_position_buffer = unsafe { create_buffer::<cl_int>(context, size)? };
+        let mut is_spike_train_buffer = unsafe { create_buffer::<cl_uint>(context, size)? };
 
         let _connections_write_event = unsafe { write_to_buffer(queue, &mut connections_buffer, &connections)? };
         let _weights_write_event = unsafe { write_to_buffer(queue, &mut weights_buffer, &weights)? };
-        let _associated_lattices_write_event =
-            unsafe { write_to_buffer(queue, &mut associated_lattices_buffer, &associated_lattices)? };
+        let _is_spike_train_write_event =
+            unsafe { write_to_buffer(queue, &mut is_spike_train_buffer, &is_spike_train)? };
         let index_to_position_write_event =
             unsafe { write_to_buffer(queue, &mut index_to_position_buffer, &index_to_position)? };
 
@@ -741,9 +808,11 @@ impl InterleavingGraphGPU {
                 connections: connections_buffer,
                 weights: weights_buffer,
                 index_to_position: index_to_position_buffer,
-                associated_lattices: associated_lattices_buffer,
+                is_spike_train: is_spike_train_buffer,
                 lattice_sizes_map,
+                spike_train_lattice_sizes_map,
                 ordered_keys,
+                spike_train_ordered_keys,
                 size,
             }
         )
@@ -768,15 +837,8 @@ impl InterleavingGraphGPU {
 
         let mut connections: Vec<cl_uint> = vec![0; length * length];
         let mut weights: Vec<cl_float> = vec![0.0; length * length];
-        let mut associated_lattices: Vec<u32> = vec![0; length];
         let mut index_to_position: Vec<i32> = vec![0; length];
 
-        let _associated_lattices_read_event = unsafe {
-            match queue.enqueue_read_buffer(&gpu_graph.associated_lattices, CL_NON_BLOCKING, 0, &mut associated_lattices, &[]) {
-                Ok(value) => value,
-                Err(_) => return Err(GPUError::BufferReadError),
-            }
-        };
         let _connections_read_event = unsafe {
             match queue.enqueue_read_buffer(&gpu_graph.connections, CL_NON_BLOCKING, 0, &mut connections, &[]) {
                 Ok(value) => value,
