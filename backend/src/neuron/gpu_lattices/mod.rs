@@ -1122,7 +1122,7 @@ where
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
 
         let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
-            &self.context, &self.queue, &self.lattices, &self.connecting_graph
+            &self.context, &self.queue, &self.lattices, &self.spike_train_lattices, &self.connecting_graph
         )?;
 
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context)?;
