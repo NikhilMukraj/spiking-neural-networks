@@ -618,27 +618,35 @@ impl InterleavingGraphGPU {
         skip_index + row * row_len + col
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn calculate_index_spike_train<
-        T: SpikeTrainGPU<N=N, U=R>, 
+        S: SpikeTrainGPU<N=N, U=R>, 
         R: NeuralRefractorinessGPU,
         N: NeurotransmitterTypeGPU,
-        C: SpikeTrainGrid<T=T>,
+        C: SpikeTrainGrid<T=S>,
     >(
         id: usize,
         row: usize, 
         col: usize,
-        lattices: &HashMap<usize, C>, 
         lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         ordered_keys: &Vec<usize>,
+        spike_train_lattices: &HashMap<usize, C>, 
+        spike_train_lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
+        spike_train_ordered_keys: &Vec<usize>,
     ) -> usize {
-        let current_group = lattices.get(&id).unwrap();
+        let current_group = spike_train_lattices.get(&id).unwrap();
                     
         let mut skip_index = 0;
         for i in ordered_keys {
+            let current_size = lattice_sizes_map.get(i).unwrap();
+            skip_index += current_size.0 * current_size.1;
+        }
+        for i in spike_train_ordered_keys {
             if *i >= id {
                 break;
             }
-            let current_size = lattice_sizes_map.get(i).unwrap();
+
+            let current_size = spike_train_lattice_sizes_map.get(i).unwrap();
             skip_index += current_size.0 * current_size.1;
         }
 
@@ -723,7 +731,7 @@ impl InterleavingGraphGPU {
                 for j in 0..cols {
                     index_to_position.push(skip_index as i32 + (i * rows + j) as i32);
                     is_spike_train.push(1);
-                    cell_tracker.push((*key, i, j, false));
+                    cell_tracker.push((*key, i, j, true));
                 }
             }
 
@@ -753,6 +761,7 @@ impl InterleavingGraphGPU {
                 } else {
                     Self::calculate_index_spike_train(
                         *id, *row, *col, 
+                        &lattice_sizes_map, &ordered_keys,
                         spike_train_lattices, &spike_train_lattice_sizes_map, &spike_train_ordered_keys
                     )
                 };
@@ -914,6 +923,7 @@ impl InterleavingGraphGPU {
                 } else {
                     Self::calculate_index_spike_train(
                         i.id, i.pos.0, i.pos.1, 
+                        &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys,
                         spike_train_lattices, &gpu_graph.spike_train_lattice_sizes_map, &gpu_graph.spike_train_ordered_keys
                     )
                 };
