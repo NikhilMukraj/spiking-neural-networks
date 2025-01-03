@@ -88,11 +88,14 @@ def skewed_random(x, y, skew_factor=1, size=1):
     
     return x + rand * (y - x)
 
-def setup_neuron(neuron):
-    neuron.current_voltage = skewed_random(-65, 30, 0.1)[0]
-    neuron.c_m = 25
+def generate_setup_neuron(c_m=25, skew_factor=0.1):
+    def setup_neuron(neuron):
+        neuron.current_voltage = skewed_random(-65, 30, skew_factor)[0]
+        neuron.c_m = c_m
 
-    return neuron
+        return neuron
+
+    return setup_neuron
 
 def reset_spike_train(neuron):
     neuron.chance_of_firing = 0
