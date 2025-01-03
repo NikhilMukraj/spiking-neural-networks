@@ -757,7 +757,7 @@ impl InterleavingGraphGPU {
                     )
                 };
                 let index_post = Self::calculate_index(
-                    *id, *row_post, *col_post, lattices, &lattice_sizes_map, &ordered_keys
+                    *id_post, *row_post, *col_post, lattices, &lattice_sizes_map, &ordered_keys
                 );
 
                 if *id == *id_post {
@@ -824,13 +824,14 @@ impl InterleavingGraphGPU {
         Z: Graph<K=GraphPosition, V=f32>,
         N: NeurotransmitterTypeGPU,
         C: CellGrid<T=T> + InternalGraph<T=U>,
-        // S: SpikeTrainGPU<N=N>,
-        // G: CellGrid<T=S>,
+        S: SpikeTrainGPU<N=N, U=R>,
+        R: NeuralRefractorinessGPU,
+        G: SpikeTrainGrid<T=S>,
     >(
         queue: &CommandQueue,
         gpu_graph: &InterleavingGraphGPU,
         lattices: &mut HashMap<usize, C>, 
-        // spike_train_lattices: &mut HashMap<usize, G>, 
+        spike_train_lattices: &mut HashMap<usize, G>, 
         connecting_graph: &mut Z
     ) -> Result<(), GPUError> {
         let length = gpu_graph.size;
@@ -879,18 +880,43 @@ impl InterleavingGraphGPU {
             }
         }
 
-        let processed_weights: Vec<Vec<f32>> = weights.chunks(index_to_position.len())
+        for key in &gpu_graph.spike_train_ordered_keys {
+            let current_cell_grid = spike_train_lattices.get(key).unwrap().spike_train_grid();    
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+
+            for i in 0..rows {
+                for j in 0..cols {
+                    processed_index_to_position.push(
+                        GraphPosition { id: *key, pos: (i, j) }
+                    );
+                }
+            }
+        }
+
+        let processed_weights: Vec<Vec<f32>> = weights.chunks(gpu_graph.size)
             .map(|chunk| chunk.to_vec()).collect();
-        let processed_connections: Vec<Vec<u32>> = connections.chunks(index_to_position.len())
+        let processed_connections: Vec<Vec<u32>> = connections.chunks(gpu_graph.size)
             .map(|chunk| chunk.to_vec()).collect();
 
         let mut graphs: HashMap<usize, U> = HashMap::new();
 
         for i in processed_index_to_position.iter() {
             for j in processed_index_to_position.iter() {
-                let index = Self::calculate_index(
-                    i.id, i.pos.0, i.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
-                );
+                if gpu_graph.spike_train_ordered_keys.contains(&j.id) {
+                    continue;
+                }
+
+                let index = if gpu_graph.ordered_keys.contains(&i.id) {
+                    Self::calculate_index(
+                        i.id, i.pos.0, i.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                    )
+                } else {
+                    Self::calculate_index_spike_train(
+                        i.id, i.pos.0, i.pos.1, 
+                        spike_train_lattices, &gpu_graph.spike_train_lattice_sizes_map, &gpu_graph.spike_train_ordered_keys
+                    )
+                };
                 let index_post = Self::calculate_index(
                     j.id, j.pos.0, j.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
                 );
@@ -918,7 +944,9 @@ impl InterleavingGraphGPU {
         }
 
         for (key, value) in graphs.into_iter() {
-            lattices.get_mut(&key).unwrap().set_internal_graph(value).expect("Valid graph mutation");
+            if lattices.contains_key(&key) {
+                lattices.get_mut(&key).unwrap().set_internal_graph(value).expect("Valid graph mutation");
+            }
         }
 
         Ok(())
