@@ -12,7 +12,7 @@ import scipy
 from tqdm import tqdm
 from pipeline_setup import parse_toml, try_max, generate_key_helper
 from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_patterns
-from pipeline_setup import calculate_correlation, skewed_random, setup_neuron
+from pipeline_setup import calculate_correlation, skewed_random, generate_setup_neuron
 from pipeline_setup import reset_spike_train, get_spike_train_setup_function
 from pipeline_setup import get_spike_train_same_firing_rate_setup, get_noisy_spike_train_setup_function
 from pipeline_setup import find_peaks_above_threshold, acc, signal_to_noise, determine_accuracy
@@ -175,6 +175,11 @@ exc_n = parsed_toml['simulation_parameters']['exc_n']
 num = exc_n * exc_n
 
 inh_n = parsed_toml['simulation_parameters']['inh_n']
+
+setup_neuron = generate_setup_neuron(
+    parsed_toml['simulation_parameters']['c_m'], 
+    0.1,
+)
 
 p_on = 0.5
 num_patterns = parsed_toml['simulation_parameters']['num_patterns']
