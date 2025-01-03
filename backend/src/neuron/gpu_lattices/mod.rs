@@ -1296,7 +1296,7 @@ where
         }
 
         InterleavingGraphGPU::convert_to_cpu(
-            &self.queue, &gpu_graph, &mut self.lattices, &mut self.connecting_graph
+            &self.queue, &gpu_graph, &mut self.lattices, &mut self.spike_train_lattices, &mut self.connecting_graph
         )?;
 
         Ok(())
