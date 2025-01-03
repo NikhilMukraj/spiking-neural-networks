@@ -797,6 +797,14 @@ where
     }
 }
 
+// pub trait SpikeTrainLatticeHistoryGPU: SpikeTrainLatticeHistory {
+//     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
+//     fn add_from_gpu(
+//         &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
+//     ) -> Result<(), GPUError>;  
+// }
+
 const NETWORK_ELECTRICAL_INPUTS_KERNEL: &str = r#"
 __kernel void calculate_network_electrical_inputs(
     __global const uint *connections, 
@@ -848,6 +856,7 @@ pub struct LatticeNetworkGPU<
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<N, W, X>>,
     connecting_graph: C,
     electrical_incoming_connections_kernel: Kernel,
+    // electrical_and_spike_train_incoming_connections: KernelFunction,
     // chemical_incoming_connections_kernel: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
