@@ -206,3 +206,17 @@ $
 ### Bayesian Inference Variable Fields
 
 ### Bayesian Inference Example Argument File
+
+## Isolated Liquid State Machine Pipeline
+
+### Isolated Liquid State Machine `[simulation_parameters]`
+
+### Isolated Liquid State Machine Required Fields
+
+### Isolated Liquid State Machine Optional Fields
+
+### Isolated Liquid State Machine `[variables]`
+
+### Isolated Liquid State Machine Variable Fields
+
+### Isolated Liquid State Machine Example Argument File
