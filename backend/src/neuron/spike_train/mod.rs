@@ -93,7 +93,7 @@ impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
         let args = vec![
             String::from("timestep"), String::from("last_firing_time"),
             String::from("v_max"), String::from("v_resting"), 
-            String::from("k"), String::from("dt"),
+            String::from("neural_refractoriness$k"), String::from("dt"),
         ];
 
         let program_source = String::from(r#"
