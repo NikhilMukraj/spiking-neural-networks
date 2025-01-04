@@ -13,10 +13,15 @@ use crate::{
     }
 };
 use super::{
-    impl_apply, iterate_and_spike::{
+    impl_apply, 
+    iterate_and_spike::{
         BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
         KernelFunction, NeurotransmitterTypeGPU,
-    }, plasticity::Plasticity, spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, RunLattice, RunNetwork, SpikeTrainLattice, SpikeTrainLatticeHistory
+    }, 
+    plasticity::Plasticity, 
+    spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, 
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, 
+    RunLattice, RunNetwork, SpikeTrainLattice, SpikeTrainLatticeHistory, SpikeTrainGridHistory,
 };
 use std::ptr;
 
@@ -151,6 +156,7 @@ __kernel void add_grid_voltage_history(
 "#;
 
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
+
 pub trait LatticeHistoryGPU: LatticeHistory {
     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
@@ -797,13 +803,107 @@ where
     }
 }
 
-// pub trait SpikeTrainLatticeHistoryGPU: SpikeTrainLatticeHistory {
-//     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
-//     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
-//     fn add_from_gpu(
-//         &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
-//     ) -> Result<(), GPUError>;  
-// }
+pub trait SpikeTrainLatticeHistoryGPU: SpikeTrainLatticeHistory {
+    fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    fn add_from_gpu(
+        &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
+    ) -> Result<(), GPUError>;  
+}
+
+impl SpikeTrainLatticeHistoryGPU for SpikeTrainGridHistory {
+    fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
+        let history_program = match Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let history_kernel = match Kernel::create(&history_program, GRID_VOLTAGE_HISTORY_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
+
+        let argument_names = vec![
+            String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
+            String::from("iteration"), String::from("size"), String::from("skip_index"),
+        ];
+
+        Ok(
+            KernelFunction { 
+                kernel: history_kernel, 
+                program_source: String::from(GRID_VOLTAGE_HISTORY_KERNEL), 
+                kernel_name: String::from(GRID_VOLTAGE_HISTORY_KERNEL_NAME), 
+                argument_names
+            }
+        )
+    }
+
+    fn to_gpu(
+        &self, context: &Context, iterations: usize, size: (usize, usize)
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        let history_buffer = unsafe {
+            match Buffer::<cl_float>::create(
+                context, CL_MEM_READ_WRITE, iterations * size.0 * size.1, ptr::null_mut()
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
+        };
+
+        let mut buffers = HashMap::new();
+
+        buffers.insert(String::from("history"), BufferGPU::Float(history_buffer));
+
+        Ok(buffers)
+    }
+
+    fn add_from_gpu(
+        &mut self, 
+        queue: &CommandQueue, 
+        buffers: HashMap<String, BufferGPU>, 
+        iterations: usize, 
+        size: (usize, usize)
+    ) -> Result<(), GPUError> {
+        let mut results = vec![0.0; iterations * size.0 * size.1];
+        let results_read_event = unsafe {
+            let event = queue.enqueue_read_buffer(
+                match buffers.get("history").expect("Could not get history") {
+                    BufferGPU::Float(value) => value,
+                    BufferGPU::UInt(_) => unreachable!("History is not unsigned integer"),
+                    BufferGPU::OptionalUInt(_) => unreachable!("History is not optional unsigned integer"),
+                }, 
+                CL_NON_BLOCKING, 
+                0, 
+                &mut results, 
+                &[]
+            );
+
+            match event {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
+        };
+
+        results_read_event.wait().expect("Could not wait");
+
+        let mut nested_vector: Vec<Vec<Vec<f32>>> = Vec::with_capacity(iterations);
+
+        for i in 0..iterations {
+            let mut grid: Vec<Vec<f32>> = Vec::with_capacity(size.0);
+
+            for j in 0..size.0 {
+                let start_idx = i * size.0 * size.1 + j * size.1;
+                let end_idx = start_idx + size.1;
+                grid.push(results[start_idx..end_idx].to_vec());
+            }
+
+            nested_vector.push(grid);
+        }
+
+        self.history.extend(nested_vector);
+
+        Ok(())
+    }
+}
 
 const NETWORK_ELECTRICAL_INPUTS_KERNEL: &str = r#"
 __kernel void calculate_network_electrical_inputs(
@@ -839,6 +939,19 @@ __kernel void calculate_network_electrical_inputs(
 
 const NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_electrical_inputs";
 
+// fn generate_network_spike_train_electrical_inputs_kernel<X: SpikeTrainGPU>() -> Result<KernelFunction, GPUError> {
+//     // prefix kernel with refractoriness function
+
+//     // variable args: get args from neural refractoriness gpu, take in special args (timestep, v range) as scalar args
+//     // required args: connections, weights, index_to_position. gap_conductances, voltages, 
+//     // required args: number of neurons in all lattices, is_spike_train buffer
+//     // required args go first
+//     // use spike_train index - number of neurons in all lattices to determine where to index spike train variables
+//     // check if current input is a spike train or not
+//     // if it is not a spike train just add the gap junction
+//     // if yes then substitute in the neural refractoriness signature and execute
+// }
+
 /// An implementation of a lattice network that is compatible with the GPU
 #[allow(dead_code)]
 pub struct LatticeNetworkGPU<
@@ -846,7 +959,7 @@ pub struct LatticeNetworkGPU<
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
     V: LatticeHistory + LatticeHistoryGPU,
     W: SpikeTrainGPU<N=N, U=R>,
-    X: SpikeTrainLatticeHistory,
+    X: SpikeTrainLatticeHistoryGPU,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
     R: NeuralRefractorinessGPU,
@@ -873,7 +986,7 @@ where
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>,
     V: LatticeHistory + LatticeHistoryGPU,
     W: SpikeTrainGPU<N=N, U=R>,
-    X: SpikeTrainLatticeHistory,
+    X: SpikeTrainLatticeHistoryGPU,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
     R: NeuralRefractorinessGPU,
@@ -1130,6 +1243,36 @@ where
 
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
 
+        // let mut spike_train_cell_vector: Vec<T> = vec![];
+        // let mut spike_train_lattice_ids: Vec<u32> = vec![];
+        // let mut spike_train_lattice_sizes: Vec<u32> = vec![];
+        // let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+
+        // let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = self.spike_train_lattices.iter()
+        //     .map(|(i, j)| (*i, j))
+        //     .collect();
+        // spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+
+        // for (key, value) in &spike_train_lattice_iterator {
+        //     let current_cell_grid = value.spike_train_grid();
+        //     for row in current_cell_grid {
+        //         for i in row {
+        //             cell_vector.push(i.clone());
+        //             lattice_ids.push(*key as u32);
+        //         }
+        //     }
+            
+        //     let rows = current_cell_grid.len();
+        //     let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+        //     spike_train_lattice_sizes.push((rows * cols) as u32);
+        //     spike_train_lattice_sizes_map.insert(*key, (rows, cols));
+        // }
+
+        // let mut spike_train_vector = vec![spike_train_vector];
+        // let spike_train_vector_size = spike_train_vector.first().unwrap_or(&vec![]).len();
+
+        // let gpu_spike_train_grid = X::convert_to_gpu(&spike_train_vector, &self.context, &self.queue)?;
+
         let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
             &self.context, &self.queue, &self.lattices, &self.spike_train_lattices, &self.connecting_graph
         )?;
@@ -1152,96 +1295,105 @@ where
             }
         }
 
+        let lattices_exist = !self.lattices.is_empty();
+        let spike_train_lattices_exist = !self.spike_train_lattices.is_empty();
+
         for _ in 0..iterations {
-            // when calculating spike train effects, pass in timestep as int
-            // use this kernel if no spike trains, otherwise use one that accounts for it
-            let gap_junctions_event = unsafe {
-                let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
+            if lattices_exist && !spike_train_lattices_exist {
+                // when calculating spike train effects, pass in timestep as int
+                // use this kernel if no spike trains, otherwise use one that accounts for it
+                let gap_junctions_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
 
-                kernel_execution.set_arg(&gpu_graph.connections)
-                    .set_arg(&gpu_graph.weights)
-                    .set_arg(&gpu_graph.index_to_position);
+                    kernel_execution.set_arg(&gpu_graph.connections)
+                        .set_arg(&gpu_graph.weights)
+                        .set_arg(&gpu_graph.index_to_position);
 
-                match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
-                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                    _ => unreachable!("gap_condutance must be float"),
-                };
+                    match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("gap_condutance must be float"),
+                    };
 
-                match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
-                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                    _ => unreachable!("current_voltage must be float"),
-                };
+                    match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("current_voltage must be float"),
+                    };
 
-                match kernel_execution.set_arg(&gpu_graph.size)
-                    .set_arg(&sums_buffer)
-                    .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
-                    .enqueue_nd_range(&self.queue) {
-                        Ok(value) => value,
-                        Err(_) => return Err(GPUError::QueueFailure),
-                    }
-            };
-
-            match gap_junctions_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
-            };
-
-            // only execute if there exists lattices, same with spike train lattices
-            let iterate_event = unsafe {
-                let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
-
-                for i in iterate_kernel.argument_names.iter() {
-                    if i == "inputs" {
-                        kernel_execution.set_arg(&sums_buffer);
-                    } else if i == "index_to_position" {
-                        kernel_execution.set_arg(&gpu_graph.index_to_position);
-                    } else {
-                        match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                            BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                            BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                            BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                        };
-                    }
-                }
-
-                match kernel_execution.set_global_work_size(gpu_graph.size)
-                    .enqueue_nd_range(&self.queue) {
-                        Ok(value) => value,
-                        Err(_) => return Err(GPUError::QueueFailure),
-                    }
-            };
-
-            match iterate_event.wait() {
-                Ok(_) => {},
-                Err(_) => return Err(GPUError::WaitError),
-            };
-
-            unsafe {
-                self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
-            };
-
-            for (key, value) in self.lattices.iter() {
-                if value.update_grid_history {
-                    let mut skip_index = 0;
-                    for i in gpu_graph.ordered_keys.iter() {
-                        if *i >= *key {
-                            break;
+                    match kernel_execution.set_arg(&gpu_graph.size)
+                        .set_arg(&sums_buffer)
+                        .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
                         }
-                        let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
-                        skip_index += current_size.0 * current_size.1;
+                };
+
+                match gap_junctions_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+            } // else if lattices_exist && spike_train_lattices_exist {
+               // spike_train_gap_junctions
+            // }
+
+            if lattices_exist {
+                // only execute if there exists lattices, same with spike train lattices
+                let iterate_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
+
+                    for i in iterate_kernel.argument_names.iter() {
+                        if i == "inputs" {
+                            kernel_execution.set_arg(&sums_buffer);
+                        } else if i == "index_to_position" {
+                            kernel_execution.set_arg(&gpu_graph.index_to_position);
+                        } else {
+                            match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        }
                     }
 
-                    let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
-                    let current_size = dim.0 * dim.1;
-                    
-                    unsafe {
-                        self.execute_grid_history(
-                            skip_index as u32,
-                            current_size as u32,
-                            &gpu_graph, 
-                            &gpu_cell_grid, 
-                            gpu_grid_histories.get(key).unwrap()
-                        )?;
+                    match kernel_execution.set_global_work_size(gpu_graph.size)
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
+
+                match iterate_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+
+                unsafe {
+                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
+                };
+
+                for (key, value) in self.lattices.iter() {
+                    if value.update_grid_history {
+                        let mut skip_index = 0;
+                        for i in gpu_graph.ordered_keys.iter() {
+                            if *i >= *key {
+                                break;
+                            }
+                            let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
+                            skip_index += current_size.0 * current_size.1;
+                        }
+
+                        let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
+                        let current_size = dim.0 * dim.1;
+                        
+                        unsafe {
+                            self.execute_grid_history(
+                                skip_index as u32,
+                                current_size as u32,
+                                &gpu_graph, 
+                                &gpu_cell_grid, 
+                                gpu_grid_histories.get(key).unwrap()
+                            )?;
+                        }
                     }
                 }
             }
@@ -1304,6 +1456,27 @@ where
             value.set_cell_grid(reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
         }
 
+        // let mut spike_train_new_grids: HashMap<usize, Vec<T>> = HashMap::new();
+
+        // if let Some(first_vec) = spike_train_vector.first() {
+        //     for (id, cell) in spike_train_lattice_ids.iter().zip(first_vec.iter()) {
+        //         spike_train_new_grids.entry(*id as usize)
+        //             .and_modify(|vec| vec.push(cell.clone()))
+        //             .or_insert_with(|| vec![cell.clone()]);
+        //     }
+        // }
+
+        // let mut spike_train_reshaped_grids = HashMap::new();
+
+        // for (key, vec) in new_grids {
+        //     if let Some(&(_, cols)) = spike_train_lattice_sizes_map.get(&key) {
+        //         let reshaped_vec: Vec<Vec<T>> = vec.chunks(cols)
+        //             .map(|chunk| chunk.to_vec())
+        //             .collect();
+        //         spike_train_reshaped_grids.insert(key, reshaped_vec);
+        //     }
+        // }
+
         InterleavingGraphGPU::convert_to_cpu(
             &self.queue, &gpu_graph, &mut self.lattices, &mut self.spike_train_lattices, &mut self.connecting_graph
         )?;
@@ -1318,7 +1491,7 @@ where
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
     V: LatticeHistory + LatticeHistoryGPU,
     W: SpikeTrainGPU<N=N, U=R>,
-    X: SpikeTrainLatticeHistory,
+    X: SpikeTrainLatticeHistoryGPU,
     Y: Plasticity<W, T, f32> + Plasticity<T, T, f32>,
     N: NeurotransmitterTypeGPU,
     R: NeuralRefractorinessGPU,
