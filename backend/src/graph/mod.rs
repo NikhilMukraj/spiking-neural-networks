@@ -590,20 +590,13 @@ pub struct InterleavingGraphGPU {
 
 #[cfg(feature = "gpu")]
 impl InterleavingGraphGPU {
-    fn calculate_index<
-        T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
-        N: NeurotransmitterTypeGPU,
-        C: CellGrid<T=T>,
-    >(
+    fn calculate_index(
         id: usize,
         row: usize, 
         col: usize,
-        lattices: &HashMap<usize, C>, 
         lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         ordered_keys: &Vec<usize>,
     ) -> usize {
-        let current_group = lattices.get(&id).unwrap();
-                    
         let mut skip_index = 0;
         for i in ordered_keys {
             if *i >= id {
@@ -613,29 +606,20 @@ impl InterleavingGraphGPU {
             skip_index += current_size.0 * current_size.1;
         }
 
-        let row_len = current_group.cell_grid().first().unwrap_or(&vec![]).len();
+        let row_len = lattice_sizes_map.get(&id).unwrap().1;
         
         skip_index + row * row_len + col
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn calculate_index_spike_train<
-        S: SpikeTrainGPU<N=N, U=R>, 
-        R: NeuralRefractorinessGPU,
-        N: NeurotransmitterTypeGPU,
-        C: SpikeTrainGrid<T=S>,
-    >(
+    fn calculate_index_spike_train(
         id: usize,
         row: usize, 
         col: usize,
         lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         ordered_keys: &Vec<usize>,
-        spike_train_lattices: &HashMap<usize, C>, 
         spike_train_lattice_sizes_map: &HashMap<usize, (usize, usize)>, 
         spike_train_ordered_keys: &Vec<usize>,
-    ) -> usize {
-        let current_group = spike_train_lattices.get(&id).unwrap();
-                    
+    ) -> usize {                    
         let mut skip_index = 0;
         for i in ordered_keys {
             let current_size = lattice_sizes_map.get(i).unwrap();
@@ -650,7 +634,7 @@ impl InterleavingGraphGPU {
             skip_index += current_size.0 * current_size.1;
         }
 
-        let row_len = current_group.spike_train_grid().first().unwrap_or(&vec![]).len();
+        let row_len = spike_train_lattice_sizes_map.get(&id).unwrap().1;
         
         skip_index + row * row_len + col
     }
@@ -756,17 +740,17 @@ impl InterleavingGraphGPU {
 
                 let index = if !current_is_spike_train {
                     Self::calculate_index(
-                        *id, *row, *col, lattices, &lattice_sizes_map, &ordered_keys
+                        *id, *row, *col, &lattice_sizes_map, &ordered_keys
                     )
                 } else {
                     Self::calculate_index_spike_train(
                         *id, *row, *col, 
                         &lattice_sizes_map, &ordered_keys,
-                        spike_train_lattices, &spike_train_lattice_sizes_map, &spike_train_ordered_keys
+                        &spike_train_lattice_sizes_map, &spike_train_ordered_keys
                     )
                 };
                 let index_post = Self::calculate_index(
-                    *id_post, *row_post, *col_post, lattices, &lattice_sizes_map, &ordered_keys
+                    *id_post, *row_post, *col_post, &lattice_sizes_map, &ordered_keys
                 );
 
                 if *id == *id_post {
@@ -918,17 +902,17 @@ impl InterleavingGraphGPU {
 
                 let index = if gpu_graph.ordered_keys.contains(&i.id) {
                     Self::calculate_index(
-                        i.id, i.pos.0, i.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                        i.id, i.pos.0, i.pos.1, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
                     )
                 } else {
                     Self::calculate_index_spike_train(
                         i.id, i.pos.0, i.pos.1, 
                         &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys,
-                        spike_train_lattices, &gpu_graph.spike_train_lattice_sizes_map, &gpu_graph.spike_train_ordered_keys
+                        &gpu_graph.spike_train_lattice_sizes_map, &gpu_graph.spike_train_ordered_keys
                     )
                 };
                 let index_post = Self::calculate_index(
-                    j.id, j.pos.0, j.pos.1, lattices, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
+                    j.id, j.pos.0, j.pos.1, &gpu_graph.lattice_sizes_map, &gpu_graph.ordered_keys
                 );
 
                 if i.id == j.id {
