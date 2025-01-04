@@ -8,7 +8,6 @@ import json
 import sys
 import itertools
 import numpy as np
-import scipy
 from tqdm import tqdm
 from pipeline_setup import parse_toml, try_max, generate_key_helper
 from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_patterns
