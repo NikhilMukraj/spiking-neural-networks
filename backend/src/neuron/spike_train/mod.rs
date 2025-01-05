@@ -3,7 +3,9 @@
 
 use rand::Rng;
 use super::iterate_and_spike::{
-    ApproximateNeurotransmitter, CurrentVoltage, IonotropicNeurotransmitterType, IsSpiking, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, NeurotransmitterTypeGPU, Neurotransmitters, Timestep
+    ApproximateNeurotransmitter, CurrentVoltage, IonotropicNeurotransmitterType, IsSpiking, 
+    LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, 
+    Neurotransmitters, Timestep
 };
 use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
 use super::plasticity::BCMActivity;
@@ -21,7 +23,7 @@ use std::ptr;
 use std::collections::HashMap;
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
-    KernelFunction, BufferGPU, NeurotransmitterKineticsGPU,
+    KernelFunction, BufferGPU, NeurotransmitterKineticsGPU, NeurotransmitterTypeGPU,
     generate_unique_prefix, AvailableBufferType,
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
@@ -89,11 +91,11 @@ impl_default_neural_refractoriness!(DeltaDiracRefractoriness, delta_dirac_effect
 
 #[cfg(feature = "gpu")]
 impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
-    fn get_refractoriness_gpu_function() -> Result<(Vec<String>, String), GPUError> {
+    fn get_refractoriness_gpu_function() -> Result<(Vec<(String, Option<AvailableBufferType>)>, String), GPUError> {
         let args = vec![
-            String::from("timestep"), String::from("last_firing_time"),
-            String::from("v_max"), String::from("v_resting"), 
-            String::from("neural_refractoriness$k"), String::from("dt"),
+            (String::from("timestep"), None), (String::from("last_firing_time"), Some(AvailableBufferType::OptionalUInt)),
+            (String::from("v_max"), Some(AvailableBufferType::Float)), (String::from("v_resting"), Some(AvailableBufferType::Float)), 
+            (String::from("neural_refractoriness$k"), Some(AvailableBufferType::Float)), (String::from("dt"), Some(AvailableBufferType::Float)),
         ];
 
         let program_source = String::from(r#"
@@ -192,8 +194,11 @@ pub trait SpikeTrain: CurrentVoltage + IsSpiking + LastFiringTime + Timestep + C
 }
 
 #[cfg(feature = "gpu")]
+type NameAndOptionalType = (String, Option<AvailableBufferType>);
+
+#[cfg(feature = "gpu")]
 pub trait NeuralRefractorinessGPU: NeuralRefractoriness {
-    fn get_refractoriness_gpu_function() -> Result<(Vec<String>, String), GPUError>;
+    fn get_refractoriness_gpu_function() -> Result<(Vec<NameAndOptionalType>, String), GPUError>;
     fn convert_to_gpu(
         grid: &[Vec<Self>], 
         context: &Context,
