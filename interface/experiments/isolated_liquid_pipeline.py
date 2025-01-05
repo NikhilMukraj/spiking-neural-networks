@@ -30,6 +30,9 @@ def fill_defaults(parsed):
     if 'variables' not in parsed:
         raise ValueError('Requires `variables` table')
 
+    if 'exc_only' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['exc_only'] = True
+
     if 'on_phase' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['on_phase'] = 1000
     if 'off_phase' not in parsed['simulation_parameters']:
@@ -60,6 +63,10 @@ def fill_defaults(parsed):
 
     if 'connectivity' not in parsed['variables']:
         parsed['variables']['connectivity'] = 0.25
+    if 'exc_to_inh_connectivity' not in parsed['variables']:
+        parsed['variables']['exc_to_inh_connectivity'] = 0.15
+    if 'inh_to_exc_connectivity' not in parsed['variables']:
+        parsed['variables']['inh_to_exc_connectivity'] = 0.15
     if 'spike_train_connectivity' not in parsed['variables']:
         parsed['variables']['spike_train_connectivity'] = 0.5
     
@@ -67,6 +74,12 @@ def fill_defaults(parsed):
         parsed['variables']['weights_scalar'] = 0.5
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = 3
+    if 'exc_to_inh_weight' not in parsed['variables']:
+        parsed['variables']['exc_to_inh_weight'] = 0.0125
+    if 'inh_to_exc_weight' not in parsed['variables']:
+        parsed['variables']['inh_to_exc_weight'] = 0.0125
+    if 'inh_internal_scalar' not in parsed['variables']:
+        parsed['variables']['weights_scalar'] = 2
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
@@ -88,8 +101,9 @@ def generate_key(parsed, current_state):
     key.append(f'trial: {current_state["trial"]}')
 
     fields = [
-        'cue_firing_rate', 'connectivity', 'spike_train_connectivity'
-        'spike_train_to_exc', 'internal_scalar'
+        'cue_firing_rate', 
+        'connectivity', 'spike_train_connectivity', 'inh_connectivity',
+        'spike_train_to_exc', 'internal_scalar', 'inh_internal_scalar', 'exc_to_inh_weight', 'inh_to_exc_weight',
         'nmda_g', 'ampa_g', 'gabaa_g',
         'glutamate_clearance', 'gabaa_clearance', 
     ]
@@ -99,10 +113,13 @@ def generate_key(parsed, current_state):
 
     return ', '.join(key)
 
-def start_firing(neuron):
-    neuron.chance_of_firing = 0.01
+def generate_start_firing(cue_firing_rate):
+    def start_firing(neuron):
+        neuron.chance_of_firing = cue_firing_rate
 
-    return neuron
+        return neuron
+
+    return start_firing
 
 def stop_firing(neuron):
     neuron.chance_of_firing = 0
@@ -128,6 +145,7 @@ exc_n = parsed_toml['simulation_parameters']['exc_n']
 num = exc_n * exc_n
 
 inh_n = parsed_toml['simulation_parameters']['inh_n']
+inh_num = inh_n * inh_n
 
 setup_neuron = generate_setup_neuron(
     parsed_toml['simulation_parameters']['c_m'], 
@@ -150,22 +168,41 @@ for current_state in tqdm(all_states):
             num, connectivity=current_state['connectivity'], scalar=current_state['internal_scalar']
         )
 
+        if not parsed_toml['simulation_parameters']['exc_only']:
+            w_inh = generate_liquid_weights(
+                inh_num, connectivity=current_state['inh_connectivity'], scalar=current_state['inh_internal_scalar']
+            )
+
+        start_firing = generate_start_firing(current_state['cue_firing_rate'])
+
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glu_clearance'])
         exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         exc_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Glutamate, glu_neuro)
+
+        gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gaba_clearance'])
+        inh_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
+        inh_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.GABA, gaba_neuro)
 
         glu = ln.GlutamateReceptor()
         
         glu.ampa_g = current_state['nmda_g']
         glu.nmda_g = current_state['ampa_g']
 
+        gaba = ln.GABAReceptor()
+        gaba.g = current_state['gabaa_g']
+
         receptors = ln.DopaGluGABAReceptors()
 
         receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
+        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.GABA, gaba)
 
         exc_neuron = ln.DopaIzhikevichNeuron()
         exc_neuron.set_neurotransmitters(exc_neurotransmitters)
         exc_neuron.set_receptors(receptors)
+
+        inh_neuron = ln.DopaIzhikevichNeuron()
+        inh_neuron.set_neurotransmitters(inh_neurotransmitters)
+        inh_neuron.set_receptors(receptors)
 
         poisson_neuron = ln.DopaPoissonNeuron()
         poisson_neuron.set_neurotransmitters(exc_neurotransmitters)
@@ -183,11 +220,41 @@ for current_state in tqdm(all_states):
         spike_train_lattice = ln.DopaPoissonLattice(1)
         spike_train_lattice.populate(poisson_neuron, exc_n, exc_n)
 
-        network = ln.DopaIzhikevichNetwork.generate_network(
-            [exc_lattice], [spike_train_lattice],
-        )
+        if parsed_toml['simulation_parameters']['exc_only']:
+            inh_lattice = ln.DopaIzhikevichLattice(2)
+            inh_lattice.populate(inh_neuron, inh_n, inh_n)
+            inh_lattice.apply(setup_neuron)
+            position_to_index = inh_lattice.position_to_index
+            inh_lattice.connect(
+                lambda x, y: bool(float(w_inh[position_to_index[x]][position_to_index[y]]) != 0), 
+                lambda x, y: float(w_inh[position_to_index[x]][position_to_index[y]]),
+            )
+            # inh_lattice.update_grid_history = True
+
+            network = ln.DopaIzhikevichNetwork.generate_network(
+                [exc_lattice], [spike_train_lattice],
+            )
+        else:
+            network = ln.DopaIzhikevichNetwork.generate_network(
+                [exc_lattice, inh_lattice], [spike_train_lattice],
+            )
+
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
         network.parallel = True
+
+        if not parsed_toml['simulation_parameters']['exc_only']:
+            network.connect(
+                2, 
+                0, 
+                lambda x, y: np.random.uniform(0, 1) < current_state['inh_to_exc_connectivity'], 
+                lambda x, y: current_state['inh_to_exc_weight'],
+            )
+            network.connect(
+                0, 
+                2, 
+                lambda x, y: np.random.uniform(0, 1) < current_state['exc_to_inh_connectivity'],
+                lambda x, y: current_state['exc_to_inh_weight'],
+            )
 
         network.connect(
             1, 
