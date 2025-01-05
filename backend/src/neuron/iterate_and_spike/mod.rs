@@ -321,15 +321,15 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         match attribute {
             "neurotransmitters$t" => self.t = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             "neurotransmitters$t_max" => self.t_max = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             "neurotransmitters$clearance_constant" => self.clearance_constant = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             _ => unreachable!(),
         }
@@ -588,7 +588,7 @@ impl ReceptorKineticsGPU for ApproximateReceptor {
         match attribute {
             "ligand_gates$r" => self.r = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             _ => unreachable!(),
         }
@@ -881,55 +881,55 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
         match attribute {
             "ligand_gates$current" => self.current = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             "ligand_gates$reversal" => self.reversal = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             "ligand_gates$g" => self.g = match value {
                 BufferType::Float(nested_val) => nested_val,
-                BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                _ => unreachable!("Incorrect type passed"),
             },
             "ligand_gates$nmda_mg" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
             },
             "ligand_gates$gabab_g" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_k3" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_k4" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             },
             "ligand_gates$gabab_kd" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
             "ligand_gates$gabab_n" => match &mut self.receptor_type {
                 IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = match value {
                     BufferType::Float(nested_val) => nested_val,
-                    BufferType::UInt(_) => unreachable!("Incorrect type passed"),
+                    _ => unreachable!("Incorrect type passed"),
                 },
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
@@ -1134,6 +1134,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
                         match attribute.1 {
                             AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
                             AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                            AvailableBufferType::OptionalUInt => retrieved_attribute.push(BufferType::OptionalUInt(-1))
                         };
                     }
                 } else {
@@ -1151,6 +1152,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
                     match attribute.1 {
                         AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
                         AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                        AvailableBufferType::OptionalUInt => retrieved_attribute.push(BufferType::OptionalUInt(-1))
                     };
                 } else {
                     unreachable!("Attribute ({}) not found", attribute.0)
@@ -1234,6 +1236,18 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                     write_buffer!(current_buffer, context, queue, size, &values, UInt, last);
 
                     buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
+                },
+                BufferType::OptionalUInt(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::OptionalUInt(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<i32>>();
+
+                    write_buffer!(current_buffer, context, queue, size, &values, OptionalUInt, last);
+
+                    buffers.insert(key.clone(), BufferGPU::OptionalUInt(current_buffer));
                 }
             };  
         }
@@ -1300,6 +1314,16 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
                         let current_contents = current_contents.iter()
                             .map(|i| BufferType::UInt(*i))
+                            .collect::<Vec<BufferType>>();
+
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    },
+                    AvailableBufferType::OptionalUInt => {
+                        let mut current_contents = vec![-1; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, OptionalUInt);
+
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::OptionalUInt(*i))
                             .collect::<Vec<BufferType>>();
 
                         cpu_conversion.insert(key.0.clone(), current_contents);
@@ -1784,6 +1808,7 @@ fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: Neurotransmitt
                     match attribute.1 {
                         AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
                         AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
+                        AvailableBufferType::OptionalUInt => retrieved_attribute.push(BufferType::OptionalUInt(-1))
                     };
                 } else {
                     unreachable!("Attribute ({}) not found", attribute.0)
@@ -1851,7 +1876,19 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                     write_buffer!(current_buffer, context, queue, size, &values, UInt, last);
 
                     buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
-                }
+                },
+                BufferType::OptionalUInt(_) => {
+                    let values = value.iter()
+                        .map(|i| match i {
+                            BufferType::OptionalUInt(inner_value) => *inner_value,
+                            _ => unreachable!("Incorrect type passed",)
+                        })
+                        .collect::<Vec<i32>>();
+
+                    write_buffer!(current_buffer, context, queue, size, &values, OptionalUInt, last);
+
+                    buffers.insert(key.clone(), BufferGPU::OptionalUInt(current_buffer));
+                },
             }
         }
 
@@ -1925,7 +1962,17 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                             .collect::<Vec<BufferType>>();
         
                         cpu_conversion.insert(key.0.clone(), current_contents);
-                    }
+                    },
+                    AvailableBufferType::OptionalUInt => {
+                        let mut current_contents = vec![-1; rows * cols * N::number_of_types()];
+                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, OptionalUInt);
+
+                        let current_contents = current_contents.iter()
+                            .map(|i| BufferType::OptionalUInt(*i))
+                            .collect::<Vec<BufferType>>();
+        
+                        cpu_conversion.insert(key.0.clone(), current_contents);
+                    },
                 }
             } else {
                 let mut current_contents = vec![0; rows * cols * N::number_of_types()];
@@ -1980,7 +2027,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
     }
 
     pub fn get_neurotransmitter_update_kernel_code() -> String {
-        let mut raw_args =  T::get_update_function().0.0;
+        let mut raw_args = T::get_update_function().0.0;
         raw_args.extend(T::get_update_function().0.1);
 
         let kernel_args = raw_args
@@ -2328,6 +2375,7 @@ pub enum BufferGPU {
 pub enum BufferType {
     Float(f32),
     UInt(u32),
+    OptionalUInt(i32),
 }
 
 #[cfg(feature = "gpu")]
@@ -2336,6 +2384,7 @@ pub enum BufferType {
 pub enum AvailableBufferType {
     Float,
     UInt,
+    OptionalUInt
 }
 
 impl AvailableBufferType {
@@ -2343,6 +2392,7 @@ impl AvailableBufferType {
         match self {
             AvailableBufferType::Float => "float",
             AvailableBufferType::UInt => "uint",
+            AvailableBufferType::OptionalUInt => "int",
         }
     }
 }
