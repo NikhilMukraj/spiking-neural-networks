@@ -13,15 +13,14 @@ use crate::{
     }
 };
 use super::{
-    impl_apply, 
-    iterate_and_spike::{
-        BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
-        KernelFunction, NeurotransmitterTypeGPU,
+    impl_apply, iterate_and_spike::{
+        AvailableBufferType, BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, 
+        NeurotransmitterTypeGPU, generate_unique_prefix,
     }, 
     plasticity::Plasticity, 
-    spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, 
+    spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU},
     GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, 
-    RunLattice, RunNetwork, SpikeTrainLattice, SpikeTrainLatticeHistory, SpikeTrainGridHistory,
+    RunLattice, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 };
 use std::ptr;
 
@@ -939,18 +938,124 @@ __kernel void calculate_network_electrical_inputs(
 
 const NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_electrical_inputs";
 
-// fn generate_network_spike_train_electrical_inputs_kernel<X: SpikeTrainGPU>() -> Result<KernelFunction, GPUError> {
-//     // prefix kernel with refractoriness function
+fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractorinessGPU>(context: &Context) -> Result<KernelFunction, GPUError> {
+    let mut args = vec![
+        String::from("connections"), String::from("weights"), String::from("index_to_position"),
+        String::from("is_spike_train"), String::from("gap_conductances"), String::from("voltages")
+    ];
 
-//     // variable args: get args from neural refractoriness gpu, take in special args (timestep, v range) as scalar args
-//     // required args: connections, weights, index_to_position. gap_conductances, voltages, 
-//     // required args: number of neurons in all lattices, is_spike_train buffer
-//     // required args go first
-//     // use spike_train index - number of neurons in all lattices to determine where to index spike train variables
-//     // check if current input is a spike train or not
-//     // if it is not a spike train just add the gap junction
-//     // if yes then substitute in the neural refractoriness signature and execute
-// }
+    let refractoriness_function = U::get_refractoriness_gpu_function()?;
+
+    let mut refractoriness_kernel_args = vec![];
+    let mut refractoriness_function_args = vec![];
+
+    for i in refractoriness_function.0 {
+        if i.0 == "last_firing_time" {
+            refractoriness_function_args.push(String::from("spike_train_last_firing_time"));
+            continue;
+        }
+
+        match i.1 {
+            Some(val) => {
+                let current_split = i.0.split("$").collect::<Vec<&str>>();
+                let current_arg = if current_split.len() == 2 {
+                    format!("{}{}", generate_unique_prefix(&args, current_split[0]), current_split[1])
+                } else {
+                    i.0.clone()
+                };
+
+                args.push(i.0.clone());
+                refractoriness_function_args.push(current_arg.clone());
+
+                match val {
+                    AvailableBufferType::Float => refractoriness_kernel_args.push(format!("__global const float *{}", current_arg)),
+                    AvailableBufferType::UInt => refractoriness_kernel_args.push(format!("__global const uint *{}", current_arg)),
+                    AvailableBufferType::OptionalUInt => refractoriness_kernel_args.push(format!("__global const int *{}", current_arg)),
+                }
+            },
+            None => {
+                refractoriness_kernel_args.push(String::from("int timestep"));
+                args.push(String::from("timestep"));
+            }
+        };
+    }
+
+    let program_source = format!(r#"
+            {}
+
+            __kernel void calculate_network_electrical_with_spike_train_inputs(
+                __global const uint *connections, 
+                __global const float *weights, 
+                __global const int *index_to_position,
+                __global const uint *is_spike_train,
+                __global const float *gap_conductances,
+                __global const float *voltages,
+                __global const int *spike_train_last_firing_time,
+                {},
+                uint n, 
+                __global float *res
+            ) {{
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];
+
+                float sum = 0.0f;
+                float count = 0.0f;
+                for (int i = 0; i < n; i++) {{
+                    if (connections[i * n + gid] == 1) {{
+                        int presynaptic_index = index_to_position[i];
+                        int postsynaptic_index = index_to_position[gid];
+                        if (is_spike_train[presynaptic_index] == 0) {{
+                            float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
+                            sum += weights[i * n + gid] * gap_junction;
+                        }} else {{
+                            if (spike_train_last_firing_time[presynaptic_index] < 0) {{
+                                sum += v_max[presynaptic_index];
+                            }} else {{
+                                sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
+                            }}
+                        }}
+                        count++;
+                    }}
+                }}
+
+                if (count != 0.0f) {{
+                    res[gid] = sum / count;
+                }} else {{
+                    res[gid] = 0;
+                }}
+            }}
+        "#,
+        refractoriness_function.1,
+        refractoriness_kernel_args.join(",\n"),
+        refractoriness_function_args.iter()
+            .map(|i| format!("{}[presynaptic_index]", i))
+            .collect::<Vec<String>>()
+            .join(", "),
+    );
+
+    args.extend(vec![String::from("n"), String::from("res")]);
+
+    let kernel_name = String::from("calculate_network_electrical_with_spike_train_inputs");
+
+    let spike_train_gap_junctions_program = match Program::create_and_build_from_source(context, &program_source, "") {
+        Ok(value) => value,
+        Err(_) => return Err(GPUError::ProgramCompileFailure),
+    };
+
+    let kernel = match Kernel::create(&spike_train_gap_junctions_program, &kernel_name) {
+        Ok(value) => value,
+        Err(_) => return Err(GPUError::KernelCompileFailure),
+    };
+
+    Ok(
+        KernelFunction { 
+            kernel, 
+            program_source, 
+            kernel_name, 
+            argument_names: args, 
+        }
+    )
+}
 
 /// An implementation of a lattice network that is compatible with the GPU
 #[allow(dead_code)]
@@ -969,7 +1074,7 @@ pub struct LatticeNetworkGPU<
     spike_train_lattices: HashMap<usize, SpikeTrainLattice<N, W, X>>,
     connecting_graph: C,
     electrical_incoming_connections_kernel: Kernel,
-    // electrical_and_spike_train_incoming_connections: KernelFunction,
+    electrical_and_spike_train_incoming_connections: KernelFunction,
     // chemical_incoming_connections_kernel: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
@@ -1045,6 +1150,7 @@ where
                 connecting_graph: lattice_network.get_connecting_graph().clone(), 
                 last_firing_time_kernel, 
                 electrical_incoming_connections_kernel, 
+                electrical_and_spike_train_incoming_connections: generate_network_spike_train_electrical_inputs_kernel::<R>(&context)?,
                 // chemical_incoming_connections_kernel: todo!(), 
                 grid_history_kernel: V::get_kernel(&context)?,
                 context, 
@@ -1334,6 +1440,7 @@ where
                 };
             } // else if lattices_exist && spike_train_lattices_exist {
                // spike_train_gap_junctions
+               // pass in timestep as a i32
             // }
 
             if lattices_exist {
