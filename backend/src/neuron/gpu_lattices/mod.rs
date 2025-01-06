@@ -260,12 +260,13 @@ impl LatticeHistoryGPU for GridVoltageHistory {
 const LAST_FIRING_TIME_KERNEL: &str = r#"
 __kernel void set_last_firing_time(
     __global const uint *index_to_position,
+    uint skip_index,
     __global const uint *is_spiking,
     __global int *last_firing_time,
     int iteration
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[gid];
+    int index = index_to_position[gid] - skip_index;
 
     if (is_spiking[index] == 1) {
         last_firing_time[index] = iteration;
@@ -426,6 +427,7 @@ where
         let last_firing_time_event = unsafe {
             match ExecuteKernel::new(&self.last_firing_time_kernel)
                 .set_arg(&gpu_graph.index_to_position)
+                .set_arg(&0)
                 .set_arg(
                     match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
                         BufferGPU::UInt(buffer) => buffer,
@@ -992,6 +994,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                 __global const float *voltages,
                 __global const int *spike_train_last_firing_time,
                 {},
+                uint skip_index,
                 uint n, 
                 __global float *res
             ) {{
@@ -1009,7 +1012,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                             sum += weights[i * n + gid] * gap_junction;
                         }} else {{
                             if (spike_train_last_firing_time[presynaptic_index] < 0) {{
-                                sum += v_max[presynaptic_index];
+                                sum += v_max[presynaptic_index - skip_index];
                             }} else {{
                                 sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
                             }}
@@ -1028,7 +1031,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
         refractoriness_function.1,
         refractoriness_kernel_args.join(",\n"),
         refractoriness_function_args.iter()
-            .map(|i| format!("{}[presynaptic_index]", i))
+            .map(|i| format!("{}[presynaptic_index - skip_index]", i))
             .collect::<Vec<String>>()
             .join(", "),
     );
@@ -1228,11 +1231,12 @@ where
     }
 
     unsafe fn execute_last_firing_time(
-        &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>
+        &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>, skip_index: u32,
     ) -> Result<(), GPUError> {
         let last_firing_time_event = unsafe {
             match ExecuteKernel::new(&self.last_firing_time_kernel)
                 .set_arg(&gpu_graph.index_to_position)
+                .set_arg(&skip_index)
                 .set_arg(
                     match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
                         BufferGPU::UInt(buffer) => buffer,
@@ -1312,6 +1316,16 @@ where
 
         Ok(())
     }
+
+    // unsafe fn execute_spike_train_grid_history(
+    //     &self,
+    //     skip_index: u32,
+    //     gpu_graph: &InterleavingGraphGPU,
+    //     gpu_cell_grid: &HashMap<String, BufferGPU>, 
+    //     gpu_grid_history: &HashMap<String, BufferGPU>,
+    // ) -> Result<(), GPUError> {
+    //     Ok(())
+    // }
 
     fn run_lattices_with_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         // concat cell grids into a single 1d vector of cell grids
@@ -1475,7 +1489,7 @@ where
                 };
 
                 unsafe {
-                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
+                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid, 0)?
                 };
 
                 for (key, value) in self.lattices.iter() {
@@ -1504,6 +1518,66 @@ where
                     }
                 }
             }
+
+            // if spike_train_lattices_exist {
+            //     let iterate_event = unsafe {
+            //         for i in spike_train_iterate_kernel.argument_names.iter() {
+            //             if i == "number_of_types" {
+            //                 kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
+            //             } else if i == "index_to_position" {
+            //                 kernel_execution.set_arg(&index_to_position_buffer);
+            //             } else if i == "skip_index" { 
+            //                 kernel_execution.set_arg(&0);
+            //             } else if i == "neuro_flags" {
+            //                 match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+            //                     BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+            //                     _ => unreachable!("Could not retrieve neurotransmitter flags"),
+            //                 };
+            //             } else {
+            //                 match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+            //                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+            //                     BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+            //                     BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+            //                 };
+            //             }
+            //         }
+            //     };
+
+            //     match iterate_event.wait() {
+            //         Ok(_) => {},
+            //         Err(_) => return Err(GPUError::WaitError),
+            //     };
+
+            //     unsafe {
+            //         self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
+            //     };
+
+            //     // for (key, value) in self.spike_train_lattices.iter() {
+            //     //     if value.update_grid_history {
+            //     //         let mut skip_index = 0;
+            //     //         for i in gpu_graph.ordered_keys.iter() {
+            //     //             if *i >= *key {
+            //     //                 break;
+            //     //             }
+            //     //             let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
+            //     //             skip_index += current_size.0 * current_size.1;
+            //     //         }
+
+            //     //         let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
+            //     //         let current_size = dim.0 * dim.1;
+                        
+            //     //         unsafe {
+            //     //             self.execute_grid_history(
+            //     //                 skip_index as u32,
+            //     //                 current_size as u32,
+            //     //                 &gpu_graph, 
+            //     //                 &gpu_cell_grid, 
+            //     //                 gpu_grid_histories.get(key).unwrap()
+            //     //             )?;
+            //     //         }
+            //     //     }
+            //     // }
+            // }
             
             self.internal_clock += 1;
         }
