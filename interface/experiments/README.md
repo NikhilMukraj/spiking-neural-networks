@@ -33,6 +33,7 @@
   - [ ] Vary dopamine modulation and ionotropic neurotransmitter dynamics
 - [ ] Liquid state machine
   - [ ] Basic liquid dynamics
+    - [ ] Testing time taken to return to baseline under various conditions
   - [ ] STDP based learning of MNIST
     - Readout has plastic connections to liquid, average neural activity of readout is used to classify
   - [ ] Varying ionotropic neurotransmitters
@@ -44,6 +45,7 @@
       - [ ] Dopamine clearance
       - [ ] Dopamine modifier for AMPA
       - [ ] Dopamine modifier for NMDA
+  - [ ] Hallucination where liquid acts as a classifier and outputs a value despite no input
   - [ ] Small world simulation where liquid and memory interact
 - [ ] Repeat experiments with more detailed ion channel models and vary ion channel conductances
   - [ ] Hodgkin-Huxley
