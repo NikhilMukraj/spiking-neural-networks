@@ -19,7 +19,7 @@ use super::{
     }, 
     plasticity::Plasticity, 
     spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU},
-    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, 
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, SpikeTrainGrid,
     RunLattice, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 };
 use std::ptr;
@@ -1363,41 +1363,42 @@ where
 
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
 
-        // let mut spike_train_cell_vector: Vec<T> = vec![];
-        // let mut spike_train_lattice_ids: Vec<u32> = vec![];
-        // let mut spike_train_lattice_sizes: Vec<u32> = vec![];
-        // let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+        let mut spike_train_cell_vector: Vec<W> = vec![];
+        let mut spike_train_lattice_ids: Vec<u32> = vec![];
+        let mut spike_train_lattice_sizes: Vec<u32> = vec![];
+        let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
 
-        // let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = self.spike_train_lattices.iter()
-        //     .map(|(i, j)| (*i, j))
-        //     .collect();
-        // spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = self.spike_train_lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
+        spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
 
-        // for (key, value) in &spike_train_lattice_iterator {
-        //     let current_cell_grid = value.spike_train_grid();
-        //     for row in current_cell_grid {
-        //         for i in row {
-        //             cell_vector.push(i.clone());
-        //             lattice_ids.push(*key as u32);
-        //         }
-        //     }
+        for (key, value) in &spike_train_lattice_iterator {
+            let current_cell_grid = value.spike_train_grid();
+            for row in current_cell_grid {
+                for i in row {
+                    spike_train_cell_vector.push(i.clone());
+                    spike_train_lattice_ids.push(*key as u32);
+                }
+            }
             
-        //     let rows = current_cell_grid.len();
-        //     let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
-        //     spike_train_lattice_sizes.push((rows * cols) as u32);
-        //     spike_train_lattice_sizes_map.insert(*key, (rows, cols));
-        // }
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+            spike_train_lattice_sizes.push((rows * cols) as u32);
+            spike_train_lattice_sizes_map.insert(*key, (rows, cols));
+        }
 
-        // let mut spike_train_vector = vec![spike_train_vector];
-        // let spike_train_vector_size = spike_train_vector.first().unwrap_or(&vec![]).len();
+        let mut spike_train_cell_vector = vec![spike_train_cell_vector];
+        let spike_train_vector_size = spike_train_cell_vector.first().unwrap_or(&vec![]).len();
 
-        // let gpu_spike_train_grid = X::convert_to_gpu(&spike_train_vector, &self.context, &self.queue)?;
+        let gpu_spike_train_grid = W::convert_to_gpu(&spike_train_cell_vector, &self.context, &self.queue)?;
 
         let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
             &self.context, &self.queue, &self.lattices, &self.spike_train_lattices, &self.connecting_graph
         )?;
 
         let iterate_kernel = T::iterate_and_spike_electrical_kernel(&self.context)?;
+        let spike_train_iterate_kernel = W::spike_train_electrical_kernel(&self.context)?;
 
         let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
 
@@ -1417,6 +1418,16 @@ where
 
         let lattices_exist = !self.lattices.is_empty();
         let spike_train_lattices_exist = !self.spike_train_lattices.is_empty();
+        let spike_train_skip_index = gpu_graph.lattice_sizes_map.values()
+            .map(|(x, y)| *x * *y)
+            .collect::<Vec<usize>>()
+            .iter()
+            .sum::<usize>() as u32;
+        let spike_train_size: usize = gpu_graph.spike_train_lattice_sizes_map.values()
+            .map(|(x, y)| *x * *y)
+            .collect::<Vec<usize>>()
+            .iter()
+            .sum();
 
         for _ in 0..iterations {
             if lattices_exist && !spike_train_lattices_exist {
@@ -1476,7 +1487,7 @@ where
                         }
                     }
 
-                    match kernel_execution.set_global_work_size(gpu_graph.size)
+                    match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
                         .enqueue_nd_range(&self.queue) {
                             Ok(value) => value,
                             Err(_) => return Err(GPUError::QueueFailure),
@@ -1519,65 +1530,73 @@ where
                 }
             }
 
-            // if spike_train_lattices_exist {
-            //     let iterate_event = unsafe {
-            //         for i in spike_train_iterate_kernel.argument_names.iter() {
-            //             if i == "number_of_types" {
-            //                 kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
-            //             } else if i == "index_to_position" {
-            //                 kernel_execution.set_arg(&index_to_position_buffer);
-            //             } else if i == "skip_index" { 
-            //                 kernel_execution.set_arg(&0);
-            //             } else if i == "neuro_flags" {
-            //                 match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
-            //                     BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-            //                     _ => unreachable!("Could not retrieve neurotransmitter flags"),
-            //                 };
-            //             } else {
-            //                 match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-            //                     BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-            //                     BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-            //                     BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-            //                 };
-            //             }
-            //         }
-            //     };
+            if spike_train_lattices_exist {
+                let iterate_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&spike_train_iterate_kernel.kernel);
 
-            //     match iterate_event.wait() {
-            //         Ok(_) => {},
-            //         Err(_) => return Err(GPUError::WaitError),
-            //     };
+                    for i in spike_train_iterate_kernel.argument_names.iter() {
+                        if i == "number_of_types" {
+                            kernel_execution.set_arg(&N::number_of_types());
+                        } else if i == "index_to_position" {
+                            kernel_execution.set_arg(&gpu_graph.index_to_position);
+                        } else if i == "skip_index" { 
+                            kernel_execution.set_arg(&0);
+                        } else if i == "neuro_flags" {
+                            match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                                _ => unreachable!("Could not retrieve neurotransmitter flags"),
+                            };
+                        } else {
+                            match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        }
+                    }
 
-            //     unsafe {
-            //         self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid)?
-            //     };
+                    match kernel_execution.set_global_work_size(spike_train_size)
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
 
-            //     // for (key, value) in self.spike_train_lattices.iter() {
-            //     //     if value.update_grid_history {
-            //     //         let mut skip_index = 0;
-            //     //         for i in gpu_graph.ordered_keys.iter() {
-            //     //             if *i >= *key {
-            //     //                 break;
-            //     //             }
-            //     //             let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
-            //     //             skip_index += current_size.0 * current_size.1;
-            //     //         }
+                match iterate_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
 
-            //     //         let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
-            //     //         let current_size = dim.0 * dim.1;
+                unsafe {
+                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid, spike_train_skip_index)?
+                };
+
+                // for (key, value) in self.spike_train_lattices.iter() {
+                //     if value.update_grid_history {
+                //         let mut skip_index = 0;
+                //         for i in gpu_graph.ordered_keys.iter() {
+                //             if *i >= *key {
+                //                 break;
+                //             }
+                //             let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
+                //             skip_index += current_size.0 * current_size.1;
+                //         }
+
+                //         let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
+                //         let current_size = dim.0 * dim.1;
                         
-            //     //         unsafe {
-            //     //             self.execute_grid_history(
-            //     //                 skip_index as u32,
-            //     //                 current_size as u32,
-            //     //                 &gpu_graph, 
-            //     //                 &gpu_cell_grid, 
-            //     //                 gpu_grid_histories.get(key).unwrap()
-            //     //             )?;
-            //     //         }
-            //     //     }
-            //     // }
-            // }
+                //         unsafe {
+                //             self.execute_grid_history(
+                //                 skip_index as u32,
+                //                 current_size as u32,
+                //                 &gpu_graph, 
+                //                 &gpu_cell_grid, 
+                //                 gpu_grid_histories.get(key).unwrap()
+                //             )?;
+                //         }
+                //     }
+                // }
+            }
             
             self.internal_clock += 1;
         }
@@ -1637,26 +1656,34 @@ where
             value.set_cell_grid(reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
         }
 
-        // let mut spike_train_new_grids: HashMap<usize, Vec<T>> = HashMap::new();
+        W::convert_electrochemical_to_cpu(
+            &mut spike_train_cell_vector, 
+            &gpu_cell_grid, 
+            1, 
+            spike_train_vector_size, 
+            &self.queue
+        )?;
 
-        // if let Some(first_vec) = spike_train_vector.first() {
-        //     for (id, cell) in spike_train_lattice_ids.iter().zip(first_vec.iter()) {
-        //         spike_train_new_grids.entry(*id as usize)
-        //             .and_modify(|vec| vec.push(cell.clone()))
-        //             .or_insert_with(|| vec![cell.clone()]);
-        //     }
-        // }
+        let mut spike_train_new_grids: HashMap<usize, Vec<W>> = HashMap::new();
 
-        // let mut spike_train_reshaped_grids = HashMap::new();
+        if let Some(first_vec) = spike_train_cell_vector.first() {
+            for (id, cell) in spike_train_lattice_ids.iter().zip(first_vec.iter()) {
+                spike_train_new_grids.entry(*id as usize)
+                    .and_modify(|vec| vec.push(cell.clone()))
+                    .or_insert_with(|| vec![cell.clone()]);
+            }
+        }
 
-        // for (key, vec) in new_grids {
-        //     if let Some(&(_, cols)) = spike_train_lattice_sizes_map.get(&key) {
-        //         let reshaped_vec: Vec<Vec<T>> = vec.chunks(cols)
-        //             .map(|chunk| chunk.to_vec())
-        //             .collect();
-        //         spike_train_reshaped_grids.insert(key, reshaped_vec);
-        //     }
-        // }
+        let mut spike_train_reshaped_grids = HashMap::new();
+
+        for (key, vec) in spike_train_new_grids {
+            if let Some(&(_, cols)) = spike_train_lattice_sizes_map.get(&key) {
+                let reshaped_vec: Vec<Vec<W>> = vec.chunks(cols)
+                    .map(|chunk| chunk.to_vec())
+                    .collect();
+                spike_train_reshaped_grids.insert(key, reshaped_vec);
+            }
+        }
 
         InterleavingGraphGPU::convert_to_cpu(
             &self.queue, &gpu_graph, &mut self.lattices, &mut self.spike_train_lattices, &mut self.connecting_graph
