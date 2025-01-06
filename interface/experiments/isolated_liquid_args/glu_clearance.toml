@@ -8,6 +8,7 @@ iterations2 = 0
 
 internal_weights_scalar = 0.5
 skew = 1
+tolerance = 2
 
 trials = 20
 
