@@ -398,4 +398,16 @@ mod tests {
 
         Ok(())
     }
+
+    // check to see if spike trains fire and that it is recorded in history
+    // #[test]
+    // pub fn test_spike_train_lattice_firing_electrical() -> Result<(), SpikingNeuralNetworksError> {
+        
+    // }
+
+    // check to see if spike trains fire and that it is recorded in history alongside regular lattice execution
+    // #[test]
+    // pub fn test_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
+        
+    // }
 }
