@@ -15,7 +15,7 @@ import sys
 import itertools
 import numpy as np
 from tqdm import tqdm
-from pipeline_setup import parse_toml, generate_setup_neuron, signal_to_noise
+from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise
 from lsm_setup import generate_liquid_weights
 import lixirnet as ln
 
@@ -63,6 +63,8 @@ def fill_defaults(parsed):
 
     if 'connectivity' not in parsed['variables']:
         parsed['variables']['connectivity'] = [0.25]
+    if 'inh_connectivity' not in parsed['variables']:
+        parsed['variables']['inh_connectivity'] = [0.25]
     if 'exc_to_inh_connectivity' not in parsed['variables']:
         parsed['variables']['exc_to_inh_connectivity'] = [0.15]
     if 'inh_to_exc_connectivity' not in parsed['variables']:
@@ -71,7 +73,7 @@ def fill_defaults(parsed):
         parsed['variables']['spike_train_connectivity'] = [0.5]
     
     if 'internal_scalar' not in parsed['variables']:
-        parsed['variables']['weights_scalar'] = [0.5]
+        parsed['variables']['internal_scalar'] = [0.5]
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = [3]
     if 'exc_to_inh_weight' not in parsed['variables']:
@@ -79,7 +81,7 @@ def fill_defaults(parsed):
     if 'inh_to_exc_weight' not in parsed['variables']:
         parsed['variables']['inh_to_exc_weight'] = [0.0125]
     if 'inh_internal_scalar' not in parsed['variables']:
-        parsed['variables']['weights_scalar'] = [2]
+        parsed['variables']['inh_internal_scalar'] = [2]
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
@@ -102,7 +104,7 @@ def generate_key(parsed, current_state):
 
     fields = [
         'cue_firing_rate', 
-        'connectivity', 'spike_train_connectivity', 'inh_connectivity',
+        'connectivity', 'spike_train_connectivity', 'inh_connectivity', 'exc_to_inh_connectivity', 'inh_to_exc_connectivity',
         'spike_train_to_exc', 'internal_scalar', 'inh_internal_scalar', 'exc_to_inh_weight', 'inh_to_exc_weight',
         'nmda_g', 'ampa_g', 'gabaa_g',
         'glutamate_clearance', 'gabaa_clearance', 
@@ -320,6 +322,8 @@ for current_state in tqdm(all_states):
 
         current_value['return_to_baseline'] = return_to_baseline
         current_value['voltages'] = voltages
+
+        current_state['trial'] = trial
 
         key = generate_key(parsed_toml, current_state)
 
