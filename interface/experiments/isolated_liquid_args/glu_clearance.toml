@@ -1,1 +1,19 @@
-# exc_only = true
+[simulation_parameters]
+measure_snr = true
+
+exc_only = true
+
+off_phase = 5000
+iterations2 = 0
+
+internal_weights_scalar = 0.5
+skew = 1
+
+trials = 20
+
+filename = "glu_clearance_liquid.json"
+
+[variables]
+spike_train_to_exc = [2]
+internal_scalar = [0.5]
+glu_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
