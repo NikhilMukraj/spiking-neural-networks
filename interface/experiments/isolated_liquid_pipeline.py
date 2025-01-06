@@ -295,6 +295,8 @@ for current_state in tqdm(all_states):
             parsed_toml['simulation_parameters']['tolerance'],
         )
 
+        current_value = {}
+
         if parsed_toml['simulation_parameters']['measure_snr']:
             current_value['first_snr'] = float(
                 signal_to_noise(voltages[
