@@ -587,7 +587,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         context: &Context,
         queue: &CommandQueue,
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        if cell_grid.is_empty() {
+        if cell_grid.is_empty() || cell_grid.iter().all(|i| i.is_empty()) {
             return Ok(HashMap::new());
         }
 
