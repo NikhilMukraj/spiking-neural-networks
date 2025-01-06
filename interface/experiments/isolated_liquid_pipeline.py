@@ -15,7 +15,7 @@ import sys
 import itertools
 import numpy as np
 from tqdm import tqdm
-from pipeline_setup import generate_setup_neuron, signal_to_noise
+from pipeline_setup import parse_toml, generate_setup_neuron, signal_to_noise
 from lsm_setup import generate_liquid_weights
 import lixirnet as ln
 
@@ -59,27 +59,27 @@ def fill_defaults(parsed):
         parsed['simulation_parameters']['c_m'] = 25
 
     if 'cue_firing_rate' not in parsed['variables']:
-        parsed['variables']['cue_firing_rate'] = 0.01
+        parsed['variables']['cue_firing_rate'] = [0.01]
 
     if 'connectivity' not in parsed['variables']:
-        parsed['variables']['connectivity'] = 0.25
+        parsed['variables']['connectivity'] = [0.25]
     if 'exc_to_inh_connectivity' not in parsed['variables']:
-        parsed['variables']['exc_to_inh_connectivity'] = 0.15
+        parsed['variables']['exc_to_inh_connectivity'] = [0.15]
     if 'inh_to_exc_connectivity' not in parsed['variables']:
-        parsed['variables']['inh_to_exc_connectivity'] = 0.15
+        parsed['variables']['inh_to_exc_connectivity'] = [0.15]
     if 'spike_train_connectivity' not in parsed['variables']:
-        parsed['variables']['spike_train_connectivity'] = 0.5
+        parsed['variables']['spike_train_connectivity'] = [0.5]
     
     if 'internal_scalar' not in parsed['variables']:
-        parsed['variables']['weights_scalar'] = 0.5
+        parsed['variables']['weights_scalar'] = [0.5]
     if 'spike_train_to_exc' not in parsed['variables']:
-        parsed['variables']['spike_train_to_exc'] = 3
+        parsed['variables']['spike_train_to_exc'] = [3]
     if 'exc_to_inh_weight' not in parsed['variables']:
-        parsed['variables']['exc_to_inh_weight'] = 0.0125
+        parsed['variables']['exc_to_inh_weight'] = [0.0125]
     if 'inh_to_exc_weight' not in parsed['variables']:
-        parsed['variables']['inh_to_exc_weight'] = 0.0125
+        parsed['variables']['inh_to_exc_weight'] = [0.0125]
     if 'inh_internal_scalar' not in parsed['variables']:
-        parsed['variables']['weights_scalar'] = 2
+        parsed['variables']['weights_scalar'] = [2]
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
@@ -163,7 +163,7 @@ np.seterr(divide='ignore', invalid='ignore')
 simulation_output = {}
 
 for current_state in tqdm(all_states):
-    for trial in parsed_toml['simulation_parameters']['trials']:
+    for trial in range(parsed_toml['simulation_parameters']['trials']):
         w = generate_liquid_weights(
             num, connectivity=current_state['connectivity'], scalar=current_state['internal_scalar']
         )
@@ -179,7 +179,7 @@ for current_state in tqdm(all_states):
         exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         exc_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Glutamate, glu_neuro)
 
-        gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gaba_clearance'])
+        gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gabaa_clearance'])
         inh_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         inh_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.GABA, gaba_neuro)
 
@@ -220,7 +220,7 @@ for current_state in tqdm(all_states):
         spike_train_lattice = ln.DopaPoissonLattice(1)
         spike_train_lattice.populate(poisson_neuron, exc_n, exc_n)
 
-        if parsed_toml['simulation_parameters']['exc_only']:
+        if not parsed_toml['simulation_parameters']['exc_only']:
             inh_lattice = ln.DopaIzhikevichLattice(2)
             inh_lattice.populate(inh_neuron, inh_n, inh_n)
             inh_lattice.apply(setup_neuron)
@@ -232,11 +232,11 @@ for current_state in tqdm(all_states):
             # inh_lattice.update_grid_history = True
 
             network = ln.DopaIzhikevichNetwork.generate_network(
-                [exc_lattice], [spike_train_lattice],
+                [exc_lattice, inh_lattice], [spike_train_lattice],
             )
         else:
             network = ln.DopaIzhikevichNetwork.generate_network(
-                [exc_lattice, inh_lattice], [spike_train_lattice],
+                [exc_lattice], [spike_train_lattice],
             )
 
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
@@ -270,19 +270,19 @@ for current_state in tqdm(all_states):
             1,
             stop_firing
         )
-        network.run_lattices(off_phase)
+        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         network.apply_spike_train_lattice(
             1,
             start_firing
         )
-        network.run_lattices(on_phase)
+        network.run_lattices(parsed_toml['simulation_parameters']['on_phase'])
 
         network.apply_spike_train_lattice(
             1,
             stop_firing
         )
-        network.run_lattices(off_phase)
+        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         hist = network.get_lattice(0).history
         voltages = [float(np.array(i).mean()) for i in hist]
