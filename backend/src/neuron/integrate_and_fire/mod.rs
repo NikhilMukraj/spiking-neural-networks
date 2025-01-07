@@ -592,7 +592,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        if cell_grid.is_empty() {
+        if cell_grid.is_empty() || cell_grid.iter().all(|i| i.is_empty()) {
             return Ok(HashMap::new());
         }
 
@@ -1550,7 +1550,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
     fn convert_to_gpu(
         cell_grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        if cell_grid.is_empty() {
+        if cell_grid.is_empty() || cell_grid.iter().all(|i| i.is_empty()) {
             return Ok(HashMap::new());
         }
 
