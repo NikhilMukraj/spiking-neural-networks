@@ -396,7 +396,6 @@ mod tests {
         Ok(())
     }
 
-    // check to see if spike trains fire and that it is recorded in history
     #[test]
     pub fn test_spike_train_lattice_firing_electrical() -> Result<(), SpikingNeuralNetworksError> {
         let mut base_spike_train = PoissonNeuron::default_impl();
@@ -404,6 +403,7 @@ mod tests {
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
         spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.update_grid_history = true;
 
         #[allow(clippy::type_complexity)]
         let mut network: LatticeNetwork<
@@ -423,8 +423,24 @@ mod tests {
 
         gpu_network.run_lattices(1000)?;
 
-        // check that spiking occurs
-        // gpu_network.get_spike_train_lattice(0).grid_history 
+        let history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+
+        assert!(!history.is_empty());
+
+        let mut spiking_occured = false;
+        for grid in history.iter() {
+            for row in grid {
+                for i in row.iter() {
+                    assert!((i - base_spike_train.v_resting).abs() < 2. 
+                        || (i - base_spike_train.v_th).abs() < 2.);
+                    if i - base_spike_train.v_th.abs() < 2. {
+                        spiking_occured = true;
+                    }
+                }
+            }
+        }
+
+        assert!(spiking_occured);
 
         Ok(())
     }
