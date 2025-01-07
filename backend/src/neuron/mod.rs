@@ -1307,6 +1307,23 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
         self.apply(|neuron| neuron.set_dt(dt));
     } 
 
+    /// Sets a spike train grid (grid must be the same dimensions as exsting grid)
+    pub fn set_spike_train_grid(&mut self, cell_grid: Vec<Vec<T>>) -> Result<(), GraphError> {
+        for (row, expected_row) in cell_grid.iter().zip(self.cell_grid.iter()) {
+            if row.len() != expected_row.len() {
+                return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+            }
+        }
+
+        if cell_grid.len() != self.cell_grid.len() {
+            return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+        }
+
+        self.cell_grid = cell_grid;
+
+        Ok(())
+    }
+
     /// Iterates one simulation timestep lattice
     fn iterate(&mut self) {
         self.cell_grid.iter_mut()
@@ -1326,6 +1343,7 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
         self.internal_clock += 1;
     }
 
+    /// Populates the [`SpikeTrainLattice`] given a [`SpikeTrain`] to clone and given dimensions
     pub fn populate(&mut self, base_spike_train: &T, num_rows: usize, num_cols: usize) {
         self.cell_grid = (0..num_rows)
             .map(|_| {
