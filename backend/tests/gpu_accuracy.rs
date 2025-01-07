@@ -4,18 +4,15 @@ mod tests {
     use std::result::Result;
     extern crate spiking_neural_networks;
     use spiking_neural_networks::{
-        error::SpikingNeuralNetworksError,
-        neuron::{
+        error::SpikingNeuralNetworksError, graph::{AdjacencyMatrix, GraphPosition}, neuron::{
             gpu_lattices::{
                 LatticeGPU, LatticeNetworkGPU,
-            }, 
-            integrate_and_fire::{
+            }, integrate_and_fire::{
                 QuadraticIntegrateAndFireNeuron, 
                 SimpleLeakyIntegrateAndFire,
             }, iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, 
-                IonotropicNeurotransmitterType, LigandGatedChannel
-            }, Lattice, LatticeNetwork, RunLattice, RunNetwork,
+                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType, LigandGatedChannel
+            }, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice
         }
     };
 
@@ -400,10 +397,37 @@ mod tests {
     }
 
     // check to see if spike trains fire and that it is recorded in history
-    // #[test]
-    // pub fn test_spike_train_lattice_firing_electrical() -> Result<(), SpikingNeuralNetworksError> {
+    #[test]
+    pub fn test_spike_train_lattice_firing_electrical() -> Result<(), SpikingNeuralNetworksError> {
+        let mut base_spike_train = PoissonNeuron::default_impl();
+        base_spike_train.chance_of_firing = 0.1;
+
+        let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+        spike_train_lattice.populate(&base_spike_train, 3, 3);
+
+        #[allow(clippy::type_complexity)]
+        let mut network: LatticeNetwork<
+            QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
+            AdjacencyMatrix<(usize, usize), f32>, 
+            GridVoltageHistory, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            SpikeTrainGridHistory, 
+            AdjacencyMatrix<GraphPosition, f32>, 
+            STDP, 
+            IonotropicNeurotransmitterType,
+        > = LatticeNetwork::default_impl();
         
-    // }
+        network.add_spike_train_lattice(spike_train_lattice)?;
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
+
+        gpu_network.run_lattices(1000)?;
+
+        // check that spiking occurs
+        // gpu_network.get_spike_train_lattice(0).grid_history 
+
+        Ok(())
+    }
 
     // check to see if spike trains fire and that it is recorded in history alongside regular lattice execution
     // #[test]
