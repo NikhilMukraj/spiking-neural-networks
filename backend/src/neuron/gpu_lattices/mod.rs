@@ -1,4 +1,4 @@
-use std::collections::{hash_map::{Values, ValuesMut}, HashMap};
+use std::collections::{hash_map::{Values, ValuesMut}, HashMap, HashSet};
 use opencl3::{
     command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
     context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
@@ -6,21 +6,18 @@ use opencl3::{
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::{
-    error::{GPUError, SpikingNeuralNetworksError}, 
+    error::{GPUError, LatticeNetworkError, SpikingNeuralNetworksError}, 
     graph::{
         ConnectingGraphGPU, ConnectingGraphToGPU, Graph, GraphGPU, 
         GraphPosition, GraphToGPU, InterleavingGraphGPU
-    }
+    },
 };
 use super::{
-    impl_apply, iterate_and_spike::{
-        AvailableBufferType, BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, 
-        NeurotransmitterTypeGPU, generate_unique_prefix,
-    }, 
-    plasticity::Plasticity, 
-    spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU},
-    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, SpikeTrainGrid,
-    RunLattice, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
+    check_position, 
+    impl_apply, 
+    iterate_and_spike::{
+        generate_unique_prefix, AvailableBufferType, BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterTypeGPU
+    }, plasticity::Plasticity, spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
 };
 use std::ptr;
 
@@ -1083,6 +1080,7 @@ pub struct LatticeNetworkGPU<
     context: Context,
     queue: CommandQueue,
     grid_history_kernel: KernelFunction,
+    spike_train_grid_history_kernel: KernelFunction,
     pub electrical_synapse: bool,
     pub chemical_synapse: bool,
     internal_clock: usize,
@@ -1156,6 +1154,7 @@ where
                 electrical_and_spike_train_incoming_connections: generate_network_spike_train_electrical_inputs_kernel::<R>(&context)?,
                 // chemical_incoming_connections_kernel: todo!(), 
                 grid_history_kernel: V::get_kernel(&context)?,
+                spike_train_grid_history_kernel: X::get_kernel(&context)?,
                 context, 
                 queue, 
                 electrical_synapse: lattice_network.electrical_synapse, 
@@ -1230,6 +1229,81 @@ where
         self.lattices.get_mut(id)
     }
 
+    /// Returns an immutable set of [`SpikeTrainLattice`]s
+    pub fn get_spike_train_lattices(&self) -> &HashMap<usize, SpikeTrainLattice<N, W, X>> {
+        &self.spike_train_lattices
+    }
+
+    /// Returns a reference to [`SpikeTrainLattice`] given the identifier
+    pub fn get_spike_train_lattice(&self, id: &usize) -> Option<&SpikeTrainLattice<N, W, X>> {
+        self.spike_train_lattices.get(id)
+    }
+
+    /// Returns a mutable reference to a [`SpikeTrainLattice`] given the identifier
+    pub fn get_mut_spike_train_lattice(&mut self, id: &usize) -> Option<&mut SpikeTrainLattice<N, W, X>> {
+        self.spike_train_lattices.get_mut(id)
+    }
+
+    /// Returns the set of [`SpikeTrainLattice`]s in the hashmap of spike train lattices
+    pub fn spike_trains_values(&self) -> Values<usize, SpikeTrainLattice<N, W, X>> {
+        self.spike_train_lattices.values()
+    }
+
+    /// Returns a mutable set [`SpikeTrainLattice`]s in the hashmap of spike train lattices    
+    pub fn spike_trains_values_mut(&mut self) -> ValuesMut<usize, SpikeTrainLattice<N, W, X>> {
+        self.spike_train_lattices.values_mut()
+    }
+
+    /// Returns an immutable reference to the connecting graph
+    pub fn get_connecting_graph(&self) -> &C {
+        &self.connecting_graph
+    }
+
+    /// Returns a hashset of each [`Lattice`] id
+    pub fn get_all_lattice_ids(&self) -> HashSet<usize> {
+        self.lattices.keys().cloned().collect()
+    }
+
+    /// Returns a hashset of each [`SpikeTrainLattice`] id
+    pub fn get_all_spike_train_lattice_ids(&self) -> HashSet<usize> {
+        self.spike_train_lattices.keys().cloned().collect()
+    } 
+
+    /// Returns a hashset of all the ids
+    pub fn get_all_ids(&self) -> HashSet<usize> {
+        let mut ids = HashSet::new();
+
+        self.lattices.keys()
+            .for_each(|i| { ids.insert(*i); });
+        self.spike_train_lattices.keys()
+            .for_each(|i| { ids.insert(*i); });
+
+        ids
+    }
+
+    /// Sets the connecting graph to a new graph, (id remains the same before and after),
+    /// also verifies if graph is valid
+    pub fn set_connecting_graph(&mut self, new_graph: C) -> Result<(), SpikingNeuralNetworksError> {
+        let id = self.connecting_graph.get_id();
+
+        for graph_pos in new_graph.get_every_node_as_ref() {
+            if let Some(lattice) = self.lattices.get(&graph_pos.id) {
+                check_position(&lattice.cell_grid, graph_pos)?;
+            } else if let Some(spike_train_lattice) = self.spike_train_lattices.get(&graph_pos.id) {
+                check_position(&spike_train_lattice.cell_grid, graph_pos)?;
+            } else {
+                return Err(SpikingNeuralNetworksError::from(
+                    LatticeNetworkError::IDNotFoundInLattices(graph_pos.id),
+                ));
+            }
+        }
+    
+        self.connecting_graph = new_graph;
+        self.connecting_graph.set_id(id);
+    
+        Ok(())
+    }
+
     unsafe fn execute_last_firing_time(
         &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>, skip_index: u32,
     ) -> Result<(), GPUError> {
@@ -1269,12 +1343,13 @@ where
         &self, 
         skip_index: u32,
         size: u32,
+        kernel: &Kernel,
         gpu_graph: &InterleavingGraphGPU, 
         gpu_cell_grid: &HashMap<String, BufferGPU>, 
         gpu_grid_history: &HashMap<String, BufferGPU>,
     ) -> Result<(), GPUError> {
         let update_history_event = unsafe {
-            let mut kernel_execution = ExecuteKernel::new(&self.grid_history_kernel.kernel);
+            let mut kernel_execution = ExecuteKernel::new(kernel);
 
             for i in self.grid_history_kernel.argument_names.iter() {
                 if i == "iteration" {
@@ -1316,16 +1391,6 @@ where
 
         Ok(())
     }
-
-    // unsafe fn execute_spike_train_grid_history(
-    //     &self,
-    //     skip_index: u32,
-    //     gpu_graph: &InterleavingGraphGPU,
-    //     gpu_cell_grid: &HashMap<String, BufferGPU>, 
-    //     gpu_grid_history: &HashMap<String, BufferGPU>,
-    // ) -> Result<(), GPUError> {
-    //     Ok(())
-    // }
 
     fn run_lattices_with_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         // concat cell grids into a single 1d vector of cell grids
@@ -1403,6 +1468,7 @@ where
         let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
 
         let mut gpu_grid_histories = HashMap::new();
+        let mut spike_train_gpu_grid_histories = HashMap::new();
 
         for (key, value) in &self.lattices {
             if value.update_grid_history {
@@ -1410,6 +1476,18 @@ where
                 let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
 
                 gpu_grid_histories.insert(
+                    key,
+                    value.grid_history.clone().to_gpu(&self.context, iterations, (rows, cols))?,
+                );
+            }
+        }
+
+        for (key, value) in &self.spike_train_lattices {
+            if value.update_grid_history {
+                let rows = value.spike_train_grid().len();
+                let cols = value.spike_train_grid().first().unwrap_or(&vec![]).len();
+
+                spike_train_gpu_grid_histories.insert(
                     key,
                     value.grid_history.clone().to_gpu(&self.context, iterations, (rows, cols))?,
                 );
@@ -1521,6 +1599,7 @@ where
                             self.execute_grid_history(
                                 skip_index as u32,
                                 current_size as u32,
+                                &self.grid_history_kernel.kernel,
                                 &gpu_graph, 
                                 &gpu_cell_grid, 
                                 gpu_grid_histories.get(key).unwrap()
@@ -1568,34 +1647,35 @@ where
                 };
 
                 unsafe {
-                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid, spike_train_skip_index)?
+                    self.execute_last_firing_time(&gpu_graph, &gpu_spike_train_grid, spike_train_skip_index)?
                 };
 
-                // for (key, value) in self.spike_train_lattices.iter() {
-                //     if value.update_grid_history {
-                //         let mut skip_index = 0;
-                //         for i in gpu_graph.ordered_keys.iter() {
-                //             if *i >= *key {
-                //                 break;
-                //             }
-                //             let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
-                //             skip_index += current_size.0 * current_size.1;
-                //         }
+                for (key, value) in self.spike_train_lattices.iter() {
+                    if value.update_grid_history {
+                        let mut skip_index = 0;
+                        for i in gpu_graph.ordered_keys.iter() {
+                            if *i >= *key {
+                                break;
+                            }
+                            let current_size = gpu_graph.spike_train_lattice_sizes_map.get(i).unwrap();
+                            skip_index += current_size.0 * current_size.1;
+                        }
 
-                //         let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
-                //         let current_size = dim.0 * dim.1;
+                        let dim = &gpu_graph.spike_train_lattice_sizes_map.get(key).unwrap();
+                        let current_size = dim.0 * dim.1;
                         
-                //         unsafe {
-                //             self.execute_grid_history(
-                //                 skip_index as u32,
-                //                 current_size as u32,
-                //                 &gpu_graph, 
-                //                 &gpu_cell_grid, 
-                //                 gpu_grid_histories.get(key).unwrap()
-                //             )?;
-                //         }
-                //     }
-                // }
+                        unsafe {
+                            self.execute_grid_history(
+                                skip_index as u32,
+                                current_size as u32,
+                                &self.spike_train_grid_history_kernel.kernel,
+                                &gpu_graph, 
+                                &gpu_cell_grid, 
+                                spike_train_gpu_grid_histories.get(key).unwrap()
+                            )?;
+                        }
+                    }
+                }
             }
             
             self.internal_clock += 1;
@@ -1683,6 +1763,32 @@ where
                     .collect();
                 spike_train_reshaped_grids.insert(key, reshaped_vec);
             }
+        }
+
+        let updates: Vec<(usize, (usize, usize), _)> = self.spike_train_lattices.iter()
+            .filter_map(|(key, value)| {
+                if value.update_grid_history {
+                    let rows = value.spike_train_grid().len();
+                    let cols = value.spike_train_grid().first().unwrap_or(&vec![]).len();
+                    Some((*key, (rows, cols), spike_train_gpu_grid_histories.remove(key).unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (key, (rows, cols), grid_history) in updates {
+            let value = self.spike_train_lattices.get_mut(&key).unwrap();
+            value.grid_history.add_from_gpu(
+                &self.queue,
+                grid_history,
+                iterations,
+                (rows, cols),
+            )?;
+        }
+
+        for (key, value) in self.spike_train_lattices.iter_mut() {
+            value.set_spike_train_grid(spike_train_reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
         }
 
         InterleavingGraphGPU::convert_to_cpu(
