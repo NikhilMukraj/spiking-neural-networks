@@ -77,6 +77,62 @@ mod tests {
     }
 
     #[test]
+    pub fn test_grid_of_empty_grids_conversion() -> Result<(), SpikingNeuralNetworksError> {
+        let cell_grid: GridType = vec![vec![], vec![]];
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let mut cpu_conversion: GridType = vec![];
+
+        let gpu_conversion = QuadraticIntegrateAndFireNeuron::convert_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
+
+        QuadraticIntegrateAndFireNeuron::convert_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            0,
+            0,
+            &queue,
+        )?;
+
+        assert_eq!(cpu_conversion.len(), 0);
+
+        let gpu_conversion = QuadraticIntegrateAndFireNeuron::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
+
+        QuadraticIntegrateAndFireNeuron::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            0,
+            0,
+            &queue,
+        )?;
+
+        assert_eq!(cpu_conversion.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
     pub fn test_neuron_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let mut cell_grid = vec![
             vec![QuadraticIntegrateAndFireNeuron::default_impl(), QuadraticIntegrateAndFireNeuron::default_impl()],
