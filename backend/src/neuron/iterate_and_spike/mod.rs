@@ -683,9 +683,9 @@ impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 #[derive(Debug, Clone, PartialEq)]
 pub enum IonotropicLigandGatedReceptorType {
     /// AMPA receptor
-    AMPA(f32),
+    AMPA,
     /// GABAa receptor
-    GABAa(f32),
+    GABAa,
     /// GABAb receptor with dissociation modifier
     GABAb(GABAbDissociation),
     /// NMDA receptor with magnesium and voltage modifier
@@ -713,7 +713,7 @@ impl<T: ReceptorKinetics + AMPADefault> AMPADefault for LigandGatedChannel<T> {
             g: 1.0, // 1.0 nS
             reversal: 0., // 0.0 mV
             receptor: T::ampa_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::AMPA(1.0),
+            receptor_type: IonotropicLigandGatedReceptorType::AMPA,
             current: 0.,
         }
     }
@@ -725,7 +725,7 @@ impl<T: ReceptorKinetics + GABAaDefault> GABAaDefault for LigandGatedChannel<T> 
             g: 1.2, // 1.2 nS
             reversal: -80., // -80 mV
             receptor: T::gabaa_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::GABAa(1.0),
+            receptor_type: IonotropicLigandGatedReceptorType::GABAa,
             current: 0.,
         }
     }
@@ -788,8 +788,8 @@ impl<T: ReceptorKinetics> LigandGatedChannel<T> {
     /// Calculates modifier for current calculation
     fn get_modifier(&mut self, voltage: f32, dt: f32) -> f32 {
         match &mut self.receptor_type {
-            IonotropicLigandGatedReceptorType::AMPA(value) => *value,
-            IonotropicLigandGatedReceptorType::GABAa(value) => *value,
+            IonotropicLigandGatedReceptorType::AMPA => 1.0,
+            IonotropicLigandGatedReceptorType::GABAa => 1.0,
             IonotropicLigandGatedReceptorType::GABAb(value) => {
                 value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * dt;
                 value.calculate_modifer() // G^N / (G^N + Kd)
@@ -973,13 +973,13 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
         attributes.extend(T::get_attribute_names());
 
         match &self.receptor_type {
-            IonotropicLigandGatedReceptorType::AMPA(_) => attributes,
+            IonotropicLigandGatedReceptorType::AMPA => attributes,
             IonotropicLigandGatedReceptorType::NMDA(_) => {
                 attributes.insert((String::from("ligand_gates$nmda_mg"), AvailableBufferType::Float));
 
                 attributes
             },
-            IonotropicLigandGatedReceptorType::GABAa(_) => attributes,
+            IonotropicLigandGatedReceptorType::GABAa => attributes,
             IonotropicLigandGatedReceptorType::GABAb(_) => {
                 attributes.insert((String::from("ligand_gates_gabab$g"), AvailableBufferType::Float));
                 attributes.insert((String::from("ligand_gates_gabab$k3"), AvailableBufferType::Float));
@@ -1011,7 +1011,7 @@ fn matching_neurotransmitter_and_receptor_type(
     neurotransmitter_type: &IonotropicNeurotransmitterType,
     receptor_type: &IonotropicLigandGatedReceptorType,
 ) -> bool {
-    if let IonotropicLigandGatedReceptorType::AMPA(_) = receptor_type {
+    if let IonotropicLigandGatedReceptorType::AMPA = receptor_type {
         if *neurotransmitter_type == IonotropicNeurotransmitterType::AMPA {
             return true;
         }
@@ -1021,7 +1021,7 @@ fn matching_neurotransmitter_and_receptor_type(
             return true;
         }
     }
-    if let IonotropicLigandGatedReceptorType::GABAa(_) = receptor_type {
+    if let IonotropicLigandGatedReceptorType::GABAa = receptor_type {
         if *neurotransmitter_type == IonotropicNeurotransmitterType::GABAa {
             return true;
         }
