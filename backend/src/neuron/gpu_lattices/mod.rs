@@ -1647,7 +1647,11 @@ where
                 };
 
                 unsafe {
-                    self.execute_last_firing_time(&gpu_graph, &gpu_spike_train_grid, spike_train_skip_index)?
+                    self.execute_last_firing_time(
+                        &gpu_graph, 
+                        &gpu_spike_train_grid, 
+                        spike_train_skip_index
+                    )?
                 };
 
                 for (key, value) in self.spike_train_lattices.iter() {
@@ -1670,7 +1674,7 @@ where
                                 current_size as u32,
                                 &self.spike_train_grid_history_kernel.kernel,
                                 &gpu_graph, 
-                                &gpu_cell_grid, 
+                                &gpu_spike_train_grid, 
                                 spike_train_gpu_grid_histories.get(key).unwrap()
                             )?;
                         }
