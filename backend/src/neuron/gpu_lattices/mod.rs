@@ -940,7 +940,8 @@ const NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_electrica
 fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractorinessGPU>(context: &Context) -> Result<KernelFunction, GPUError> {
     let mut args = vec![
         String::from("connections"), String::from("weights"), String::from("index_to_position"),
-        String::from("is_spike_train"), String::from("gap_conductances"), String::from("voltages")
+        String::from("is_spike_train"), String::from("gap_conductances"), String::from("voltages"),
+        String::from("last_firing_time"),
     ];
 
     let refractoriness_function = U::get_refractoriness_gpu_function()?;
@@ -950,7 +951,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
 
     for i in refractoriness_function.0 {
         if i.0 == "last_firing_time" {
-            refractoriness_function_args.push(String::from("spike_train_last_firing_time"));
+            refractoriness_function_args.push(String::from("last_firing_time"));
             continue;
         }
 
@@ -989,7 +990,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                 __global const uint *is_spike_train,
                 __global const float *gap_conductances,
                 __global const float *voltages,
-                __global const int *spike_train_last_firing_time,
+                __global const int *last_firing_time,
                 {},
                 uint skip_index,
                 uint n, 
@@ -1008,8 +1009,8 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
                             sum += weights[i * n + gid] * gap_junction;
                         }} else {{
-                            if (spike_train_last_firing_time[presynaptic_index] < 0) {{
-                                sum += v_max[presynaptic_index - skip_index];
+                            if (last_firing_time[presynaptic_index] < 0) {{
+                                sum += v_th[presynaptic_index - skip_index];
                             }} else {{
                                 sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
                             }}
@@ -1033,7 +1034,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
             .join(", "),
     );
 
-    args.extend(vec![String::from("n"), String::from("res")]);
+    args.extend(vec![String::from("skip_index"), String::from("n"), String::from("res")]);
 
     let kernel_name = String::from("calculate_network_electrical_with_spike_train_inputs");
 
@@ -1541,10 +1542,63 @@ where
                     Ok(_) => {},
                     Err(_) => return Err(GPUError::WaitError),
                 };
-            } // else if lattices_exist && spike_train_lattices_exist {
+            } else if lattices_exist && spike_train_lattices_exist {
                // spike_train_gap_junctions
                // pass in timestep as a i32
-            // }
+
+                let gap_junctions_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(
+                        &self.electrical_and_spike_train_incoming_connections.kernel
+                    );
+
+                    for i in &self.electrical_and_spike_train_incoming_connections.argument_names {
+                        if i == "weights" {
+                            kernel_execution.set_arg(&gpu_graph.weights);
+                        } else if i == "connections" {
+                            kernel_execution.set_arg(&gpu_graph.connections);
+                        } else if i == "index_to_position" {
+                            kernel_execution.set_arg(&gpu_graph.index_to_position);
+                        } else if i == "is_spike_train" {
+                            kernel_execution.set_arg(&gpu_graph.is_spike_train);
+                        } else if i == "gap_conductances" {
+                            match &gpu_cell_grid.get("gap_conductance").unwrap() {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                _ => unreachable!("gap_conductance must be a float buffer")
+                            };
+                        } else if i == "voltages" {
+                            match &gpu_cell_grid.get("current_voltage").unwrap() {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                _ => unreachable!("current_voltage must be a float buffer")
+                            };
+                        } else if i == "timestep" {
+                            kernel_execution.set_arg(&(self.internal_clock as i32));
+                        } else if i == "skip_index" {
+                            kernel_execution.set_arg(&spike_train_skip_index);
+                        } else if i == "n" {
+                            kernel_execution.set_arg(&gpu_graph.size);
+                        } else if i == "res" {
+                            kernel_execution.set_arg(&sums_buffer);
+                        } else {
+                            match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        }
+                    }
+
+                    match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                    };
+
+                    match gap_junctions_event.wait() {
+                        Ok(_) => {},
+                        Err(_) => return Err(GPUError::WaitError),
+                    };
+                }
 
             if lattices_exist {
                 // only execute if there exists lattices, same with spike train lattices
