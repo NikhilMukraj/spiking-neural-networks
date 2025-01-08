@@ -8,6 +8,11 @@
 - [x] Basic liquid implementation
   - [ ] Basic testing
 - [ ] Learning liquid
+  - [ ] Bayesian inference where dopamine modulates readout to bias a certain outcome
+    - Bias could potentially be so strong that output is given without a fully formed input cue/no input
+    - Could test behavior of liquid when givne malformed cue
+    - Could analyze neurons in liquid (excitatory or inhbitory component) to determine
+    which are active when a certain cue is outputted and then bias them with $D_1$ or $D_2$
 
 ## Todo
 
@@ -56,6 +61,7 @@
   - [ ] Morris-Lecar
   - [ ] Two-compartment Model
   - [ ] Could also vary $Mg^{2+}$
+- [ ] Grid attractor as prior cue for Bayesian inference
 
 ## Schizophrenia Simulation Pipeline
 
