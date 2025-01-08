@@ -24,7 +24,7 @@ filename = "distortion_d2_clearance_optimization.json"
 
 [variables]
 spike_train_to_exc = [4]
-bayesian_to_exc = [1]
+bayesian_to_exc = [0.5]
 prob_of_exc_to_inh = [1]
 distortion = [0.2, 0.8]
 bayesian_distortion = [0]
