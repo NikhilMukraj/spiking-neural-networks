@@ -94,7 +94,7 @@ impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
     fn get_refractoriness_gpu_function() -> Result<(Vec<(String, Option<AvailableBufferType>)>, String), GPUError> {
         let args = vec![
             (String::from("timestep"), None), (String::from("last_firing_time"), Some(AvailableBufferType::OptionalUInt)),
-            (String::from("v_max"), Some(AvailableBufferType::Float)), (String::from("v_resting"), Some(AvailableBufferType::Float)), 
+            (String::from("v_th"), Some(AvailableBufferType::Float)), (String::from("v_resting"), Some(AvailableBufferType::Float)), 
             (String::from("neural_refractoriness$k"), Some(AvailableBufferType::Float)), (String::from("dt"), Some(AvailableBufferType::Float)),
         ];
 
@@ -102,12 +102,12 @@ impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
             float get_effect(
                 int timestep,
                 int last_firing_time,
-                float v_max,
+                float v_th,
                 float v_resting,
                 float k, 
                 float dt
             ) {
-                float a = v_max - v_resting;
+                float a = v_th - v_resting;
                 float time_difference = timestep - last_firing_time;
 
                 return a * exp((-1.0f / (k / dt)) * time_difference * time_difference) + v_resting;
@@ -130,7 +130,7 @@ impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
 
         create_float_buffer!(k_buffer, context, queue, grid, k, last);
 
-        buffers.insert(String::from("neural_refactoriness$k"), BufferGPU::Float(k_buffer));
+        buffers.insert(String::from("neural_refractoriness$k"), BufferGPU::Float(k_buffer));
 
         Ok(buffers)
     }
@@ -378,6 +378,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 // have associated neural refractoriness function
 
 // scale the rand
+#[cfg(feature = "gpu")]
 const RAND_FUNCTION: &str = r#"
     uint rand(uint seed) {
         uint a = 1664525;
@@ -390,6 +391,7 @@ const RAND_FUNCTION: &str = r#"
     }
 "#;
 
+#[cfg(feature = "gpu")]
 impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for PoissonNeuron<N, T, U> {
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("poisson_neuron_electrical_kernel");
