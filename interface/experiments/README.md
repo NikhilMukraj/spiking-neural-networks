@@ -3,7 +3,11 @@
 ## Current Todo List
 
 - [ ] Bayesian inference with varied ionotropic neurotransmitters
-- [ ] Basic liquid implementation
+  - [ ] Bayesian inference with $D_2$ where $D_2$ modulates gabaergic neurons
+    - Analyze weights from inhbitory neurons to determine $D_2$ mappings
+- [x] Basic liquid implementation
+  - [ ] Basic testing
+- [ ] Learning liquid
 
 ## Todo
 
