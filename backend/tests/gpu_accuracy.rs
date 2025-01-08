@@ -446,8 +446,54 @@ mod tests {
     }
 
     // check to see if spike trains fire and that it is recorded in history alongside regular lattice execution
-    // #[test]
-    // pub fn test_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
+    #[test]
+    pub fn test_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = QuadraticIntegrateAndFireNeuron {
+            gap_conductance: 0.1,
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
+        };
+    
+        let iterations = 1000;
+
+        let mut lattice1 = Lattice::default_impl();
         
-    // }
+        lattice1.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        );
+    
+        // lattice1.connect(&connection_conditional, None);
+        lattice1.apply(|neuron: &mut _| {
+            let mut rng = rand::thread_rng();
+            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        });
+        lattice1.update_grid_history = true;
+
+        lattice1.set_id(1);
+
+        let mut base_spike_train = PoissonNeuron::default_impl();
+        base_spike_train.chance_of_firing = 0.1;
+
+        let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.update_grid_history = true;
+
+        let lattices = vec![lattice1];
+        let spike_train_lattices = vec![spike_train_lattice];
+
+        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+
+        network.connect(0, 1, &|x, y| {(x.0 * 3 + x.1) % 2 == 0 && x == y}, None)?;
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
+
+        gpu_network.run_lattices(iterations)?;
+
+        // change spike train incoming connections kernel to prefix each spike train input with a unique prefix
+        // prefix non spike train things with $ in argument names vector
+        // make sure that this test still passes
+
+        Ok(())
+    }
 }
