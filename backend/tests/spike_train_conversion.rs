@@ -138,6 +138,10 @@ mod tests {
                     actual.dt, 
                     expected.dt,
                 );
+                assert_eq!(
+                    actual.neural_refractoriness.k,
+                    expected.neural_refractoriness.k,
+                );
             }
         }
 
@@ -237,6 +241,10 @@ mod tests {
                 assert_eq!(
                     actual.synaptic_neurotransmitters,
                     expected.synaptic_neurotransmitters,
+                );
+                assert_eq!(
+                    actual.neural_refractoriness.k,
+                    expected.neural_refractoriness.k,
                 );
             }
         }
