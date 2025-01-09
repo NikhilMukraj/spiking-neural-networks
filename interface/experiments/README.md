@@ -3,8 +3,9 @@
 ## Current Todo List
 
 - [ ] Bayesian inference with varied ionotropic neurotransmitters
+  - [ ] Add option for pattern to change in second phase
+    - Test how easy it is for pattern to change when $D_1$ or $D_2$ is active on inhibitory group
   - [ ] Bayesian inference with $D_2$ where $D_2$ modulates gabaergic neurons
-    - Analyze weights from inhbitory neurons to determine $D_2$ mappings
 - [x] Basic liquid implementation
   - [ ] Basic testing
 - [ ] Learning liquid
