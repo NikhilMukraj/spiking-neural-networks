@@ -445,6 +445,90 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    pub fn test_isolated_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = QuadraticIntegrateAndFireNeuron {
+            gap_conductance: 0.1,
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
+        };
+    
+        let iterations = 1000;
+
+        let mut lattice1 = Lattice::default_impl();
+        
+        lattice1.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        );
+    
+        lattice1.connect(&connection_conditional, None);
+        lattice1.apply(|neuron: &mut _| {
+            let mut rng = rand::thread_rng();
+            neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+        });
+        lattice1.update_grid_history = true;
+
+        lattice1.set_id(1);
+
+        let mut base_spike_train = PoissonNeuron::default_impl();
+        base_spike_train.chance_of_firing = 0.1;
+
+        let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.update_grid_history = true;
+
+        let lattices = vec![lattice1];
+        let spike_train_lattices = vec![spike_train_lattice];
+
+        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
+
+        gpu_network.run_lattices(iterations)?;
+
+        network.run_lattices(iterations)?;
+
+        // let cpu_grid_history = &network.get_lattice(&1).unwrap().grid_history;
+        // let gpu_grid_history = &gpu_network.get_lattice(&1).unwrap().grid_history;
+        
+        // for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.history.iter()
+        //     .zip(gpu_grid_history.history.iter()) {
+        //     for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+        //         for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+        //             let error = (voltage1 - voltage2).abs();
+        //             assert!(
+        //                 error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+        //                 error,
+        //                 voltage1,
+        //                 voltage2,
+        //             );
+        //         }
+        //     }
+        // }   
+
+        let history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+
+        assert!(!history.is_empty());
+
+        let mut spiking_occured = false;
+        for grid in history.iter() {
+            for row in grid {
+                for i in row.iter() {
+                    assert!((i - base_spike_train.v_resting).abs() < 2. 
+                        || (i - base_spike_train.v_th).abs() < 2.);
+                    if i - base_spike_train.v_th.abs() < 2. {
+                        spiking_occured = true;
+                    }
+                }
+            }
+        }
+
+        assert!(spiking_occured);
+
+        Ok(())
+    }
+
     // check to see if spike trains fire and that it is recorded in history alongside regular lattice execution
     #[test]
     pub fn test_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
