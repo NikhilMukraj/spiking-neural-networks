@@ -65,6 +65,9 @@ def fill_defaults(parsed):
     if parsed['simulation_parameters']['d1'] and parsed['simulation_parameters']['d2']:
         raise ValueError('D1 and D2 cannot both be active, must be one or the other or neither')
     
+    # if 'd_acts_on_inh' not in parsed['simulation_parameters']:
+    #     parsed['simulation_parameters']['d_acts_on_inh'] = False
+    
     if 'first_window' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['first_window'] = 1_000
     if 'second_window' not in parsed['simulation_parameters']:
