@@ -949,6 +949,8 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
     let mut refractoriness_kernel_args = vec![];
     let mut refractoriness_function_args = vec![];
 
+    let spike_train_prefix = generate_unique_prefix(&args, "spike_train");
+
     for i in refractoriness_function.0 {
         if i.0 == "last_firing_time" {
             refractoriness_function_args.push(String::from("last_firing_time"));
@@ -963,6 +965,12 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                 } else {
                     i.0.clone()
                 };
+
+                let current_arg = format!(
+                    "{}{}",
+                    spike_train_prefix,
+                    current_arg
+                );
 
                 args.push(i.0.clone());
                 refractoriness_function_args.push(current_arg.clone());
@@ -1010,7 +1018,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                             sum += weights[i * n + gid] * gap_junction;
                         }} else {{
                             if (last_firing_time[presynaptic_index] < 0) {{
-                                sum += v_th[presynaptic_index - skip_index];
+                                sum += {}v_th[presynaptic_index - skip_index];
                             }} else {{
                                 sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
                             }}
@@ -1028,6 +1036,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
         "#,
         refractoriness_function.1,
         refractoriness_kernel_args.join(",\n"),
+        spike_train_prefix,
         refractoriness_function_args.iter()
             .map(|i| format!("{}[presynaptic_index - skip_index]", i))
             .collect::<Vec<String>>()
