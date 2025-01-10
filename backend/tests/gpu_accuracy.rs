@@ -12,7 +12,7 @@ mod tests {
                 SimpleLeakyIntegrateAndFire,
             }, iterate_and_spike::{
                 AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType, LigandGatedChannel
-            }, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork, SpikeTrainGridHistory, SpikeTrainLattice
+            }, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice
         }
     };
 
@@ -433,7 +433,7 @@ mod tests {
                 for i in row.iter() {
                     assert!((i - base_spike_train.v_resting).abs() < 2. 
                         || (i - base_spike_train.v_th).abs() < 2.);
-                    if i - base_spike_train.v_th.abs() < 2. {
+                    if (i - base_spike_train.v_th.abs()) < 2. {
                         spiking_occured = true;
                     }
                 }
@@ -489,23 +489,23 @@ mod tests {
 
         network.run_lattices(iterations)?;
 
-        // let cpu_grid_history = &network.get_lattice(&1).unwrap().grid_history;
-        // let gpu_grid_history = &gpu_network.get_lattice(&1).unwrap().grid_history;
+        let cpu_grid_history = &network.get_lattice(&1).unwrap().grid_history;
+        let gpu_grid_history = &gpu_network.get_lattice(&1).unwrap().grid_history;
         
-        // for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.history.iter()
-        //     .zip(gpu_grid_history.history.iter()) {
-        //     for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
-        //         for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
-        //             let error = (voltage1 - voltage2).abs();
-        //             assert!(
-        //                 error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
-        //                 error,
-        //                 voltage1,
-        //                 voltage2,
-        //             );
-        //         }
-        //     }
-        // }   
+        for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.history.iter()
+            .zip(gpu_grid_history.history.iter()) {
+            for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+                for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                    let error = (voltage1 - voltage2).abs();
+                    assert!(
+                        error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+                        error,
+                        voltage1,
+                        voltage2,
+                    );
+                }
+            }
+        }   
 
         let history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
 
@@ -517,7 +517,7 @@ mod tests {
                 for i in row.iter() {
                     assert!((i - base_spike_train.v_resting).abs() < 2. 
                         || (i - base_spike_train.v_th).abs() < 2.);
-                    if i - base_spike_train.v_th.abs() < 2. {
+                    if (i - base_spike_train.v_th.abs()) < 2. {
                         spiking_occured = true;
                     }
                 }
@@ -538,6 +538,8 @@ mod tests {
         };
     
         let iterations = 1000;
+
+        let lattice_size = 3;
 
         let mut lattice1 = Lattice::default_impl();
         
@@ -560,7 +562,14 @@ mod tests {
         base_spike_train.chance_of_firing = 0.1;
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
-        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.populate(&base_spike_train, lattice_size, lattice_size);
+        spike_train_lattice.apply_given_position(|pos, i| {
+            if (pos.0 * lattice_size + pos.1) % 2 == 0 {
+                i.chance_of_firing = 0.001;
+            } else {
+                i.chance_of_firing = 0.;
+            }
+        });
         spike_train_lattice.update_grid_history = true;
 
         let lattices = vec![lattice1];
@@ -568,16 +577,65 @@ mod tests {
 
         let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
 
-        network.connect(0, 1, &|x, y| {(x.0 * 3 + x.1) % 2 == 0 && x == y}, None)?;
+        network.connect(0, 1, &|x, y| {(x.0 * lattice_size + x.1) % 2 == 0 && x == y}, None)?;
+        network.set_dt(1.);
 
         let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
 
         gpu_network.run_lattices(iterations)?;
 
-        // change spike train incoming connections kernel to prefix each spike train input with a unique prefix
-        // prefix non spike train things with $ in argument names vector
-        // make sure that this test still passes
+        // check which neurons are firing and which are not
+        // check that the only spike trains that are firing are correct
 
+        // check that spike trains in right row/col are firing, same with neurons
+
+        let history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+
+        let mut has_fired = false;
+
+        for grid in history {
+            for row in grid {
+                for j in row {
+                    if (j - base_spike_train.v_th).abs() < 2. {
+                        has_fired = true;
+                    }
+                }
+            }
+        }
+
+        assert!(has_fired);
+
+        for i in 0..lattice_size {
+            for j in 0..lattice_size {
+                let mut spiking_count = 0;
+
+                #[allow(clippy::needless_range_loop)]
+                for n in 0..iterations {
+                    if (history[n][i][j] - base_spike_train.v_th).abs() < 2. {
+                        spiking_count += 1;
+                    }
+                }
+
+                if (i * lattice_size + j) % 2 == 0 {
+                    assert!(
+                        gpu_network.get_spike_train_lattice(&0)
+                            .unwrap()
+                            .spike_train_grid()[i][j].chance_of_firing != 0.
+                    );
+                    assert!(spiking_count > 3, "({}, {}) | spiking count: {}", i, j, spiking_count);
+                } else {
+                    assert!(
+                        gpu_network.get_spike_train_lattice(&0)
+                            .unwrap()
+                            .spike_train_grid()[i][j].chance_of_firing == 0.
+                    );
+                    assert!(spiking_count <= 3, "({}, {}) | spiking count: {}", i, j, spiking_count);
+                }
+            }
+        }
+
+        // next check on neuron spiking
+        
         Ok(())
     }
 }
