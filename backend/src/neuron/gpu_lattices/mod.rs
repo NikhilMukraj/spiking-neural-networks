@@ -141,13 +141,12 @@ __kernel void add_grid_voltage_history(
     __global const float *current_voltage,
     __global float *history,
     int iteration,
-    int size,
-    int skip_index
+    int size
 ) {
     int gid = get_global_id(0);
-    uint index = index_to_position[gid];
+    int index = index_to_position[gid];
 
-    history[skip_index + iteration * size + index] = current_voltage[index]; 
+    history[iteration * size + index] = current_voltage[index]; 
 }
 "#;
 
@@ -174,7 +173,7 @@ impl LatticeHistoryGPU for GridVoltageHistory {
 
         let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
-            String::from("iteration"), String::from("size"), String::from("skip_index"),
+            String::from("iteration"), String::from("size"),
         ];
 
         Ok(
@@ -263,7 +262,7 @@ __kernel void set_last_firing_time(
     int iteration
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[gid] - skip_index;
+    int index = index_to_position[gid + skip_index] - skip_index;
 
     if (is_spiking[index] == 1) {
         last_firing_time[index] = iteration;
@@ -467,8 +466,8 @@ where
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
                     kernel_execution.set_arg(&gpu_graph.size);
-                } else if i == "skip_index" {
-                    kernel_execution.set_arg(&0);
+                // } else if i == "skip_index" {
+                //     kernel_execution.set_arg(&0);
                 } else if i == "index_to_position" {
                     kernel_execution.set_arg(&gpu_graph.index_to_position);
                 } else if gpu_cell_grid.contains_key(i) {
@@ -809,13 +808,31 @@ pub trait SpikeTrainLatticeHistoryGPU: SpikeTrainLatticeHistory {
     ) -> Result<(), GPUError>;  
 }
 
+const SPIKE_TRAIN_GRID_VOLTAGE_HISTORY_KERNEL: &str = r#"
+__kernel void add_spike_train_grid_voltage_history(
+    __global const uint *index_to_position,
+    __global const float *current_voltage,
+    __global float *history,
+    int iteration,
+    int size,
+    int skip_index
+) {
+    int gid = get_global_id(0);
+    int index = index_to_position[gid + skip_index] - skip_index;
+
+    history[iteration * size + index] = current_voltage[index]; 
+}
+"#;
+
+const SPIKE_TRAIN_GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_spike_train_grid_voltage_history";
+
 impl SpikeTrainLatticeHistoryGPU for SpikeTrainGridHistory {
     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
-        let history_program = match Program::create_and_build_from_source(context, GRID_VOLTAGE_HISTORY_KERNEL, "") {
+        let history_program = match Program::create_and_build_from_source(context, SPIKE_TRAIN_GRID_VOLTAGE_HISTORY_KERNEL, "") {
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
         };
-        let history_kernel = match Kernel::create(&history_program, GRID_VOLTAGE_HISTORY_KERNEL_NAME) {
+        let history_kernel = match Kernel::create(&history_program, SPIKE_TRAIN_GRID_VOLTAGE_HISTORY_KERNEL_NAME) {
             Ok(value) => value,
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
@@ -1353,15 +1370,15 @@ where
         &self, 
         skip_index: u32,
         size: u32,
-        kernel: &Kernel,
+        kernel: &KernelFunction,
         gpu_graph: &InterleavingGraphGPU, 
         gpu_cell_grid: &HashMap<String, BufferGPU>, 
         gpu_grid_history: &HashMap<String, BufferGPU>,
     ) -> Result<(), GPUError> {
         let update_history_event = unsafe {
-            let mut kernel_execution = ExecuteKernel::new(kernel);
+            let mut kernel_execution = ExecuteKernel::new(&kernel.kernel);
 
-            for i in self.grid_history_kernel.argument_names.iter() {
+            for i in kernel.argument_names.iter() {
                 if i == "iteration" {
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
@@ -1387,7 +1404,7 @@ where
                 }
             }
 
-            match kernel_execution.set_global_work_size(gpu_graph.size)
+            match kernel_execution.set_global_work_size(size as usize)
                 .enqueue_nd_range(&self.queue) {
                     Ok(value) => value,
                     Err(_) => return Err(GPUError::QueueFailure),
@@ -1662,7 +1679,7 @@ where
                             self.execute_grid_history(
                                 skip_index as u32,
                                 current_size as u32,
-                                &self.grid_history_kernel.kernel,
+                                &self.grid_history_kernel,
                                 &gpu_graph, 
                                 &gpu_cell_grid, 
                                 gpu_grid_histories.get(key).unwrap()
@@ -1682,7 +1699,7 @@ where
                         } else if i == "index_to_position" {
                             kernel_execution.set_arg(&gpu_graph.index_to_position);
                         } else if i == "skip_index" { 
-                            kernel_execution.set_arg(&0);
+                            kernel_execution.set_arg(&spike_train_skip_index);
                         } else if i == "neuro_flags" {
                             match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                                 BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
@@ -1719,8 +1736,8 @@ where
 
                 for (key, value) in self.spike_train_lattices.iter() {
                     if value.update_grid_history {
-                        let mut skip_index = 0;
-                        for i in gpu_graph.ordered_keys.iter() {
+                        let mut skip_index = spike_train_skip_index as usize;
+                        for i in gpu_graph.spike_train_ordered_keys.iter() {
                             if *i >= *key {
                                 break;
                             }
@@ -1735,7 +1752,7 @@ where
                             self.execute_grid_history(
                                 skip_index as u32,
                                 current_size as u32,
-                                &self.spike_train_grid_history_kernel.kernel,
+                                &self.spike_train_grid_history_kernel,
                                 &gpu_graph, 
                                 &gpu_spike_train_grid, 
                                 spike_train_gpu_grid_histories.get(key).unwrap()
@@ -1805,7 +1822,7 @@ where
 
         W::convert_electrochemical_to_cpu(
             &mut spike_train_cell_vector, 
-            &gpu_cell_grid, 
+            &gpu_spike_train_grid, 
             1, 
             spike_train_vector_size, 
             &self.queue
@@ -1855,7 +1872,8 @@ where
         }
 
         for (key, value) in self.spike_train_lattices.iter_mut() {
-            value.set_spike_train_grid(spike_train_reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
+            value.set_spike_train_grid(spike_train_reshaped_grids.get(key).unwrap().clone())
+                .expect("Same dimensions");
         }
 
         InterleavingGraphGPU::convert_to_cpu(
