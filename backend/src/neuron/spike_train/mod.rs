@@ -421,7 +421,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 {}
             ) {{
                 int gid = get_global_id(0);
-                int index = index_to_position[gid] - skip_index;
+                int index = index_to_position[gid + skip_index] - skip_index;
 
                 uint new_seed = rand(seed[index]);
                 seed[index] = new_seed;
