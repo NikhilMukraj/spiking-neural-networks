@@ -35,6 +35,9 @@ def fill_defaults(parsed):
 
     if 'bayesian_is_not_main' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['bayesian_is_not_main'] = True
+
+    if 'pattern_switch' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['pattern_switch'] = False
     
     if 'memory_biases_memory' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['memory_biases_memory'] = False
@@ -222,6 +225,11 @@ for current_state in tqdm(all_states):
         else:
             pattern1 = np.random.choice(range(num_patterns))
             pattern2 = pattern1
+
+        if parsed_toml['simulation_parameters']['pattern_switch']:
+            pattern_switch1 = np.random.choice(
+                [i for i in range(num_patterns) if i != pattern1 and i != pattern2]
+            ) 
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             bayesian_memory_pattern = np.random.choice(range(num_patterns))
@@ -548,17 +556,30 @@ for current_state in tqdm(all_states):
         else:
             main_firing_rate = 0
 
-        network.apply_spike_train_lattice_given_position(
-            c1, 
-            get_spike_train_setup_function(
-                patterns,
-                pattern1, 
-                current_state['distortion'],
-                main_firing_rate,
-                exc_n,
-                parsed_toml['simulation_parameters']['distortion_on_only'],
+        if not parsed_toml['simulation_parameters']['pattern_switch']:
+            network.apply_spike_train_lattice_given_position(
+                c1, 
+                get_spike_train_setup_function(
+                    patterns,
+                    pattern1, 
+                    current_state['distortion'],
+                    main_firing_rate,
+                    exc_n,
+                    parsed_toml['simulation_parameters']['distortion_on_only'],
+                )
             )
-        )
+        else:
+            network.apply_spike_train_lattice_given_position(
+                c1, 
+                get_spike_train_setup_function(
+                    patterns,
+                    pattern_switch, 
+                    current_state['distortion'],
+                    main_firing_rate,
+                    exc_n,
+                    parsed_toml['simulation_parameters']['distortion_on_only'],
+                )
+            )
 
         if parsed_toml['simulation_parameters']['bayesian_2_on']:
             bayesian_firing_rate = current_state['bayesian_firing_rate']
@@ -658,6 +679,18 @@ for current_state in tqdm(all_states):
                     parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                     parsed_toml['simulation_parameters']['get_all_accuracies'],
                 )
+
+            if not parsed_toml['simulation_parameters']['pattern_switch']:
+                pattern_switch_acc = determine_accuracy(
+                    patterns,
+                    pattern_switch1,
+                    num_patterns,
+                    second_window,
+                    peaks,
+                    exc_n,
+                    parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+                    parsed_toml['simulation_parameters']['get_all_accuracies'],
+                )
         else:
             second_acc = 0
             bayesian_second_acc = 0
@@ -684,6 +717,9 @@ for current_state in tqdm(all_states):
             current_value['bayesian_first_acc'] = bayesian_first_acc
             if parsed_toml['simulation_parameters']['iterations2'] != 0:
                 current_value['bayesian_second_acc'] = bayesian_second_acc
+
+                if parsed_toml['simulation_parameters']['pattern_switch']:
+                    current_value['pattern_switch_acc'] = pattern_switch_acc
 
         if parsed_toml['simulation_parameters']['measure_snr']:
             signal = np.array([np.array(i).mean() for i in hist])
