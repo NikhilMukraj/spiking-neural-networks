@@ -1,0 +1,6 @@
+# c2 weight of 0
+# iterations1 = 5000
+# iterations2 = 5000
+# pattern_switch = true
+# trials = 30
+# change gmax of ampa to see if pattern_switch accuracy changes at all
