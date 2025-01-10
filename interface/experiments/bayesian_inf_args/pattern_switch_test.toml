@@ -1,4 +1,5 @@
-# c2 weight of 0
+# c2 weight of 0/c2 bayesian cue off
+# memory_biases_memory = false
 # iterations1 = 5000
 # iterations2 = 5000
 # pattern_switch = true
