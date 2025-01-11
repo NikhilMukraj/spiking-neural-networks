@@ -1,7 +1,35 @@
-# c2 weight of 0/c2 bayesian cue off
-# memory_biases_memory = false
-# iterations1 = 5000
-# iterations2 = 5000
-# pattern_switch = true
-# trials = 30
-# change gmax of ampa to see if pattern_switch accuracy changes at all
+[simulation_parameters]
+peaks_on = false
+# bayesian_is_not_main = true
+use_correlation_as_accuracy = true
+measure_snr = true
+
+distortion_on_only = false
+
+d1 = true
+
+bayesian_1_on = false
+
+pattern_switch = true
+
+iterations1 = 5000
+iterations2 = 5000
+a = -1
+b = 0
+
+weights_scalar = 1
+inh_weights_scalar = 1
+skew = 0.1
+c_m = 25
+
+trials = 20
+
+filename = "pattern_switch_test.json"
+
+[variables]
+spike_train_to_exc = [4]
+bayesian_to_exc = [0]
+prob_of_exc_to_inh = [1]
+# distortion = [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+ampa_g = [0.25, 0.5, 0.75, 0.1, 1.25, 1.5, 1.75, 2]
+
