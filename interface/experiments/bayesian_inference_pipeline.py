@@ -151,6 +151,14 @@ def fill_defaults(parsed):
 
     # single on/off cue versus entire group
 
+
+fields = [
+    'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
+    'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
+    'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2',
+    'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
+]
+
 def generate_key(parsed, current_state):
     key = []
 
@@ -161,13 +169,6 @@ def generate_key(parsed, current_state):
 
     if 'pattern_switch' in current_state:
         key.append(f'pattern_switch: {current_state["pattern_switch"]}')
-
-    fields = [
-        'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
-        'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
-        'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2',
-        'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
-    ]
     
     for field in fields:
         generate_key_helper(current_state, key, parsed, field)
@@ -178,6 +179,9 @@ with open(sys.argv[1], 'r') as f:
     parsed_toml = parse_toml(f)
 
 fill_defaults(parsed_toml)
+
+if any(i not in fields for i in parsed_toml['variables']):
+    raise ValueError(f'Unkown variables: {[i for i in parsed_toml["variables"] if i not in fields]}')
 
 exc_n = parsed_toml['simulation_parameters']['exc_n']
 num = exc_n * exc_n
@@ -576,7 +580,7 @@ for current_state in tqdm(all_states):
                 c1, 
                 get_spike_train_setup_function(
                     patterns,
-                    pattern_switch, 
+                    pattern_switch1, 
                     current_state['distortion'],
                     main_firing_rate,
                     exc_n,
@@ -683,7 +687,7 @@ for current_state in tqdm(all_states):
                     parsed_toml['simulation_parameters']['get_all_accuracies'],
                 )
 
-            if not parsed_toml['simulation_parameters']['pattern_switch']:
+            if parsed_toml['simulation_parameters']['pattern_switch']:
                 pattern_switch_acc = determine_accuracy(
                     patterns,
                     pattern_switch1,
