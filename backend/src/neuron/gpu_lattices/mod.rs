@@ -1332,7 +1332,11 @@ where
     }
 
     unsafe fn execute_last_firing_time(
-        &self, gpu_graph: &InterleavingGraphGPU, gpu_cell_grid: &HashMap<String, BufferGPU>, skip_index: u32,
+        &self, 
+        gpu_graph: &InterleavingGraphGPU, 
+        gpu_cell_grid: &HashMap<String, BufferGPU>, 
+        skip_index: u32,
+        size: usize,
     ) -> Result<(), GPUError> {
         let last_firing_time_event = unsafe {
             match ExecuteKernel::new(&self.last_firing_time_kernel)
@@ -1351,7 +1355,7 @@ where
                     }
                 )
                 .set_arg(&(self.internal_clock as i32))
-                .set_global_work_size(gpu_graph.size)
+                .set_global_work_size(size)
                 .enqueue_nd_range(&self.queue) {
                     Ok(value) => value,
                     Err(_) => return Err(GPUError::QueueFailure),
@@ -1425,63 +1429,21 @@ where
         // use those vectors to write the new values back to the cpu and execute the connections kernel
         // connections kernel should take each weight matrix in and use lattice size to index where to go
 
-        let mut cell_vector: Vec<T> = vec![];
-        let mut lattice_ids: Vec<u32> = vec![];
-        let mut lattice_sizes: Vec<u32> = vec![];
-        let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
-
-        let mut lattice_iterator: Vec<(usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter()
-            .map(|(i, j)| (*i, j))
-            .collect();
-        lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
-
-        for (key, value) in &lattice_iterator {
-            let current_cell_grid = value.cell_grid();
-            for row in current_cell_grid {
-                for i in row {
-                    cell_vector.push(i.clone());
-                    lattice_ids.push(*key as u32);
-                }
-            }
-            
-            let rows = current_cell_grid.len();
-            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
-            lattice_sizes.push((rows * cols) as u32);
-            lattice_sizes_map.insert(*key, (rows, cols));
-        }
-
-        let mut cell_vector = vec![cell_vector];
-        let cell_vector_size = cell_vector.first().unwrap_or(&vec![]).len();
+        let (
+            lattice_ids, 
+            lattice_sizes_map, 
+            mut cell_vector, 
+            cell_vector_size
+        ) = self.generate_cell_grid_vector();
 
         let gpu_cell_grid = T::convert_to_gpu(&cell_vector, &self.context, &self.queue)?;
 
-        let mut spike_train_cell_vector: Vec<W> = vec![];
-        let mut spike_train_lattice_ids: Vec<u32> = vec![];
-        let mut spike_train_lattice_sizes: Vec<u32> = vec![];
-        let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
-
-        let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = self.spike_train_lattices.iter()
-            .map(|(i, j)| (*i, j))
-            .collect();
-        spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
-
-        for (key, value) in &spike_train_lattice_iterator {
-            let current_cell_grid = value.spike_train_grid();
-            for row in current_cell_grid {
-                for i in row {
-                    spike_train_cell_vector.push(i.clone());
-                    spike_train_lattice_ids.push(*key as u32);
-                }
-            }
-            
-            let rows = current_cell_grid.len();
-            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
-            spike_train_lattice_sizes.push((rows * cols) as u32);
-            spike_train_lattice_sizes_map.insert(*key, (rows, cols));
-        }
-
-        let mut spike_train_cell_vector = vec![spike_train_cell_vector];
-        let spike_train_vector_size = spike_train_cell_vector.first().unwrap_or(&vec![]).len();
+        let (
+            spike_train_lattice_ids, 
+            spike_train_lattice_sizes_map, 
+            mut spike_train_cell_vector, 
+            spike_train_vector_size
+        ) = self.generate_spike_train_grid_vector();
 
         let gpu_spike_train_grid = W::convert_to_gpu(&spike_train_cell_vector, &self.context, &self.queue)?;
 
@@ -1658,7 +1620,12 @@ where
                 };
 
                 unsafe {
-                    self.execute_last_firing_time(&gpu_graph, &gpu_cell_grid, 0)?
+                    self.execute_last_firing_time(
+                        &gpu_graph, 
+                        &gpu_cell_grid, 
+                        0, 
+                        spike_train_skip_index as usize
+                    )?
                 };
 
                 for (key, value) in self.lattices.iter() {
@@ -1730,7 +1697,8 @@ where
                     self.execute_last_firing_time(
                         &gpu_graph, 
                         &gpu_spike_train_grid, 
-                        spike_train_skip_index
+                        spike_train_skip_index,
+                        spike_train_size,
                     )?
                 };
 
@@ -1881,6 +1849,83 @@ where
         )?;
 
         Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn generate_spike_train_grid_vector(&mut self) -> 
+    (
+        Vec<u32>, 
+        HashMap<usize, (usize, usize)>, 
+        Vec<Vec<W>>, 
+        usize
+    ) {
+        let mut spike_train_cell_vector: Vec<W> = vec![];
+        let mut spike_train_lattice_ids: Vec<u32> = vec![];
+        let mut spike_train_lattice_sizes: Vec<u32> = vec![];
+        let mut spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+    
+        let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = self.spike_train_lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
+        spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+    
+        for (key, value) in &spike_train_lattice_iterator {
+            let current_cell_grid = value.spike_train_grid();
+            for row in current_cell_grid {
+                for i in row {
+                    spike_train_cell_vector.push(i.clone());
+                    spike_train_lattice_ids.push(*key as u32);
+                }
+            }
+    
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+            spike_train_lattice_sizes.push((rows * cols) as u32);
+            spike_train_lattice_sizes_map.insert(*key, (rows, cols));
+        }
+    
+        let spike_train_cell_vector = vec![spike_train_cell_vector];
+        let spike_train_vector_size = spike_train_cell_vector.first().unwrap_or(&vec![]).len();
+
+        (spike_train_lattice_ids, spike_train_lattice_sizes_map, spike_train_cell_vector, spike_train_vector_size)
+    }
+    
+    #[allow(clippy::type_complexity)]
+    fn generate_cell_grid_vector(&mut self) -> (
+        Vec<u32>, 
+        HashMap<usize, (usize, usize)>, 
+        Vec<Vec<T>>, 
+        usize
+    ) {
+        let mut cell_vector: Vec<T> = vec![];
+        let mut lattice_ids: Vec<u32> = vec![];
+        let mut lattice_sizes: Vec<u32> = vec![];
+        let mut lattice_sizes_map: HashMap<usize, (usize, usize)> = HashMap::new();
+        
+        let mut lattice_iterator: Vec<(usize, &Lattice<_, _, _, _, _>)> = self.lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
+        lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        
+        for (key, value) in &lattice_iterator {
+            let current_cell_grid = value.cell_grid();
+            for row in current_cell_grid {
+                for i in row {
+                    cell_vector.push(i.clone());
+                    lattice_ids.push(*key as u32);
+                }
+            }
+            
+            let rows = current_cell_grid.len();
+            let cols = current_cell_grid.first().unwrap_or(&vec![]).len();
+            lattice_sizes.push((rows * cols) as u32);
+            lattice_sizes_map.insert(*key, (rows, cols));
+        }
+        
+        let cell_vector = vec![cell_vector];
+        let cell_vector_size = cell_vector.first().unwrap_or(&vec![]).len();
+
+        (lattice_ids, lattice_sizes_map, cell_vector, cell_vector_size)
     }
 }
 
