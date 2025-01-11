@@ -15,6 +15,7 @@ from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_p
 from pipeline_setup import calculate_correlation, skewed_random, generate_setup_neuron
 from pipeline_setup import get_spike_train_setup_function
 from pipeline_setup import find_peaks_above_threshold, signal_to_noise
+import lixirnet as ln
 
 
 def fill_defaults(parsed):
@@ -89,8 +90,6 @@ def fill_defaults(parsed):
         parsed['variables']['exc_to_inh'] = [1]
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = [5]
-    if 'bayesian_to_exc' not in parsed['variables']:
-        parsed['variables']['bayesian_to_exc'] = [5]
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
@@ -112,10 +111,10 @@ def generate_key(parsed, current_state):
     key.append(f'pattern: {current_state["pattern"]}')
 
     fields = [
-        'cue_firing_rate', 'distortion'
-        'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc'
+        'cue_firing_rate', 'distortion', 
+        'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc',
         'nmda_g', 'ampa_g', 'gabaa_g',
-        'glutamate_clearance', 'gabaa_clearance'
+        'glutamate_clearance', 'gabaa_clearance',
     ]
     
     for field in fields:
@@ -146,24 +145,23 @@ patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_pa
 w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
 w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
 
-all_states = [dict(zip(keys, combination)) for combination in combinations]
+combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
-if parsed_toml['simulation_parameters']['use_glutamate_clearance']:
-    all_states = [i for i in all_states if i['nmda_clearance'] == i['ampa_clearance']]
+all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for combination in combinations]
 
 print(json.dumps(parsed_toml, indent=4))
 
 e1 = 1
 i1 = 0
-c2 = 2
+c1 = 2
 
 simulation_output = {}
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
-        pattern1, pattern2 = np.random.choice(range(num_patterns), 2, replace=False)
+        pattern1 = np.random.choice(range(num_patterns), replace=False)
 
-        distortion = parsed_toml['simulation_parameters']['distortion']
+        distortion = current_state['distortion']
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
         gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gabaa_clearance'])
 
@@ -233,7 +231,7 @@ for current_state in tqdm(all_states):
                 patterns,
                 pattern1, 
                 current_state['distortion'],
-                main_firing_rate,
+                current_state['cue_firing_rate'],
                 exc_n,
                 parsed_toml['simulation_parameters']['distortion_on_only'],
             )
@@ -250,6 +248,11 @@ for current_state in tqdm(all_states):
         peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
         firing_rate_data = [int(len(i)) for i in peaks]
 
+        current_state['trial'] = trial
+        current_state['pattern'] = pattern1
+
+        current_value = {}
+
         current_value['firing_rates'] = firing_rate_data
 
         signal = [float(i.mean()) for i in data]
@@ -264,7 +267,7 @@ for current_state in tqdm(all_states):
 
         simulation_output[key] = current_value
 
-simulation_output['patterns'] = patterns
+simulation_output['patterns'] = [[int(j) for j in i] for i in patterns]
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
