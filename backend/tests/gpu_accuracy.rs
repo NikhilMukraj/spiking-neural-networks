@@ -533,7 +533,7 @@ mod tests {
     #[test]
     pub fn test_spike_train_lattice_firing_with_neurons_electrical() -> Result<(), SpikingNeuralNetworksError> {
         let base_neuron = QuadraticIntegrateAndFireNeuron {
-            gap_conductance: 0.1,
+            gap_conductance: 10.,
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
     
@@ -634,7 +634,26 @@ mod tests {
             }
         }
 
-        // next check on neuron spiking
+        let history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
+
+        for i in 0..lattice_size {
+            for j in 0..lattice_size {
+                let mut spiking_count = 0;
+
+                #[allow(clippy::needless_range_loop)]
+                for n in 0..iterations {
+                    if (history[n][i][j] - base_neuron.v_th).abs() < 2. {
+                        spiking_count += 1;
+                    }
+                }
+
+                if (i * lattice_size + j) % 2 == 0 {
+                    assert!(spiking_count > 3, "({}, {}) | spiking count: {}", i, j, spiking_count);
+                } else {
+                    assert!(spiking_count <= 3, "({}, {}) | spiking count: {}", i, j, spiking_count);
+                }
+            }
+        }
         
         Ok(())
     }
