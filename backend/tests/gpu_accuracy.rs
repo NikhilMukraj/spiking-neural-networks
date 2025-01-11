@@ -657,4 +657,6 @@ mod tests {
         
         Ok(())
     }
+
+    // write tests for these situations with chemical syanpses and electrochemical synapses
 }
