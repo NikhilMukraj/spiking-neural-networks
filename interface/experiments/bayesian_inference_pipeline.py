@@ -9,7 +9,7 @@ import sys
 import itertools
 import numpy as np
 from tqdm import tqdm
-from pipeline_setup import parse_toml, try_max, generate_key_helper
+from pipeline_setup import parse_toml, generate_key_helper
 from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_patterns
 from pipeline_setup import calculate_correlation, skewed_random, generate_setup_neuron
 from pipeline_setup import reset_spike_train, get_spike_train_setup_function
@@ -158,6 +158,9 @@ def generate_key(parsed, current_state):
 
     key.append(f'pattern1: {current_state["pattern1"]}')
     key.append(f'pattern2: {current_state["pattern2"]}')
+
+    if 'pattern_switch' in current_state:
+        key.append(f'pattern_switch: {current_state["pattern_switch"]}')
 
     fields = [
         'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
@@ -700,6 +703,8 @@ for current_state in tqdm(all_states):
         current_state['trial'] = trial
         current_state['pattern1'] = pattern1
         current_state['pattern2'] = pattern2
+        if parsed_toml['simulation_parameters']['pattern_switch']:
+            current_state['pattern_swtich'] = pattern_switch1
 
         key = generate_key(parsed_toml, current_state)
 
