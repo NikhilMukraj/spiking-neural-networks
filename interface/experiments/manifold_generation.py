@@ -103,19 +103,19 @@ def fill_defaults(parsed):
     if 'gabaa_clearance' not in parsed['variables']:
         parsed['variables']['gabaa_clearance'] = [0.001]
 
+fields = [
+    'cue_firing_rate', 'distortion', 
+    'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc',
+    'nmda_g', 'ampa_g', 'gabaa_g',
+    'glutamate_clearance', 'gabaa_clearance',
+]
+
 def generate_key(parsed, current_state):
     key = []
 
     key.append(f'trial: {current_state["trial"]}')
 
     key.append(f'pattern: {current_state["pattern"]}')
-
-    fields = [
-        'cue_firing_rate', 'distortion', 
-        'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc',
-        'nmda_g', 'ampa_g', 'gabaa_g',
-        'glutamate_clearance', 'gabaa_clearance',
-    ]
     
     for field in fields:
         generate_key_helper(current_state, key, parsed, field)
@@ -126,6 +126,9 @@ with open(sys.argv[1], 'r') as f:
     parsed_toml = parse_toml(f)
 
 fill_defaults(parsed_toml)
+
+if any(i not in fields for i in parsed_toml['variables']):
+    raise ValueError(f'Unkown variables: {[i for i in parsed_toml["variables"] if i not in fields]}')
 
 exc_n = parsed_toml['simulation_parameters']['exc_n']
 num = exc_n * exc_n
