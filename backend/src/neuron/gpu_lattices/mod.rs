@@ -954,6 +954,53 @@ __kernel void calculate_network_electrical_inputs(
 
 const NETWORK_ELECTRICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_electrical_inputs";
 
+const NETWORK_CHEMICAL_INPUTS_KERNEL: &str = r#"
+__kernel void calculate_network_chemical_inputs(
+    __global const uint *connections, 
+    __global const float *weights, 
+    __global const uint *index_to_position,
+    __global const uint *flags,
+    __global const float *t,
+    uint n, 
+    uint number_of_types,
+    __global float *counts,
+    __global float *res
+) {
+    int gid = get_global_id(0);
+
+    for (int t_index = 0; t_index < number_of_types; t_index++) {
+        int idx = gid * number_of_types + t_index;
+        res[idx] = 0.0f;
+        counts[idx] = 0.0f;
+    }
+
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
+    for (int i = 0; i < n; i++) {
+        if (connections[i * n + gid] == 1) {
+            int presynaptic_index = index_to_position[i] * number_of_types;
+            // int postsynaptic_index = index_to_position[gid]; // maybe use this instead of just gid
+            for (int t_index = 0; t_index < number_of_types; t_index++) {
+                if (flags[presynaptic_index + t_index] == 1) {
+                    res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
+                    counts[gid * number_of_types + t_index]++;
+                }
+            }
+        }
+    }
+
+    for (int t_index = 0; t_index < number_of_types; t_index++) {
+        if (counts[gid * number_of_types + t_index] != 0.0f) {
+            res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+        } else {
+            res[gid * number_of_types + t_index] = 0.0f;
+        }
+    }
+}
+"#;
+
+const NETWORK_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_chemical_inputs";
+
 fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractorinessGPU>(context: &Context) -> Result<KernelFunction, GPUError> {
     let mut args = vec![
         String::from("connections"), String::from("weights"), String::from("index_to_position"),
@@ -1102,7 +1149,7 @@ pub struct LatticeNetworkGPU<
     connecting_graph: C,
     electrical_incoming_connections_kernel: Kernel,
     electrical_and_spike_train_incoming_connections: KernelFunction,
-    // chemical_incoming_connections_kernel: Kernel,
+    chemical_incoming_connections_kernel: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
@@ -1153,14 +1200,14 @@ where
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
-        // let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
-        //     Ok(value) => value,
-        //     Err(_) => return Err(GPUError::ProgramCompileFailure),
-        // };
-        // let chemical_incoming_connections_kernel = match Kernel::create(&chemical_incoming_connections_program, NEUROTRANSMITTER_INPUTS_KERNEL_NAME) {
-        //     Ok(value) => value,
-        //     Err(_) => return Err(GPUError::KernelCompileFailure),
-        // };
+        let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NETWORK_CHEMICAL_INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let chemical_incoming_connections_kernel = match Kernel::create(&chemical_incoming_connections_program, NETWORK_CHEMICAL_INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
 
         let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
             Ok(value) => value,
@@ -1179,7 +1226,7 @@ where
                 last_firing_time_kernel, 
                 electrical_incoming_connections_kernel, 
                 electrical_and_spike_train_incoming_connections: generate_network_spike_train_electrical_inputs_kernel::<R>(&context)?,
-                // chemical_incoming_connections_kernel: todo!(), 
+                chemical_incoming_connections_kernel, 
                 grid_history_kernel: V::get_kernel(&context)?,
                 spike_train_grid_history_kernel: X::get_kernel(&context)?,
                 context, 
@@ -1741,38 +1788,9 @@ where
             &self.queue
         )?;
 
-        let mut new_grids: HashMap<usize, Vec<T>> = HashMap::new();
+        let reshaped_grids = Self::consolidate_neurons(lattice_ids, lattice_sizes_map, cell_vector);
 
-        if let Some(first_vec) = cell_vector.first() {
-            for (id, cell) in lattice_ids.iter().zip(first_vec.iter()) {
-                new_grids.entry(*id as usize)
-                    .and_modify(|vec| vec.push(cell.clone()))
-                    .or_insert_with(|| vec![cell.clone()]);
-            }
-        } // maybe use std::mem::take ?
-
-        let mut reshaped_grids = HashMap::new();
-
-        for (key, vec) in new_grids {
-            if let Some(&(_, cols)) = lattice_sizes_map.get(&key) {
-                let reshaped_vec: Vec<Vec<T>> = vec.chunks(cols)
-                    .map(|chunk| chunk.to_vec())
-                    .collect();
-                reshaped_grids.insert(key, reshaped_vec);
-            }
-        }
-
-        let updates: Vec<(usize, (usize, usize), _)> = self.lattices.iter()
-            .filter_map(|(key, value)| {
-                if value.update_grid_history {
-                    let rows = value.cell_grid().len();
-                    let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
-                    Some((*key, (rows, cols), gpu_grid_histories.remove(key).unwrap()))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let updates = Self::consolidate_neuron_histories(&self.lattices, gpu_grid_histories);
 
         for (key, (rows, cols), grid_history) in updates {
             let value = self.lattices.get_mut(&key).unwrap();
@@ -1796,38 +1814,13 @@ where
             &self.queue
         )?;
 
-        let mut spike_train_new_grids: HashMap<usize, Vec<W>> = HashMap::new();
+        let spike_train_reshaped_grids = Self::consolidate_spike_trains(
+            spike_train_lattice_ids, spike_train_lattice_sizes_map, spike_train_cell_vector
+        );
 
-        if let Some(first_vec) = spike_train_cell_vector.first() {
-            for (id, cell) in spike_train_lattice_ids.iter().zip(first_vec.iter()) {
-                spike_train_new_grids.entry(*id as usize)
-                    .and_modify(|vec| vec.push(cell.clone()))
-                    .or_insert_with(|| vec![cell.clone()]);
-            }
-        }
-
-        let mut spike_train_reshaped_grids = HashMap::new();
-
-        for (key, vec) in spike_train_new_grids {
-            if let Some(&(_, cols)) = spike_train_lattice_sizes_map.get(&key) {
-                let reshaped_vec: Vec<Vec<W>> = vec.chunks(cols)
-                    .map(|chunk| chunk.to_vec())
-                    .collect();
-                spike_train_reshaped_grids.insert(key, reshaped_vec);
-            }
-        }
-
-        let updates: Vec<(usize, (usize, usize), _)> = self.spike_train_lattices.iter()
-            .filter_map(|(key, value)| {
-                if value.update_grid_history {
-                    let rows = value.spike_train_grid().len();
-                    let cols = value.spike_train_grid().first().unwrap_or(&vec![]).len();
-                    Some((*key, (rows, cols), spike_train_gpu_grid_histories.remove(key).unwrap()))
-                } else {
-                    None
-                }
-            })
-            .collect();
+        let updates = Self::consolidate_spike_train_histories(
+            &self.spike_train_lattices, spike_train_gpu_grid_histories
+        );
 
         for (key, (rows, cols), grid_history) in updates {
             let value = self.spike_train_lattices.get_mut(&key).unwrap();
@@ -1849,6 +1842,104 @@ where
         )?;
 
         Ok(())
+    }
+
+    #[allow(clippy::type_complexity)]
+    fn consolidate_spike_train_histories(
+        spike_train_lattices: &HashMap<usize, SpikeTrainLattice<N, W, X>>, 
+        mut spike_train_gpu_grid_histories: HashMap<&usize, HashMap<String, BufferGPU>>
+    ) -> Vec<(usize, (usize, usize), HashMap<String, BufferGPU>)> {
+        let updates: Vec<(usize, (usize, usize), _)> = spike_train_lattices.iter()
+            .filter_map(|(key, value)| {
+                if value.update_grid_history {
+                    let rows = value.spike_train_grid().len();
+                    let cols = value.spike_train_grid().first().unwrap_or(&vec![]).len();
+                    Some((*key, (rows, cols), spike_train_gpu_grid_histories.remove(key).unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        updates
+    }
+    
+    #[allow(clippy::type_complexity)]
+    fn consolidate_neuron_histories(
+        lattices: &HashMap<usize, Lattice<T, U, V, Y, N>>, 
+        mut gpu_grid_histories: HashMap<&usize, HashMap<String, BufferGPU>>
+    ) -> Vec<(usize, (usize, usize), HashMap<String, BufferGPU>)> {
+        let updates: Vec<(usize, (usize, usize), _)> = lattices.iter()
+            .filter_map(|(key, value)| {
+                if value.update_grid_history {
+                    let rows = value.cell_grid().len();
+                    let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
+                    Some((*key, (rows, cols), gpu_grid_histories.remove(key).unwrap()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        updates
+    }
+    
+    fn consolidate_neurons(
+        lattice_ids: Vec<u32>, 
+        lattice_sizes_map: HashMap<usize, (usize, usize)>, 
+        cell_vector: Vec<Vec<T>>
+    ) -> HashMap<usize, Vec<Vec<T>>> {
+        let mut new_grids: HashMap<usize, Vec<T>> = HashMap::new();
+    
+        if let Some(first_vec) = cell_vector.first() {
+            for (id, cell) in lattice_ids.iter().zip(first_vec.iter()) {
+                new_grids.entry(*id as usize)
+                    .and_modify(|vec| vec.push(cell.clone()))
+                    .or_insert_with(|| vec![cell.clone()]);
+            }
+        }
+        // maybe use std::mem::take ?
+    
+        let mut reshaped_grids = HashMap::new();
+    
+        for (key, vec) in new_grids {
+            if let Some(&(_, cols)) = lattice_sizes_map.get(&key) {
+                let reshaped_vec: Vec<Vec<T>> = vec.chunks(cols)
+                    .map(|chunk| chunk.to_vec())
+                    .collect();
+                reshaped_grids.insert(key, reshaped_vec);
+            }
+        }
+
+        reshaped_grids
+    }
+
+    fn consolidate_spike_trains(
+        spike_train_lattice_ids: Vec<u32>, 
+        spike_train_lattice_sizes_map: HashMap<usize, (usize, usize)>, 
+        spike_train_cell_vector: Vec<Vec<W>>
+    ) -> HashMap<usize, Vec<Vec<W>>> {
+        let mut spike_train_new_grids: HashMap<usize, Vec<W>> = HashMap::new();
+    
+        if let Some(first_vec) = spike_train_cell_vector.first() {
+            for (id, cell) in spike_train_lattice_ids.iter().zip(first_vec.iter()) {
+                spike_train_new_grids.entry(*id as usize)
+                    .and_modify(|vec| vec.push(cell.clone()))
+                    .or_insert_with(|| vec![cell.clone()]);
+            }
+        }
+    
+        let mut spike_train_reshaped_grids = HashMap::new();
+    
+        for (key, vec) in spike_train_new_grids {
+            if let Some(&(_, cols)) = spike_train_lattice_sizes_map.get(&key) {
+                let reshaped_vec: Vec<Vec<W>> = vec.chunks(cols)
+                    .map(|chunk| chunk.to_vec())
+                    .collect();
+                spike_train_reshaped_grids.insert(key, reshaped_vec);
+            }
+        }
+
+        spike_train_reshaped_grids
     }
 
     #[allow(clippy::type_complexity)]
