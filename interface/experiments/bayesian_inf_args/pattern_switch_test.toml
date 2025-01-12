@@ -1,6 +1,6 @@
 [simulation_parameters]
 peaks_on = false
-# bayesian_is_not_main = true
+bayesian_is_not_main = false
 use_correlation_as_accuracy = true
 measure_snr = true
 
