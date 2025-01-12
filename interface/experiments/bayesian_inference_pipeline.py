@@ -167,8 +167,8 @@ def generate_key(parsed, current_state):
     key.append(f'pattern1: {current_state["pattern1"]}')
     key.append(f'pattern2: {current_state["pattern2"]}')
 
-    if 'pattern_switch' in current_state:
-        key.append(f'pattern_switch: {current_state["pattern_switch"]}')
+    if 'switched_pattern' in current_state:
+        key.append(f'switched_pattern: {current_state["switched_pattern"]}')
     
     for field in fields:
         generate_key_helper(current_state, key, parsed, field)
@@ -708,7 +708,7 @@ for current_state in tqdm(all_states):
         current_state['pattern1'] = pattern1
         current_state['pattern2'] = pattern2
         if parsed_toml['simulation_parameters']['pattern_switch']:
-            current_state['pattern_swtich'] = pattern_switch1
+            current_state['switched_pattern'] = pattern_switch1
 
         key = generate_key(parsed_toml, current_state)
 
@@ -722,13 +722,13 @@ for current_state in tqdm(all_states):
             if parsed_toml['simulation_parameters']['memory_biases_memory']:
                 current_value['memory_biases_memory_second_acc'] = bayesian_memory_second_acc
 
+            if parsed_toml['simulation_parameters']['pattern_switch']:
+                current_value['pattern_switch_acc'] = pattern_switch_acc
+
         if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
             current_value['bayesian_first_acc'] = bayesian_first_acc
             if parsed_toml['simulation_parameters']['iterations2'] != 0:
                 current_value['bayesian_second_acc'] = bayesian_second_acc
-
-                if parsed_toml['simulation_parameters']['pattern_switch']:
-                    current_value['pattern_switch_acc'] = pattern_switch_acc
 
         if parsed_toml['simulation_parameters']['measure_snr']:
             signal = np.array([np.array(i).mean() for i in hist])
