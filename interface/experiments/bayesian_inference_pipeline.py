@@ -90,6 +90,9 @@ def fill_defaults(parsed):
     if 'b' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['b'] = 1
 
+    if 'reset_patterns' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['reset_patterns'] = False
+
     if 'correlation_threshold' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['correlation_threshold'] = 0.08
 
@@ -196,6 +199,13 @@ setup_neuron = generate_setup_neuron(
 p_on = 0.5
 num_patterns = parsed_toml['simulation_parameters']['num_patterns']
 
+patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+if parsed_toml['simulation_parameters']['memory_biases_memory']:
+    bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+
+w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
+w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
 all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for combination in combinations]
@@ -216,12 +226,13 @@ d = 6
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
-        patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+        if parsed_toml['simulation_parameters']['reset_patterns']:
+            patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
 
-        w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
-        w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+            w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
+            w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             w_2 = get_weights(num, bayesian_memory_patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
