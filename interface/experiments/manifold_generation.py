@@ -161,8 +161,16 @@ c1 = 2
 simulation_output = {}
 
 for current_state in tqdm(all_states):
-    for trial in range(parsed_toml['simulation_parameters']['trials']):
-        pattern1 = np.random.choice(range(num_patterns), replace=False)
+    trials = parsed_toml['simulation_parameters']['trials']
+    pattern_indexes = list(
+            itertools.chain(*[[i] * (trials // num_patterns) for i in range(num_patterns)])
+        ) + \
+        [int(i) for i in np.random.choice(range(num_patterns), trials % num_patterns)]
+    # assert len(pattern_indexes) == trials
+    
+    for trial in range(trials):
+        # pattern1 = np.random.choice(range(num_patterns), replace=False)
+        pattern1 = pattern_indexes[trial]
 
         distortion = current_state['distortion']
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
