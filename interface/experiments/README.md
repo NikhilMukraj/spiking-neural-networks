@@ -71,6 +71,7 @@
   - [ ] Two-compartment Model
   - [ ] Could also vary $Mg^{2+}$
 - [ ] Grid attractor as prior cue for Bayesian inference
+- [ ] Ring attractor + point attractor Bayesian inference
 
 ## Schizophrenia Simulation Pipeline
 
