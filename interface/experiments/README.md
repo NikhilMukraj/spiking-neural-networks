@@ -15,6 +15,13 @@
     - Could test behavior of liquid when givne malformed cue
     - Could analyze neurons in liquid (excitatory or inhbitory component) to determine
     which are active when a certain cue is outputted and then bias them with $D_1$ or $D_2$
+- [ ] Manifold generation
+  - [ ] Manifold for point attractor
+    - Clusters form for each pattern with low distortion as well as potentially a low firing state
+    - High distortion patterns exist in between
+    - [ ] Test if neurotransmitter changes increases distance between clusters (may need to use same patterns and vary neurotransmitters)
+  - [ ] Manifold for liquid
+    - [ ] Test if manifold can capture MNIST digits in liquid
 
 ## Todo
 
