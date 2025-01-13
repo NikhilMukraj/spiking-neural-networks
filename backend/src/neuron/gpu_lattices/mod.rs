@@ -1780,6 +1780,268 @@ where
             self.internal_clock += 1;
         }
 
+        T::convert_to_cpu(
+            &mut cell_vector, 
+            &gpu_cell_grid, 
+            1, 
+            cell_vector_size, 
+            &self.queue
+        )?;
+
+        let reshaped_grids = Self::consolidate_neurons(lattice_ids, lattice_sizes_map, cell_vector);
+
+        let updates = Self::consolidate_neuron_histories(&self.lattices, gpu_grid_histories);
+
+        for (key, (rows, cols), grid_history) in updates {
+            let value = self.lattices.get_mut(&key).unwrap();
+            value.grid_history.add_from_gpu(
+                &self.queue,
+                grid_history,
+                iterations,
+                (rows, cols),
+            )?;
+        }
+
+        for (key, value) in self.lattices.iter_mut() {
+            value.set_cell_grid(reshaped_grids.get(key).unwrap().clone()).expect("Same dimensions");
+        }
+
+        W::convert_to_cpu(
+            &mut spike_train_cell_vector, 
+            &gpu_spike_train_grid, 
+            1, 
+            spike_train_vector_size, 
+            &self.queue
+        )?;
+
+        let spike_train_reshaped_grids = Self::consolidate_spike_trains(
+            spike_train_lattice_ids, spike_train_lattice_sizes_map, spike_train_cell_vector
+        );
+
+        let updates = Self::consolidate_spike_train_histories(
+            &self.spike_train_lattices, spike_train_gpu_grid_histories
+        );
+
+        for (key, (rows, cols), grid_history) in updates {
+            let value = self.spike_train_lattices.get_mut(&key).unwrap();
+            value.grid_history.add_from_gpu(
+                &self.queue,
+                grid_history,
+                iterations,
+                (rows, cols),
+            )?;
+        }
+
+        for (key, value) in self.spike_train_lattices.iter_mut() {
+            value.set_spike_train_grid(spike_train_reshaped_grids.get(key).unwrap().clone())
+                .expect("Same dimensions");
+        }
+
+        InterleavingGraphGPU::convert_to_cpu(
+            &self.queue, &gpu_graph, &mut self.lattices, &mut self.spike_train_lattices, &mut self.connecting_graph
+        )?;
+
+        Ok(())
+    }
+
+    fn run_lattices_with_chemical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
+        let (
+            lattice_ids, 
+            lattice_sizes_map, 
+            mut cell_vector, 
+            cell_vector_size
+        ) = self.generate_cell_grid_vector();
+
+        let gpu_cell_grid = T::convert_electrochemical_to_gpu(&cell_vector, &self.context, &self.queue)?;
+
+        let (
+            spike_train_lattice_ids, 
+            spike_train_lattice_sizes_map, 
+            mut spike_train_cell_vector, 
+            spike_train_vector_size
+        ) = self.generate_spike_train_grid_vector();
+
+        let gpu_spike_train_grid = W::convert_electrochemical_to_gpu(&spike_train_cell_vector, &self.context, &self.queue)?;
+
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
+            &self.context, &self.queue, &self.lattices, &self.spike_train_lattices, &self.connecting_graph
+        )?;
+
+        let iterate_kernel = T::iterate_and_spike_electrochemical_kernel(&self.context)?;
+        // let spike_train_iterate_kernel = W::spike_train_electrochemical_kernel(&self.context)?;
+
+        let sums_buffer = create_and_write_buffer(&self.context, &self.queue, gpu_graph.size, 0.0)?;
+
+        let t_sums_buffer = create_and_write_buffer(
+            &self.context, &self.queue, gpu_graph.size * N::number_of_types(), 0.0
+        )?;
+
+        let counts_buffer = create_and_write_buffer(
+            &self.context, &self.queue, gpu_graph.size * N::number_of_types(), 0.0
+        )?;
+
+        let mut gpu_grid_histories = HashMap::new();
+        let mut spike_train_gpu_grid_histories = HashMap::new();
+
+        for (key, value) in &self.lattices {
+            if value.update_grid_history {
+                let rows = value.cell_grid().len();
+                let cols = value.cell_grid().first().unwrap_or(&vec![]).len();
+
+                gpu_grid_histories.insert(
+                    key,
+                    value.grid_history.clone().to_gpu(&self.context, iterations, (rows, cols))?,
+                );
+            }
+        }
+
+        for (key, value) in &self.spike_train_lattices {
+            if value.update_grid_history {
+                let rows = value.spike_train_grid().len();
+                let cols = value.spike_train_grid().first().unwrap_or(&vec![]).len();
+
+                spike_train_gpu_grid_histories.insert(
+                    key,
+                    value.grid_history.clone().to_gpu(&self.context, iterations, (rows, cols))?,
+                );
+            }
+        }
+
+        let lattices_exist = !self.lattices.is_empty();
+        let spike_train_lattices_exist = !self.spike_train_lattices.is_empty();
+        let spike_train_skip_index = gpu_graph.lattice_sizes_map.values()
+            .map(|(x, y)| *x * *y)
+            .collect::<Vec<usize>>()
+            .iter()
+            .sum::<usize>() as u32;
+        // let spike_train_size: usize = gpu_graph.spike_train_lattice_sizes_map.values()
+        //     .map(|(x, y)| *x * *y)
+        //     .collect::<Vec<usize>>()
+        //     .iter()
+        //     .sum();
+
+        for _ in 0..iterations {
+            if lattices_exist && !spike_train_lattices_exist {
+                let chemical_synapses_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&self.chemical_incoming_connections_kernel);
+
+                    kernel_execution.set_arg(&gpu_graph.connections)
+                        .set_arg(&gpu_graph.weights)
+                        .set_arg(&gpu_graph.index_to_position);
+
+                    match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$flags"),
+                    };
+
+                    match &gpu_cell_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$t must be float"),
+                    };
+
+                    kernel_execution.set_arg(&gpu_graph.size)
+                        .set_arg(&N::number_of_types());
+
+                    match kernel_execution
+                        .set_arg(&counts_buffer)
+                        .set_arg(&t_sums_buffer)
+                        .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
+
+                match chemical_synapses_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+            }
+
+            if lattices_exist {
+                let iterate_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
+
+                    for i in iterate_kernel.argument_names.iter() {
+                        if i == "inputs" {
+                            kernel_execution.set_arg(&sums_buffer);
+                        } else if i == "t" {
+                            kernel_execution.set_arg(&t_sums_buffer);
+                        } else if i == "index_to_position" {
+                            kernel_execution.set_arg(&gpu_graph.index_to_position);
+                        } else if i == "number_of_types" {
+                            kernel_execution.set_arg(&N::number_of_types());
+                        } else if i == "neuro_flags" {
+                            match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                                _ => unreachable!("Could not retrieve neurotransmitter flags"),
+                            };
+                        } else if i == "lg_flags" {
+                            match &gpu_cell_grid.get("ligand_gates$flags").expect("Could not retrieve receptor flags") {
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                                _ => unreachable!("Could not retrieve receptor flags"),
+                            };
+                        } else {
+                            match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                            };
+                        }
+                    }
+
+                    match kernel_execution.set_global_work_size(gpu_graph.size)
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
+
+                match iterate_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+
+                unsafe {
+                    self.execute_last_firing_time(
+                        &gpu_graph, 
+                        &gpu_cell_grid, 
+                        0, 
+                        spike_train_skip_index as usize
+                    )?
+                };
+
+                for (key, value) in self.lattices.iter() {
+                    if value.update_grid_history {
+                        let mut skip_index = 0;
+                        for i in gpu_graph.ordered_keys.iter() {
+                            if *i >= *key {
+                                break;
+                            }
+                            let current_size = gpu_graph.lattice_sizes_map.get(i).unwrap();
+                            skip_index += current_size.0 * current_size.1;
+                        }
+
+                        let dim = &gpu_graph.lattice_sizes_map.get(key).unwrap();
+                        let current_size = dim.0 * dim.1;
+                        
+                        unsafe {
+                            self.execute_grid_history(
+                                skip_index as u32,
+                                current_size as u32,
+                                &self.grid_history_kernel,
+                                &gpu_graph, 
+                                &gpu_cell_grid, 
+                                gpu_grid_histories.get(key).unwrap()
+                            )?;
+                        }
+                    }
+                }
+            }
+            
+            self.internal_clock += 1;
+        }
+
         T::convert_electrochemical_to_cpu(
             &mut cell_vector, 
             &gpu_cell_grid, 
@@ -2044,7 +2306,7 @@ where
 
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattices_with_electrical_synapses(iterations).map_err(Into::into),
-            (false, true) => todo!(),
+            (false, true) => self.run_lattices_with_chemical_synapses(iterations).map_err(Into::into),
             (true, true) => todo!(),
             (false, false) => Ok(()),
         }
