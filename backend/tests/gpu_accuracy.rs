@@ -815,4 +815,5 @@ mod tests {
     }
 
     // write tests for these situations with chemical syanpses and electrochemical synapses
+    // abstact out shared kernel processes (particularly gap junctions execution)
 }
