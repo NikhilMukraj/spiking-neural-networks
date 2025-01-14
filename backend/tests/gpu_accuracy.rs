@@ -735,5 +735,84 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    pub fn test_connected_lattices_chemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        // for _ in 0..3 {
+            // let base_neuron = QuadraticIntegrateAndFireNeuron {
+            //     gap_conductance: 0.1,
+            //     ..QuadraticIntegrateAndFireNeuron::default_impl()
+            // };
+        
+            // let iterations = 1000;
+
+            // let mut lattice1 = Lattice::default_impl();
+            
+            // lattice1.populate(
+            //     &base_neuron, 
+            //     2, 
+            //     2, 
+            // );
+        
+            // lattice1.connect(&connection_conditional, None);
+            // lattice1.apply(|neuron: &mut _| {
+            //     let mut rng = rand::thread_rng();
+            //     neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+            // });
+            // lattice1.update_grid_history = true;
+
+            // let mut lattice2 = Lattice::default_impl();
+            // lattice2.set_id(1);
+
+            // lattice2.populate(
+            //     &base_neuron, 
+            //     3, 
+            //     3, 
+            // );
+
+            // lattice2.connect(&connection_conditional, None);
+            // lattice2.apply(|neuron: &mut _| {
+            //     let mut rng = rand::thread_rng();
+            //     neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
+            // });
+            // lattice2.update_grid_history = true;
+
+            // let mut network = LatticeNetwork::default_impl();
+            // network.parallel = true;
+            // network.add_lattice(lattice1)?;
+            // network.add_lattice(lattice2)?;
+
+            // network.connect(0, 1, &inter_lattice_connection_conditional, None)?;
+
+            // network.electrical_synapse = false;
+            // network.chemical_synapse = true;
+
+            // let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
+
+            // gpu_network.run_lattices(iterations)?;
+
+            // for i in network.get_all_ids() {
+            //     let cpu_grid_history = &network.get_lattice(&i).unwrap().grid_history;
+            //     let gpu_grid_history = &gpu_network.get_lattice(&i).unwrap().grid_history;
+                
+            //     for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.history.iter()
+            //         .zip(gpu_grid_history.history.iter()) {
+            //         for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+            //             for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+            //                 let error = (voltage1 - voltage2).abs();
+            //                 assert!(
+            //                     error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+            //                     error,
+            //                     voltage1,
+            //                     voltage2,
+            //                 );
+            //             }
+            //         }
+            //     }
+            // }
+        // }
+
+        Ok(())
+    }
+
     // write tests for these situations with chemical syanpses and electrochemical synapses
 }
