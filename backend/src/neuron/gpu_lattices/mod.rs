@@ -1001,6 +1001,67 @@ __kernel void calculate_network_chemical_inputs(
 
 const NETWORK_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_chemical_inputs";
 
+// const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL: &str = r#"
+// __kernel void calculate_network_with_spike_train_chemical_inputs(
+//     __global const uint *connections, 
+//     __global const float *weights, 
+//     __global const uint *index_to_position,
+//     __global const uint *is_spike_train,
+//     __global const uint *flags,
+//     __global const float *t,
+//     __global const uint *spike_train_flags,
+//     __global const float *spike_train_t,
+//     uint skip_index,
+//     uint n, 
+//     uint number_of_types,
+//     __global float *counts,
+//     __global float *res
+// ) {
+//     int gid = get_global_id(0);
+
+//     for (int t_index = 0; t_index < number_of_types; t_index++) {
+//         int idx = gid * number_of_types + t_index;
+//         res[idx] = 0.0f;
+//         counts[idx] = 0.0f;
+//     }
+
+//     barrier(CLK_GLOBAL_MEM_FENCE);
+
+//     for (int i = 0; i < n; i++) {
+//         if (connections[i * n + gid] == 1) {
+//             int presynaptic_index = index_to_position[i] * number_of_types;
+
+//             if (is_spike_train[presynaptic_index] == 0) {
+//                 for (int t_index = 0; t_index < number_of_types; t_index++) {
+//                     if (flags[presynaptic_index + t_index] == 1) {
+//                         res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
+//                         counts[gid * number_of_types + t_index]++;
+//                     }
+//                 }
+//             } else {
+//                 presynaptic_index -= skip_index;
+//                 for (int t_index = 0; t_index < number_of_types; t_index++) {
+//                     if (spike_train_flags[presynaptic_index + t_index] == 1) {
+//                         res[gid * number_of_types + t_index] += weights[i * n + gid] * spike_train_t[presynaptic_index + t_index];
+//                         counts[gid * number_of_types + t_index]++;
+//                     }
+//                 }
+//             }
+//         }
+//     }
+
+//     for (int t_index = 0; t_index < number_of_types; t_index++) {
+//         if (counts[gid * number_of_types + t_index] != 0.0f) {
+//             res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+//         } else {
+//             res[gid * number_of_types + t_index] = 0.0f;
+//         }
+//     }
+// }
+// "#;
+
+// const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_with_spike_train_chemical_inputs";
+
 fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractorinessGPU>(context: &Context) -> Result<KernelFunction, GPUError> {
     let mut args = vec![
         String::from("connections"), String::from("weights"), String::from("index_to_position"),
