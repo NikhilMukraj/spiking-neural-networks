@@ -143,7 +143,15 @@ setup_neuron = generate_setup_neuron(
 p_on = 0.5
 num_patterns = parsed_toml['simulation_parameters']['num_patterns']
 
-patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+if parse_toml['simulation_parameters']['inputted_patterns'] == None:
+    patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+else:
+    patterns = parse_toml['simulation_parameters']['inputted_patterns']
+
+    if any([i not in [0, 1] for i in patterns]):
+        raise ValueError('Pattern must be comprised of 0s and 1s')
+    if any([len(i) != exc_n * exc_n for i in patterns]):
+        raise ValueError(f'Patterns must be of size {exc_n * exc_n} to match inputted network dimensions')
 
 w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
 w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
