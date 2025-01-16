@@ -30,3 +30,5 @@ bayesian_to_exc = [1]
 prob_of_exc_to_inh = [1]
 s_d2 = [0.0125, 0.25, 0.375, 0.5]
 bayesian_distortion = [0]
+
+# if d2 too strong increase number of inh_n
