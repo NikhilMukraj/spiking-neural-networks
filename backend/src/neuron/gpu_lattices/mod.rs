@@ -1001,66 +1001,66 @@ __kernel void calculate_network_chemical_inputs(
 
 const NETWORK_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_chemical_inputs";
 
-// const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL: &str = r#"
-// __kernel void calculate_network_with_spike_train_chemical_inputs(
-//     __global const uint *connections, 
-//     __global const float *weights, 
-//     __global const uint *index_to_position,
-//     __global const uint *is_spike_train,
-//     __global const uint *flags,
-//     __global const float *t,
-//     __global const uint *spike_train_flags,
-//     __global const float *spike_train_t,
-//     uint skip_index,
-//     uint n, 
-//     uint number_of_types,
-//     __global float *counts,
-//     __global float *res
-// ) {
-//     int gid = get_global_id(0);
+const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL: &str = r#"
+__kernel void calculate_network_with_spike_train_chemical_inputs(
+    __global const uint *connections, 
+    __global const float *weights, 
+    __global const uint *index_to_position,
+    __global const uint *is_spike_train,
+    __global const uint *flags,
+    __global const float *t,
+    __global const uint *spike_train_flags,
+    __global const float *spike_train_t,
+    uint skip_index,
+    uint n, 
+    uint number_of_types,
+    __global float *counts,
+    __global float *res
+) {
+    int gid = get_global_id(0);
 
-//     for (int t_index = 0; t_index < number_of_types; t_index++) {
-//         int idx = gid * number_of_types + t_index;
-//         res[idx] = 0.0f;
-//         counts[idx] = 0.0f;
-//     }
+    for (int t_index = 0; t_index < number_of_types; t_index++) {
+        int idx = gid * number_of_types + t_index;
+        res[idx] = 0.0f;
+        counts[idx] = 0.0f;
+    }
 
-//     barrier(CLK_GLOBAL_MEM_FENCE);
+    barrier(CLK_GLOBAL_MEM_FENCE);
 
-//     for (int i = 0; i < n; i++) {
-//         if (connections[i * n + gid] == 1) {
-//             int presynaptic_index = index_to_position[i] * number_of_types;
+    for (int i = 0; i < n; i++) {
+        if (connections[i * n + gid] == 1) {
+            int presynaptic_index = index_to_position[i] * number_of_types;
 
-//             if (is_spike_train[presynaptic_index] == 0) {
-//                 for (int t_index = 0; t_index < number_of_types; t_index++) {
-//                     if (flags[presynaptic_index + t_index] == 1) {
-//                         res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
-//                         counts[gid * number_of_types + t_index]++;
-//                     }
-//                 }
-//             } else {
-//                 presynaptic_index -= skip_index;
-//                 for (int t_index = 0; t_index < number_of_types; t_index++) {
-//                     if (spike_train_flags[presynaptic_index + t_index] == 1) {
-//                         res[gid * number_of_types + t_index] += weights[i * n + gid] * spike_train_t[presynaptic_index + t_index];
-//                         counts[gid * number_of_types + t_index]++;
-//                     }
-//                 }
-//             }
-//         }
-//     }
+            if (is_spike_train[presynaptic_index] == 0) {
+                for (int t_index = 0; t_index < number_of_types; t_index++) {
+                    if (flags[presynaptic_index + t_index] == 1) {
+                        res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
+                        counts[gid * number_of_types + t_index]++;
+                    }
+                }
+            } else {
+                presynaptic_index -= skip_index;
+                for (int t_index = 0; t_index < number_of_types; t_index++) {
+                    if (spike_train_flags[presynaptic_index + t_index] == 1) {
+                        res[gid * number_of_types + t_index] += weights[i * n + gid] * spike_train_t[presynaptic_index + t_index];
+                        counts[gid * number_of_types + t_index]++;
+                    }
+                }
+            }
+        }
+    }
 
-//     for (int t_index = 0; t_index < number_of_types; t_index++) {
-//         if (counts[gid * number_of_types + t_index] != 0.0f) {
-//             res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
-//         } else {
-//             res[gid * number_of_types + t_index] = 0.0f;
-//         }
-//     }
-// }
-// "#;
+    for (int t_index = 0; t_index < number_of_types; t_index++) {
+        if (counts[gid * number_of_types + t_index] != 0.0f) {
+            res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+        } else {
+            res[gid * number_of_types + t_index] = 0.0f;
+        }
+    }
+}
+"#;
 
-// const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_with_spike_train_chemical_inputs";
+const NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME: &str = "calculate_network_with_spike_train_chemical_inputs";
 
 fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractorinessGPU>(context: &Context) -> Result<KernelFunction, GPUError> {
     let mut args = vec![
@@ -1211,6 +1211,7 @@ pub struct LatticeNetworkGPU<
     electrical_incoming_connections_kernel: Kernel,
     electrical_and_spike_train_incoming_connections: KernelFunction,
     chemical_incoming_connections_kernel: Kernel,
+    chemical_and_spike_train_incoming_connections: Kernel,
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
@@ -1270,6 +1271,15 @@ where
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
+        let chemical_and_spike_train_incoming_connections = match Program::create_and_build_from_source(&context, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        let chemical_and_spike_train_incoming_connections = match Kernel::create(&chemical_and_spike_train_incoming_connections, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        };
+
         let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
@@ -1288,6 +1298,7 @@ where
                 electrical_incoming_connections_kernel, 
                 electrical_and_spike_train_incoming_connections: generate_network_spike_train_electrical_inputs_kernel::<R>(&context)?,
                 chemical_incoming_connections_kernel, 
+                chemical_and_spike_train_incoming_connections,
                 grid_history_kernel: V::get_kernel(&context)?,
                 spike_train_grid_history_kernel: X::get_kernel(&context)?,
                 context, 
@@ -2034,6 +2045,108 @@ where
                     };
 
                     kernel_execution.set_arg(&gpu_graph.size)
+                        .set_arg(&N::number_of_types());
+
+                    match kernel_execution
+                        .set_arg(&counts_buffer)
+                        .set_arg(&t_sums_buffer)
+                        .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                        .enqueue_nd_range(&self.queue) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::QueueFailure),
+                        }
+                };
+
+                match chemical_synapses_event.wait() {
+                    Ok(_) => {},
+                    Err(_) => return Err(GPUError::WaitError),
+                };
+            } else if lattices_exist && spike_train_lattices_exist {
+                if self.electrical_synapse {
+                    let gap_junctions_event = unsafe {
+                        let mut kernel_execution = ExecuteKernel::new(
+                            &self.electrical_and_spike_train_incoming_connections.kernel
+                        );
+    
+                        for i in &self.electrical_and_spike_train_incoming_connections.argument_names {
+                            if i == "weights" {
+                                kernel_execution.set_arg(&gpu_graph.weights);
+                            } else if i == "connections" {
+                                kernel_execution.set_arg(&gpu_graph.connections);
+                            } else if i == "index_to_position" {
+                                kernel_execution.set_arg(&gpu_graph.index_to_position);
+                            } else if i == "is_spike_train" {
+                                kernel_execution.set_arg(&gpu_graph.is_spike_train);
+                            } else if i == "gap_conductances" {
+                                match &gpu_cell_grid.get("gap_conductance").unwrap() {
+                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                    _ => unreachable!("gap_conductance must be a float buffer")
+                                };
+                            } else if i == "voltages" {
+                                match &gpu_cell_grid.get("current_voltage").unwrap() {
+                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                    _ => unreachable!("current_voltage must be a float buffer")
+                                };
+                            } else if i == "timestep" {
+                                kernel_execution.set_arg(&(self.internal_clock as i32));
+                            } else if i == "skip_index" {
+                                kernel_execution.set_arg(&spike_train_skip_index);
+                            } else if i == "n" {
+                                kernel_execution.set_arg(&gpu_graph.size);
+                            } else if i == "res" {
+                                kernel_execution.set_arg(&sums_buffer);
+                            } else {
+                                match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                                    BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                                };
+                            }
+                        }
+    
+                        match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
+                            .enqueue_nd_range(&self.queue) {
+                                Ok(value) => value,
+                                Err(_) => return Err(GPUError::QueueFailure),
+                            }
+                        };
+    
+                        match gap_junctions_event.wait() {
+                            Ok(_) => {},
+                            Err(_) => return Err(GPUError::WaitError),
+                        };
+                }
+
+                let chemical_synapses_event = unsafe {
+                    let mut kernel_execution = ExecuteKernel::new(&self.chemical_incoming_connections_kernel);
+
+                    kernel_execution.set_arg(&gpu_graph.connections)
+                        .set_arg(&gpu_graph.weights)
+                        .set_arg(&gpu_graph.index_to_position)
+                        .set_arg(&gpu_graph.is_spike_train);
+
+                    match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$flags"),
+                    };
+
+                    match &gpu_cell_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$t must be float"),
+                    };
+
+                    match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$flags"),
+                    };
+
+                    match &gpu_spike_train_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("neurotransmitters$t must be float"),
+                    };
+
+                    kernel_execution.set_arg(&spike_train_skip_index)
+                        .set_arg(&gpu_graph.size)
                         .set_arg(&N::number_of_types());
 
                     match kernel_execution
