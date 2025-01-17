@@ -1031,7 +1031,7 @@ __kernel void calculate_network_with_spike_train_chemical_inputs(
         if (connections[i * n + gid] == 1) {
             int presynaptic_index = index_to_position[i] * number_of_types;
 
-            if (is_spike_train[presynaptic_index] == 0) {
+            if (is_spike_train[index_to_position[i]] == 0) {
                 for (int t_index = 0; t_index < number_of_types; t_index++) {
                     if (flags[presynaptic_index + t_index] == 1) {
                         res[gid * number_of_types + t_index] += weights[i * n + gid] * t[presynaptic_index + t_index];
@@ -1039,10 +1039,10 @@ __kernel void calculate_network_with_spike_train_chemical_inputs(
                     }
                 }
             } else {
-                presynaptic_index -= skip_index;
+                int spike_train_presynaptic_index = presynaptic_index - (skip_index * number_of_types);
                 for (int t_index = 0; t_index < number_of_types; t_index++) {
-                    if (spike_train_flags[presynaptic_index + t_index] == 1) {
-                        res[gid * number_of_types + t_index] += weights[i * n + gid] * spike_train_t[presynaptic_index + t_index];
+                    if (spike_train_flags[spike_train_presynaptic_index + t_index] == 1) {
+                        res[gid * number_of_types + t_index] += weights[i * n + gid] * spike_train_t[spike_train_presynaptic_index + t_index];
                         counts[gid * number_of_types + t_index]++;
                     }
                 }
@@ -1193,7 +1193,6 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
 }
 
 /// An implementation of a lattice network that is compatible with the GPU
-#[allow(dead_code)]
 pub struct LatticeNetworkGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
@@ -2118,7 +2117,7 @@ where
                 }
 
                 let chemical_synapses_event = unsafe {
-                    let mut kernel_execution = ExecuteKernel::new(&self.chemical_incoming_connections_kernel);
+                    let mut kernel_execution = ExecuteKernel::new(&self.chemical_and_spike_train_incoming_connections);
 
                     kernel_execution.set_arg(&gpu_graph.connections)
                         .set_arg(&gpu_graph.weights)
