@@ -2587,7 +2587,7 @@ where
         match (self.electrical_synapse, self.chemical_synapse) {
             (true, false) => self.run_lattices_with_electrical_synapses(iterations).map_err(Into::into),
             (false, true) => self.run_lattices_with_chemical_synapses(iterations).map_err(Into::into),
-            (true, true) => todo!(),
+            (true, true) => self.run_lattices_with_chemical_synapses(iterations).map_err(Into::into),
             (false, false) => Ok(()),
         }
     }
