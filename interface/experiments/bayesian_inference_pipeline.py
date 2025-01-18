@@ -133,6 +133,9 @@ def fill_defaults(parsed):
     if 'bayesian_to_exc' not in parsed['variables']:
         parsed['variables']['bayesian_to_exc'] = [5]
 
+    if 'prob_of_d_to_inh' not in parsed['variables']:
+        parsed['variables']['prob_of_d_to_inh'] = [1]
+
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
     if 'ampa_g' not in parsed['variables']:
@@ -158,6 +161,7 @@ def fill_defaults(parsed):
 fields = [
     'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
     'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
+    'prob_of_d_to_inh',
     'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2',
     'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
 ]
@@ -472,7 +476,8 @@ for current_state in tqdm(all_states):
                         i1, 
                         lambda x, y: bool(
                             x[0] * exc_n + x[1] in d_to_i1_mapping.keys() and 
-                            y[0] * exc_n + y[1] in d_to_i1_mapping.values()
+                            y[0] * exc_n + y[1] in d_to_i1_mapping.values() and
+                            np.random.uniform() < current_state['prob_of_d_to_inh']
                         ), 
                         lambda x, y: current_state['bayesian_to_exc']
                     )
