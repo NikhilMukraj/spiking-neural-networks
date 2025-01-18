@@ -9,6 +9,7 @@ measure_snr = true
 pattern_switch = true
 
 d2 = true
+d_acts_on_inh = true
 
 iterations1 = 5000
 iterations2 = 5000
@@ -28,7 +29,7 @@ filename = "bayesian_inf_pattern_switch_d2.json"
 spike_train_to_exc = [4]
 bayesian_to_exc = [1]
 prob_of_exc_to_inh = [1]
-prob_of_d_to_inh = [0.5]
+# prob_of_d_to_inh = [0.5]
 s_d2 = [0.0, 0.0125, 0.25, 0.375, 0.5]
 dopamine_clearance = [0.01]
 # ampa_g = [2]
