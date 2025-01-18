@@ -1541,6 +1541,110 @@ where
         Ok(())
     }
 
+    unsafe fn execute_gap_junctions(
+        &self,
+        sums_buffer: &Buffer<cl_float>,
+        gpu_cell_grid: &HashMap<String, BufferGPU>,
+        gpu_graph: &InterleavingGraphGPU,
+    ) -> Result<(), GPUError> {
+        let gap_junctions_event = unsafe {
+            let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
+
+            kernel_execution.set_arg(&gpu_graph.connections)
+                .set_arg(&gpu_graph.weights)
+                .set_arg(&gpu_graph.index_to_position);
+
+            match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
+                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("gap_condutance must be float"),
+            };
+
+            match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
+                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("current_voltage must be float"),
+            };
+
+            match kernel_execution.set_arg(&gpu_graph.size)
+                .set_arg(sums_buffer)
+                .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+        };
+
+        match gap_junctions_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(GPUError::WaitError),
+        };
+
+        Ok(())
+    }
+
+    unsafe fn execute_gap_junctions_with_spike_train(
+        &self,
+        sums_buffer: &Buffer<cl_float>,
+        spike_train_skip_index: u32,
+        gpu_cell_grid: &HashMap<String, BufferGPU>,
+        gpu_spike_train_grid: &HashMap<String, BufferGPU>,
+        gpu_graph: &InterleavingGraphGPU,
+    ) -> Result<(), GPUError> {
+        let gap_junctions_event = unsafe {
+            let mut kernel_execution = ExecuteKernel::new(
+                &self.electrical_and_spike_train_incoming_connections.kernel
+            );
+
+            for i in &self.electrical_and_spike_train_incoming_connections.argument_names {
+                if i == "weights" {
+                    kernel_execution.set_arg(&gpu_graph.weights);
+                } else if i == "connections" {
+                    kernel_execution.set_arg(&gpu_graph.connections);
+                } else if i == "index_to_position" {
+                    kernel_execution.set_arg(&gpu_graph.index_to_position);
+                } else if i == "is_spike_train" {
+                    kernel_execution.set_arg(&gpu_graph.is_spike_train);
+                } else if i == "gap_conductances" {
+                    match &gpu_cell_grid.get("gap_conductance").unwrap() {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("gap_conductance must be a float buffer")
+                    };
+                } else if i == "voltages" {
+                    match &gpu_cell_grid.get("current_voltage").unwrap() {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        _ => unreachable!("current_voltage must be a float buffer")
+                    };
+                } else if i == "timestep" {
+                    kernel_execution.set_arg(&(self.internal_clock as i32));
+                } else if i == "skip_index" {
+                    kernel_execution.set_arg(&spike_train_skip_index);
+                } else if i == "n" {
+                    kernel_execution.set_arg(&gpu_graph.size);
+                } else if i == "res" {
+                    kernel_execution.set_arg(sums_buffer);
+                } else {
+                    match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+                        BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                    };
+                }
+            }
+
+            match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
+                .enqueue_nd_range(&self.queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::QueueFailure),
+                }
+            };
+
+            match gap_junctions_event.wait() {
+                Ok(_) => {},
+                Err(_) => return Err(GPUError::WaitError),
+            };
+        
+        Ok(())
+    }
+
     fn run_lattices_with_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         // concat cell grids into a single 1d vector of cell grids
         // create a new vector that keeps track of which lattices and positions each cell belongs to
@@ -1616,95 +1720,24 @@ where
 
         for _ in 0..iterations {
             if lattices_exist && !spike_train_lattices_exist {
-                // when calculating spike train effects, pass in timestep as int
-                // use this kernel if no spike trains, otherwise use one that accounts for it
-                let gap_junctions_event = unsafe {
-                    let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
-
-                    kernel_execution.set_arg(&gpu_graph.connections)
-                        .set_arg(&gpu_graph.weights)
-                        .set_arg(&gpu_graph.index_to_position);
-
-                    match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
-                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                        _ => unreachable!("gap_condutance must be float"),
-                    };
-
-                    match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
-                        BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                        _ => unreachable!("current_voltage must be float"),
-                    };
-
-                    match kernel_execution.set_arg(&gpu_graph.size)
-                        .set_arg(&sums_buffer)
-                        .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
-                        .enqueue_nd_range(&self.queue) {
-                            Ok(value) => value,
-                            Err(_) => return Err(GPUError::QueueFailure),
-                        }
-                };
-
-                match gap_junctions_event.wait() {
-                    Ok(_) => {},
-                    Err(_) => return Err(GPUError::WaitError),
-                };
-            } else if lattices_exist && spike_train_lattices_exist {
-               // spike_train_gap_junctions
-               // pass in timestep as a i32
-
-                let gap_junctions_event = unsafe {
-                    let mut kernel_execution = ExecuteKernel::new(
-                        &self.electrical_and_spike_train_incoming_connections.kernel
-                    );
-
-                    for i in &self.electrical_and_spike_train_incoming_connections.argument_names {
-                        if i == "weights" {
-                            kernel_execution.set_arg(&gpu_graph.weights);
-                        } else if i == "connections" {
-                            kernel_execution.set_arg(&gpu_graph.connections);
-                        } else if i == "index_to_position" {
-                            kernel_execution.set_arg(&gpu_graph.index_to_position);
-                        } else if i == "is_spike_train" {
-                            kernel_execution.set_arg(&gpu_graph.is_spike_train);
-                        } else if i == "gap_conductances" {
-                            match &gpu_cell_grid.get("gap_conductance").unwrap() {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                _ => unreachable!("gap_conductance must be a float buffer")
-                            };
-                        } else if i == "voltages" {
-                            match &gpu_cell_grid.get("current_voltage").unwrap() {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                _ => unreachable!("current_voltage must be a float buffer")
-                            };
-                        } else if i == "timestep" {
-                            kernel_execution.set_arg(&(self.internal_clock as i32));
-                        } else if i == "skip_index" {
-                            kernel_execution.set_arg(&spike_train_skip_index);
-                        } else if i == "n" {
-                            kernel_execution.set_arg(&gpu_graph.size);
-                        } else if i == "res" {
-                            kernel_execution.set_arg(&sums_buffer);
-                        } else {
-                            match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                            };
-                        }
-                    }
-
-                    match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
-                        .enqueue_nd_range(&self.queue) {
-                            Ok(value) => value,
-                            Err(_) => return Err(GPUError::QueueFailure),
-                        }
-                    };
-
-                    match gap_junctions_event.wait() {
-                        Ok(_) => {},
-                        Err(_) => return Err(GPUError::WaitError),
-                    };
+                unsafe {
+                    self.execute_gap_junctions(
+                        &sums_buffer,
+                        &gpu_cell_grid,
+                        &gpu_graph,
+                    )?;
                 }
+            } else if lattices_exist && spike_train_lattices_exist {
+                unsafe {
+                    self.execute_gap_junctions_with_spike_train(
+                        &sums_buffer,
+                        spike_train_skip_index,
+                        &gpu_cell_grid,
+                        &gpu_spike_train_grid,
+                        &gpu_graph,
+                    )?;
+                }
+            }
 
             if lattices_exist {
                 // only execute if there exists lattices, same with spike train lattices
@@ -1994,36 +2027,13 @@ where
         for _ in 0..iterations {
             if lattices_exist && !spike_train_lattices_exist {
                 if self.electrical_synapse {
-                    let gap_junctions_event = unsafe {
-                        let mut kernel_execution = ExecuteKernel::new(&self.electrical_incoming_connections_kernel);
-    
-                        kernel_execution.set_arg(&gpu_graph.connections)
-                            .set_arg(&gpu_graph.weights)
-                            .set_arg(&gpu_graph.index_to_position);
-    
-                        match &gpu_cell_grid.get("gap_conductance").expect("Could not retrieve buffer: gap_conductance") {
-                            BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                            _ => unreachable!("gap_condutance must be float"),
-                        };
-    
-                        match &gpu_cell_grid.get("current_voltage").expect("Could not retrieve buffer: current_voltage") {
-                            BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                            _ => unreachable!("current_voltage must be float"),
-                        };
-    
-                        match kernel_execution.set_arg(&gpu_graph.size)
-                            .set_arg(&sums_buffer)
-                            .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
-                            .enqueue_nd_range(&self.queue) {
-                                Ok(value) => value,
-                                Err(_) => return Err(GPUError::QueueFailure),
-                            }
-                    };
-    
-                    match gap_junctions_event.wait() {
-                        Ok(_) => {},
-                        Err(_) => return Err(GPUError::WaitError),
-                    };
+                    unsafe {
+                        self.execute_gap_junctions(
+                            &sums_buffer,
+                            &gpu_cell_grid,
+                            &gpu_graph,
+                        )?;
+                    }
                 }
 
                 let chemical_synapses_event = unsafe {
@@ -2062,58 +2072,15 @@ where
                 };
             } else if lattices_exist && spike_train_lattices_exist {
                 if self.electrical_synapse {
-                    let gap_junctions_event = unsafe {
-                        let mut kernel_execution = ExecuteKernel::new(
-                            &self.electrical_and_spike_train_incoming_connections.kernel
-                        );
-    
-                        for i in &self.electrical_and_spike_train_incoming_connections.argument_names {
-                            if i == "weights" {
-                                kernel_execution.set_arg(&gpu_graph.weights);
-                            } else if i == "connections" {
-                                kernel_execution.set_arg(&gpu_graph.connections);
-                            } else if i == "index_to_position" {
-                                kernel_execution.set_arg(&gpu_graph.index_to_position);
-                            } else if i == "is_spike_train" {
-                                kernel_execution.set_arg(&gpu_graph.is_spike_train);
-                            } else if i == "gap_conductances" {
-                                match &gpu_cell_grid.get("gap_conductance").unwrap() {
-                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                    _ => unreachable!("gap_conductance must be a float buffer")
-                                };
-                            } else if i == "voltages" {
-                                match &gpu_cell_grid.get("current_voltage").unwrap() {
-                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                    _ => unreachable!("current_voltage must be a float buffer")
-                                };
-                            } else if i == "timestep" {
-                                kernel_execution.set_arg(&(self.internal_clock as i32));
-                            } else if i == "skip_index" {
-                                kernel_execution.set_arg(&spike_train_skip_index);
-                            } else if i == "n" {
-                                kernel_execution.set_arg(&gpu_graph.size);
-                            } else if i == "res" {
-                                kernel_execution.set_arg(&sums_buffer);
-                            } else {
-                                match &gpu_spike_train_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
-                                    BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
-                                    BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
-                                    BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
-                                };
-                            }
-                        }
-    
-                        match kernel_execution.set_global_work_size(spike_train_skip_index as usize)
-                            .enqueue_nd_range(&self.queue) {
-                                Ok(value) => value,
-                                Err(_) => return Err(GPUError::QueueFailure),
-                            }
-                        };
-    
-                        match gap_junctions_event.wait() {
-                            Ok(_) => {},
-                            Err(_) => return Err(GPUError::WaitError),
-                        };
+                    unsafe {
+                        self.execute_gap_junctions_with_spike_train(
+                            &sums_buffer,
+                            spike_train_skip_index,
+                            &gpu_cell_grid,
+                            &gpu_spike_train_grid,
+                            &gpu_graph,
+                        )?;
+                    }
                 }
 
                 let chemical_synapses_event = unsafe {
