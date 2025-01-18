@@ -690,7 +690,7 @@ mod tests {
         spike_train_lattice.populate(&base_spike_train, lattice_size, lattice_size);
         spike_train_lattice.apply_given_position(|pos, i| {
             if (pos.0 * lattice_size + pos.1) % 2 == 0 {
-                i.chance_of_firing = 0.001;
+                i.chance_of_firing = 0.005;
             } else {
                 i.chance_of_firing = 0.;
             }
@@ -828,7 +828,4 @@ mod tests {
             
         Ok(())
     }
-
-    // write tests for these situations with chemical syanpses and electrochemical synapses
-    // abstact out shared kernel processes (particularly gap junctions execution)
 }
