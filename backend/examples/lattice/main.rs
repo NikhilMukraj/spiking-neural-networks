@@ -39,7 +39,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
         &base_neuron, 
         num_rows, 
         num_cols, 
-    );
+    )?;
 
     lattice.connect(&connection_conditional, None);
 

@@ -42,12 +42,12 @@ mod tests {
     {
         let mut spike_train_lattice = SpikeTrainLattice::<IonotropicNeurotransmitterType, SpikeTrainType<K, U>, _>::default_impl();
         spike_train_lattice.set_id(0);
-        spike_train_lattice.populate(spike_train, size.0, size.1);
+        spike_train_lattice.populate(spike_train, size.0, size.1)?;
         spike_train_lattice.update_grid_history = true;
     
         let mut lattice = Lattice::<T, _, _, _, IonotropicNeurotransmitterType>::default();
         lattice.set_id(1);
-        lattice.populate(neuron, size.0, size.1);
+        lattice.populate(neuron, size.0, size.1)?;
         lattice.update_grid_history = true;
     
         let lattices: Vec<

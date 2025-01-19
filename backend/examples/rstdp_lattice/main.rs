@@ -70,7 +70,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut reward_modulated_lattice = RewardModulatedLattice::default_impl();
     reward_modulated_lattice.update_graph_history = true;
 
-    reward_modulated_lattice.populate(&izhikevich_neuron, 5, 5);
+    reward_modulated_lattice.populate(&izhikevich_neuron, 5, 5)?;
     reward_modulated_lattice.connect(&connection_conditional, &weight_logic);
     reward_modulated_lattice.apply(|neuron: &mut _| {
         let mut rng = rand::thread_rng();

@@ -35,12 +35,12 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
     spike_train_lattice.set_id(0);
-    spike_train_lattice.populate(&poisson_neuron, num_rows, num_cols);
+    spike_train_lattice.populate(&poisson_neuron, num_rows, num_cols)?;
     spike_train_lattice.update_grid_history = true;
 
     let mut lattice = Lattice::default_impl();
     lattice.set_id(1);
-    lattice.populate(&izhikevich_neuron, num_rows, num_cols);
+    lattice.populate(&izhikevich_neuron, num_rows, num_cols)?;
     lattice.update_grid_history = true;
 
     let lattices = vec![lattice];

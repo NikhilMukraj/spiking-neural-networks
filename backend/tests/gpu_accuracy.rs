@@ -58,7 +58,7 @@ mod tests {
             &base_neuron, 
             num_rows, 
             num_cols, 
-        );
+        )?;
     
         lattice.connect(&connection_conditional, None);
 
@@ -145,7 +145,7 @@ mod tests {
                 &base_neuron, 
                 num_rows, 
                 num_cols, 
-            );
+            )?;
         
             lattice.connect(&connection_conditional, None);
 
@@ -204,7 +204,7 @@ mod tests {
                 &base_neuron, 
                 num_rows, 
                 num_cols, 
-            );
+            )?;
         
             lattice.connect(&connection_conditional, None);
 
@@ -268,7 +268,7 @@ mod tests {
             &base_neuron, 
             2, 
             2, 
-        );
+        )?;
         
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -284,7 +284,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
 
         lattice2.connect(&connection_conditional, None);
         lattice2.apply(|neuron: &mut _| {
@@ -362,7 +362,7 @@ mod tests {
             &base_neuron, 
             2, 
             2, 
-        );
+        )?;
 
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -378,7 +378,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
 
         lattice2.connect(&connection_conditional, None);
         lattice2.apply(|neuron: &mut _| {
@@ -462,7 +462,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
     
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -477,7 +477,7 @@ mod tests {
         base_spike_train.chance_of_firing = 0.1;
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
-        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.populate(&base_spike_train, 3, 3)?;
         spike_train_lattice.update_grid_history = true;
 
         let lattices = vec![lattice1];
@@ -575,7 +575,7 @@ mod tests {
         base_spike_train.chance_of_firing = 0.1;
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
-        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.populate(&base_spike_train, 3, 3)?;
         spike_train_lattice.update_grid_history = true;
 
         #[allow(clippy::type_complexity)]
@@ -669,7 +669,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
     
         // lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -687,7 +687,7 @@ mod tests {
         );
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
-        spike_train_lattice.populate(&base_spike_train, lattice_size, lattice_size);
+        spike_train_lattice.populate(&base_spike_train, lattice_size, lattice_size)?;
         spike_train_lattice.apply_given_position(|pos, i| {
             if (pos.0 * lattice_size + pos.1) % 2 == 0 {
                 i.chance_of_firing = 0.005;

@@ -58,7 +58,7 @@ where
         SpikeTrainGridHistory,
     > = SpikeTrainLattice::default();
     let preset_spike_train = BCMPoissonNeuron::default();
-    spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1);
+    spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1)?;
     spike_train_lattice.apply_given_position(
         |pos: (usize, usize), spike_train: &mut SpikeTrainType<N>| { 
             spike_train.chance_of_firing = firing_rates[pos.0]; 
@@ -69,7 +69,7 @@ where
 
     // setup postsynaptic neuron
     let mut lattice: Lattice<T, AdjacencyMatrix<_, _>, GridVoltageHistory, BCM, N> = Lattice::default();
-    lattice.populate(&postsynaptic_neuron.clone(), 1, 1);
+    lattice.populate(&postsynaptic_neuron.clone(), 1, 1)?;
     lattice.plasticity = *bcm_params;
     lattice.do_plasticity = true;
     lattice.update_grid_history = true;

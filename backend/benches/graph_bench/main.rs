@@ -19,7 +19,7 @@ mod tests {
     #[bench]
     fn bench_mat_5x5(b: &mut Bencher) {
         let mut grid5x5 = Lattice::default_impl();
-        grid5x5.populate(&IzhikevichNeuron::default_impl(), 5, 5);
+        grid5x5.populate(&IzhikevichNeuron::default_impl(), 5, 5).unwrap();
         grid5x5.connect(&|x, y| x != y, None);
         grid5x5.parallel = true;
 
@@ -37,7 +37,7 @@ mod tests {
     #[bench]
     fn bench_list_5x5(b: &mut Bencher) {
         let mut grid5x5: Lattice<_, AdjacencyList<(usize, usize), f32>, GridVoltageHistory, STDP, _> = Lattice::default();
-        grid5x5.populate(&IzhikevichNeuron::default_impl(), 5, 5);
+        grid5x5.populate(&IzhikevichNeuron::default_impl(), 5, 5).unwrap();
         grid5x5.connect(&|x, y| x != y, None);
         grid5x5.parallel = true;
 
@@ -55,7 +55,7 @@ mod tests {
     #[bench]
     fn bench_mat_10x10(b: &mut Bencher) {
         let mut grid10x10 = Lattice::default_impl();
-        grid10x10.populate(&IzhikevichNeuron::default_impl(), 10, 10);
+        grid10x10.populate(&IzhikevichNeuron::default_impl(), 10, 10).unwrap();
         grid10x10.connect(&|x, y| x != y, None);
         grid10x10.parallel = true;
 
@@ -73,7 +73,7 @@ mod tests {
     #[bench]
     fn bench_list_10x10(b: &mut Bencher) {
         let mut grid10x10: Lattice<_, AdjacencyList<(usize, usize), f32>, GridVoltageHistory, STDP, _> = Lattice::default();
-        grid10x10.populate(&IzhikevichNeuron::default_impl(), 10, 10);
+        grid10x10.populate(&IzhikevichNeuron::default_impl(), 10, 10).unwrap();
         grid10x10.connect(&|x, y| x != y, None);
         grid10x10.parallel = true;
 

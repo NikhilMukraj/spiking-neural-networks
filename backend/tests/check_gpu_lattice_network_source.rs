@@ -30,7 +30,7 @@ mod tests {
             &QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::default_impl(), 
             1, 
             1,
-        );
+        )?;
 
         match LatticeGPU::from_lattice(lattice) {
             Ok(_) => Ok(()),
@@ -65,7 +65,7 @@ mod tests {
             &QuadraticIntegrateAndFireNeuron::<ApproximateNeurotransmitter, ApproximateReceptor>::default_impl(), 
             1, 
             1,
-        );
+        )?;
 
         network.add_lattice(lattice)?;
 

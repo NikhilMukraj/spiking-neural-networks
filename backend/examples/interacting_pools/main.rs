@@ -19,7 +19,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let base_neuron = IzhikevichNeuron::default_impl();
 
     let mut inh_lattice: Lattice<_, AdjacencyMatrix<_, _>, AverageVoltageHistory, STDP, _> = Lattice::default();
-    inh_lattice.populate(&base_neuron, 5, 5);
+    inh_lattice.populate(&base_neuron, 5, 5)?;
     inh_lattice.connect(&|x, y| x != y, Some(&|_, _| -1.));
     inh_lattice.apply(|n| {
         let mut rng = rand::thread_rng();
@@ -29,7 +29,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     let mut exc_lattice: Lattice<_, AdjacencyMatrix<_, _>, AverageVoltageHistory, STDP, _> = Lattice::default();
     exc_lattice.set_id(1);
-    exc_lattice.populate(&base_neuron, 10, 10);
+    exc_lattice.populate(&base_neuron, 10, 10)?;
     exc_lattice.connect(&|x, y| x != y, Some(&|_, _| 1.));
     exc_lattice.apply(|n| {
         let mut rng = rand::thread_rng();

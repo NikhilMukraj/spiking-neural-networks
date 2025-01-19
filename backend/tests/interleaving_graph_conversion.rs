@@ -37,7 +37,7 @@ mod tests {
             &base_neuron, 
             2, 
             2, 
-        );
+        )?;
     
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -53,7 +53,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
 
         lattice2.connect(&connection_conditional, None);
         lattice2.apply(|neuron: &mut _| {
@@ -105,7 +105,7 @@ mod tests {
                         &base_neuron, 
                         lattice_to_copy.cell_grid().len(),
                         lattice_to_copy.cell_grid().first().unwrap_or(&vec![]).len(),
-                    );
+                    ).unwrap();
 
                     current_lattice
                 })
@@ -171,7 +171,7 @@ mod tests {
             &base_neuron, 
             2, 
             2, 
-        );
+        )?;
     
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -187,7 +187,7 @@ mod tests {
             &base_neuron, 
             3, 
             3, 
-        );
+        )?;
 
         lattice2.connect(&connection_conditional, None);
         lattice2.apply(|neuron: &mut _| {
@@ -243,7 +243,7 @@ mod tests {
                         &base_neuron, 
                         lattice_to_copy.cell_grid().len(),
                         lattice_to_copy.cell_grid().first().unwrap_or(&vec![]).len(),
-                    );
+                    ).unwrap();
 
                     current_lattice
                 })
@@ -321,7 +321,7 @@ mod tests {
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
         spike_train_lattice.id = 1;
 
-        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.populate(&base_spike_train, 3, 3)?;
 
         #[allow(clippy::type_complexity)]
         let mut network: LatticeNetwork<
@@ -386,7 +386,7 @@ mod tests {
                         &base_spike_train,
                         lattice_to_copy.spike_train_grid().len(),
                         lattice_to_copy.spike_train_grid().first().unwrap_or(&vec![]).len(),
-                    );
+                    ).unwrap();
 
                     current_lattice
                 })
@@ -420,7 +420,7 @@ mod tests {
             &base_neuron, 
             2, 
             2, 
-        );
+        )?;
     
         lattice1.connect(&connection_conditional, None);
         lattice1.apply(|neuron: &mut _| {
@@ -436,7 +436,7 @@ mod tests {
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
         spike_train_lattice.id = 1;
 
-        spike_train_lattice.populate(&base_spike_train, 3, 3);
+        spike_train_lattice.populate(&base_spike_train, 3, 3)?;
 
         let mut network = LatticeNetwork::default();
         network.parallel = true;
@@ -481,7 +481,7 @@ mod tests {
                         &base_neuron, 
                         lattice_to_copy.cell_grid().len(),
                         lattice_to_copy.cell_grid().first().unwrap_or(&vec![]).len(),
-                    );
+                    ).unwrap();
 
                     current_lattice
                 })
@@ -498,7 +498,7 @@ mod tests {
                         &base_spike_train,
                         lattice_to_copy.spike_train_grid().len(),
                         lattice_to_copy.spike_train_grid().first().unwrap_or(&vec![]).len(),
-                    );
+                    ).unwrap();
 
                     current_lattice
                 })

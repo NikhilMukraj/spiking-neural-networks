@@ -96,12 +96,12 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     let base_spike_train = PoissonNeuron::default_impl();
 
     let mut poisson_input = SpikeTrainLattice::default_impl();
-    poisson_input.populate(&base_spike_train, 1, 10);
+    poisson_input.populate(&base_spike_train, 1, 10)?;
     poisson_input.update_grid_history = true;
     poisson_input.set_id(0);
 
     let mut liquid = Lattice::default_impl();
-    liquid.populate(&base_neuron, 10, 10);
+    liquid.populate(&base_neuron, 10, 10)?;
     // could edit so weight matrix should have a spectral radius of 1
     liquid.connect(&sparse_connect, None);
     liquid.apply(|n| {
@@ -110,7 +110,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     liquid.set_id(1);
 
     let mut readout = RewardModulatedLattice::default_impl();
-    readout.populate(&base_neuron, 4, 2);
+    readout.populate(&base_neuron, 4, 2)?;
     readout.connect(&feedforward_connect, &(
         |_, _| TraceRSTDP {
             counter: 0,
