@@ -20,6 +20,8 @@ pub enum GraphError {
     PostsynapticNotFound(String),
     /// Position cannot be found
     PositionNotFound(String),
+    /// Dimensions do not match
+    DimensionsDoNotMatch,
 }
 
 impl Display for GraphError {
@@ -28,6 +30,7 @@ impl Display for GraphError {
             GraphError::PostsynapticNotFound(value) => format!("Postsynaptic position not found, position: {:#?}", value),
             GraphError::PresynapticNotFound(value) => format!("Presynaptic position not found, position: {:#?}", value),
             GraphError::PositionNotFound(value) => format!("Position not found, position: {:#?}", value),
+            GraphError::DimensionsDoNotMatch => String::from("Dimensions do not match"),
         };
 
         write!(f, "{}", err_msg)
