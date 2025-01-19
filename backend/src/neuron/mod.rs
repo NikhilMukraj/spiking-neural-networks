@@ -533,7 +533,7 @@ pub type InternalChemicalInputs<N> = HashMap<(usize, usize), NeurotransmitterCon
 ///     let mut lattice = Lattice::default_impl();
 /// 
 ///     // creates 5x5 grid of neurons
-///     lattice.populate(&base_neuron, 5, 5);
+///     lattice.populate(&base_neuron, 5, 5)?;
 ///     // connects each neuron depending on whether the neuron is in a radius of 2. with
 ///     // an 80% chance of connectiing, each neuron is connected with a default weight of 1.
 ///     lattice.connect(&connection_conditional, None);
@@ -550,7 +550,7 @@ pub type InternalChemicalInputs<N> = HashMap<(usize, usize), NeurotransmitterCon
 ///     Ok(())
 /// }
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Lattice<
     T: IterateAndSpike<N=N>, 
     U: Graph<K=(usize, usize), V=f32>, 
@@ -558,6 +558,8 @@ pub struct Lattice<
     W: Plasticity<T, T, f32>,
     N: NeurotransmitterType,
 > {
+    /// Whether the lattice is in a network
+    in_network: bool,
     /// Grid of neurons
     cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -585,6 +587,7 @@ pub struct Lattice<
 impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Default for Lattice<T, U, V, W, N> {
     fn default() -> Self {
         Lattice {
+            in_network: false,
             cell_grid: vec![],
             graph: U::default(),
             grid_history: V::default(),
@@ -596,6 +599,25 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
             plasticity: W::default(),
             parallel: false,
             internal_clock: 0,
+        }
+    }
+}
+
+impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize), V=f32>, V: LatticeHistory, W: Plasticity<T, T, f32>> Clone for Lattice<T, U, V, W, N> {
+    fn clone(&self) -> Self {
+        Lattice {
+            in_network: false,
+            cell_grid: self.cell_grid.clone(),
+            graph: self.graph.clone(),
+            grid_history: self.grid_history.clone(),
+            update_graph_history: self.update_graph_history,
+            update_grid_history: self.update_grid_history,
+            electrical_synapse: self.electrical_synapse,
+            chemical_synapse: self.chemical_synapse,
+            do_plasticity: self.do_plasticity,
+            plasticity: self.plasticity.clone(),
+            parallel: self.parallel,
+            internal_clock: self.internal_clock,
         }
     }
 }
@@ -1077,8 +1099,15 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
 
     /// Populates a lattice given the dimensions and a base neuron to copy the parameters
     /// of without generating any connections within the graph, (overwrites any pre-existing
-    /// neurons or connections)
-    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+    /// neurons or connections), if the lattice is in a network, the dimensions must match current dimensions
+    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) -> Result<(), GraphError> {
+        let current_rows = self.cell_grid.len();
+        let current_cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+
+        if self.in_network && (current_rows != num_rows || current_cols != num_cols)  {
+            return Err(GraphError::DimensionsDoNotMatch); 
+        }
+
         let id = self.get_id();
 
         self.graph = U::default();
@@ -1090,6 +1119,8 @@ impl<N: NeurotransmitterType, T: IterateAndSpike<N=N>, U: Graph<K=(usize, usize)
                 self.graph.add_node((i, j))
             }
         }
+
+        Ok(())
     }
 
     /// Connects the neurons in a lattice together given a function to determine
@@ -1255,8 +1286,10 @@ impl SpikeTrainLatticeHistory for SpikeTrainGridHistory {
 }
 
 /// Lattice of [`SpikeTrain`] neurons
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SpikeTrainLattice<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> {
+    /// Whether the lattice is in a network
+    in_network: bool,
     /// Grid of spike trains
     cell_grid: Vec<Vec<T>>,
     /// History of grid states
@@ -1272,11 +1305,25 @@ pub struct SpikeTrainLattice<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: Spi
 impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> Default for SpikeTrainLattice<N, T, U> {
     fn default() -> Self {
         SpikeTrainLattice {
+            in_network: false,
             cell_grid: vec![],
             grid_history: U::default(),
             update_grid_history: false,
             internal_clock: 0,
             id: 0,
+        }
+    }
+}
+
+impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> Clone for SpikeTrainLattice<N, T, U> {
+    fn clone(&self) -> Self {
+        SpikeTrainLattice {
+            in_network: false,
+            cell_grid: self.cell_grid.clone(),
+            grid_history: self.grid_history.clone(),
+            update_grid_history: self.update_grid_history,
+            internal_clock: self.internal_clock,
+            id: self.id,
         }
     }
 }
@@ -1343,8 +1390,16 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
         self.internal_clock += 1;
     }
 
-    /// Populates the [`SpikeTrainLattice`] given a [`SpikeTrain`] to clone and given dimensions
-    pub fn populate(&mut self, base_spike_train: &T, num_rows: usize, num_cols: usize) {
+    /// Populates the [`SpikeTrainLattice`] given a [`SpikeTrain`] to clone and given dimensions,
+    /// if the lattice is in a network, the dimensions must match current dimensions
+    pub fn populate(&mut self, base_spike_train: &T, num_rows: usize, num_cols: usize) -> Result<(), GraphError> {
+        let current_rows = self.cell_grid.len();
+        let current_cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+
+        if self.in_network && (current_rows != num_rows || current_cols != num_cols)  {
+            return Err(GraphError::DimensionsDoNotMatch); 
+        }
+
         self.cell_grid = (0..num_rows)
             .map(|_| {
                 (0..num_cols)
@@ -1354,6 +1409,8 @@ impl<N: NeurotransmitterType, T: SpikeTrain<N=N>, U: SpikeTrainLatticeHistory> S
                     .collect::<Vec<T>>()
             })
             .collect();
+            
+        Ok(())
     }
 }
 
@@ -1442,12 +1499,12 @@ fn check_position<T>(
 ///     let mut lattice2 = lattice1.clone();
 ///     lattice2.set_id(1);
 /// 
-///     lattice1.populate(&base_neuron, 3, 3);
-///     lattice2.populate(&base_neuron, 3, 3);
+///     lattice1.populate(&base_neuron, 3, 3)?;
+///     lattice2.populate(&base_neuron, 3, 3)?;
 /// 
 ///     let mut spike_train_lattice = SpikeTrainLattice::default_impl();
 ///     spike_train_lattice.set_id(2);
-///     spike_train_lattice.populate(&base_spike_train, 3, 3);
+///     spike_train_lattice.populate(&base_spike_train, 3, 3)?;
 /// 
 ///     let lattices = vec![lattice1, lattice2];
 ///     let spike_train_lattices = vec![spike_train_lattice];
@@ -1605,10 +1662,15 @@ where
         &mut self, 
         lattice: Lattice<T, U, V, Z, N>
     ) -> Result<(), LatticeNetworkError> {
-        if self.get_all_ids().contains(&lattice.get_id()) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
+        let current_id = lattice.get_id();
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
         }
-        self.lattices.insert(lattice.get_id(), lattice);
+        self.lattices.insert(current_id, lattice);
+
+        let lattice_ref = self.lattices.get_mut(&current_id).unwrap();
+        lattice_ref.in_network = true;
 
         Ok(())
     }
@@ -1619,11 +1681,16 @@ where
         &mut self, 
         spike_train_lattice: SpikeTrainLattice<N, W, X>, 
     ) -> Result<(), LatticeNetworkError> {
-        if self.get_all_ids().contains(&spike_train_lattice.id) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent(spike_train_lattice.id));
+        let current_id = spike_train_lattice.id;
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
         }
 
-        self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
+        self.spike_train_lattices.insert(current_id, spike_train_lattice);
+
+        let spike_train_lattice_ref = self.spike_train_lattices.get_mut(&current_id).unwrap();
+        spike_train_lattice_ref.in_network = true;
 
         Ok(())
     }
@@ -2637,7 +2704,7 @@ where
 // connecting function could generate different enums
 
 /// A lattice of neurons whose connections can be modulated by a reward signal
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RewardModulatedLattice<
     S: RewardModulatedWeight,
     T: IterateAndSpike<N=N>, 
@@ -2646,6 +2713,8 @@ pub struct RewardModulatedLattice<
     W: RewardModulator<T, T, S>, 
     N: NeurotransmitterType,
 > {
+    /// Whether the lattice is in a network
+    in_network: bool,
     /// Grid of neurons
     cell_grid: Vec<Vec<T>>,
     /// Graph connecting internal neurons and storing weights between neurons
@@ -2681,6 +2750,7 @@ where
 {
     fn default() -> Self {
         RewardModulatedLattice { 
+            in_network: false,
             cell_grid: vec![], 
             graph: U::default(), 
             grid_history: V::default(), 
@@ -2692,6 +2762,33 @@ where
             reward_modulator: W::default(), 
             parallel: false,
             internal_clock: 0,
+        }
+    }
+}
+
+impl<S, T, U, V, W, N> Clone for RewardModulatedLattice<S, T, U, V, W, N>
+where
+    S: RewardModulatedWeight,
+    T: IterateAndSpike<N=N>,
+    U: Graph<K = (usize, usize), V = S>,
+    V: LatticeHistory,
+    W: RewardModulator<T, T, S>,
+    N: NeurotransmitterType,
+{
+    fn clone(&self) -> Self {
+        RewardModulatedLattice { 
+            in_network: false,
+            cell_grid: self.cell_grid.clone(), 
+            graph: self.graph.clone(), 
+            grid_history: self.grid_history.clone(), 
+            update_graph_history: self.update_graph_history, 
+            update_grid_history: self.update_grid_history,
+            electrical_synapse: self.electrical_synapse,
+            chemical_synapse: self.chemical_synapse, 
+            do_modulation: self.do_modulation, 
+            reward_modulator: self.reward_modulator.clone(), 
+            parallel: self.parallel,
+            internal_clock: self.internal_clock,
         }
     }
 }
@@ -3162,8 +3259,15 @@ where
 
     /// Populates a lattice given the dimensions and a base neuron to copy the parameters
     /// of without generating any connections within the graph, (overwrites any pre-existing
-    /// neurons or connections)
-    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+    /// neurons or connections), if the lattice is in a network, the dimensions must match current dimensions
+    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) -> Result<(), GraphError> {
+        let current_rows = self.cell_grid.len();
+        let current_cols = self.cell_grid.first().unwrap_or(&vec![]).len();
+
+        if self.in_network && (current_rows != num_rows || current_cols != num_cols)  {
+            return Err(GraphError::DimensionsDoNotMatch); 
+        }
+
         let id = self.get_id();
 
         self.graph = U::default();
@@ -3175,6 +3279,8 @@ where
                 self.graph.add_node((i, j))
             }
         }
+
+        Ok(())
     }
 
     /// Connects the neurons in a lattice together given a function to determine
@@ -3480,10 +3586,15 @@ where
         &mut self, 
         lattice: Lattice<T, U, V, Z, N>
     ) -> Result<(), LatticeNetworkError> {
-        if self.get_all_ids().contains(&lattice.get_id()) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent(lattice.get_id()));
+        let current_id = lattice.get_id();
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
         }
-        self.lattices.insert(lattice.get_id(), lattice);
+        self.lattices.insert(current_id, lattice);
+
+        let lattice_ref = self.lattices.get_mut(&current_id).unwrap();
+        lattice_ref.in_network = true;
 
         Ok(())
     }
@@ -3494,12 +3605,17 @@ where
         &mut self, 
         reward_modulated_lattice: RewardModulatedLattice<S, T, C, V, R, N>
     ) -> Result<(), LatticeNetworkError> {
-        if self.get_all_ids().contains(&reward_modulated_lattice.get_id()) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent(reward_modulated_lattice.get_id()));
+        let current_id = reward_modulated_lattice.get_id();
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
         }
         self.reward_modulated_lattices.insert(
-            reward_modulated_lattice.get_id(), reward_modulated_lattice
+            current_id, reward_modulated_lattice
         );
+
+        let reward_modulated_lattice_ref = self.reward_modulated_lattices.get_mut(&current_id).unwrap();
+        reward_modulated_lattice_ref.in_network = true;
 
         Ok(())
     }
@@ -3510,11 +3626,16 @@ where
         &mut self, 
         spike_train_lattice: SpikeTrainLattice<N, W, X>, 
     ) -> Result<(), LatticeNetworkError> {
-        if self.get_all_ids().contains(&spike_train_lattice.id) {
-            return Err(LatticeNetworkError::GraphIDAlreadyPresent(spike_train_lattice.id));
+        let current_id = spike_train_lattice.id;
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
         }
 
-        self.spike_train_lattices.insert(spike_train_lattice.id, spike_train_lattice);
+        self.spike_train_lattices.insert(current_id, spike_train_lattice);
+
+        let spike_train_lattice_ref = self.spike_train_lattices.get_mut(&current_id).unwrap();
+        spike_train_lattice_ref.in_network = true;
 
         Ok(())
     }
