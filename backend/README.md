@@ -63,7 +63,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
 
     // creates smaller inhbitory lattice to stabilize excitatory feedback
     let mut inh_lattice: Lattice<_, AdjacencyMatrix<_, _>, AverageVoltageHistory, STDP, _> = Lattice::default();
-    inh_lattice.populate(&base_neuron, 4, 4);
+    inh_lattice.populate(&base_neuron, 4, 4)?;
     inh_lattice.connect(&|x, y| x != y, Some(&|_, _| -1.));
     inh_lattice.apply(|n| {
         let mut rng = rand::thread_rng();
@@ -74,7 +74,7 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
     // creates larger excitatory lattice
     let mut exc_lattice: Lattice<_, AdjacencyMatrix<_, _>, AverageVoltageHistory, STDP, _> = Lattice::default();
     exc_lattice.set_id(1);
-    exc_lattice.populate(&base_neuron, 7, 7);
+    exc_lattice.populate(&base_neuron, 7, 7)?;
     exc_lattice.connect(&|x, y| x != y, Some(&|_, _| 1.));
     exc_lattice.apply(|n| {
         let mut rng = rand::thread_rng();
@@ -143,7 +143,7 @@ where
         SpikeTrainGridHistory,
     > = SpikeTrainLattice::default();
     let preset_spike_train = PresetSpikeTrain::default();
-    spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1);
+    spike_train_lattice.populate(&preset_spike_train, firing_rates.len(), 1)?;
     spike_train_lattice.apply_given_position(
         &(|pos: (usize, usize), spike_train: &mut SpikeTrainType<N>| { 
             spike_train.firing_times = vec![firing_rates[pos.0]]; 
@@ -154,7 +154,7 @@ where
 
     // generates postsynaptic neuron
     let mut lattice = Lattice::default_impl();
-    lattice.populate(&postsynaptic_neuron.clone(), 1, 1);
+    lattice.populate(&postsynaptic_neuron.clone(), 1, 1)?;
     lattice.plasticity = *stdp_params;
     lattice.do_plasticity = true;
     lattice.update_grid_history = true;
@@ -204,7 +204,7 @@ where
 ```rust
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 use spiking_neural_networks::neuron::iterate_and_spike::{
-    GaussianParameters, IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
+    IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
     ApproximateNeurotransmitter, ApproximateReceptor,
