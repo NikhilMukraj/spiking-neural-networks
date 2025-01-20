@@ -316,7 +316,6 @@ impl NeuronDefinition {
         let gap_conductance_field = String::from("pub gap_conductance: f32");
         let is_spiking_field = String::from("pub is_spiking: bool");
         let last_firing_time_field = String::from("pub last_firing_time: Option<usize>");
-        let gaussian_field = String::from("pub gaussian_params: GaussianParameters");
         let neurotransmitter_field = format!("pub synaptic_neurotransmitters: Neurotransmitters<{}, T>", neurotransmitter_kind);
         let ligand_gates_field = String::from("pub ligand_gates: LigandGatedChannels<R>");
 
@@ -347,7 +346,6 @@ impl NeuronDefinition {
 
         fields.push(is_spiking_field);
         fields.push(last_firing_time_field);
-        fields.push(gaussian_field);
         fields.push(neurotransmitter_field);
         fields.push(ligand_gates_field);
 
@@ -379,7 +377,6 @@ impl NeuronDefinition {
             defaults.extend(default_ion_channels);
             defaults.push(String::from("is_spiking: false"));
             defaults.push(String::from("last_firing_time: None"));
-            defaults.push(String::from("gaussian_params: GaussianParameters::default()"));
             defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
             defaults.push(String::from("ligand_gates: LigandGatedChannels::<R>::default()"));
 
@@ -467,7 +464,7 @@ impl NeuronDefinition {
         let get_concentrations_body = "self.synaptic_neurotransmitters.get_concentrations()";
         let get_concentrations_function = format!("{}\n\t{}\n}}", get_concentrations_header, get_concentrations_body);
 
-        let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(self.current_voltage, self.dt);";
+        let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));";
         let handle_spiking_call = "self.handle_spiking()";
         let iteration_body = format!(
             "\n\t{}\n\t{}\n\t{}\n\t{}", 
@@ -1233,13 +1230,16 @@ pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
 
     let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
     let neuron_necessary_imports = [
-        "CurrentVoltage", "GapConductance", "GaussianFactor", "LastFiringTime", "IsSpiking",
-        "Timestep", "IterateAndSpike", "GaussianParameters", "LigandGatedChannels", 
+        "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
+        "Timestep", "IterateAndSpike", "LigandGatedChannels", 
         "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
         "NeurotransmitterConcentrations"
     ];
     let neuron_necessary_imports = format!(
-        "use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};",
+        "
+        use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;\n
+        use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};
+        ",
         neuron_necessary_imports.join(", ")
     );
     let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
