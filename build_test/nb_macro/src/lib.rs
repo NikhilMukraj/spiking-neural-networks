@@ -317,7 +317,7 @@ impl NeuronDefinition {
         let is_spiking_field = String::from("pub is_spiking: bool");
         let last_firing_time_field = String::from("pub last_firing_time: Option<usize>");
         let neurotransmitter_field = format!("pub synaptic_neurotransmitters: Neurotransmitters<{}, T>", neurotransmitter_kind);
-        let ligand_gates_field = String::from("pub ligand_gates: LigandGatedChannels<R>");
+        let receptors_field = String::from("pub receptors: LigandGatedChannels<R>");
 
         fields.insert(0, current_voltage_field);
         fields.push(gap_conductance_field);
@@ -347,7 +347,7 @@ impl NeuronDefinition {
         fields.push(is_spiking_field);
         fields.push(last_firing_time_field);
         fields.push(neurotransmitter_field);
-        fields.push(ligand_gates_field);
+        fields.push(receptors_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
@@ -378,7 +378,7 @@ impl NeuronDefinition {
             defaults.push(String::from("is_spiking: false"));
             defaults.push(String::from("last_firing_time: None"));
             defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
-            defaults.push(String::from("ligand_gates: LigandGatedChannels::<R>::default()"));
+            defaults.push(String::from("receptors: LigandGatedChannels::<R>::default()"));
 
             let default_fields = defaults.join(",\n\t");
             
@@ -477,15 +477,15 @@ impl NeuronDefinition {
 
         let iteration_with_neurotransmitter_header = generate_iteration_with_neurotransmitter_header();
 
-        let ligand_gates_update = "self.ligand_gates.update_receptor_kinetics(t_total, self.dt);";
-        let ligand_gates_set_current = "self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);";
+        let receptors_update = "self.receptors.update_receptor_kinetics(t_total, self.dt);";
+        let receptors_set_current = "self.receptors.set_receptor_currents(self.current_voltage, self.dt);";
 
-        let update_with_receptor_current = "self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);";
+        let update_with_receptor_current = "self.current_voltage += self.receptors.get_receptor_currents(self.dt, self.c_m);";
 
         let iteration_with_neurotransmitter_body = format!(
             "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
-            ligand_gates_update,
-            ligand_gates_set_current,
+            receptors_update,
+            receptors_set_current,
             on_iteration_assignments,
             changes,
             update_with_receptor_current,
