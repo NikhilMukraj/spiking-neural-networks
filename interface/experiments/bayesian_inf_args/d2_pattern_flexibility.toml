@@ -12,8 +12,8 @@ d2 = true
 d_acts_on_inh = true
 memory_biases_memory = true
 
-iterations1 = 5000
-iterations2 = 5000
+iterations1 = 2500
+iterations2 = 2500
 a = -1
 b = 0
 
@@ -37,3 +37,4 @@ ampa_g = [1.5]
 bayesian_distortion = [0]
 
 # if d2 too strong increase number of inh_n or try smaller dopamine clearance
+# may need to change iteration times
