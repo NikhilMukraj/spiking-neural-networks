@@ -42,6 +42,11 @@ def fill_defaults(parsed):
     if 'memory_biases_memory' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['memory_biases_memory'] = False
 
+    if 'main_noisy' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['main_noisy'] = False
+    if 'noisy_cue_noise_level' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['noisy_cue_noise_level'] = 0.1
+
     if 'bayesian_1_on' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['bayesian_1_on'] = True
     if 'bayesian_2_on' not in parsed['simulation_parameters']:
@@ -505,17 +510,26 @@ for current_state in tqdm(all_states):
         else:
             main_firing_rate = 0
 
-        network.apply_spike_train_lattice_given_position(
-            c1, 
-            get_spike_train_setup_function(
-                patterns,
-                pattern1, 
-                current_state['distortion'],
-                main_firing_rate,
-                exc_n,
-                parsed_toml['simulation_parameters']['distortion_on_only'],
+        if not parsed_toml['simulation_parameters']['main_noisy']:
+            network.apply_spike_train_lattice_given_position(
+                c1, 
+                get_spike_train_setup_function(
+                    patterns,
+                    pattern1, 
+                    current_state['distortion'],
+                    main_firing_rate,
+                    exc_n,
+                    parsed_toml['simulation_parameters']['distortion_on_only'],
+                )
             )
-        )
+        else:
+            network.apply_spike_train_lattice(
+                c1, 
+                get_noisy_spike_train_setup_function(
+                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+                    parsed_toml['simulation_parameters']['main_firing_rate'],
+                )
+            )
 
         if parsed_toml['simulation_parameters']['bayesian_1_on']:
             bayesian_firing_rate = current_state['bayesian_firing_rate']
@@ -620,28 +634,37 @@ for current_state in tqdm(all_states):
         else:
             main_firing_rate = 0
 
-        if not parsed_toml['simulation_parameters']['pattern_switch']:
-            network.apply_spike_train_lattice_given_position(
-                c1, 
-                get_spike_train_setup_function(
-                    patterns,
-                    pattern1, 
-                    current_state['distortion'],
-                    main_firing_rate,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['distortion_on_only'],
+        if not parsed_toml['simulation_parameters']['main_noisy']:
+            if not parsed_toml['simulation_parameters']['pattern_switch']:
+                network.apply_spike_train_lattice_given_position(
+                    c1, 
+                    get_spike_train_setup_function(
+                        patterns,
+                        pattern1, 
+                        current_state['distortion'],
+                        main_firing_rate,
+                        exc_n,
+                        parsed_toml['simulation_parameters']['distortion_on_only'],
+                    )
                 )
-            )
+            else:
+                network.apply_spike_train_lattice_given_position(
+                    c1, 
+                    get_spike_train_setup_function(
+                        patterns,
+                        pattern_switch1, 
+                        current_state['distortion'],
+                        main_firing_rate,
+                        exc_n,
+                        parsed_toml['simulation_parameters']['distortion_on_only'],
+                    )
+                )
         else:
-            network.apply_spike_train_lattice_given_position(
+            network.apply_spike_train_lattice(
                 c1, 
-                get_spike_train_setup_function(
-                    patterns,
-                    pattern_switch1, 
-                    current_state['distortion'],
-                    main_firing_rate,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['distortion_on_only'],
+                get_noisy_spike_train_setup_function(
+                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+                    parsed_toml['simulation_parameters']['main_firing_rate'],
                 )
             )
 
