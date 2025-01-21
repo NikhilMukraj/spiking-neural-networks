@@ -7,6 +7,7 @@
     - Test how easy it is for pattern to change when $D_1$ or $D_2$ is active on inhibitory group
   - [ ] Bayesian inference with $D_2$ where $D_2$ modulates gabaergic neurons
   - [ ] $D_1$ and $D_2$ testing when there is no cue (modulating inhibitory lattice)
+  - [ ] Noisy cue for $C_1$ and $C_2$
 - [x] Basic liquid implementation
   - [ ] Basic testing
 - [ ] Learning liquid
