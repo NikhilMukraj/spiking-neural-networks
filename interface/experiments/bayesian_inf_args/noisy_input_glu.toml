@@ -26,7 +26,7 @@ c_m = 25
 
 trials = 20
 
-filename = "bayesian_inf_pattern_switch_d2.json"
+filename = "bayesian_inf_noisy_c1_glu.json"
 
 [variables]
 spike_train_to_exc = [4]
@@ -35,5 +35,3 @@ prob_of_exc_to_inh = [1]
 bayesian_distortion = [0]
 
 # may need to change iteration times
-# modify ampa g or weights scalar to ensure accuracy
-
