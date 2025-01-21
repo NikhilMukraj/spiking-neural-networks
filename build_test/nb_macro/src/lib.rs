@@ -787,6 +787,8 @@ impl IonChannelDefinition {
 
             let changes = add_indents(&changes, "\t");
 
+            let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
+
             format!(
                 "{}\n{}\n{}\n{}\n}}", 
                 update_current_header, 
@@ -797,6 +799,8 @@ impl IonChannelDefinition {
         } else {
             let update_current_header = "fn update_current(&mut self, voltage: f32) {";
             let update_current_body = add_indents(&self.on_iteration.generate(), "\t");
+            let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
+
             format!("{}\n{}\n}}", update_current_header, update_current_body)
         };
         
@@ -827,12 +831,51 @@ impl IonChannelDefinition {
         let update_current = add_indents(&update_current, "\t");
         let get_current = add_indents(get_current, "\t");
 
+        let mut defaults = match &self.vars {
+            Ast::VariablesAssignments(variables) => {
+                variables
+                    .iter()
+                    .filter_map(|i| {
+                        if let Ast::VariableAssignment { name, value: Some(x) } = i {
+                            if x % 1. == 0. {
+                                Some(format!("{}: {}.", name, x))
+                            } else {
+                                Some(format!("{}: {}", name, x))
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .collect::<Vec<String>>()
+            },
+            _ => unreachable!(),
+        };
+
+        defaults.push(String::from("current: 0."));
+
+        let default_fields = defaults.join(",\n\t");
+            
+        let default_function = format!(
+            "fn default() -> Self {{ {} {{\n\t{}\n}}", 
+            self.type_name.generate(),
+            default_fields,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let default_function = format!(
+            "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
+            self.type_name.generate(),
+            default_function,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
         (
             imports, 
             format!(
-                "{}\n{}\n}}\n\n{}\n{}\n\n{}\n}}\n", 
+                "{}\n{}\n}}\n\n{}\n\n{}\n{}\n\n{}\n}}\n", 
                 header, 
                 fields, 
+                default_function,
                 impl_header, 
                 update_current, 
                 get_current
