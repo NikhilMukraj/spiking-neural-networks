@@ -9,6 +9,7 @@
 
 - [ ] ion channel defaults
   - [ ] basic gating variables defaults in ion channels
+- [ ] `(struct_call | name)` in front of declarations to edit struct variables
 - [ ] if statements (handled by statement blocks)
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
