@@ -527,7 +527,7 @@ for current_state in tqdm(all_states):
                 c1, 
                 get_noisy_spike_train_setup_function(
                     parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
-                    parsed_toml['simulation_parameters']['main_firing_rate'],
+                    main_firing_rate,
                 )
             )
 
@@ -664,7 +664,7 @@ for current_state in tqdm(all_states):
                 c1, 
                 get_noisy_spike_train_setup_function(
                     parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
-                    parsed_toml['simulation_parameters']['main_firing_rate'],
+                    main_firing_rate,
                 )
             )
 
