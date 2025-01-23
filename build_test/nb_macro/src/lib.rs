@@ -853,6 +853,19 @@ impl IonChannelDefinition {
 
         defaults.push(String::from("current: 0."));
 
+        let gating_defaults = match &self.gating_vars {
+            Some(Ast::GatingVariables(variables)) => {
+                variables.clone()
+                    .iter()
+                    .map(|i| format!("{}: BasicGatingVariable::default()", i))
+                    .collect()
+            },
+            None => vec![],
+            _ => unreachable!()
+        };
+
+        defaults.extend(gating_defaults);
+
         let default_fields = defaults.join(",\n\t");
             
         let default_function = format!(
