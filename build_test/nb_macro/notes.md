@@ -10,6 +10,10 @@
 - [ ] ion channel defaults
   - [ ] basic gating variables defaults in ion channels
 - [ ] `(struct_call | name)` in front of declarations to edit struct variables
+  - [ ] in assignments add a `struct_call_execution` to or where it execution is `_{ struct_call }`
+    - eventually change to seperate struct_function_call
+  - [ ] calling structs functions
+  - [ ] struct var call versus struct func call in declaration
 - [ ] if statements (handled by statement blocks)
 - [ ] bool vars (should be listed in same `vars:` block)
 - [ ] default ligand gated channel
