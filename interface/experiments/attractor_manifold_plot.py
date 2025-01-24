@@ -76,7 +76,6 @@ if args['plot_args']['plot_all_data']:
 
     selected_embedding = reducer.transform(scaled_selected)
 
-    pattern_colors = ['#a83232', '#8b32a8', '#3a32a8']
     pattern_to_color = {pattern: pattern_colors[i % len(pattern_colors)] for i, pattern in enumerate(df['pattern'].unique())}
     colors = [
         pattern_colors[pattern] for pattern in df['pattern'].map({i: int(i) for i in range(3)})
