@@ -30,6 +30,10 @@ cue_to_liquid = np.array([
 
 # generate current state dictionary to determine parameters for simulation
 
+# e1 = 0
+# i1 = 1
+# c1 = 2
+
 # attach firing rate data to a target and the inputted pattern
 # simulation_output = {}
 
@@ -77,7 +81,7 @@ cue_to_liquid = np.array([
 #     poisson_neuron = ln.DopaPoissonNeuron()
 #     poisson_neuron.set_neurotransmitters(exc_neurotransmitters)
 
-#     exc_lattice = ln.DopaIzhikevichLattice(0)
+#     exc_lattice = ln.DopaIzhikevichLattice(e1)
 #     exc_lattice.populate(exc_neuron, exc_n, exc_n)
 #     exc_lattice.apply(setup_neuron)
 #     position_to_index = exc_lattice.position_to_index
@@ -87,11 +91,11 @@ cue_to_liquid = np.array([
 #     )
 #     exc_lattice.update_grid_history = True
 
-#     spike_train_lattice = ln.DopaPoissonLattice(1)
+#     spike_train_lattice = ln.DopaPoissonLattice(c1)
 #     spike_train_lattice.populate(poisson_neuron, exc_n, exc_n)
 
 #     if not parsed_toml['simulation_parameters']['exc_only']:
-#         inh_lattice = ln.DopaIzhikevichLattice(2)
+#         inh_lattice = ln.DopaIzhikevichLattice(i1)
 #         inh_lattice.populate(inh_neuron, inh_n, inh_n)
 #         inh_lattice.apply(setup_neuron)
 #         position_to_index = inh_lattice.position_to_index
@@ -114,21 +118,21 @@ cue_to_liquid = np.array([
 
 #     if not parsed_toml['simulation_parameters']['exc_only']:
 #         network.connect(
-#             2, 
-#             0, 
+#             i1, 
+#             e1, 
 #             lambda x, y: np.random.uniform(0, 1) < current_state['inh_to_exc_connectivity'], 
 #             lambda x, y: current_state['inh_to_exc_weight'],
 #         )
 #         network.connect(
-#             0, 
-#             2, 
+#             e1, 
+#             i1, 
 #             lambda x, y: np.random.uniform(0, 1) < current_state['exc_to_inh_connectivity'],
 #             lambda x, y: current_state['exc_to_inh_weight'],
 #         )
 
 #     network.connect(
-#         1, 
-#         0, 
+#         c1, 
+#         e1, 
 #         lambda x, y: cue_to_liquid[x[0] * (digits_size * spacing_term) + x[1]], 
 #         lambda x, y: current_state['spike_train_to_exc']
 #     )
