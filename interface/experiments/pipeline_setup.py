@@ -155,6 +155,15 @@ def acc(true_pattern, pred_pattern, exc_n, threshold=10):
     current_pred_pattern[pred_pattern >= threshold] = 1
     return (true_pattern.reshape(exc_n, exc_n) == current_pred_pattern.reshape(exc_n, exc_n)).sum() / (num)
 
+def correlation_acc(patterns, num_patterns, desired_pattern_index, firing_data):
+    correlation_coefficients = []
+    for pattern_index in range(num_patterns):
+        correlation_coefficients.append(
+            np.corrcoef(patterns[pattern_index], firing_data)[0, 1]
+        )
+        
+    return bool(desired_pattern_index == np.argmax(correlation_coefficients))
+
 def signal_to_noise(a, axis=0, ddof=0):
     a = np.asanyarray(a)
     m = a.mean(axis)
