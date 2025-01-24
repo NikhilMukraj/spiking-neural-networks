@@ -1,0 +1,7 @@
+[plot_args]
+firing_data = './manifold_output/manifold_data.json'
+colors = ['#a83232', '#8b32a8', '#3a32a8']
+
+plot_all_data = true
+plot_high_accuracy_only_bounded_data = true
+bounding_percent = 0.5
