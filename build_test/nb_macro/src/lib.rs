@@ -85,7 +85,13 @@ enum Op {
 impl Ast {
     fn generate(&self) -> String {
         match self {
-            Ast::Number(n) => n.to_string(),
+            Ast::Number(n) => {
+                if n % 1. != 0. {
+                    n.to_string()
+                } else {
+                    format!("{}.0", n)
+                }
+            },
             Ast::Name(name) => {
                 if name == "v" {
                     String::from("self.current_voltage")
