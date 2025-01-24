@@ -130,6 +130,11 @@ cue_to_liquid = np.array([
 #             lambda x, y: current_state['exc_to_inh_weight'],
 #         )
 
+#     network.electrical_synapse = False
+#     network.chemical_synapse = True
+
+#     network.run_lattices(parsed_toml['off_phase_iterations'])
+
 #     network.connect(
 #         c1, 
 #         e1, 
@@ -137,5 +142,25 @@ cue_to_liquid = np.array([
 #         lambda x, y: current_state['spike_train_to_exc']
 #     )
 
-#     network.electrical_synapse = False
-#     network.chemical_synapse = True
+#     network.run_lattices(parsed_toml['on_phase_iterations'])
+
+#     network.connect(
+#         c1, 
+#         e1, 
+#         lambda x, y: False, 
+#         lambda x, y: 0
+#     )
+
+#     network.run_lattices(parsed_toml['off_phase_iterations'])
+
+#     current_value['firing_rates'] = firing_rate_data
+#     signal = [float(i.mean()) for i in data]
+#     current_value['voltages'] = signal
+
+#     simulation_output[(current_digit, current_class)] = current_value
+
+# with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
+#     json.dump(simulation_output, file, indent=4)
+
+# print("\033[92mFinished simulation\033[0m")
+
