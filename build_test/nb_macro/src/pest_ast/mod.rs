@@ -45,11 +45,11 @@ bin_op = _{
 
 expr = { atom ~ (bin_op ~ atom)* }
 
-diff_eq_declaration = { "d" ~ name ~ "/dt" ~ " "* ~ "=" ~ " "* ~ expr }
-eq_declaration = { name ~ " "* ~ "=" ~ " "* ~ expr }
+diff_eq_declaration = { "d" ~ (struct_call | name) ~ "/dt" ~ " "* ~ "=" ~ " "* ~ expr }
+eq_declaration = { (struct_call | name) ~ " "* ~ "=" ~ " "* ~ expr }
 
 func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
-func_declaration = { name ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
+func_declaration = { (struct_call | name) ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
 
 WHITESPACE = _{ " " }
 
