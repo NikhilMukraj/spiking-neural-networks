@@ -1,19 +1,22 @@
 #[cfg(test)]
 mod test {
-    // use nb_macro::neuron_builder; 
+    use nb_macro::neuron_builder; 
 
     
-    // neuron_builder!(r#"
-    //     [ion_channel]
-    //         type: CalciumIonChannel 
-    //         vars: e = 0, g = 1,
-    //         gating_vars: s
-    //         on_iteration:
-    //             s.alpha = 1.6 / exp(1 + (-0.072 * (v - 5)));
-    //             s.beta = (0.02 * (v + 8.9)) / ((exp(v + 8.9) / 5) - 1);
-    //             current = g * (v - e)
-    //     [end]
-    // "#);
+    neuron_builder!(r#"
+        [ion_channel]
+            type: CalciumIonChannel 
+            vars: e = 0, g = 1,
+            gating_vars: s
+            on_iteration:
+                s.alpha = 1.6 / exp(1 + (-0.072 * (v - 5)))
+                s.beta = (0.02 * (v + 8.9)) / ((exp(v + 8.9) / 5) - 1)
+
+                current = g * s.state * (v - e)
+        [end]
+    "#);
+
+    // s.update(dt)
 
     // #[test]
     // pub fn test_current() {
