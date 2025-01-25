@@ -14,8 +14,10 @@
     - eventually change to seperate struct_function_call
   - [ ] calling structs functions
   - [ ] struct var call versus struct func call in declaration
+  - [ ] rename assignments to calls (call assignments for current assignments)
 - [ ] if statements (handled by statement blocks)
 - [ ] bool vars (should be listed in same `vars:` block)
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
 - [ ] kinetics
+- [ ] function definition blocks
