@@ -35,6 +35,11 @@ enum Ast {
         attribute: String,
         args: Option<Vec<Ast>>,
     },
+    StructFunctionCall {
+        name: String,
+        attribute: String,
+        args: Vec<Ast>,
+    },
     StructAssignment {
         name: String,
         type_name: String,
@@ -145,7 +150,18 @@ impl Ast {
                         None => String::from(""),
                     }
                 )
-            }
+            },
+            Ast::StructFunctionCall { name, attribute, args } => {
+                format!(
+                    "self.{}.{}({});", 
+                    name, 
+                    attribute,
+                    args.iter()
+                        .map(|i| i.generate())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            },
             Ast::EqAssignment { name, expr } => {
                 let name = if name == "v" {
                     String::from("self.current_voltage")
@@ -698,6 +714,12 @@ impl IonChannelDefinition {
                 for i in assignments {
                     if let Ast::DiffEqAssignment { .. } = i {
                         use_timestep = true;
+                    } else if let Ast::StructFunctionCall { args, .. } = i {
+                        for arg in args {
+                            if arg.generate() == "self.dt" {
+                                use_timestep = true;
+                            }
+                        }
                     }
                 }
 
@@ -794,6 +816,7 @@ impl IonChannelDefinition {
             let changes = add_indents(&changes, "\t");
 
             let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
+            let update_current_body = update_current_body.replace("self.dt", "dt");
 
             format!(
                 "{}\n{}\n{}\n{}\n}}", 
@@ -1155,6 +1178,25 @@ fn parse_bool_expr(pairs: Pairs<Rule>) -> Ast {
 
 fn parse_declaration(pair: Pair<Rule>) -> Ast {
     match pair.as_rule() {
+        Rule::struct_call_execution => {
+            let mut inner_rules = pair.into_inner();
+
+            let name: String = String::from(inner_rules.next()
+                .expect("Could not get function name").as_str()
+            );
+
+            let attribute: String = String::from(inner_rules.next()
+                .expect("Could not get attribute name").as_str()
+            );
+
+            let args: Vec<Ast> = inner_rules.next()
+                .unwrap()
+                .into_inner()
+                .map(|i| parse_expr(i.into_inner()))
+                .collect();
+
+            Ast::StructFunctionCall { name, attribute, args }
+        },
         Rule::diff_eq_declaration => {
             let mut inner_rules = pair.into_inner();
 
