@@ -51,6 +51,8 @@ eq_declaration = { (struct_call | name) ~ " "* ~ "=" ~ " "* ~ expr }
 func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
 func_declaration = { (struct_call | name) ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
 
+struct_call_execution = { name ~ "." ~ name ~ ("(" ~ args ~ ")") }
+
 WHITESPACE = _{ " " }
 
 signed_number = @{ unary_minus? ~ number }
@@ -70,7 +72,7 @@ ion_channels_def_with_assignment = _{
 }
 
 eq_assignments = _{ eq_declaration ~ (NEWLINE* ~ eq_declaration)* ~ NEWLINE? }
-assignment = _{ func_declaration | diff_eq_declaration | eq_declaration }
+assignment = _{ func_declaration | diff_eq_declaration | eq_declaration | struct_call_execution  }
 assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
 type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
