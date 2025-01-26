@@ -153,7 +153,12 @@ cue_to_liquid = np.array([
 
 #     network.run_lattices(parsed_toml['off_phase_iterations'])
 
-#     current_value['firing_rates'] = firing_rate_data
+    # hist = network.get_lattice(e1).history
+    # data = [i.flatten() for i in np.array(hist)]
+    # peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+#     current_value['firing_rates'] = [int(len(i)) for i in peaks]
+#     current_value['peaks'] = peaks
 #     signal = [float(i.mean()) for i in data]
 #     current_value['voltages'] = signal
 
