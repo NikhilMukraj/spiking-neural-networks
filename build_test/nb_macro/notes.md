@@ -16,6 +16,7 @@
   - [ ] struct var call versus struct func call in declaration
   - [ ] rename assignments to calls (call assignments for current assignments)
 - [ ] if statements (handled by statement blocks)
+- [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
