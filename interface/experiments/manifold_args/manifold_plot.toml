@@ -5,3 +5,7 @@ colors = ['#a83232', '#8b32a8', '#3a32a8']
 plot_all_data = true
 plot_high_accuracy_only_bounded_data = true
 bounding_percent = 0.5
+
+[reducer_args]
+reducer_all_data = "reducer.sav"
+reducer_high_accuracy_only_bounded = "bounded_reducer.sav"
