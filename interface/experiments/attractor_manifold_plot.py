@@ -10,6 +10,7 @@ from matplotlib.colors import Normalize
 import seaborn as sns
 import pandas as pd
 from pipeline_setup import correlation_acc
+import joblib
 import umap
 
 
@@ -43,6 +44,14 @@ if 'colors' in args['plot_args']:
     pattern_colors = args['plot_args']['colors']
 else:
     raise ValueError('plot_args requires colors argument')
+
+if 'reducer_args' not in args:
+    args['reducer_args'] = {'reducer_all_data' : None, 'reducer_high_accuracy_only_bounded' : None}
+else:
+    if 'reducer_all_data' not in args['reducer_args']:
+        args['reducer_args']['reducer_all_data'] = None
+    if 'reducer_all_data' not in args['reducer_args']:
+        args['reducer_args']['reducer_all_data'] = None
 
 regex_pattern = r'trial: (\d+), pattern: (\d+), distortion: (\d+\.*\d*)'
 
@@ -93,6 +102,9 @@ if args['plot_args']['plot_all_data']:
     plt.title('Attractor States')
     plt.show()
 
+    if args['reducer_args']['reducer_all_data'] is not None:
+        joblib.dump(reducer, args['reducer_args']['reducer_all_data'])
+
 if args['plot_args']['plot_high_accuracy_only_bounded_data']:
     mean_firing_rate = np.array([i[neuron_cols].mean() for _, i in df.iterrows()]).mean()
 
@@ -127,5 +139,8 @@ if args['plot_args']['plot_high_accuracy_only_bounded_data']:
         c=colors
     )
     plt.show()
+
+    if args['reducer_args']['reducer_high_accuracy_only_bounded'] is not None:
+        joblib.dump(selected_reducer, args['reducer_args']['reducer_high_accuracy_only_bounded'])
 
 print("\033[92mFinished plots\033[0m")
