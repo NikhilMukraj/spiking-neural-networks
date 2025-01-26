@@ -53,6 +53,7 @@
 - [ ] Liquid state machine
   - [ ] Basic liquid dynamics
     - [ ] Testing time taken to return to baseline under various conditions
+  - [ ] Liquid with and without readout
   - [ ] STDP based learning of MNIST
     - Readout has plastic connections to liquid, average neural activity of readout is used to classify
   - [ ] Varying ionotropic neurotransmitters
