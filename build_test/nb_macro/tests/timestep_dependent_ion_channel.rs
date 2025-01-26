@@ -54,42 +54,30 @@ mod test {
             vars: e = 80, g = 0.025,
             gating_vars: s
             on_iteration:
-                s.alpha = 1.6 / exp(1 + (-0.072 * (v - 5)))
+                s.alpha = 1.6 / (1 + exp(-0.072 * (v - 5)))
                 s.beta = (0.02 * (v + 8.9)) / ((exp(v + 8.9) / 5) - 1)
 
                 s.update(dt)
 
-                current = g * s.state * (v - e)
+                current = g * -(s.state ^ 2) * (v - e)
         [end]
     "#);
 
 
-    // #[test]
-    // pub fn test_current() {
-    //     let mut leak = CalciumIonChannel::default();
+    #[test]
+    pub fn test_current() {
+        let mut ref_channel = ReferenceCalciumIonChannel::default();
+        let mut channel_to_test = CalciumIonChannel::default();
 
-    //     let voltages = [-50., -40., -30., -20., -10., 0., 10., 20., 30.];
+        let voltages = [-50., -40., -30., -20., -10., 0., 10., 20., 30.];
 
-    //     for i in voltages {
-    //         leak.update_current(i);
+        for i in voltages {
+            for _ in 0..1000 {
+                ref_channel.update_current(i, 0.01);
+                channel_to_test.update_current(i, 0.01);
 
-    //         assert_eq!(leak.current, i);
-    //     }
-
-    //     leak.g = 2.;
-
-    //     for i in voltages {
-    //         leak.update_current(i);
-
-    //         assert_eq!(leak.current, 2. * i);
-    //     }
-
-    //     leak.e = -10.;
-
-    //     for i in voltages {
-    //         leak.update_current(i);
-
-    //         assert_eq!(leak.current, 2. * (i - -10.));
-    //     }
-    // }
+                assert_eq!(ref_channel.current, channel_to_test.current);
+            }
+        }
+    }
 }
