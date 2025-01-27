@@ -40,6 +40,7 @@
     - declare receptor kinetics name
     - declare vars
     - assignment blocks
+    - `receptor_kinetics = {"[receptor_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }`
 - [ ] function definition blocks
 - [ ] spike train block
 - [ ] eventually remove vars declaration without vars
