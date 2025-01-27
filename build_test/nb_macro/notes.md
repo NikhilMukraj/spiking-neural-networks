@@ -32,9 +32,14 @@
 - [ ] kinetics
   - [ ] neurotransmitter kinetics
     - declare neurotransmitter kinetics name
+    - declare vars
     - assignment blocks
+    - `neurotransmitter_kinetics = {"[neurotransmitter_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }`
+    - make sure to add to full def and make sure that both vars and on iteration are defined before parsing
   - [ ] receptor kinetics
     - declare receptor kinetics name
+    - declare vars
     - assignment blocks
 - [ ] function definition blocks
 - [ ] spike train block
+- [ ] eventually remove vars declaration without vars
