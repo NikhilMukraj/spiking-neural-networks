@@ -25,5 +25,11 @@
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
 - [ ] kinetics
+  - [ ] neurotransmitter kinetics
+    - declare neurotransmitter kinetics name
+    - assignment blocks
+  - [ ] receptor kinetics
+    - declare receptor kinetics name
+    - assignment blocks
 - [ ] function definition blocks
 - [ ] spike train block
