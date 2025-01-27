@@ -19,6 +19,7 @@
 - [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
 - [x] read neuron model from text file
+- [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
 - [ ] kinetics
