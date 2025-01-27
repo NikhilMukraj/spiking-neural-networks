@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fs::read_to_string;
 use std::io::{Error, ErrorKind, Result};
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
@@ -1279,6 +1280,262 @@ fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> String
     }
 }
 
+fn build_function(model_description: String) -> TokenStream {
+    let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
+    let neuron_necessary_imports = [
+        "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
+        "Timestep", "IterateAndSpike", "LigandGatedChannels", 
+        "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
+        "NeurotransmitterConcentrations"
+    ];
+    let neuron_necessary_imports = format!(
+        "
+        use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;\n
+        use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};
+        ",
+        neuron_necessary_imports.join(", ")
+    );
+    let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
+    
+    let mut imports = vec![];
+    let mut code: HashMap<String, HashMap<String, String>> = HashMap::new();
+    
+    match ASTParser::parse(Rule::full, &model_description) {
+        Ok(pairs) => {
+            for pair in pairs {
+                match pair.as_rule() {
+                    Rule::neuron_definition => {
+                        let neuron_definition = generate_neuron(pair.into_inner())
+                            .expect("Could not generate neuron");
+    
+                        let (neuron_imports, neuron_code) = neuron_definition.to_code();
+    
+                        if !imports.contains(&neuron_necessary_imports) {
+                            imports.push(neuron_necessary_imports.clone());
+                        }
+                        for i in &neuron_imports {
+                            if !imports.contains(i) {
+                                imports.push(i.clone());
+                            }
+                        }
+    
+                        let neuron_type_name = neuron_definition.type_name.generate();
+    
+                        let neuron_code_map = code.entry(String::from("neuron"))
+                            .or_default();
+                    
+                        neuron_code_map.insert(neuron_type_name, neuron_code);
+                    },
+                    Rule::ion_channel_definition => {
+                        let ion_channel = generate_ion_channel(pair.into_inner())
+                            .expect("Could not generate ion channel");
+    
+                        let (ion_channel_imports, ion_channel_code) = ion_channel.to_code();
+    
+                        for i in ion_channel_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+    
+                        let ion_channel_type_name = ion_channel.type_name.generate();
+                    
+                        let ion_channel_code_map = code.entry(String::from("ion_channel"))
+                            .or_default();
+    
+                        ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
+                    },
+                    Rule::EOI => {
+                        continue
+                    }
+                    _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
+                }
+            }
+        
+            // if any of the ion channel names found in neuron
+            // (use substring to detect)
+            // modify neuron code to insert proper update current code before dv changes
+    
+            let ion_channel_data: HashMap<String, bool> = code.get("ion_channel")
+                .unwrap_or(&HashMap::<String, String>::new())
+                .iter()
+                .map(|(name, code)| {
+                    let is_timestep_independent = code.contains("impl TimestepIndependentIonChannel");
+                    (name.clone(), is_timestep_independent)
+                })
+                .collect();
+    
+            let iteration_with_neurotransmitter_header = add_indents(
+                &generate_iteration_with_neurotransmitter_header(), "\t"
+            );
+    
+            if let Some(neuron_code_map) = code.get_mut("neuron") {
+                for i in neuron_code_map.values_mut() {
+                    for (ion_channel_name, is_timestep_independent) in &ion_channel_data {
+                        if i.contains(ion_channel_name) {
+                            let names = extract_name_from_pattern(i, ion_channel_name);
+    
+                            for name in names {
+                                let to_insert = if *is_timestep_independent {
+                                    format!(
+                                        "\n\t\tself.{}.update_current(self.current_voltage, self.dt);",
+                                        name
+                                    )
+                                } else {
+                                    format!(
+                                        "\n\t\tself.{}.update_current(self.current_voltage);",
+                                        name
+                                    )
+                                };
+    
+                                *i = insert_at_substring(
+                                    i, 
+                                    ITERATION_HEADER,
+                                    &to_insert,
+                                );
+    
+                                *i = insert_at_substring(
+                                    i, 
+                                    &iteration_with_neurotransmitter_header,
+                                    &to_insert,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+    
+            let mut functions: HashMap<String, String> = HashMap::new();
+            functions.insert(
+                String::from("max"), 
+                String::from("fn max(a: f32, b: f32) -> f32 { a.max(b) }"),
+            );
+            functions.insert(
+                String::from("min"),
+                String::from("fn min(a: f32, b: f32) -> f32 { a.min(b) }")
+            );
+            functions.insert(
+                String::from("exp"),
+                String::from("fn exp(x: f32) -> f32 { x.exp() }") 
+            );
+            functions.insert(
+                String::from("tanh"),
+                String::from("fn tanh(x: f32) -> f32 { x.tanh() }"),
+            );
+            functions.insert(
+                String::from("sinh"),
+                String::from("fn sinh(x: f32) -> f32 { x.sinh() }"),
+            );
+            functions.insert(
+                String::from("cosh"),
+                String::from("fn cosh(x: f32) -> f32 { x.cosh() }"),
+            );
+            functions.insert(
+                String::from("tan"),
+                String::from("fn tan(x: f32) -> f32 { x.tan() }"),
+            );
+            functions.insert(
+                String::from("sin"),
+                String::from("fn sin(x: f32) -> f32 { x.sin() }"),
+            );
+            functions.insert(
+                String::from("cos"),
+                String::from("fn cos(x: f32) -> f32 { x.cos() }"),
+            );
+            functions.insert(
+                String::from("heaviside"),
+                String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
+            );
+            // continous is also a reserved function name
+    
+            let mut functions_to_add = Vec::new();
+    
+            let mut all_code = code.values()
+                .map(|i| i.values().cloned().collect::<Vec<String>>().join("\n"))
+                .collect::<Vec<String>>()
+                .join("\n");
+    
+            // check whitespace or ( before function to ensure that it is a function call
+            // (do not need to check for operator) as long as code generator formats with whitespace
+            for (key, value) in functions.iter() {
+                if all_code.contains(&format!(" {}(", key)) || all_code.contains(&format!("({}(", key)) {
+                    functions_to_add.push(value.clone());
+                }
+            }
+    
+            all_code = if !functions_to_add.is_empty() {
+                format!("{}\n{}\n", all_code, functions_to_add.join("\n\n"))
+            } else {
+                all_code
+            };
+    
+            // println!("{}\n\n\n{}", imports.join("\n"), all_code);
+    
+            format!("{}\n\n\n{}", imports.join("\n"), all_code)
+                .parse::<TokenStream>().unwrap()
+        }
+        Err(e) => {
+            let mut error_out = format!("Parse failed: {:?}", e);
+    
+            match e.line_col {
+                // Handle the case where the error is at a single position
+                LineColLocation::Pos((line_number, _)) => {
+                    let lines: Vec<&str> = model_description.lines().collect();
+                    if line_number > 0 && line_number <= lines.len() {
+                        error_out = format!("{}, Error occurred at line {}: {}", error_out, line_number, lines[line_number - 1]);
+                    } else if line_number == lines.len() + 1 {
+                        error_out = format!("{}, Error occured at line: {}", error_out, line_number);
+                    } else {
+                        error_out = format!("{}, Line number {} is out of bounds", error_out, line_number);
+                    }
+                }
+                // Handle the case where the error spans multiple positions
+                LineColLocation::Span((start_line, _), (end_line, _)) => {
+                    let lines: Vec<&str> = model_description.lines().collect();
+                    if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line <= lines.len() {
+                        error_out = format!("{}, Error starts at line {}: {}", error_out, start_line, lines[start_line - 1]);
+                        if start_line != end_line {
+                            error_out = format!("{}, Error ends at line {}: {}", error_out, end_line, lines[end_line - 1]);
+                        }
+                    } else if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line == lines.len() + 1 { 
+                        error_out = format!("{}, Error starts at line {}: {}", error_out, start_line, lines[start_line - 1]);
+                        if start_line != end_line {
+                            error_out = format!("{}, Error ends at line {}", error_out, end_line);
+                        }
+                    } else {
+                        error_out = format!("{}, Line numbers are out of bounds", error_out);
+                    }
+                }
+            }
+    
+            match &e.variant {
+                ParsingError { positives, negatives } => {
+                    if !positives.is_empty() {
+                        error_out = format!("{}, Expected to find: {:?}", error_out, positives);
+                    }
+                    if !negatives.is_empty() {
+                        error_out = format!("{}, Did not expect to find: {:?}", error_out, negatives);
+                    }
+                }
+                CustomError { message } => {
+                    error_out = format!("{}, Custom error: {}", error_out, message);
+                }
+            }
+    
+            [
+                TokenTree::Ident(Ident::new("compile_error", Span::mixed_site())),
+                TokenTree::Punct(Punct::new('!', Spacing::Alone)),
+                TokenTree::Group(Group::new(
+                    Delimiter::Parenthesis,
+                    [TokenTree::Literal(Literal::string(&error_out))].into_iter().collect(),
+                )),
+            ]
+            .into_iter()
+            .collect()
+        }
+    }
+}
+
 #[proc_macro]
 pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
     // block based seperation
@@ -1332,257 +1589,13 @@ pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
     let model_description = parse_macro_input!(model_description as LitStr);
     let model_description = model_description.value();
 
-    let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
-    let neuron_necessary_imports = [
-        "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
-        "Timestep", "IterateAndSpike", "LigandGatedChannels", 
-        "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
-        "NeurotransmitterConcentrations"
-    ];
-    let neuron_necessary_imports = format!(
-        "
-        use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;\n
-        use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};
-        ",
-        neuron_necessary_imports.join(", ")
-    );
-    let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
+    build_function(model_description)
+}
 
-    let mut imports = vec![];
-    let mut code: HashMap<String, HashMap<String, String>> = HashMap::new();
+#[proc_macro]
+pub fn neuron_builder_from_file(filename: TokenStream) -> TokenStream {
+    let filename = parse_macro_input!(filename as LitStr);
+    let filename = filename.value();
 
-    match ASTParser::parse(Rule::full, &model_description) {
-        Ok(pairs) => {
-            for pair in pairs {
-                match pair.as_rule() {
-                    Rule::neuron_definition => {
-                        let neuron_definition = generate_neuron(pair.into_inner())
-                            .expect("Could not generate neuron");
-
-                        let (neuron_imports, neuron_code) = neuron_definition.to_code();
-    
-                        if !imports.contains(&neuron_necessary_imports) {
-                            imports.push(neuron_necessary_imports.clone());
-                        }
-                        for i in &neuron_imports {
-                            if !imports.contains(i) {
-                                imports.push(i.clone());
-                            }
-                        }
-    
-                        let neuron_type_name = neuron_definition.type_name.generate();
-    
-                        let neuron_code_map = code.entry(String::from("neuron"))
-                            .or_default();
-                        
-                        neuron_code_map.insert(neuron_type_name, neuron_code);
-                    },
-                    Rule::ion_channel_definition => {
-                        let ion_channel = generate_ion_channel(pair.into_inner())
-                            .expect("Could not generate ion channel");
-    
-                        let (ion_channel_imports, ion_channel_code) = ion_channel.to_code();
-    
-                        for i in ion_channel_imports {
-                            if !imports.contains(&i) {
-                                imports.push(i);
-                            }
-                        }
-    
-                        let ion_channel_type_name = ion_channel.type_name.generate();
-                        
-                        let ion_channel_code_map = code.entry(String::from("ion_channel"))
-                            .or_default();
-    
-                        ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
-                    },
-                    Rule::EOI => {
-                        continue
-                    }
-                    _ => unreachable!("Unexpected definition: {:#?}", pair.as_rule()),
-                }
-            }
-            
-            // if any of the ion channel names found in neuron
-            // (use substring to detect)
-            // modify neuron code to insert proper update current code before dv changes
-
-            let ion_channel_data: HashMap<String, bool> = code.get("ion_channel")
-                .unwrap_or(&HashMap::<String, String>::new())
-                .iter()
-                .map(|(name, code)| {
-                    let is_timestep_independent = code.contains("impl TimestepIndependentIonChannel");
-                    (name.clone(), is_timestep_independent)
-                })
-                .collect();
-
-            let iteration_with_neurotransmitter_header = add_indents(
-                &generate_iteration_with_neurotransmitter_header(), "\t"
-            );
-
-            if let Some(neuron_code_map) = code.get_mut("neuron") {
-                for i in neuron_code_map.values_mut() {
-                    for (ion_channel_name, is_timestep_independent) in &ion_channel_data {
-                        if i.contains(ion_channel_name) {
-                            let names = extract_name_from_pattern(i, ion_channel_name);
-
-                            for name in names {
-                                let to_insert = if *is_timestep_independent {
-                                    format!(
-                                        "\n\t\tself.{}.update_current(self.current_voltage, self.dt);",
-                                        name
-                                    )
-                                } else {
-                                    format!(
-                                        "\n\t\tself.{}.update_current(self.current_voltage);",
-                                        name
-                                    )
-                                };
-        
-                                *i = insert_at_substring(
-                                    i, 
-                                    ITERATION_HEADER,
-                                    &to_insert,
-                                );
-        
-                                *i = insert_at_substring(
-                                    i, 
-                                    &iteration_with_neurotransmitter_header,
-                                    &to_insert,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-
-            let mut functions: HashMap<String, String> = HashMap::new();
-            functions.insert(
-                String::from("max"), 
-                String::from("fn max(a: f32, b: f32) -> f32 { a.max(b) }"),
-            );
-            functions.insert(
-                String::from("min"),
-                String::from("fn min(a: f32, b: f32) -> f32 { a.min(b) }")
-            );
-            functions.insert(
-                String::from("exp"),
-                String::from("fn exp(x: f32) -> f32 { x.exp() }") 
-            );
-            functions.insert(
-                String::from("tanh"),
-                String::from("fn tanh(x: f32) -> f32 { x.tanh() }"),
-            );
-            functions.insert(
-                String::from("sinh"),
-                String::from("fn sinh(x: f32) -> f32 { x.sinh() }"),
-            );
-            functions.insert(
-                String::from("cosh"),
-                String::from("fn cosh(x: f32) -> f32 { x.cosh() }"),
-            );
-            functions.insert(
-                String::from("tan"),
-                String::from("fn tan(x: f32) -> f32 { x.tan() }"),
-            );
-            functions.insert(
-                String::from("sin"),
-                String::from("fn sin(x: f32) -> f32 { x.sin() }"),
-            );
-            functions.insert(
-                String::from("cos"),
-                String::from("fn cos(x: f32) -> f32 { x.cos() }"),
-            );
-            functions.insert(
-                String::from("heaviside"),
-                String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
-            );
-            // continous is also a reserved function name
-
-            let mut functions_to_add = Vec::new();
-
-            let mut all_code = code.values()
-                .map(|i| i.values().cloned().collect::<Vec<String>>().join("\n"))
-                .collect::<Vec<String>>()
-                .join("\n");
-
-            // check whitespace or ( before function to ensure that it is a function call
-            // (do not need to check for operator) as long as code generator formats with whitespace
-            for (key, value) in functions.iter() {
-                if all_code.contains(&format!(" {}(", key)) || all_code.contains(&format!("({}(", key)) {
-                    functions_to_add.push(value.clone());
-                }
-            }
-
-            all_code = if !functions_to_add.is_empty() {
-                format!("{}\n{}\n", all_code, functions_to_add.join("\n\n"))
-            } else {
-                all_code
-            };
-
-            // println!("{}\n\n\n{}", imports.join("\n"), all_code);
-
-            format!("{}\n\n\n{}", imports.join("\n"), all_code)
-                .parse::<TokenStream>().unwrap()
-        }
-        Err(e) => {
-            let mut error_out = format!("Parse failed: {:?}", e);
-
-            match e.line_col {
-                // Handle the case where the error is at a single position
-                LineColLocation::Pos((line_number, _)) => {
-                    let lines: Vec<&str> = model_description.lines().collect();
-                    if line_number > 0 && line_number <= lines.len() {
-                        error_out = format!("{}, Error occurred at line {}: {}", error_out, line_number, lines[line_number - 1]);
-                    } else if line_number == lines.len() + 1 {
-                        error_out = format!("{}, Error occured at line: {}", error_out, line_number);
-                    } else {
-                        error_out = format!("{}, Line number {} is out of bounds", error_out, line_number);
-                    }
-                }
-                // Handle the case where the error spans multiple positions
-                LineColLocation::Span((start_line, _), (end_line, _)) => {
-                    let lines: Vec<&str> = model_description.lines().collect();
-                    if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line <= lines.len() {
-                        error_out = format!("{}, Error starts at line {}: {}", error_out, start_line, lines[start_line - 1]);
-                        if start_line != end_line {
-                            error_out = format!("{}, Error ends at line {}: {}", error_out, end_line, lines[end_line - 1]);
-                        }
-                    } else if start_line > 0 && start_line <= lines.len() && end_line > 0 && end_line == lines.len() + 1 { 
-                        error_out = format!("{}, Error starts at line {}: {}", error_out, start_line, lines[start_line - 1]);
-                        if start_line != end_line {
-                            error_out = format!("{}, Error ends at line {}", error_out, end_line);
-                        }
-                    } else {
-                        error_out = format!("{}, Line numbers are out of bounds", error_out);
-                    }
-                }
-            }
-
-            match &e.variant {
-                ParsingError { positives, negatives } => {
-                    if !positives.is_empty() {
-                        error_out = format!("{}, Expected to find: {:?}", error_out, positives);
-                    }
-                    if !negatives.is_empty() {
-                        error_out = format!("{}, Did not expect to find: {:?}", error_out, negatives);
-                    }
-                }
-                CustomError { message } => {
-                    error_out = format!("{}, Custom error: {}", error_out, message);
-                }
-            }
-
-            [
-                TokenTree::Ident(Ident::new("compile_error", Span::mixed_site())),
-                TokenTree::Punct(Punct::new('!', Spacing::Alone)),
-                TokenTree::Group(Group::new(
-                    Delimiter::Parenthesis,
-                    [TokenTree::Literal(Literal::string(&error_out))].into_iter().collect(),
-                )),
-            ]
-            .into_iter()
-            .collect()
-        }
-    }
+    build_function(read_to_string(filename).expect("Could not read file to string"))
 }
