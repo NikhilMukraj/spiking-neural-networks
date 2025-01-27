@@ -66,6 +66,8 @@
 /interface/experiments/*/*.npy
 /interface/experiments/*/*.csv
 /interface/experiments/*/*.txt
+/interface/experiments/*/*.sav
+/interface/experiments/*/*.html
 /interface/generate_methods.py
 /build_test/pratt/target
 /build_test/other_ast/target
