@@ -6,6 +6,10 @@ plot_all_data = true
 plot_high_accuracy_only_bounded_data = true
 bounding_percent = 0.5
 
+backend = "plotly"
+save_all_data_plot = "./manifold_output/all_data.html"
+save_bounded_plot = "./manifold_output/bounded_data.html"
+
 [reducer_args]
-reducer_all_data = "reducer.sav"
-reducer_high_accuracy_only_bounded = "bounded_reducer.sav"
+reducer_all_data = "./manifold_output/reducer.sav"
+reducer_high_accuracy_only_bounded = "./manifold_output/bounded_reducer.sav"
