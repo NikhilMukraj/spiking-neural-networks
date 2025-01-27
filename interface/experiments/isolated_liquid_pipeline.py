@@ -94,8 +94,6 @@ def fill_defaults(parsed):
         parsed['variables']['glutamate_clearance'] = [0.001]
     if 'gabaa_clearance' not in parsed['variables']:
         parsed['variables']['gabaa_clearance'] = [0.001]
-    if 'dopamine_clearance' not in parsed['variables']:
-        parsed['variables']['dopamine_clearance'] = [0.001]
 
 def generate_key(parsed, current_state):
     key = []
