@@ -4,6 +4,7 @@ import toml
 import sys
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import Normalize
@@ -36,6 +37,12 @@ if 'plot_high_accuracy_only_bounded_data' not in args['plot_args']:
 if args['plot_args']['plot_high_accuracy_only_bounded_data']:
     if 'bounding_percent' not in args['plot_args']:
         args['plot_args']['bounding_percent'] = 0.5
+if 'backend' not in args['plot_args']:
+    args['plot_args']['backend'] = 'matplotlib'
+if 'save_all_data_plot' not in args['plot_args']:
+    args['plot_args']['save_all_data_plot'] = None
+if 'save_bounded_plot' not in args['plot_args']:
+    args['plot_args']['save_bounded_plot'] = None
 
 patterns = contents['patterns']
 num_patterns = len(contents['patterns'])
@@ -90,17 +97,43 @@ if args['plot_args']['plot_all_data']:
         pattern_colors[pattern] for pattern in df['pattern'].map({i: int(i) for i in range(3)})
     ]
 
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
+    if args['plot_args']['backend'] == 'matplotlib':
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(projection='3d')
 
-    ax.scatter(
-        selected_embedding[:, 0],
-        selected_embedding[:, 1],
-        selected_embedding[:, 2],
-        c=colors
-    )
-    plt.title('Attractor States')
-    plt.show()
+        ax.scatter(
+            selected_embedding[:, 0],
+            selected_embedding[:, 1],
+            selected_embedding[:, 2],
+            c=colors
+        )
+        plt.title('Attractor States')
+        plt.show()
+
+        if args['plot_args']['save_all_data_plot'] is not None:
+            fig.savefig(args['plot_args']['save_all_data_plot'])
+    elif args['plot_args']['backend'] == 'plotly':
+        fig = go.Figure(data=[
+            go.Scatter3d(
+                x=selected_embedding[:, 0],
+                y=selected_embedding[:, 1],
+                z=selected_embedding[:, 2],
+                mode='markers',
+                marker=dict(
+                    size=5,
+                    color=colors,
+                    colorscale='Viridis',
+                    opacity=0.8
+                )
+            )
+        ])
+
+        fig.update_layout(title='Attractor States')
+
+        fig.show()
+
+        if args['plot_args']['save_all_data_plot'] is not None:
+            fig.write_html(args['plot_args']['save_all_data_plot'])
 
     if args['reducer_args']['reducer_all_data'] is not None:
         joblib.dump(reducer, args['reducer_args']['reducer_all_data'])
@@ -129,16 +162,43 @@ if args['plot_args']['plot_high_accuracy_only_bounded_data']:
         pattern_colors[pattern] for pattern in selected_df['pattern'].map({i: int(i) for i in range(3)})
     ]
 
-    fig = plt.figure(figsize=(12, 12))
-    ax = fig.add_subplot(projection='3d')
+    if args['plot_args']['backend'] == 'matplotlib':
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot(projection='3d')
 
-    ax.scatter(
-        selected_embedding[:, 0],
-        selected_embedding[:, 1],
-        selected_embedding[:, 2],
-        c=colors
-    )
-    plt.show()
+        ax.scatter(
+            selected_embedding[:, 0],
+            selected_embedding[:, 1],
+            selected_embedding[:, 2],
+            c=colors
+        )
+        plt.title('Attractor States')
+        plt.show()
+
+        if args['plot_args']['save_bounded_plot'] is not None:
+            fig.savefig(args['plot_args']['save_bounded_plot'])
+    elif args['plot_args']['backend'] == 'plotly':
+        fig = go.Figure(data=[
+            go.Scatter3d(
+                x=selected_embedding[:, 0],
+                y=selected_embedding[:, 1],
+                z=selected_embedding[:, 2],
+                mode='markers',
+                marker=dict(
+                    size=5,
+                    color=colors,
+                    colorscale='Viridis',
+                    opacity=0.8
+                )
+            )
+        ])
+
+        fig.update_layout(title='Attractor States')
+
+        fig.show()
+
+        if args['plot_args']['save_bounded_plot'] is not None:
+            fig.write_html(args['plot_args']['save_bounded_plot'])
 
     if args['reducer_args']['reducer_high_accuracy_only_bounded'] is not None:
         joblib.dump(selected_reducer, args['reducer_args']['reducer_high_accuracy_only_bounded'])
