@@ -18,7 +18,7 @@
 - [ ] if statements (handled by statement blocks)
 - [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
-- [ ] read neuron model from text file
+- [x] read neuron model from text file
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
 - [ ] kinetics
