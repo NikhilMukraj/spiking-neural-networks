@@ -22,7 +22,12 @@
 - [ ] bool vars (should be listed in same `vars:` block)
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
-- [ ] default ligand gated channel
+- [ ] receptors
+  - [ ] ionotropic receptors
+    - [ ] default ligand gated channel
+      - default operation with receptors is just to add receptor currents
+      - should have option to customize receptors
+  - [ ] metabotropic receptors
 - [ ] neuronal chemical testing
 - [ ] kinetics
   - [ ] neurotransmitter kinetics
