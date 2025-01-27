@@ -7,8 +7,8 @@
 
 ## todo
 
-- [ ] ion channel defaults
-  - [ ] basic gating variables defaults in ion channels
+- [x] ion channel defaults
+  - [x] basic gating variables defaults in ion channels
 - [ ] `(struct_call | name)` in front of declarations to edit struct variables
   - [ ] in assignments add a `struct_call_execution` to or where it execution is `_{ struct_call }`
     - eventually change to seperate struct_function_call
@@ -18,7 +18,9 @@
 - [ ] if statements (handled by statement blocks)
 - [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
+- [ ] read neuron model from text file
 - [ ] default ligand gated channel
 - [ ] neuronal chemical testing
 - [ ] kinetics
 - [ ] function definition blocks
+- [ ] spike train block
