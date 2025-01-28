@@ -1035,6 +1035,16 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     Ok(ion_channel)
 }
 
+// struct NeurotransmitterKineticsDefinition {
+    // vars: Ast,
+    // on_iteration: Ast,
+// }
+
+// struct ReceptorKineticsDefinition {
+    // vars: Ast,
+    // on_iteration: Ast,
+// }
+
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
@@ -1344,6 +1354,12 @@ fn build_function(model_description: String) -> TokenStream {
                             .or_default();
     
                         ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
+                    },
+                    Rule::neurotransmitter_kinetics_definition => {
+                        todo!()
+                    },
+                    Rule::receptor_kinetics_definition => {
+                        todo!()
                     },
                     Rule::EOI => {
                         continue
