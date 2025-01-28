@@ -23,6 +23,7 @@
 - [ ] bool vars (should be listed in same `vars:` block)
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
+- [ ] rename ligand gates to receptors
 - [ ] receptors
   - [ ] ionotropic receptors
     - [ ] default ligand gated channel
