@@ -102,8 +102,15 @@ ion_channel_definition = {
 	"[end]"
 }
 
+neurotransmitter_kinetics_definition= {"[neurotransmitter_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }
+receptor_kinetics_definition = {"[receptor_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }
+
 full = _{
-	SOI ~ NEWLINE* ~ ((neuron_definition | ion_channel_definition)+ ~ NEWLINE*)* ~ EOI
+	SOI ~ NEWLINE* ~ ((
+		neuron_definition | ion_channel_definition | 
+		neurotransmitter_kinetics_definition | receptor_kinetics_definition 
+	)+ ~ NEWLINE*
+	)* ~ EOI
 }
 "#]
 pub struct ASTParser;
