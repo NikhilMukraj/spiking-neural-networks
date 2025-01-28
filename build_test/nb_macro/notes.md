@@ -17,6 +17,7 @@
   - [ ] rename assignments to calls (call assignments for current assignments)
 - [ ] if statements (handled by statement blocks)
   - `if_statement = { "[if]" ~ WHITESPACE* ~ expr ~ WHITESPACE* ~ "[then]\n" ~ WHITESPACE* ~ assignments ~ NEWLINE? ~ "[end]" }`
+  - **make sure to parse with bool_expr**
   - optional else if and else in between if and end
 - [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
