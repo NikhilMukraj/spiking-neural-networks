@@ -1,1 +1,9 @@
 # if takes too long, try moving to adj list
+
+[simulation_parameters]
+off_phase = 2000
+on_phase = 1000
+
+filename = "liquid_manifold_data.json"
+
+[variables]
