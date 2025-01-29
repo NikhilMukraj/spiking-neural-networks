@@ -293,6 +293,25 @@ fn generate_on_iteration(on_iteration: &Ast) -> String {
     format!("{}\n{}\n", on_iteration_assignments, changes)
 }
 
+fn generate_fields(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    format!("pub {}: f32", var_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -323,22 +342,7 @@ impl NeuronDefinition {
             self.type_name.generate(),
         );
 
-        let mut fields = match &self.vars {
-            Ast::VariablesAssignments(variables) => {
-                variables
-                    .iter()
-                    .map(|i| {
-                        let var_name = match i {
-                            Ast::VariableAssignment { name, .. } => name,
-                            _ => unreachable!(),
-                        };
-
-                        format!("pub {}: f32", var_name)
-                    })
-                    .collect::<Vec<String>>()
-            },
-            _ => unreachable!()
-        };
+        let mut fields = generate_fields(&self.vars);
 
         let mut defaults = match &self.vars {
             Ast::VariablesAssignments(variables) => {
@@ -740,22 +744,7 @@ impl IonChannelDefinition {
             self.type_name.generate(),
         );
         
-        let mut fields = match &self.vars {
-            Ast::VariablesAssignments(variables) => {
-                variables
-                    .iter()
-                    .map(|i| {
-                        let var_name = match i {
-                            Ast::VariableAssignment { name, .. } => name,
-                            _ => unreachable!(),
-                        };
-
-                        format!("pub {}: f32", var_name)
-                    })
-                    .collect::<Vec<String>>()
-            },
-            _ => unreachable!()
-        };
+        let mut fields = generate_fields(&self.vars);
 
         let gating_variables = match &self.gating_vars {
             Some(Ast::GatingVariables(variables)) => {
