@@ -266,6 +266,33 @@ fn generate_iteration_with_neurotransmitter_header() -> String {
     )
 }
 
+fn generate_on_iteration(on_iteration: &Ast) -> String {
+    let on_iteration_assignments = on_iteration.generate();
+
+    let changes = match on_iteration {
+        Ast::OnIteration(assignments) => {
+            let mut assignments_strings = vec![];
+
+            for i in assignments {
+                if let Ast::DiffEqAssignment { name, .. } =  i {
+                    let change_string = if name == "v" {
+                        "self.current_voltage += dv;".to_string()
+                    } else {
+                        format!("self.{} += d{}", name, name)
+                    };
+
+                    assignments_strings.push(change_string);
+                }
+            }
+
+            assignments_strings.join("\t\n")
+        },
+        _ => panic!("Expected on iteration AST")
+    };
+
+    format!("{}\n{}\n", on_iteration_assignments, changes)
+}
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -460,29 +487,6 @@ impl NeuronDefinition {
             )
         };
 
-        let on_iteration_assignments = self.on_iteration.generate();
-
-        let changes = match &self.on_iteration {
-            Ast::OnIteration(assignments) => {
-                let mut assignments_strings = vec![];
-
-                for i in assignments {
-                    if let Ast::DiffEqAssignment { name, .. } =  i {
-                        let change_string = if name == "v" {
-                            "self.current_voltage += dv;".to_string()
-                        } else {
-                            format!("self.{} += d{}", name, name)
-                        };
-
-                        assignments_strings.push(change_string);
-                    }
-                }
-
-                assignments_strings.join("\t\n")
-            },
-            _ => unreachable!()
-        };
-
         let get_concentrations_header = "fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {";
         let get_concentrations_body = "self.synaptic_neurotransmitters.get_concentrations()";
         let get_concentrations_function = format!("{}\n\t{}\n}}", get_concentrations_header, get_concentrations_body);
@@ -490,9 +494,8 @@ impl NeuronDefinition {
         let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));";
         let handle_spiking_call = "self.handle_spiking()";
         let iteration_body = format!(
-            "\n\t{}\n\t{}\n\t{}\n\t{}", 
-            on_iteration_assignments, 
-            changes, 
+            "\n\t{}\n\t{}\n\t{}", 
+            generate_on_iteration(&self.on_iteration), 
             handle_neurotransmitter_conc,
             handle_spiking_call,
         );
@@ -506,11 +509,10 @@ impl NeuronDefinition {
         let update_with_receptor_current = "self.current_voltage += self.receptors.get_receptor_currents(self.dt, self.c_m);";
 
         let iteration_with_neurotransmitter_body = format!(
-            "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
+            "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
             receptors_update,
             receptors_set_current,
-            on_iteration_assignments,
-            changes,
+            generate_on_iteration(&self.on_iteration),
             update_with_receptor_current,
             handle_neurotransmitter_conc,
             handle_spiking_call,
@@ -787,44 +789,25 @@ impl IonChannelDefinition {
 
         let update_current = if use_timestep {
             let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
-            let on_iteration = &self.on_iteration.generate();
 
-            let mut lines: Vec<&str> = on_iteration.split('\n').collect();
-            let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"));
+            // let mut lines: Vec<&str> = on_iteration.split('\n').collect();
+            // let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"));
 
-            let current_assignment = match current_line_index {
-                Some(index) => lines.remove(index),
-                None => "",
-            };
+            // let current_assignment = match current_line_index {
+            //     Some(index) => lines.remove(index),
+            //     None => "",
+            // };
 
-            let update_current_body = add_indents(&lines.join("\n"), "\t");
-
-            let changes = match &self.on_iteration {
-                Ast::OnIteration(assignments) => {
-                    let mut assignments_strings = vec![];
-    
-                    for i in assignments {
-                        if let Ast::DiffEqAssignment { name, .. } = i {
-                            assignments_strings.push(format!("self.{} += d{}", name, name));
-                        }
-                    }
-    
-                    assignments_strings.join("\t\n")
-                },
-                _ => unreachable!()
-            };
-
-            let changes = add_indents(&changes, "\t");
+            // let update_current_body = add_indents(&lines.join("\n"), "\t");
+            let update_current_body = generate_on_iteration(&self.on_iteration);
 
             let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
             let update_current_body = update_current_body.replace("self.dt", "dt");
 
             format!(
-                "{}\n{}\n{}\n{}\n}}", 
+                "{}\n{}\n}}", 
                 update_current_header, 
-                update_current_body, 
-                changes, 
-                current_assignment
+                update_current_body,
             )
         } else {
             let update_current_header = "fn update_current(&mut self, voltage: f32) {";
