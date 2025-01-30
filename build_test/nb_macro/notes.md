@@ -45,6 +45,8 @@
     - `receptor_kinetics = {"[receptor_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }`
   - [ ] default impl method for default kinetics
   - [ ] default impl trait maybe
+- [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
 - [ ] function definition blocks
 - [ ] spike train block
 - [ ] eventually remove vars declaration without vars
+- [ ] gpu implementations
