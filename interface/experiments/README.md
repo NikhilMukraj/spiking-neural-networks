@@ -75,6 +75,15 @@
 - [ ] Grid attractor as prior cue for Bayesian inference
 - [ ] Ring attractor + point attractor Bayesian inference
 
+## Quick notes
+
+- healthy versus schizophrenic behavior
+  - healthy control should expect that c1 is dominant at lower distortions and c2 should take over at higher distortions
+  - c2 should be applied before c1 is applied
+  - psychotic behavior would be c2 taking over at higher and higher distortions
+  - or c2 should have higher accuracy at lower distortion
+  - c2 should take over when c1 distortion is lower
+
 ## Schizophrenia Simulation Pipeline
 
 The pipeline simulates brain activity by generating two groups of neurons, one inhibitory group
