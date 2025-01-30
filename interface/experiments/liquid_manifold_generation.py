@@ -5,10 +5,13 @@
 # determine which neurons contribute to which digits by
 # inputting differing firing rates into reducer to see where they land
 
+import json
 import sys
 import numpy as np
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
+from pipeline_setup import parse_toml, generate_setup_neuron, find_peaks_above_threshold
+from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing
 import lixirnet as ln
 
 
@@ -90,6 +93,16 @@ with open(sys.argv[1], 'r') as f:
 
 fill_defaults(parsed_toml)
 
+exc_n = parsed_toml['simulation_parameters']['exc_n']
+num = exc_n * exc_n
+
+inh_n = parsed_toml['simulation_parameters']['inh_n']
+
+setup_neuron = generate_setup_neuron(
+    parsed_toml['simulation_parameters']['c_m'], 
+    0.1,
+)
+
 digits = load_digits()
 
 percentage_sample = parsed_toml['variables']['percentage_sample']
@@ -117,18 +130,19 @@ if not parsed_toml['simulation_parameters']['exc_only']:
         inh_num, connectivity=parsed_toml['variables']['inh_connectivity'], scalar=parsed_toml['variables']['inh_internal_scalar']
     )
 
+print(json.dumps(parsed_toml, indent=4))
+
 e1 = 0
 i1 = 1
 c1 = 2
 
-# attach firing rate data to a target and the inputted pattern
 simulation_output = {}
 
 for current_digit, current_class in zip(data, target):
 
     start_firing = generate_start_firing(parsed_toml['variables']['cue_firing_rate'])
 
-    glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=parsed_toml['variables']['glu_clearance'])
+    glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=parsed_toml['variables']['glutamate_clearance'])
     exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
     exc_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Glutamate, glu_neuro)
 
@@ -212,36 +226,46 @@ for current_digit, current_class in zip(data, target):
     network.electrical_synapse = False
     network.chemical_synapse = True
 
-    network.run_lattices(parsed_toml['off_phase_iterations'])
+    network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
     network.connect(
         c1, 
         e1, 
-        lambda x, y: cue_to_liquid[x[0] * (digits_size * spacing_term) + x[1]], 
+        lambda x, y: bool(cue_to_liquid[x[0]][x[1]]), 
         lambda x, y: parsed_toml['variables']['spike_train_to_exc']
     )
 
-    network.run_lattices(parsed_toml['on_phase_iterations'])
-
-    network.connect(
-        c1, 
-        e1, 
-        lambda x, y: False, 
-        lambda x, y: 0
+    network.apply_spike_train_lattice(
+        c1,
+        start_firing
     )
 
-    network.run_lattices(parsed_toml['off_phase_iterations'])
+    network.run_lattices(parsed_toml['simulation_parameters']['on_phase'])
+
+    network.apply_spike_train_lattice(
+        c1,
+        stop_firing
+    )
+
+    network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
+
+    network.apply_spike_train_lattice(
+        c1,
+        start_firing
+    )
 
     hist = network.get_lattice(e1).history
     data = [i.flatten() for i in np.array(hist)]
     peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+    current_value = {}
 
     current_value['firing_rates'] = [int(len(i)) for i in peaks]
     current_value['peaks'] = peaks
     signal = [float(i.mean()) for i in data]
     current_value['voltages'] = signal
 
-    simulation_output[(current_digit, current_class)] = current_value
+    simulation_output[(str(current_digit), str(current_class))] = current_value
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
