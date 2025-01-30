@@ -16,7 +16,7 @@ import itertools
 import numpy as np
 from tqdm import tqdm
 from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise
-from lsm_setup import generate_liquid_weights
+from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing
 import lixirnet as ln
 
 
@@ -112,19 +112,6 @@ def generate_key(parsed, current_state):
         generate_key_helper(current_state, key, parsed, field)
 
     return ', '.join(key)
-
-def generate_start_firing(cue_firing_rate):
-    def start_firing(neuron):
-        neuron.chance_of_firing = cue_firing_rate
-
-        return neuron
-
-    return start_firing
-
-def stop_firing(neuron):
-    neuron.chance_of_firing = 0
-
-    return neuron
 
 def determine_return_to_baseline(voltages, settling_period, on_phase, off_phase, tolerance):
     baseline = np.array(voltages[1000:off_phase]).mean()
