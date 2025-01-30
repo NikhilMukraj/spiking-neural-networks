@@ -19,3 +19,16 @@ def generate_liquid_weights(size, minimum=0, maximum=1, connectivity=0.25, scala
     w /= spectral_radius(w) * scalar
 
     return w
+
+def generate_start_firing(cue_firing_rate):
+    def start_firing(neuron):
+        neuron.chance_of_firing = cue_firing_rate
+
+        return neuron
+
+    return start_firing
+
+def stop_firing(neuron):
+    neuron.chance_of_firing = 0
+
+    return neuron
