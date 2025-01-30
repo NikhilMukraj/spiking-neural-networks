@@ -82,7 +82,6 @@
   - c2 should be applied before c1 is applied
   - psychotic behavior would be c2 taking over at higher and higher distortions
   - or c2 should have higher accuracy at lower distortion
-  - c2 should take over when c1 distortion is lower
 
 ## Schizophrenia Simulation Pipeline
 
