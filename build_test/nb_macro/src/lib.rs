@@ -693,16 +693,35 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
         definitions.insert(key, current_ast);
     }
 
-    let neuron = NeuronDefinition {
-        type_name: definitions.remove("type").unwrap(),
-        vars: definitions.remove("vars").unwrap(),
-        spike_detection: definitions.remove("spike_detection").unwrap(),
-        on_iteration: definitions.remove("on_iteration").unwrap(),
-        on_spike: definitions.remove("on_spike"),
-        ion_channels: definitions.remove("ion_channels"),
-    };
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type definition expected")
+    })?;
+    
+    let vars = definitions.remove("vars").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+    })?;
+    
+    let spike_detection = definitions.remove("spike_detection").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Spike detection definition expected")
+    })?;
+    
+    let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+    })?;
+    
+    let on_spike = definitions.remove("on_spike");
+    let ion_channels = definitions.remove("ion_channels");
 
-    Ok(neuron)
+    Ok(
+        NeuronDefinition {
+            type_name,
+            vars,
+            spike_detection,
+            on_iteration,
+            on_spike,
+            ion_channels,
+        }
+    )
 }
 
 struct IonChannelDefinition {
@@ -997,19 +1016,111 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
         definitions.insert(key, current_ast);
     }
 
-    let ion_channel = IonChannelDefinition {
-        type_name: definitions.remove("type").unwrap(),
-        vars: definitions.remove("vars").unwrap(),
-        gating_vars: definitions.remove("gating_vars"),
-        on_iteration: definitions.remove("on_iteration").unwrap(),
-    };
-
-    Ok(ion_channel)
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type definition expected")
+    })?;
+    
+    let vars = definitions.remove("vars").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+    })?;
+    
+    let gating_vars = definitions.remove("gating_vars");
+    
+    let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+    })?;
+    
+    Ok(
+        IonChannelDefinition {
+            type_name,
+            vars,
+            gating_vars,
+            on_iteration,
+        }
+    )
 }
 
 // struct NeurotransmitterKineticsDefinition {
-    // vars: Ast,
-    // on_iteration: Ast,
+//     vars: Ast,
+//     on_iteration: Ast,
+// }
+
+// fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<NeurotransmitterKineticsDefinition> {
+//     let mut definitions: HashMap<String, Ast> = HashMap::new();
+
+//     for pair in pairs {
+//         let (key, current_ast) = match pair.as_rule() {
+//             Rule::type_def => {
+//                 (
+//                     String::from("type"), 
+//                     Ast::TypeDefinition(
+//                         String::from(pair.into_inner().next().unwrap().as_str())
+//                     )
+//                 )
+//             },
+//             Rule::on_iteration_def => {
+//                 let inner_rules = pair.into_inner();
+
+//                 (
+//                     String::from("on_iteration"),
+//                     Ast::OnIteration(
+//                         inner_rules
+//                         .map(|i| parse_declaration(i))
+//                         .collect::<Vec<Ast>>()
+//                     )
+//                 )
+//             },
+//             Rule::vars_with_default_def => {
+//                 // assignment should be just a number
+//                 // in order to prevent duplicate, key should be "vars"
+
+//                 let inner_rules = pair.into_inner();
+
+//                 let assignments: Vec<Ast> = inner_rules 
+//                     .map(|i| {
+//                         let mut nested_rule = i.into_inner();
+
+//                         Ast::VariableAssignment { 
+//                             name: String::from(nested_rule.next().unwrap().as_str()), 
+//                             value: Some(
+//                                 nested_rule.next()
+//                                     .unwrap()
+//                                     .as_str()
+//                                     .parse::<f32>()
+//                                     .unwrap()
+//                                 ), 
+//                         }
+//                     })
+//                     .collect(); 
+
+//                 (
+//                     String::from("vars"),
+//                     Ast::VariablesAssignments(assignments)
+//                 )
+//             },
+//             definition => unreachable!("Unexpected definition: {:#?}", definition)
+//         };
+
+//         if definitions.contains_key(&key) {
+//             return Err(
+//                 Error::new(
+//                     ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+//                 )
+//             )
+//         }
+
+//         definitions.insert(key, current_ast);
+//     }
+
+//     let vars = definitions.remove("vars").ok_or_else(|| {
+//         Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+//     })?;
+    
+//     let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+//         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+//     })?;
+    
+//     Ok(NeurotransmitterKineticsDefinition { vars, on_iteration })    
 // }
 
 // struct ReceptorKineticsDefinition {
