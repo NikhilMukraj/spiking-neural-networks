@@ -344,25 +344,7 @@ impl NeuronDefinition {
 
         let mut fields = generate_fields(&self.vars);
 
-        let mut defaults = match &self.vars {
-            Ast::VariablesAssignments(variables) => {
-                variables
-                    .iter()
-                    .filter_map(|i| {
-                        if let Ast::VariableAssignment { name, value: Some(x) } = i {
-                            if x % 1. == 0. {
-                                Some(format!("{}: {}.", name, x))
-                            } else {
-                                Some(format!("{}: {}", name, x))
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<String>>()
-            },
-            _ => unreachable!(),
-        };
+        let mut defaults = generate_defaults(&self.vars);
 
         let current_voltage_field = String::from("pub current_voltage: f32");
         let dt_field = String::from("pub dt: f32");
@@ -568,116 +550,159 @@ impl NeuronDefinition {
     }
 }
 
+fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("type"), 
+        Ast::TypeDefinition(
+            String::from(pair.into_inner().next().unwrap().as_str())
+        )
+    )
+}
+
+fn parse_on_iteration(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    (
+        String::from("on_iteration"),
+        Ast::OnIteration(
+            inner_rules
+            .map(|i| parse_declaration(i))
+            .collect::<Vec<Ast>>()
+        )
+    )
+}
+
+fn parse_on_spike(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    (
+        String::from("on_spike"),
+        Ast::OnSpike(
+            inner_rules
+            .map(|i| parse_declaration(i))
+            .collect::<Vec<Ast>>()
+        )
+    )
+}
+
+fn parse_spike_detection(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("spike_detection"),
+        Ast::SpikeDetection(Box::new(parse_bool_expr(pair.into_inner())))
+    )
+}
+
+fn parse_vars_assignments(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    let assignments: Vec<Ast> = inner_rules
+        .map(|i| Ast::VariableAssignment { 
+            name: String::from(i.as_str()), 
+            value: None,
+        })
+        .collect();
+
+    (
+        String::from("vars"),
+        Ast::VariablesAssignments(assignments)
+    )
+}
+
+fn parse_vars_with_default(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    let assignments: Vec<Ast> = inner_rules 
+        .map(|i| {
+            let mut nested_rule = i.into_inner();
+
+            Ast::VariableAssignment { 
+                name: String::from(nested_rule.next().unwrap().as_str()), 
+                value: Some(
+                    nested_rule.next()
+                        .unwrap()
+                        .as_str()
+                        .parse::<f32>()
+                        .unwrap()
+                    ), 
+            }
+        })
+        .collect(); 
+
+    (
+        String::from("vars"),
+        Ast::VariablesAssignments(assignments)
+    )
+}
+
+fn parse_ion_channels(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    let assignments: Vec<Ast> = inner_rules 
+        .map(|i| {
+            let mut nested_rule = i.into_inner();
+
+            Ast::StructAssignment { 
+                name: String::from(nested_rule.next().unwrap().as_str()), 
+                type_name: String::from(
+                    nested_rule.next()
+                        .unwrap()
+                        .as_str()
+                )
+            }
+        })
+        .collect(); 
+
+    (
+        String::from("ion_channels"),
+        Ast::StructAssignments(assignments)
+    )
+}
+
+fn parse_gating_variables(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    let assignments: Vec<String> = inner_rules 
+        .map(|i| {
+            String::from(i.as_str())
+        })
+        .collect(); 
+
+    (
+        String::from("gating_vars"),
+        Ast::GatingVariables(assignments)
+    )
+}
+
 fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     let mut definitions: HashMap<String, Ast> = HashMap::new();
 
     for pair in pairs {
         let (key, current_ast) = match pair.as_rule() {
             Rule::type_def => {
-                (
-                    String::from("type"), 
-                    Ast::TypeDefinition(
-                        String::from(pair.into_inner().next().unwrap().as_str())
-                    )
-                )
+                parse_type_definition(pair)
             },
             Rule::on_iteration_def => {
-                let inner_rules = pair.into_inner();
-
-                (
-                    String::from("on_iteration"),
-                    Ast::OnIteration(
-                        inner_rules
-                        .map(|i| parse_declaration(i))
-                        .collect::<Vec<Ast>>()
-                    )
-                )
+                parse_on_iteration(pair)
             },
             Rule::on_spike_def => {
-                let inner_rules = pair.into_inner();
-
-                (
-                    String::from("on_spike"),
-                    Ast::OnSpike(
-                        inner_rules
-                        .map(|i| parse_declaration(i))
-                        .collect::<Vec<Ast>>()
-                    )
-                )
+                parse_on_spike(pair)
             },
             Rule::spike_detection_def => {
-                (
-                    String::from("spike_detection"),
-                    Ast::SpikeDetection(Box::new(parse_bool_expr(pair.into_inner())))
-                )
+                parse_spike_detection(pair)
             }
             Rule::vars_def => {
                 // if no defaults then just assume assingment is None
                 // in order to prevent duplicate, key should be "vars"
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<Ast> = inner_rules
-                    .map(|i| Ast::VariableAssignment { 
-                        name: String::from(i.as_str()), 
-                        value: None,
-                    })
-                    .collect();
-
-                (
-                    String::from("vars"),
-                    Ast::VariablesAssignments(assignments)
-                )
+                parse_vars_assignments(pair)
             },
             Rule::vars_with_default_def => {
                 // assignment should be just a number
                 // in order to prevent duplicate, key should be "vars"
 
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<Ast> = inner_rules 
-                    .map(|i| {
-                        let mut nested_rule = i.into_inner();
-
-                        Ast::VariableAssignment { 
-                            name: String::from(nested_rule.next().unwrap().as_str()), 
-                            value: Some(
-                                nested_rule.next()
-                                    .unwrap()
-                                    .as_str()
-                                    .parse::<f32>()
-                                    .unwrap()
-                                ), 
-                        }
-                    })
-                    .collect(); 
-
-                (
-                    String::from("vars"),
-                    Ast::VariablesAssignments(assignments)
-                )
+                parse_vars_with_default(pair)
             },
             Rule::ion_channels_def => {
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<Ast> = inner_rules 
-                    .map(|i| {
-                        let mut nested_rule = i.into_inner();
-
-                        Ast::StructAssignment { 
-                            name: String::from(nested_rule.next().unwrap().as_str()), 
-                            type_name: String::from(
-                                nested_rule.next()
-                                    .unwrap()
-                                    .as_str()
-                            )
-                        }
-                    })
-                    .collect(); 
-
-                (
-                    String::from("ion_channels"),
-                    Ast::StructAssignments(assignments)
-                )
+                parse_ion_channels(pair)
             },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
@@ -722,6 +747,30 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             ion_channels,
         }
     )
+}
+
+fn generate_defaults(vars: &Ast) -> Vec<String> {
+    let defaults = match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .filter_map(|i| {
+                    if let Ast::VariableAssignment { name, value: Some(x) } = i {
+                        if x % 1. == 0. {
+                            Some(format!("{}: {}.", name, x))
+                        } else {
+                            Some(format!("{}: {}", name, x))
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!(),
+    };
+
+    defaults
 }
 
 struct IonChannelDefinition {
@@ -852,25 +901,7 @@ impl IonChannelDefinition {
         let update_current = add_indents(&update_current, "\t");
         let get_current = add_indents(get_current, "\t");
 
-        let mut defaults = match &self.vars {
-            Ast::VariablesAssignments(variables) => {
-                variables
-                    .iter()
-                    .filter_map(|i| {
-                        if let Ast::VariableAssignment { name, value: Some(x) } = i {
-                            if x % 1. == 0. {
-                                Some(format!("{}: {}.", name, x))
-                            } else {
-                                Some(format!("{}: {}", name, x))
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<String>>()
-            },
-            _ => unreachable!(),
-        };
+        let mut defaults = generate_defaults(&self.vars);
 
         defaults.push(String::from("current: 0."));
 
@@ -924,83 +955,23 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     for pair in pairs {
         let (key, current_ast) = match pair.as_rule() {
             Rule::type_def => {
-                (
-                    String::from("type"), 
-                    Ast::TypeDefinition(
-                        String::from(pair.into_inner().next().unwrap().as_str())
-                    )
-                )
+                parse_type_definition(pair)
             },
             Rule::on_iteration_def => {
-                let inner_rules = pair.into_inner();
-
-                (
-                    String::from("on_iteration"),
-                    Ast::OnIteration(
-                        inner_rules
-                        .map(|i| parse_declaration(i))
-                        .collect::<Vec<Ast>>()
-                    )
-                )
+                parse_on_iteration(pair)
             },
             Rule::vars_def => {
                 // if no defaults then just assume assingment is None
                 // in order to prevent duplicate, key should be "vars"
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<Ast> = inner_rules
-                    .map(|i| Ast::VariableAssignment { 
-                        name: String::from(i.as_str()), 
-                        value: None,
-                    })
-                    .collect();
-
-                (
-                    String::from("vars"),
-                    Ast::VariablesAssignments(assignments)
-                )
+                parse_vars_assignments(pair)
             },
             Rule::vars_with_default_def => {
                 // assignment should be just a number
                 // in order to prevent duplicate, key should be "vars"
-
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<Ast> = inner_rules 
-                    .map(|i| {
-                        let mut nested_rule = i.into_inner();
-
-                        Ast::VariableAssignment { 
-                            name: String::from(nested_rule.next().unwrap().as_str()), 
-                            value: Some(
-                                nested_rule.next()
-                                    .unwrap()
-                                    .as_str()
-                                    .parse::<f32>()
-                                    .unwrap()
-                                ), 
-                        }
-                    })
-                    .collect(); 
-
-                (
-                    String::from("vars"),
-                    Ast::VariablesAssignments(assignments)
-                )
+                parse_vars_with_default(pair)
             },
             Rule::gating_variables_def => {
-                let inner_rules = pair.into_inner();
-
-                let assignments: Vec<String> = inner_rules 
-                    .map(|i| {
-                        String::from(i.as_str())
-                    })
-                    .collect(); 
-
-                (
-                    String::from("gating_vars"),
-                    Ast::GatingVariables(assignments)
-                )
+                parse_gating_variables(pair)
             },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
@@ -1040,88 +1011,113 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     )
 }
 
-// struct NeurotransmitterKineticsDefinition {
-//     vars: Ast,
-//     on_iteration: Ast,
-// }
+struct NeurotransmitterKineticsDefinition {
+    type_name: Ast,
+    vars: Ast,
+    on_iteration: Ast,
+}
 
-// fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<NeurotransmitterKineticsDefinition> {
-//     let mut definitions: HashMap<String, Ast> = HashMap::new();
+fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<NeurotransmitterKineticsDefinition> {
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
 
-//     for pair in pairs {
-//         let (key, current_ast) = match pair.as_rule() {
-//             Rule::type_def => {
-//                 (
-//                     String::from("type"), 
-//                     Ast::TypeDefinition(
-//                         String::from(pair.into_inner().next().unwrap().as_str())
-//                     )
-//                 )
-//             },
-//             Rule::on_iteration_def => {
-//                 let inner_rules = pair.into_inner();
+    for pair in pairs {
+        let (key, current_ast) = match pair.as_rule() {
+            Rule::type_def => {
+                parse_type_definition(pair)
+            },
+            Rule::on_iteration_def => {
+                parse_on_iteration(pair)
+            },
+            Rule::vars_with_default_def => {
+                // assignment should be just a number
+                // in order to prevent duplicate, key should be "vars"
+                parse_vars_with_default(pair)
+            },
+            definition => unreachable!("Unexpected definition: {:#?}", definition)
+        };
 
-//                 (
-//                     String::from("on_iteration"),
-//                     Ast::OnIteration(
-//                         inner_rules
-//                         .map(|i| parse_declaration(i))
-//                         .collect::<Vec<Ast>>()
-//                     )
-//                 )
-//             },
-//             Rule::vars_with_default_def => {
-//                 // assignment should be just a number
-//                 // in order to prevent duplicate, key should be "vars"
+        if definitions.contains_key(&key) {
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                )
+            )
+        }
 
-//                 let inner_rules = pair.into_inner();
+        definitions.insert(key, current_ast);
+    }
 
-//                 let assignments: Vec<Ast> = inner_rules 
-//                     .map(|i| {
-//                         let mut nested_rule = i.into_inner();
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type name definition expected")
+    })?;
 
-//                         Ast::VariableAssignment { 
-//                             name: String::from(nested_rule.next().unwrap().as_str()), 
-//                             value: Some(
-//                                 nested_rule.next()
-//                                     .unwrap()
-//                                     .as_str()
-//                                     .parse::<f32>()
-//                                     .unwrap()
-//                                 ), 
-//                         }
-//                     })
-//                     .collect(); 
-
-//                 (
-//                     String::from("vars"),
-//                     Ast::VariablesAssignments(assignments)
-//                 )
-//             },
-//             definition => unreachable!("Unexpected definition: {:#?}", definition)
-//         };
-
-//         if definitions.contains_key(&key) {
-//             return Err(
-//                 Error::new(
-//                     ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
-//                 )
-//             )
-//         }
-
-//         definitions.insert(key, current_ast);
-//     }
-
-//     let vars = definitions.remove("vars").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "Variables definition expected")
-//     })?;
+    let vars = definitions.remove("vars").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+    })?;
     
-//     let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
-//     })?;
+    let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+    })?;
     
-//     Ok(NeurotransmitterKineticsDefinition { vars, on_iteration })    
-// }
+    Ok(NeurotransmitterKineticsDefinition { type_name, vars, on_iteration })    
+}
+
+impl NeurotransmitterKineticsDefinition {
+    fn to_code(&self) -> (Vec<String>, String) {
+        let imports = vec![String::from("NeurotransmitterKinetics")];
+
+        let header = format!(
+            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
+            self.type_name.generate(),
+        );
+        
+        let mut fields = generate_fields(&self.vars);
+
+        let t_field = String::from("pub t: f32");
+        fields.push(t_field);
+
+        let fields = format!("\t{},", fields.join(",\n\t"));
+
+        let update_body = generate_on_iteration(&self.on_iteration);
+
+        let mut defaults = generate_defaults(&self.vars);
+
+        defaults.push(String::from("t: 0."));
+
+        let default_fields = defaults.join(",\n\t");
+
+        let default_function = format!(
+            "fn default() -> Self {{ {} {{\n\t{}\n}}", 
+            self.type_name.generate(),
+            default_fields,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let default_function = format!(
+            "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
+            self.type_name.generate(),
+            default_function,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let impl_header = format!("impl NeurotransmitterKinetics for {} {{", self.type_name.generate());
+
+        let get_t = "fn(&self) -> f32 { self.t }";
+
+        (
+            imports,
+            format!(
+                "{}\n{}\n}}\n\n{}\n\n{}\n{}\n\n{}\n}}\n", 
+                header, 
+                fields, 
+                default_function,
+                impl_header, 
+                update_body, 
+                get_t
+            )
+        )
+    }
+}
 
 // struct ReceptorKineticsDefinition {
     // vars: Ast,
@@ -1439,7 +1435,25 @@ fn build_function(model_description: String) -> TokenStream {
                         ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
                     },
                     Rule::neurotransmitter_kinetics_definition => {
-                        todo!()
+                        let neurotransmitter_kinetics = generate_neurotransmitter_kinetics(pair.into_inner())
+                            .expect("Could not generate neurotransmitter kinetics");
+
+                        let (neurotransmitter_kinetics_imports, neurotransmitter_kinetics_code) = neurotransmitter_kinetics.to_code();
+
+                        for i in neurotransmitter_kinetics_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+    
+                        let neurotransmitter_kinetics_type_name = neurotransmitter_kinetics.type_name.generate();
+                    
+                        let neurotransmitter_kinetics_code_map = code.entry(String::from("neurotransmitter_kinetics"))
+                            .or_default();
+    
+                        neurotransmitter_kinetics_code_map.insert(
+                            neurotransmitter_kinetics_type_name, neurotransmitter_kinetics_code
+                        );
                     },
                     Rule::receptor_kinetics_definition => {
                         todo!()
