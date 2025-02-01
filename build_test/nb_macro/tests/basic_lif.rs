@@ -6,6 +6,7 @@ mod test {
     use nb_macro::neuron_builder; 
     use crate::lif_reference::ReferenceIntegrateAndFire;
 
+    
     neuron_builder!(r#"
     [neuron]
         type: BasicIntegrateAndFire
