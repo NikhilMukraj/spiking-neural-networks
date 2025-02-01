@@ -21,6 +21,7 @@
   - optional else if and else in between if and end
 - [ ] basic function calling tests
 - [ ] bool vars (should be listed in same `vars:` block)
+- [ ] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [ ] rename ligand gates to receptors
