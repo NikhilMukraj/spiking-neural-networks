@@ -69,6 +69,10 @@ enum Ast {
         value: Option<f32>,
     },
     VariablesAssignments(Vec<Ast>),
+    IfStatement {
+        condition: Box<Ast>,
+        declarations: Vec<Ast>,
+    }
 }
 
 #[derive(Debug)]
@@ -229,6 +233,16 @@ impl Ast {
                     .join("\n\t");
 
                 format!("structs:\n\t{}", assignments_string)
+            },
+            Ast::IfStatement { condition, declarations } => {
+                format!(
+                    "if {} {{\n{}\n}}", 
+                    condition.generate(), 
+                    declarations.iter()
+                        .map(|i| i.generate())
+                        .collect::<Vec<String>>()
+                        .join("\n")
+                )
             }
         }
     }
@@ -1337,6 +1351,17 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
                 args,
                 expr,
             }
+        },
+        Rule::if_statement => {
+            let mut inner_rules = pair.into_inner();
+
+            let condition = Box::new(parse_bool_expr(inner_rules.next().unwrap().into_inner()));
+
+            let declarations: Vec<Ast> = inner_rules
+                .map(|i| parse_declaration(i))
+                .collect();
+
+            Ast::IfStatement { condition, declarations }
         }
         rule => unreachable!("Unexpected declaration, found {:#?}", rule),
     }
