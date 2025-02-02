@@ -27,6 +27,22 @@ mod test {
                 flag = 1
             [end]
     [end]
+
+    [neuron]
+        type: NestedBasicIntegrateAndFire
+        vars: e = 0, v_reset = -75, v_th = -55, flag1 = 0, flag2 = 0
+        on_spike: 
+            v = v_reset
+        spike_detection: v >= v_th
+        on_iteration:
+            dv/dt = (v - e) + i
+            [if] i < 0 [then]
+                flag1 = 1
+                [if] i > -30 [then]
+                    flag2 = 2
+                [end]
+            [end]
+    [end]
     "#);
 
     #[test]
@@ -58,4 +74,44 @@ mod test {
             assert_eq!(test_output, reference_output);
         }
     }
+
+    #[test]
+    pub fn test_nested_if_statement() {
+        let voltages = [-50., -40., -30., -20., -10., 0., 10., 20., 30., 40., 50.];
+
+        for i in voltages {
+            let mut test_output: Vec<f32> = vec![];
+            let mut reference_output: Vec<f32> = vec![];
+
+            let mut to_test: NestedBasicIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> = 
+                NestedBasicIntegrateAndFire::default();
+            let mut reference_neuron: ReferenceIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> = 
+                ReferenceIntegrateAndFire::default();
+
+            assert_eq!(to_test.flag1, 0.);
+            assert_eq!(to_test.flag2, 0.);
+
+            for _ in 0..1000 {
+                let _ = to_test.iterate_and_spike(i);
+                test_output.push(to_test.current_voltage);
+                let _ = reference_neuron.iterate_and_spike(i);
+                reference_output.push(reference_neuron.current_voltage);
+
+                if i < 0. {
+                    assert_eq!(to_test.flag1, 1.);
+                    if i > -30. {
+                        assert_eq!(to_test.flag2, 2.);
+                    } else {
+                        assert_eq!(to_test.flag2, 0.);
+                    }
+                } else {
+                    assert_eq!(to_test.flag1, 0.);
+                    assert_eq!(to_test.flag2, 0.);
+                }
+            }
+
+            assert_eq!(test_output, reference_output);
+        }
+    }
+
 }
