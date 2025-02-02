@@ -31,7 +31,7 @@ c_m = 25
 
 trials = 20
 
-filename = "bayesian_inf_noisy_c1_d1.json"
+filename = "bayesian_inf_noisy_c1_inh_d1.json"
 
 [variables]
 spike_train_to_exc = [4]
