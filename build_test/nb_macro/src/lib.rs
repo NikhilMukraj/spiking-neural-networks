@@ -71,7 +71,7 @@ enum Ast {
     VariablesAssignments(Vec<Ast>),
     IfStatement {
         condition: Box<Ast>,
-        declarations: Vec<Ast>,
+        declarations: Vec<Vec<Ast>>,
     }
 }
 
@@ -235,14 +235,29 @@ impl Ast {
                 format!("structs:\n\t{}", assignments_string)
             },
             Ast::IfStatement { condition, declarations } => {
-                format!(
-                    "if {} {{\n{}\n}}", 
-                    condition.generate(), 
-                    declarations.iter()
-                        .map(|i| i.generate())
-                        .collect::<Vec<String>>()
-                        .join("\n")
-                )
+                if declarations.len() == 1 {
+                    format!(
+                        "if {} {{\n{}\n}}", 
+                        condition.generate(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                } else {
+                    format!(
+                        "if {} {{\n{}\n}} else {{\n{}\n}}",
+                        condition.generate(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate())
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        declarations[1].iter()
+                            .map(|i| i.generate())
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                    )
+                }
             }
         }
     }
@@ -1357,9 +1372,23 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
 
             let condition = Box::new(parse_bool_expr(inner_rules.next().unwrap().into_inner()));
 
-            let declarations: Vec<Ast> = inner_rules
-                .map(|i| parse_declaration(i))
-                .collect();
+            let mut declarations: Vec<Vec<Ast>> = vec![
+                inner_rules
+                    .next()
+                    .unwrap()
+                    .into_inner()
+                    .map(|i| parse_declaration(i))
+                    .collect::<Vec<Ast>>()
+            ];
+
+            if let Some(inner) = inner_rules.next() {
+                declarations.push(
+                    inner
+                        .into_inner()
+                        .map(|i| parse_declaration(i))
+                        .collect::<Vec<Ast>>()
+                );
+            }
 
             Ast::IfStatement { condition, declarations }
         }
