@@ -73,7 +73,13 @@ ion_channels_def_with_assignment = _{
 
 eq_assignments = _{ eq_declaration ~ (NEWLINE* ~ eq_declaration)* ~ NEWLINE? }
 
-if_statement = { "[if]" ~ WHITESPACE* ~ expr ~ WHITESPACE* ~ "[then]\n" ~ WHITESPACE* ~ assignments ~ NEWLINE? ~ "[end]" }
+else = { "[else]\n" ~ WHITESPACE* ~ assignments }
+if_body = { assignments }
+if_statement = { 
+	"[if]" ~ WHITESPACE* ~ expr ~ WHITESPACE* ~ "[then]\n" 
+	~ WHITESPACE* ~ if_body ~ else? 
+	~ NEWLINE? ~ "[end]" 
+}
 
 assignment = _{ func_declaration | diff_eq_declaration | eq_declaration | struct_call_execution | if_statement  }
 assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
