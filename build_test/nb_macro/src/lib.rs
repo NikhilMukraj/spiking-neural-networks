@@ -1093,7 +1093,13 @@ fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<Neurotransmi
 
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
-        let imports = vec![String::from("NeurotransmitterKinetics")];
+        let imports = vec![
+            String::from(
+                "use spiking_neural_networks::neuron::iterate_and_spike::{{
+                    CurrentVoltage, Timestep, IsSpiking, NeurotransmitterKinetics
+                }};"
+            )
+        ];
 
         let header = format!(
             "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
@@ -1108,6 +1114,15 @@ impl NeurotransmitterKineticsDefinition {
         let fields = format!("\t{},", fields.join(",\n\t"));
 
         let update_body = generate_on_iteration(&self.on_iteration);
+
+        let update_body = update_body.replace("self.is_spiking", "neuron.is_spiking()");
+        let update_body = update_body.replace("self.dt", "neuron.get_dt()");
+        let update_body = update_body.replace("self.current_voltage", "neuron.get_current_voltage()");
+
+        let update_body = format!(
+            "fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {{\n{}\n}}",
+            update_body
+        );
 
         let mut defaults = generate_defaults(&self.vars);
 
@@ -1131,18 +1146,20 @@ impl NeurotransmitterKineticsDefinition {
 
         let impl_header = format!("impl NeurotransmitterKinetics for {} {{", self.type_name.generate());
 
-        let get_t = "fn(&self) -> f32 { self.t }";
+        let get_t = "fn get_t(&self) -> f32 { self.t }";
+        let set_t = "fn set_t(&mut self, t: f32) { self.t = t; }";
 
         (
             imports,
             format!(
-                "{}\n{}\n}}\n\n{}\n\n{}\n{}\n\n{}\n}}\n", 
+                "{}\n{}\n}}\n\n{}\n\n{}\n{}\n\n{}\n\n{}\n}}\n", 
                 header, 
                 fields, 
                 default_function,
                 impl_header, 
                 update_body, 
-                get_t
+                get_t,
+                set_t,
             )
         )
     }
