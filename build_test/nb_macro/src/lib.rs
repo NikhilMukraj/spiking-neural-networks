@@ -1046,7 +1046,7 @@ struct NeurotransmitterKineticsDefinition {
     on_iteration: Ast,
 }
 
-fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<NeurotransmitterKineticsDefinition> {
+fn parse_kinetics(pairs: Pairs<'_, Rule>) -> Result<(Ast, Ast, Ast)> {
     let mut definitions: HashMap<String, Ast> = HashMap::new();
 
     for pair in pairs {
@@ -1083,10 +1083,16 @@ fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<Neurotransmi
     let vars = definitions.remove("vars").ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Variables definition expected")
     })?;
-    
+
     let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
     })?;
+
+    Ok((type_name, vars, on_iteration))
+}
+
+fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<NeurotransmitterKineticsDefinition> {
+    let (type_name, vars, on_iteration) = parse_kinetics(pairs)?;
     
     Ok(NeurotransmitterKineticsDefinition { type_name, vars, on_iteration })    
 }
@@ -1165,10 +1171,88 @@ impl NeurotransmitterKineticsDefinition {
     }
 }
 
-// struct ReceptorKineticsDefinition {
-    // vars: Ast,
-    // on_iteration: Ast,
-// }
+struct ReceptorKineticsDefinition {
+    type_name: Ast,
+    vars: Ast,
+    on_iteration: Ast,
+}
+
+fn generate_receptor_kinetics(pairs: Pairs<Rule>) -> Result<ReceptorKineticsDefinition> {
+    let (type_name, vars, on_iteration) = parse_kinetics(pairs)?;
+    
+    Ok(ReceptorKineticsDefinition { type_name, vars, on_iteration })    
+}
+
+impl ReceptorKineticsDefinition {
+    fn to_code(&self) -> (Vec<String>, String) {
+        let imports = vec![
+            String::from(
+                "use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;"
+            )
+        ];
+
+        let header = format!(
+            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
+            self.type_name.generate(),
+        );
+        
+        let mut fields = generate_fields(&self.vars);
+
+        let t_field = String::from("pub r: f32");
+        fields.push(t_field);
+
+        let fields = format!("\t{},", fields.join(",\n\t"));
+
+        let update_body = generate_on_iteration(&self.on_iteration);
+
+        let update_body = update_body.replace("self.t", "t");
+        let update_body = update_body.replace("self.dt", "neuron.get_dt()");
+
+        let update_body = format!(
+            "fn apply_r_change(&mut self, t: f32, dt: f32) {{\n{}\n}}",
+            update_body
+        );
+
+        let mut defaults = generate_defaults(&self.vars);
+
+        defaults.push(String::from("r: 0."));
+
+        let default_fields = defaults.join(",\n\t");
+
+        let default_function = format!(
+            "fn default() -> Self {{ {} {{\n\t{}\n}}", 
+            self.type_name.generate(),
+            default_fields,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let default_function = format!(
+            "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
+            self.type_name.generate(),
+            default_function,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let impl_header = format!("impl ReceptorKinetics for {} {{", self.type_name.generate());
+
+        let get_r = "fn get_r(&self) -> f32 { self.r }";
+        let set_r = "fn set_r(&mut self, r: f32) { self.r = r; }";
+
+        (
+            imports,
+            format!(
+                "{}\n{}\n}}\n\n{}\n\n{}\n{}\n\n{}\n\n{}\n}}\n", 
+                header, 
+                fields, 
+                default_function,
+                impl_header, 
+                update_body, 
+                get_r,
+                set_r,
+            )
+        )
+    }
+}
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
@@ -1527,7 +1611,25 @@ fn build_function(model_description: String) -> TokenStream {
                         );
                     },
                     Rule::receptor_kinetics_definition => {
-                        todo!()
+                        let receptor_kinetics = generate_receptor_kinetics(pair.into_inner())
+                            .expect("Could not generate receptor kinetics");
+
+                        let (receptor_kinetics_imports, receptor_kinetics_code) = receptor_kinetics.to_code();
+
+                        for i in receptor_kinetics_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+    
+                        let receptor_kinetics_type_name = receptor_kinetics.type_name.generate();
+                    
+                        let receptor_kinetics_code_map = code.entry(String::from("receptor_kinetics"))
+                            .or_default();
+    
+                        receptor_kinetics_code_map.insert(
+                            receptor_kinetics_type_name, receptor_kinetics_code
+                        );
                     },
                     Rule::EOI => {
                         continue
