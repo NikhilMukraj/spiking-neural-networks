@@ -25,6 +25,7 @@
 - [ ] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
+- [ ] remove vars without defaults, all vars should have associated defaults
 - [ ] rename ligand gates to receptors
 - [ ] receptors
   - [ ] ionotropic receptors
@@ -34,13 +35,13 @@
   - [ ] metabotropic receptors
 - [ ] neuronal chemical testing
 - [ ] kinetics
-  - [ ] neurotransmitter kinetics
+  - [x] neurotransmitter kinetics
     - declare neurotransmitter kinetics name
     - declare vars
     - assignment blocks
     - `neurotransmitter_kinetics = {"[neurotransmitter_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }`
     - make sure to add to full def and make sure that both vars and on iteration are defined before parsing
-  - [ ] receptor kinetics
+  - [x] receptor kinetics
     - declare receptor kinetics name
     - declare vars
     - assignment blocks
