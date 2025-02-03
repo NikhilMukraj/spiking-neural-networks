@@ -21,11 +21,12 @@
   - option within if statement ast
     - could have vec of conditionals and vec of vec of declarations and iterate through each one
 - [ ] basic function calling tests
-- [ ] bool vars (should be listed in same `vars:` block)
+- [ ] **bool vars (should be listed in same `vars:` block)**
 - [ ] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [ ] remove vars without defaults, all vars should have associated defaults
+- [ ] `to_code` abstraction in generation
 - [ ] rename ligand gates to receptors
 - [ ] receptors
   - [ ] ionotropic receptors
