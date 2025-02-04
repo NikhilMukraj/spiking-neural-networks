@@ -53,4 +53,5 @@
 - [ ] function definition blocks
 - [ ] spike train block
 - [ ] eventually remove vars declaration without vars
+- [ ] comments/docs in/around blocks
 - [ ] gpu implementations
