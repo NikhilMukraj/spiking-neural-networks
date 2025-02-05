@@ -1483,6 +1483,12 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
             ];
 
             if let Some(inner) = inner_rules.next() {
+                // if using else if add else if, if not add else
+                // if statement should parse out else if if multiple conditions
+                // match var {
+                //     Rule::else_if_body => {}
+                //     Rule::else_body => {}
+                // }
                 declarations.push(
                     inner
                         .into_inner()
