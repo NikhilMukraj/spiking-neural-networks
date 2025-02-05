@@ -74,6 +74,9 @@
   - [ ] Could also vary $Mg^{2+}$
 - [ ] Grid attractor as prior cue for Bayesian inference
 - [ ] Ring attractor + point attractor Bayesian inference
+  - [ ] Using glutamate
+  - [ ] Using $D_1$
+  - [ ] Using $D_2$
 - [ ] Tolman Eichenbaum machine (with dopamine potentially)
 
 ## Quick notes
