@@ -54,4 +54,6 @@
 - [ ] spike train block
 - [ ] eventually remove vars declaration without vars
 - [ ] comments/docs in/around blocks
+- [ ] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
+- [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] gpu implementations
