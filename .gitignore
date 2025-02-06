@@ -63,6 +63,7 @@
 /interface/notebooks/*.npy
 /interface/experiments/*/*.json
 /interface/experiments/*/*.ipynb
+/interface/experiments/*/*.py
 /interface/experiments/*/*.npy
 /interface/experiments/*/*.csv
 /interface/experiments/*/*.txt
