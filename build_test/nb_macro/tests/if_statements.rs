@@ -1,10 +1,3 @@
-// check if
-// check if else
-// check if else if 
-// check if else if else if
-// check if else if else if else
-// check nested ifs
-
 mod lif_reference;
 
 
@@ -88,6 +81,25 @@ mod test {
                 flag = 2
             [else]
                 flag = 3
+            [end]
+    [end]
+
+    [neuron]
+        type: ElseIfElseIfBasicIntegrateAndFire
+        vars: e = 0, v_reset = -75, v_th = -55, flag = 0
+        on_spike: 
+            v = v_reset
+        spike_detection: v >= v_th
+        on_iteration:
+            dv/dt = (v - e) + i
+            [if] i < 0 [then]
+                flag = 1
+            [elseif] i > 20 [then]
+                flag = 2
+            [elseif] i > 0 [then]
+                flag = 3
+            [else]
+                flag = 4
             [end]
     [end]
 
@@ -304,7 +316,49 @@ mod test {
     }
 
     #[test]
-    pub fn test_if_if_else_nested() {
+    pub fn test_if_else_if_else_if_else() {
+        let (mut hit1, mut hit2, mut hit3, mut hit4) = (false, false, false, false);
+
+        for i in VOLTAGES {
+            let mut test_output: Vec<f32> = vec![];
+            let mut reference_output: Vec<f32> = vec![];
+
+            let mut to_test: ElseIfElseIfBasicIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> = 
+            ElseIfElseIfBasicIntegrateAndFire::default();
+            let mut reference_neuron: ReferenceIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor> = 
+                ReferenceIntegrateAndFire::default();
+
+            assert_eq!(to_test.flag, 0.);
+
+            for _ in 0..1000 {
+                let _ = to_test.iterate_and_spike(i);
+                test_output.push(to_test.current_voltage);
+                let _ = reference_neuron.iterate_and_spike(i);
+                reference_output.push(reference_neuron.current_voltage);
+
+                if i < 0. {
+                    hit1 = true;
+                    assert_eq!(to_test.flag, 1.)
+                } else if i > 20. {
+                    hit2 = true;
+                    assert_eq!(to_test.flag, 2.);
+                } else if i > 0. {
+                    hit3 = true;
+                    assert_eq!(to_test.flag, 3.)
+                } else {
+                    hit4 = true;
+                    assert_eq!(to_test.flag, 4.)
+                }
+            }
+
+            assert_eq!(test_output, reference_output);
+        }
+
+        assert!(hit1 && hit2 && hit3 && hit4);
+    }
+
+    #[test]
+    pub fn test_if_else_if_nested() {
         let (mut hit1, mut hit2, mut hit3, mut hit4) = (false, false, false, false);
 
         for i in VOLTAGES {
