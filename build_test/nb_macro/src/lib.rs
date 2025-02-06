@@ -70,7 +70,7 @@ enum Ast {
     },
     VariablesAssignments(Vec<Ast>),
     IfStatement {
-        condition: Box<Ast>,
+        conditions: Vec<Ast>,
         declarations: Vec<Vec<Ast>>,
     }
 }
@@ -234,20 +234,20 @@ impl Ast {
 
                 format!("structs:\n\t{}", assignments_string)
             },
-            Ast::IfStatement { condition, declarations } => {
-                if declarations.len() == 1 {
+            Ast::IfStatement { conditions, declarations } => {
+                if conditions.len() == 1 && declarations.len() == 1 {
                     format!(
                         "if {} {{\n{}\n}}", 
-                        condition.generate(), 
+                        conditions[0].generate(), 
                         declarations[0].iter()
                             .map(|i| i.generate())
                             .collect::<Vec<String>>()
                             .join("\n")
                     )
-                } else {
+                } else if conditions.len() == 1 {
                     format!(
                         "if {} {{\n{}\n}} else {{\n{}\n}}",
-                        condition.generate(), 
+                        conditions[0].generate(), 
                         declarations[0].iter()
                             .map(|i| i.generate())
                             .collect::<Vec<String>>()
@@ -257,6 +257,38 @@ impl Ast {
                             .collect::<Vec<String>>()
                             .join("\n"),
                     )
+                } else {
+                    let mut result = String::new();
+
+                    result.push_str(&format!(
+                        "if {} {{\n{}\n}}", 
+                        conditions[0].generate(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    ));
+
+                    for i in 1..conditions.len() {
+                        result.push_str(&format!(
+                            " else if {} {{\n{}\n}}", 
+                            conditions[i].generate(), 
+                            declarations[i].iter()
+                                .map(|i| i.generate())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        ));
+                    }
+
+                    result.push_str(&format!(
+                        " else {{\n{}\n}}", 
+                        declarations[declarations.len() - 1].iter()
+                            .map(|i| i.generate())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    ));
+
+                    result
                 }
             }
         }
@@ -1471,7 +1503,7 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
         Rule::if_statement => {
             let mut inner_rules = pair.into_inner();
 
-            let condition = Box::new(parse_bool_expr(inner_rules.next().unwrap().into_inner()));
+            let mut conditions = vec![parse_bool_expr(inner_rules.next().unwrap().into_inner())];
 
             let mut declarations: Vec<Vec<Ast>> = vec![
                 inner_rules
@@ -1482,22 +1514,33 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
                     .collect::<Vec<Ast>>()
             ];
 
-            if let Some(inner) = inner_rules.next() {
-                // if using else if add else if, if not add else
-                // if statement should parse out else if if multiple conditions
-                // match var {
-                //     Rule::else_if_body => {}
-                //     Rule::else_body => {}
-                // }
-                declarations.push(
-                    inner
-                        .into_inner()
-                        .map(|i| parse_declaration(i))
-                        .collect::<Vec<Ast>>()
-                );
+            for inner in inner_rules {
+                match inner.as_rule() {
+                    Rule::else_if_body => {
+                        let mut inner_pairs = inner.into_inner();
+
+                        let condition = parse_bool_expr(inner_pairs.next().unwrap().into_inner());
+
+                        let decls = inner_pairs
+                            .map(|i| parse_declaration(i))
+                            .collect::<Vec<Ast>>();
+
+                        conditions.push(condition);
+                        declarations.push(decls);
+                    }
+                    Rule::else_body => {
+                        declarations.push(
+                            inner
+                                .into_inner()
+                                .map(|i| parse_declaration(i))
+                                .collect::<Vec<Ast>>()
+                        );
+                    }
+                    _ => unreachable!("Non if statement found")
+                }
             }
 
-            Ast::IfStatement { condition, declarations }
+            Ast::IfStatement { conditions, declarations }
         }
         rule => unreachable!("Unexpected declaration, found {:#?}", rule),
     }
