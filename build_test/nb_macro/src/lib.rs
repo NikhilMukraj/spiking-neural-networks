@@ -1283,6 +1283,24 @@ impl ReceptorKineticsDefinition {
     }
 }
 
+// struct ReceptorsDefinition {
+//     type_name: Ast,
+//     top_level_vars: Option<Ast>,
+//     blocks: Vec<(Ast, Ast, Ast)>,
+// }
+
+// impl ReceptorsDefinition {
+//     // generate neurotransmitter type from the blocks
+//     // for each neurotransmitter type create a receptors enum with structs in enum
+//     // structs in enum get associated vars
+//     // each struct also calculates a current
+//     // then move to metabotropic
+//     // should have simple way to edit gmax when receptors struct is initialized
+//     fn to_code(&self) -> (Vec<String>, String) {
+
+//     }
+// }
+
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
