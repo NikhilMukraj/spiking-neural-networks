@@ -4,6 +4,7 @@ use pest::pratt_parser::PrattParser;
 #[derive(pest_derive::Parser)]
 #[grammar_inline = r#"
 integer = @{ ASCII_DIGIT+ }
+bool = { "true" | "false" }
 decimal = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT* }
 number = @{ decimal | integer }
 name_characters = @{ 'a'..'z' | 'A'..'z' | "_" }
@@ -13,12 +14,12 @@ name = @{ name_characters ~ (name_characters | integer)* }
 struct_call = { name ~ "." ~ name ~ ("(" ~ args ~ ")")? } 
 
 args = {
-    (expr | struct_call | function | name | number)? ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number))* ~ ","?
+    (expr | struct_call | function | name | number | bool)? ~ (" "* ~ "," ~ " "* ~ (expr | function | name | number | bool))* ~ ","?
 }
 function = { name ~ ("(" ~ args ~ ")") }
 
 unary_minus = { "-" }
-primary = _{ struct_call | function | number | name | "(" ~ expr ~ ")" }
+primary = _{ struct_call | function | number | bool | name | "(" ~ expr ~ ")" }
 
 atom = _{ (not_operator ~ primary) | (unary_minus ~ primary) | primary  }
 
@@ -57,7 +58,7 @@ WHITESPACE = _{ " " }
 
 signed_number = @{ unary_minus? ~ number }
 variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
-variables_assignment = { name ~ " "* ~ "=" ~ " "* ~ signed_number }
+variables_assignment = { name ~ " "* ~ "=" ~ " "* ~ (signed_number | bool) }
 variables_with_assignment = _{ 
 	"vars:" ~ " "* ~ variables_assignment ~ 
     (" "* ~ "," ~ " "* ~ variables_assignment)* ~ 
@@ -86,7 +87,6 @@ assignment = _{ func_declaration | diff_eq_declaration | eq_declaration | struct
 assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
 type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
-vars_def  = { variables_block ~ NEWLINE+ }
 vars_with_default_def  = { variables_with_assignment ~ NEWLINE+ }
 on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ eq_assignments }
 on_iteration_def = { "on_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
@@ -98,7 +98,7 @@ neuron_definition = {
     "[neuron]" ~ NEWLINE ~ 
 	(
 		on_iteration_def | type_def | on_spike_def | spike_detection_def | 
-		vars_def | vars_with_default_def | ion_channels_def
+		vars_with_default_def | ion_channels_def
 	){5,} ~ 
 	"[end]"
 }
@@ -108,7 +108,7 @@ gating_variables_def = { gating_variables_block ~ NEWLINE+ }
 
 ion_channel_definition = {
 	"[ion_channel]" ~ NEWLINE ~ 
-	(gating_variables_def | type_def | vars_def | vars_with_default_def | on_iteration_def){3,} ~
+	(gating_variables_def | type_def | vars_with_default_def | on_iteration_def){3,} ~
 	"[end]"
 }
 
