@@ -115,10 +115,23 @@ ion_channel_definition = {
 neurotransmitter_kinetics_definition= {"[neurotransmitter_kinetics]" ~ NEWLINE ~ (type_def | vars_with_default_def | on_iteration_def){3,} ~ "[end]" }
 receptor_kinetics_definition = {"[receptor_kinetics]" ~ NEWLINE ~ (type_def | vars_with_default_def | on_iteration_def){3,} ~ "[end]" }
 
+neurotransmitter_def = { "neurotransmitter:" ~ " "* ~ name ~ NEWLINE+ }
+receptors_definition = {
+	"[receptors]" ~ NEWLINE+ ~ 
+		(
+			type_def | vars_with_default_def | 
+			(
+				neurotransmitter_def ~ NEWLINE* ~ vars_with_default_def ~ 
+				NEWLINE* ~ on_iteration_def ~ NEWLINE*
+			)+
+		){2,3} ~ WHITESPACE* ~ "[end]"
+}
+
 full = _{
 	SOI ~ NEWLINE* ~ ((
 		neuron_definition | ion_channel_definition | 
-		neurotransmitter_kinetics_definition | receptor_kinetics_definition 
+		neurotransmitter_kinetics_definition | receptor_kinetics_definition |
+        receptors_definition
 	)+ ~ NEWLINE*
 	)* ~ EOI
 }
