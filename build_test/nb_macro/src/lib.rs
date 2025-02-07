@@ -1289,6 +1289,10 @@ impl ReceptorKineticsDefinition {
 //     blocks: Vec<(Ast, Ast, Ast)>,
 // }
 
+// fn generate_receptors(pairs: Pairs<Rule>) -> ReceptorsDefinition {
+
+// }
+
 // impl ReceptorsDefinition {
 //     // generate neurotransmitter type from the blocks
 //     // for each neurotransmitter type create a receptors enum with structs in enum
