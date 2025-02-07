@@ -15,7 +15,7 @@
   - [ ] calling structs functions
   - [ ] struct var call versus struct func call in declaration
   - [ ] rename assignments to calls (call assignments for current assignments)
-- [ ] if statements (handled by statement blocks)
+- [x] if statements (handled by statement blocks)
   - `if_statement = { "[if]" ~ WHITESPACE* ~ expr ~ WHITESPACE* ~ "[then]\n" ~ WHITESPACE* ~ assignments ~ NEWLINE? ~ "[end]" }`
   - optional else if and else in between if and end
   - option within if statement ast
@@ -52,7 +52,7 @@
 - [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
 - [ ] function definition blocks
 - [ ] spike train block
-- [ ] eventually remove vars declaration without vars
+- [x] eventually remove vars declaration without vars
 - [ ] comments/docs in/around blocks
 - [ ] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
