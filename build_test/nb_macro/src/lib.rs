@@ -17,8 +17,15 @@ use proc_macro::{
 
 
 #[derive(Debug)]
+enum NumOrBool {
+    Number(f32),
+    Bool(bool),
+}
+
+#[derive(Debug)]
 enum Ast {
     Number(f32),
+    Bool(bool),
     Name(String),
     UnaryMinus(Box<Ast>),
     NotOperator(Box<Ast>),
@@ -66,7 +73,7 @@ enum Ast {
     GatingVariables(Vec<String>),
     VariableAssignment {
         name: String,
-        value: Option<f32>,
+        value: NumOrBool,
     },
     VariablesAssignments(Vec<Ast>),
     IfStatement {
@@ -102,6 +109,7 @@ impl Ast {
                     format!("{}.0", n)
                 }
             },
+            Ast::Bool(val) => val.to_string(),
             Ast::Name(name) => {
                 if name == "v" {
                     String::from("self.current_voltage")
@@ -208,12 +216,12 @@ impl Ast {
                 format!("gating_vars: {}", vars.join(", "))
             },
             Ast::VariableAssignment { name, value } => {
-                let value = match value {
-                    Some(x) => x.to_string(),
-                    None => String::from("None"),
+                let value_str = match value {
+                    NumOrBool::Number(x) => x.to_string(),
+                    NumOrBool::Bool(x) => x.to_string(),
                 };
 
-                format!("{} = {}", name, value)
+                format!("{} = {}", name, value_str)
             },
             Ast::VariablesAssignments(assignments) => {
                 let assignments_string = assignments.iter()
@@ -365,7 +373,15 @@ fn generate_fields(vars: &Ast) -> Vec<String> {
                         _ => unreachable!(),
                     };
 
-                    format!("pub {}: f32", var_name)
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "f32",
+                            NumOrBool::Bool(_) => "bool",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!("pub {}: {}", var_name, type_name)
                 })
                 .collect::<Vec<String>>()
         },
@@ -653,22 +669,6 @@ fn parse_spike_detection(pair: Pair<'_, Rule>) -> (String, Ast) {
     )
 }
 
-fn parse_vars_assignments(pair: Pair<'_, Rule>) -> (String, Ast) {
-    let inner_rules = pair.into_inner();
-
-    let assignments: Vec<Ast> = inner_rules
-        .map(|i| Ast::VariableAssignment { 
-            name: String::from(i.as_str()), 
-            value: None,
-        })
-        .collect();
-
-    (
-        String::from("vars"),
-        Ast::VariablesAssignments(assignments)
-    )
-}
-
 fn parse_vars_with_default(pair: Pair<'_, Rule>) -> (String, Ast) {
     let inner_rules = pair.into_inner();
 
@@ -678,13 +678,15 @@ fn parse_vars_with_default(pair: Pair<'_, Rule>) -> (String, Ast) {
 
             Ast::VariableAssignment { 
                 name: String::from(nested_rule.next().unwrap().as_str()), 
-                value: Some(
-                    nested_rule.next()
-                        .unwrap()
-                        .as_str()
-                        .parse::<f32>()
-                        .unwrap()
-                    ), 
+                value: {
+                    let parsed = nested_rule.next()
+                        .unwrap();
+
+                    match parsed.as_str().parse::<f32>() {
+                        Ok(val) => NumOrBool::Number(val),
+                        Err(_) => NumOrBool::Bool(parsed.as_str().parse::<bool>().unwrap())
+                    }
+                }
             }
         })
         .collect(); 
@@ -751,11 +753,6 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             Rule::spike_detection_def => {
                 parse_spike_detection(pair)
             }
-            Rule::vars_def => {
-                // if no defaults then just assume assingment is None
-                // in order to prevent duplicate, key should be "vars"
-                parse_vars_assignments(pair)
-            },
             Rule::vars_with_default_def => {
                 // assignment should be just a number
                 // in order to prevent duplicate, key should be "vars"
@@ -815,15 +812,20 @@ fn generate_defaults(vars: &Ast) -> Vec<String> {
         Ast::VariablesAssignments(variables) => {
             variables
                 .iter()
-                .filter_map(|i| {
-                    if let Ast::VariableAssignment { name, value: Some(x) } = i {
-                        if x % 1. == 0. {
-                            Some(format!("{}: {}.", name, x))
-                        } else {
-                            Some(format!("{}: {}", name, x))
+                .map(|i| {
+                    if let Ast::VariableAssignment { name, value } = i {
+                        match value {
+                            NumOrBool::Number(x) => {
+                                if x % 1. == 0. {
+                                    format!("{}: {}.", name, x)
+                                } else {
+                                    format!("{}: {}", name, x)
+                                }
+                            },
+                            NumOrBool::Bool(x) => format!("{}: {}", name, x)
                         }
                     } else {
-                        None
+                        unreachable!("Expected variable assignment")
                     }
                 })
                 .collect::<Vec<String>>()
@@ -1020,11 +1022,6 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
             },
             Rule::on_iteration_def => {
                 parse_on_iteration(pair)
-            },
-            Rule::vars_def => {
-                // if no defaults then just assume assingment is None
-                // in order to prevent duplicate, key should be "vars"
-                parse_vars_assignments(pair)
             },
             Rule::vars_with_default_def => {
                 // assignment should be just a number
@@ -1357,6 +1354,7 @@ fn parse_bool_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
         .map_primary(|primary| match primary.as_rule() {
             Rule::number => Ast::Number(primary.as_str().parse::<f32>().unwrap()),
+            Rule::bool => Ast::Bool(primary.as_str().parse::<bool>().unwrap()),
             Rule::name => Ast::Name(String::from(primary.as_str())),
             Rule::expr => parse_bool_expr(primary.into_inner()),
             Rule::struct_call => {
