@@ -27,15 +27,7 @@
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [ ] remove vars without defaults, all vars should have associated defaults
 - [ ] `to_code` abstraction in generation
-- [ ] rename ligand gates to receptors
-- [ ] receptors
-  - [ ] ionotropic receptors
-    - [ ] default ligand gated channel
-      - default operation with receptors is just to add receptor currents
-      - should have option to customize receptors
-  - [ ] metabotropic receptors
-- [ ] neuronal chemical testing
-- [ ] kinetics
+- [x] kinetics
   - [x] neurotransmitter kinetics
     - declare neurotransmitter kinetics name
     - declare vars
@@ -50,10 +42,20 @@
   - [ ] default impl method for default kinetics
   - [ ] default impl trait maybe
 - [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
+- [ ] rename ligand gates to receptors
+- [ ] receptors
+  - [ ] ionotropic receptors
+    - [ ] option to have multiple receptor values (`r1`, `r2`, etc)
+    - [ ] default ligand gated channel
+      - default operation with receptors is just to add receptor currents
+      - should have option to customize receptors
+  - [ ] metabotropic receptors
+- [ ] neuronal chemical testing
 - [ ] function definition blocks
 - [ ] spike train block
 - [x] eventually remove vars declaration without vars
 - [ ] comments/docs in/around blocks
 - [ ] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
+- [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] gpu implementations
