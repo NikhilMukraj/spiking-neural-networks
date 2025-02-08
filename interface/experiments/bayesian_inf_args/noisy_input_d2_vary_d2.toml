@@ -17,6 +17,7 @@ main_1_on = false
 main_2_on = true
 
 d2 = true
+d_acts_on_inh = true
 
 iterations1 = 2500
 iterations2 = 2500
@@ -30,7 +31,7 @@ c_m = 25
 
 trials = 20
 
-filename = "bayesian_inf_noisy_c1_d2.json"
+filename = "bayesian_inf_noisy_c1_d2_inh_vary_d2.json"
 
 [variables]
 spike_train_to_exc = [4]
