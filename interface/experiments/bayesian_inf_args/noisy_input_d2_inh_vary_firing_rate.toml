@@ -39,7 +39,7 @@ bayesian_to_exc = [1]
 prob_of_exc_to_inh = [1]
 bayesian_distortion = [0]
 # s_d2 = [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
-main_cue_firing_rate = [0.01, 0.02, 0.03, 0.04, 0.05]
+main_firing_rate = [0.01, 0.02, 0.03, 0.04, 0.05]
 # glutamate_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
 glutamate_clearance = [0.01]
 
