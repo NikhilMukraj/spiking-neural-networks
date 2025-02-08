@@ -4,7 +4,7 @@ use std::io::{Error, ErrorKind, Result};
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest::error::{LineColLocation, ErrorVariant::{ParsingError, CustomError}};
-use regex::Regex;
+// use regex::Regex;
 
 mod pest_ast;
 use pest_ast::{ASTParser, Rule, PRATT_PARSER};
@@ -1283,27 +1283,125 @@ impl ReceptorKineticsDefinition {
     }
 }
 
-// struct ReceptorsDefinition {
-//     type_name: Ast,
-//     top_level_vars: Option<Ast>,
-//     blocks: Vec<(Ast, Ast, Ast)>,
-// }
+#[allow(dead_code)]
+struct ReceptorsDefinition {
+    type_name: Ast,
+    top_level_vars: Option<Ast>,
+    blocks: Vec<(Ast, Ast, Ast)>,
+}
 
-// fn generate_receptors(pairs: Pairs<Rule>) -> ReceptorsDefinition {
-//     // hashmap for top level vars and type name and nested hashmap for tuples in generate function 
-// }
+fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
+    // hashmap for top level vars and type name and nested hashmap for tuples in generate function 
 
-// impl ReceptorsDefinition {
-//     // generate neurotransmitter type from the blocks
-//     // for each neurotransmitter type create a receptors enum with structs in enum
-//     // structs in enum get associated vars
-//     // each struct also calculates a current
-//     // then move to metabotropic
-//     // should have simple way to edit gmax when receptors struct is initialized
-//     fn to_code(&self) -> (Vec<String>, String) {
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
+    let mut blocks: Vec<(Ast, Ast, Ast)> = vec![];
 
-//     }
-// }
+    for pair in pairs {
+        match pair.as_rule() {
+            Rule::type_def => {
+                let (key, current_ast) = parse_type_definition(pair);
+
+                if definitions.contains_key(&key) {
+                    return Err(
+                        Error::new(
+                            ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                        )
+                    )
+                }
+
+                definitions.insert(key, current_ast);
+            },
+            Rule::vars_with_default_def => {
+                let (key, current_ast) = parse_vars_with_default(pair);
+
+                if definitions.contains_key(&key) {
+                    return Err(
+                        Error::new(
+                            ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                        )
+                    )
+                }
+
+                definitions.insert(key, current_ast);
+            },
+            Rule::receptor_block => {
+                let mut new_block: HashMap<String, Ast> = HashMap::new();
+
+                for inner_pair in pair.into_inner() {
+                    let (key, current_ast)  = match inner_pair.as_rule() {
+                        Rule::neurotransmitter_def => (
+                            String::from("neurotransmitter"), 
+                            Ast::TypeDefinition(String::from(inner_pair.as_str()))
+                        ),
+                        Rule::vars_with_default_def => {
+                            parse_vars_with_default(inner_pair)
+                        },
+                        Rule::on_iteration_def => {
+                            parse_on_iteration(inner_pair)
+                        },
+                        definition => unreachable!("Unexpected definition: {:#?}", definition)
+                    };
+
+                    new_block.insert(key, current_ast);
+                }
+
+                let neurotransmitter_block = match new_block.remove("neurotransmitter") {
+                    Some(val) => val,
+                    None => {
+                        return Err(Error::new(ErrorKind::InvalidData, "Missing neurotransmitter definition"))
+                    }
+                };
+                let vars_block = match new_block.remove("vars") {
+                    Some(val) => val,
+                    None => {
+                        return Err(Error::new(ErrorKind::InvalidData, "Missing variables definition"))
+                    }
+                };
+                let on_iteration_block = match new_block.remove("on_iteration") {
+                    Some(val) => val,
+                    None => {
+                        return Err(Error::new(ErrorKind::InvalidData, "Missing on iteration definition"))
+                    }
+                };
+
+                blocks.push(
+                    (
+                        neurotransmitter_block,
+                        vars_block,
+                        on_iteration_block,
+                    )
+                );
+            }
+            definition => unreachable!("Unexpected definition: {:#?}", definition)
+        };
+    }
+
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type name definition expected")
+    })?;
+
+    let vars = definitions.remove("vars");
+
+    Ok(
+        ReceptorsDefinition { 
+            type_name,
+            top_level_vars: vars, 
+            blocks,
+        }
+    )
+}
+
+impl ReceptorsDefinition {
+    // generate neurotransmitter type from the blocks
+    // for each neurotransmitter type create a receptors enum with structs in enum
+    // structs in enum get associated vars
+    // each struct also calculates a current
+    // then move to metabotropic
+    // should have simple way to edit gmax when receptors struct is initialized
+    fn to_code(&self) -> (Vec<String>, String) {
+        (Vec::new(), String::from(""))
+    }
+}
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
     PRATT_PARSER
@@ -1566,32 +1664,32 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
     }
 }
 
-fn extract_name_from_pattern(string: &str, i: &str) -> Vec<String> {
-    let re = Regex::new(&format!(r"pub (.*): {}", i)).unwrap();
-    let mut output = vec![];
+// fn extract_name_from_pattern(string: &str, i: &str) -> Vec<String> {
+//     let re = Regex::new(&format!(r"pub (.*): {}", i)).unwrap();
+//     let mut output = vec![];
 
-    for caps in re.captures_iter(string) {
-        let first_part = &caps[1];
-        if string.contains(i) {
-            output.push(first_part.to_string());
-        }
-    }
+//     for caps in re.captures_iter(string) {
+//         let first_part = &caps[1];
+//         if string.contains(i) {
+//             output.push(first_part.to_string());
+//         }
+//     }
 
-    output
-}
+//     output
+// }
 
-fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> String {
-    if let Some(start) = original.find(to_find) {
-        let mut result = String::new();
-        result.push_str(&original[..start + to_find.len()]);
-        result.push_str(to_insert);
-        result.push_str(&original[start + to_find.len()..]);
+// fn insert_at_substring(original: &str, to_find: &str, to_insert: &str) -> String {
+//     if let Some(start) = original.find(to_find) {
+//         let mut result = String::new();
+//         result.push_str(&original[..start + to_find.len()]);
+//         result.push_str(to_insert);
+//         result.push_str(&original[start + to_find.len()..]);
 
-        result
-    } else {
-        String::from(original)
-    }
-}
+//         result
+//     } else {
+//         String::from(original)
+//     }
+// }
 
 fn build_function(model_description: String) -> TokenStream {
     let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
@@ -1700,6 +1798,27 @@ fn build_function(model_description: String) -> TokenStream {
                             receptor_kinetics_type_name, receptor_kinetics_code
                         );
                     },
+                    Rule::receptors_definition => {
+                        let receptors = generate_receptors(pair.into_inner())
+                            .expect("Could not generate receptor kinetics");
+
+                        let (receptors_imports, receptors_code) = receptors.to_code();
+
+                        for i in receptors_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+    
+                        let receptors_type_name = receptors.type_name.generate();
+                    
+                        let receptors_code_map = code.entry(String::from("receptor_kinetics"))
+                            .or_default();
+    
+                        receptors_code_map.insert(
+                            receptors_type_name, receptors_code
+                        );
+                    }
                     Rule::EOI => {
                         continue
                     }
@@ -1710,55 +1829,6 @@ fn build_function(model_description: String) -> TokenStream {
             // if any of the ion channel names found in neuron
             // (use substring to detect)
             // modify neuron code to insert proper update current code before dv changes
-    
-            let ion_channel_data: HashMap<String, bool> = code.get("ion_channel")
-                .unwrap_or(&HashMap::<String, String>::new())
-                .iter()
-                .map(|(name, code)| {
-                    let is_timestep_independent = code.contains("impl TimestepIndependentIonChannel");
-                    (name.clone(), is_timestep_independent)
-                })
-                .collect();
-    
-            let iteration_with_neurotransmitter_header = add_indents(
-                &generate_iteration_with_neurotransmitter_header(), "\t"
-            );
-    
-            if let Some(neuron_code_map) = code.get_mut("neuron") {
-                for i in neuron_code_map.values_mut() {
-                    for (ion_channel_name, is_timestep_independent) in &ion_channel_data {
-                        if i.contains(ion_channel_name) {
-                            let names = extract_name_from_pattern(i, ion_channel_name);
-    
-                            for name in names {
-                                let to_insert = if *is_timestep_independent {
-                                    format!(
-                                        "\n\t\tself.{}.update_current(self.current_voltage, self.dt);",
-                                        name
-                                    )
-                                } else {
-                                    format!(
-                                        "\n\t\tself.{}.update_current(self.current_voltage);",
-                                        name
-                                    )
-                                };
-    
-                                *i = insert_at_substring(
-                                    i, 
-                                    ITERATION_HEADER,
-                                    &to_insert,
-                                );
-    
-                                *i = insert_at_substring(
-                                    i, 
-                                    &iteration_with_neurotransmitter_header,
-                                    &to_insert,
-                                );
-                            }
-                        }
-                    }
-                }
-            }
     
             let mut functions: HashMap<String, String> = HashMap::new();
             functions.insert(
