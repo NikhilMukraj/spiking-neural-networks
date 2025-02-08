@@ -42,6 +42,7 @@
   - [ ] default impl method for default kinetics
   - [ ] default impl trait maybe
 - [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
+- [x] ion channel update current in neuron refactor
 - [ ] rename ligand gates to receptors
 - [ ] receptors
   - [ ] ionotropic receptors
