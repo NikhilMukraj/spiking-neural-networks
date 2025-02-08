@@ -1290,7 +1290,7 @@ impl ReceptorKineticsDefinition {
 // }
 
 // fn generate_receptors(pairs: Pairs<Rule>) -> ReceptorsDefinition {
-
+//     // hashmap for top level vars and type name and nested hashmap for tuples in generate function 
 // }
 
 // impl ReceptorsDefinition {
