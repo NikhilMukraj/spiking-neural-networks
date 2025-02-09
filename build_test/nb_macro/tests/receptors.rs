@@ -7,7 +7,7 @@ mod test {
     [receptors]
         type: BasicReceptors
         neurotransmitter: X
-        vars: g = 1, e = 0
+        vars: current = 0, g = 1, e = 0
         on_iteration:
             current = g * r * (v - e)
     [end]
