@@ -1331,7 +1331,9 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
                     let (key, current_ast)  = match inner_pair.as_rule() {
                         Rule::neurotransmitter_def => (
                             String::from("neurotransmitter"), 
-                            Ast::TypeDefinition(String::from(inner_pair.as_str()))
+                            Ast::TypeDefinition(
+                                String::from(inner_pair.into_inner().next().unwrap().as_str())
+                            )
                         ),
                         Rule::vars_with_default_def => {
                             parse_vars_with_default(inner_pair)
@@ -1399,7 +1401,75 @@ impl ReceptorsDefinition {
     // then move to metabotropic
     // should have simple way to edit gmax when receptors struct is initialized
     fn to_code(&self) -> (Vec<String>, String) {
-        (Vec::new(), String::from(""))
+        let neurotransmitters_name = format!("{}NeurotransmitterType", self.type_name.generate());
+        let neurotransmitter_types: Vec<String> = self.blocks.iter()
+            .map(|i| i.0.generate())
+            .collect();
+
+        let neurotransmitters_definiton = format!(
+            "pub enum {} {{\n{}\n}}", 
+            neurotransmitters_name,
+            neurotransmitter_types.join(",\n"),
+        );
+
+        // let receptors_definition = format!("pub struct {} {{{}}}", self.type_name.generate());
+
+        let mut receptors = vec![];
+
+        for (type_name, vars_def, on_iteration) in &self.blocks {
+            let mut vars = generate_fields(vars_def);
+            let mut defaults = generate_defaults(vars_def);
+
+            vars.push(String::from("pub r: T"));
+            defaults.push(String::from("r: T::default()"));
+
+            let struct_def = format!(
+                "pub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
+                type_name.generate(),
+                vars.join(",\n")
+            );
+
+            let struct_defaults = format!(
+                "impl<T: ReceptorKinetics> Default for {}Receptor<T> {{\nfn default() -> Self {{\n{}Receptor {{\n{}\n}}}}}}",
+                type_name.generate(),
+                type_name.generate(),
+                defaults.join(",\n"),
+            );
+
+            let iterate_block = on_iteration.generate();
+            let iterate_block = iterate_block.replace("self.r ", "self.r.get_r()");
+            let iterate_block = iterate_block.replace("self.r)", "self.r.get_r())");
+            let iterate_block = iterate_block.replace("self.r;", "self.r.get_r();");
+            let iterate_block = iterate_block.replace("self.current_voltage ", "current_voltage");
+            let iterate_block = iterate_block.replace("self.current_voltage)", "current_voltage)");
+            let iterate_block = iterate_block.replace("self.current_voltage;", "current_voltage;");
+
+            let receptor_impl = format!(
+                "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
+                    fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
+                    fn iterate(&mut self, current_voltage: f32) {{ {} }}
+                }}
+                ",
+                type_name.generate(),
+                iterate_block,
+            );
+
+            receptors.push(
+                format!(
+                    "{}\n{}\n{}", 
+                    struct_def, 
+                    struct_defaults,
+                    receptor_impl,
+                )
+            );
+        }
+
+        (
+            vec![
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;")
+            ], 
+            format!("{}\n{}", neurotransmitters_definiton, receptors.join("\n"))
+        )
     }
 }
 
