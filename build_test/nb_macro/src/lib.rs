@@ -1464,6 +1464,11 @@ impl ReceptorsDefinition {
             );
         }
 
+        // when implementing receptors together
+        // check if there is a current
+        // if not ignore
+        // otherwise add it to the currents to sum together ionotropically
+
         (
             vec![
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;")
