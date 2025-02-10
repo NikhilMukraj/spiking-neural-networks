@@ -42,7 +42,7 @@ prob_of_exc_to_inh = [1]
 bayesian_distortion = [0]
 s_d2 = [0.0, 0.5]
 # glutamate_clearance = [0.001, 0.002, 0.003, 0.004, 0.005, 0.006, 0.007, 0.008, 0.009, 0.01]
-glutamate_clearance = [0.005]
+glutamate_clearance = [0.001] # glu may need to be modified
 
 # may need to change iteration times
 # should check that cues are on as expected
