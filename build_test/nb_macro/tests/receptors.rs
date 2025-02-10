@@ -7,7 +7,7 @@ mod test {
     // test multiple receptor types, (X and Y)
     // test mismatching receptors
     // test getting and seting currents and iterating (with different concs of neurotransmitter)
-    // then move to metaboptric stuff
+    // then move to metabotropic stuff (with top level vars)
 
     neuron_builder!(r#"
     [receptors]
