@@ -1407,7 +1407,7 @@ impl ReceptorsDefinition {
             .collect();
 
         let neurotransmitters_definiton = format!(
-            "pub enum {} {{\n{}\n}}", 
+            "#[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]\npub enum {} {{\n{}\n}}", 
             neurotransmitters_name,
             neurotransmitter_types.join(",\n"),
         );
@@ -1415,13 +1415,21 @@ impl ReceptorsDefinition {
         // let receptors_definition = format!("pub struct {} {{{}}}", self.type_name.generate());
 
         let mut receptors = vec![];
+        let mut receptor_names = vec![];
+        let mut has_current = vec![];
 
         for (type_name, vars_def, on_iteration) in &self.blocks {
+            receptor_names.push(type_name.generate());
+
             let mut vars = generate_fields(vars_def);
             let mut defaults = generate_defaults(vars_def);
 
             vars.push(String::from("pub r: T"));
             defaults.push(String::from("r: T::default()"));
+
+            if vars.contains(&String::from("pub current: f32")) {
+                has_current.push(type_name.generate());
+            }
 
             let struct_def = format!(
                 "pub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
@@ -1447,7 +1455,7 @@ impl ReceptorsDefinition {
             let receptor_impl = format!(
                 "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
                     fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
-                    fn iterate(&mut self, current_voltage: f32) {{ {} }}
+                    fn iterate(&mut self, current_voltage: f32, dt: f32) {{ {} }}
                 }}
                 ",
                 type_name.generate(),
@@ -1469,11 +1477,167 @@ impl ReceptorsDefinition {
         // if not ignore
         // otherwise add it to the currents to sum together ionotropically
 
+        let receptor_enum = format!(
+            "pub enum {}Type<T: ReceptorKinetics> {{\n{}\n}}",
+            self.type_name.generate(),
+            receptor_names.iter()
+                .map(|i| format!("{}({}Receptor<T>)", i, i))
+                .collect::<Vec<String>>()
+                .join("\n,")
+        );
+
+        let receptors_struct = format!(
+            "pub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+            self.type_name.generate(),
+            neurotransmitters_name,
+            self.type_name.generate(),
+        );
+
+        let update_receptor_kinetics = format!(
+            "pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<{}>, dt: f32) {{
+                t_total.iter()
+                    .for_each(|(key, value)| {{
+                        if let Some(receptor_type) = self.receptors.get_mut(key) {{
+                            match receptor_type {{
+                                {}
+                            }}
+                        }}
+                    }});
+            }}",
+            neurotransmitters_name,
+            receptor_names.iter()
+                .map(|name| 
+                    format!(
+                        "{}Type::{}(receptor) => {{ receptor.apply_r_change(*value, dt); }}", 
+                        self.type_name.generate(), 
+                        name
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join(",\n")
+        );
+
+        let set_receptor_currents = has_current.iter()
+            .map(|name| 
+                format!(
+                    "if let Some(receptor_type) = self.receptors.get_mut(&{}::{}) {{
+                        if let {}Type::{}(receptor) = receptor_type {{
+                            receptor.iterate(current_voltage, dt);
+                        }}
+                    }}",
+                    neurotransmitters_name,
+                    name,
+                    self.type_name.generate(),
+                    name
+                )
+            )
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let get_receptor_currents = has_current.iter()
+            .map(|name| 
+                format!(
+                    "if let Some(receptor_type) = self.receptors.get(&{}::{}) {{
+                        if let {}Type::{}(receptor) = receptor_type {{
+                            total += receptor.current;
+                        }}
+                    }}",
+                    neurotransmitters_name,
+                    name,
+                    self.type_name.generate(),
+                    name
+                )
+            )
+            .collect::<Vec<String>>()
+            .join("\n");
+
+        let get_receptor_currents = format!(
+            "let mut total = 0.;\n{};\ntotal * (dt / c_m)", 
+            get_receptor_currents
+        );
+
+        let check_receptor_neurotransmitter_type = neurotransmitter_types.iter().zip(receptor_names.iter())
+            .map(|(i, j)| 
+                format!("
+                    if let {}Type::{}(_) = receptor_type {{
+                        if neurotransmitter_type == {}::{} {{
+                            is_valid = true;
+                        }}
+                    }}
+                    ",
+                    self.type_name.generate(),
+                    j,
+                    neurotransmitters_name,
+                    i,
+                )
+            ).collect::<Vec<String>>();
+
+        let insert = format!(
+            "
+                pub fn insert(&mut self, neurotransmitter_type: {}, receptor_type: {}Type<T>) -> Result<(), ReceptorNeurotransmitterError> {{
+                    let mut is_valid = false;
+
+                    {}
+
+                    if !is_valid {{
+                        return Err(ReceptorNeurotransmitterError::MismatchedTypes);
+                    }}
+
+                    self.receptors.insert(neurotransmitter_type, receptor_type);
+
+                    Ok(())
+                }}
+            ",
+            neurotransmitters_name,
+            self.type_name.generate(),
+            check_receptor_neurotransmitter_type.join("\n"),
+        );
+
+        let receptors_impl = format!(
+            "impl<T: ReceptorKinetics> {}<T> {{
+                {}
+                pub fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {{\n{}\n}}
+                pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {{\n{}\n}}
+                pub fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
+                pub fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
+                pub fn len(&self) -> usize {{\nself.receptors.len()\n}}
+                pub fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
+                {}
+            }}
+            ",
+            self.type_name.generate(),
+            update_receptor_kinetics,
+            set_receptor_currents,
+            get_receptor_currents,
+            neurotransmitters_name,
+            self.type_name.generate(), 
+            neurotransmitters_name,
+            self.type_name.generate(), 
+            insert,
+        );
+
+        let receptors_default = format!(
+            "impl<T: ReceptorKinetics> Default for {}<T> {{\nfn default() -> Self {{{} {{ receptors: HashMap::new() }} }} }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
         (
             vec![
-                String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;")
+                String::from("use std::collections::HashMap;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterConcentrations;"),
+                String::from("use spiking_neural_networks::error::ReceptorNeurotransmitterError;"),
             ], 
-            format!("{}\n{}", neurotransmitters_definiton, receptors.join("\n"))
+            format!(
+                "{}\n{}\n{}\n{}\n{}\n{}", 
+                neurotransmitters_definiton, 
+                receptors.join("\n"),
+                receptor_enum,
+                receptors_struct,
+                receptors_impl,
+                receptors_default,
+            )
         )
     }
 }
