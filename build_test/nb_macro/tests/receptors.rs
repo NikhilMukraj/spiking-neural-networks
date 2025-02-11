@@ -37,6 +37,19 @@ mod test {
         on_iteration:
             m = r ^ 2
     [end]
+
+    [receptors]
+        type: Mixed
+        vars: m = 0
+        neurotransmitter: Iono
+        vars: current = 0, g = 1, e = 0
+        on_iteration:
+            current = g * r * (v - e)
+        neurotransmitter: Meta
+        vars: s = 0
+        on_iteration:
+            s = 2 * s + 1
+    [end]
     "#);
 
     #[test]
