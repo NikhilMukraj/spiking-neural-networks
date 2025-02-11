@@ -29,6 +29,14 @@ mod test {
         on_iteration:
             current = 2 * g * r * (v - e)
     [end]
+
+    [receptors]
+        type: OneMetabotropic
+        neurotransmitter: M
+        vars: m = 0
+        on_iteration:
+            m = r ^ 2
+    [end]
     "#);
 
     #[test]
@@ -74,5 +82,28 @@ mod test {
                 MultipleReceptorsType::B(BReceptor::default())
             ).is_ok()
         );
+    }
+
+    #[test]
+    fn test_simple_metabotropic() {
+        let mut receptors = OneMetabotropic::<ApproximateReceptor>::default();
+
+        receptors.insert(
+            OneMetabotropicNeurotransmitterType::M, 
+            OneMetabotropicType::M(MReceptor::default())
+        ).unwrap();
+
+        let ts = [0., 0.25, 0.5, 0.75, 0.1, 0.75, 0.5, 0.25, 0.];
+
+        for t in ts {
+            let conc = HashMap::from([(OneMetabotropicNeurotransmitterType::M, t)]);
+            receptors.update_receptor_kinetics(&conc, 1.);
+
+            if let Some(OneMetabotropicType::M(receptor)) = receptors.get(&OneMetabotropicNeurotransmitterType::M) {
+                assert_eq!(receptor.r.get_r(), t);
+            } else {
+                panic!("Receptor should have been inserted");
+            }
+        }
     }
 }
