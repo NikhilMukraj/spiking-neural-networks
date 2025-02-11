@@ -16,13 +16,13 @@ use proc_macro::{
 };
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum NumOrBool {
     Number(f32),
     Bool(bool),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Ast {
     Number(f32),
     Bool(bool),
@@ -82,7 +82,7 @@ enum Ast {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 enum Op {
     Add,
     Subtract,
@@ -1283,7 +1283,6 @@ impl ReceptorKineticsDefinition {
     }
 }
 
-#[allow(dead_code)]
 struct ReceptorsDefinition {
     type_name: Ast,
     top_level_vars: Option<Ast>,
@@ -1419,7 +1418,7 @@ impl ReceptorsDefinition {
             neurotransmitter_types.join(",\n"),
         );
 
-        // let receptors_definition = format!("pub struct {} {{{}}}", self.type_name.generate());
+        let has_top_level_vars = &self.top_level_vars.is_some();
 
         let mut receptors = vec![];
         let mut receptor_names = vec![];
@@ -1495,12 +1494,22 @@ impl ReceptorsDefinition {
                 .join("\n,")
         );
 
-        let receptors_struct = format!(
-            "pub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
-            self.type_name.generate(),
-            neurotransmitters_name,
-            self.type_name.generate(),
-        );
+        let receptors_struct = if !has_top_level_vars {
+            format!(
+                "pub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                self.type_name.generate(),
+                neurotransmitters_name,
+                self.type_name.generate(),
+            )  
+        } else {
+            format!(
+                "pub struct {}<T: ReceptorKinetics> {{\n{},\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                self.type_name.generate(),
+                generate_fields(self.top_level_vars.as_ref().unwrap()).join(",\n"),
+                neurotransmitters_name,
+                self.type_name.generate(),
+            ) 
+        };
 
         let update_receptor_kinetics = format!(
             "pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<{}>, dt: f32) {{
@@ -1563,11 +1572,20 @@ impl ReceptorsDefinition {
             check_receptor_neurotransmitter_type.join("\n"),
         );
  
-        let receptors_default = format!(
-            "impl<T: ReceptorKinetics> Default for {}<T> {{\nfn default() -> Self {{{} {{ receptors: HashMap::new() }} }} }}",
-            self.type_name.generate(),
-            self.type_name.generate(),
-        );
+        let receptors_default = if !has_top_level_vars {
+            format!(
+                "impl<T: ReceptorKinetics> Default for {}<T> {{\nfn default() -> Self {{{} {{ receptors: HashMap::new() }} }} }}",
+                self.type_name.generate(),
+                self.type_name.generate(),
+            )
+        } else {
+            format!(
+                "impl<T: ReceptorKinetics> Default for {}<T> {{\nfn default() -> Self {{{} {{ {},\nreceptors: HashMap::new() }} }} }}",
+                self.type_name.generate(),
+                self.type_name.generate(),
+                generate_defaults(self.top_level_vars.as_ref().unwrap()).join(",\n"),
+            )
+        };
 
         if has_current.is_empty() {
             let receptors_impl = format!(
