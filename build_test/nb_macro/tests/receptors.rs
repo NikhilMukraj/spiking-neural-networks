@@ -3,6 +3,8 @@ mod test {
     use nb_macro::neuron_builder;
     use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;
 
+    // need to implement multiple receptor values
+
     neuron_builder!(r#"
     [receptors]
         type: BasicReceptors
