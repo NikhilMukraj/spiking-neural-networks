@@ -4,6 +4,7 @@ mod test {
     use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;
 
     // need to implement multiple receptor values
+    // could default to always assuming one receptor until specified otherwise
 
     neuron_builder!(r#"
     [receptors]
