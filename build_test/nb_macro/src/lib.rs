@@ -362,7 +362,7 @@ fn generate_on_iteration(on_iteration: &Ast) -> String {
     format!("{}\n{}\n", on_iteration_assignments, changes)
 }
 
-fn generate_fields(vars: &Ast) -> Vec<String> {
+fn generate_fields_internal(vars: &Ast, format_type: fn(&str, &str) -> String) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
             variables
@@ -381,12 +381,36 @@ fn generate_fields(vars: &Ast) -> Vec<String> {
                         _ => unreachable!(),
                     };
 
-                    format!("pub {}: {}", var_name, type_name)
+                    format_type(var_name, type_name)
                 })
                 .collect::<Vec<String>>()
         },
         _ => unreachable!()
     }
+}
+
+fn generate_fields(vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, j| format!("pub {}: {}", i, j))
+}
+
+fn generate_fields_as_args(vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, j| format!("{}: &mut {}", i, j))
+}
+
+fn generate_fields_as_names(vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, _| i.to_string())
+}
+
+fn generate_fields_as_args_to_pass(vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, _| format!("&mut self.{}", i))
+}
+
+fn replace_self_var(original: String, var: &str, replace_with: &str) -> String {
+    let original = original.replace(&format!("self.{}.", var), &format!("{}.", replace_with));
+    let original = original.replace(&format!("self.{} ", var), &format!("{} ", replace_with));
+    let original = original.replace(&format!("self.{})", var), &format!("{})", replace_with));
+    let original = original.replace(&format!("self.{},", var), &format!("{},", replace_with));
+    original.replace(&format!("self.{};", var), &format!("{};", replace_with))
 }
 
 impl NeuronDefinition {
@@ -921,8 +945,8 @@ impl IonChannelDefinition {
             // let update_current_body = add_indents(&lines.join("\n"), "\t");
             let update_current_body = generate_on_iteration(&self.on_iteration);
 
-            let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
-            let update_current_body = update_current_body.replace("self.dt", "dt");
+            let update_current_body = replace_self_var(update_current_body, "current_voltage", "voltage");
+            let update_current_body = replace_self_var(update_current_body, "dt", "dt");
 
             format!(
                 "{}\n{}\n}}", 
@@ -932,7 +956,7 @@ impl IonChannelDefinition {
         } else {
             let update_current_header = "fn update_current(&mut self, voltage: f32) {";
             let update_current_body = add_indents(&self.on_iteration.generate(), "\t");
-            let update_current_body = update_current_body.replace("self.current_voltage", "voltage");
+            let update_current_body = replace_self_var(update_current_body, "current_voltage", "voltage");
 
             format!("{}\n{}\n}}", update_current_header, update_current_body)
         };
@@ -1150,9 +1174,9 @@ impl NeurotransmitterKineticsDefinition {
 
         let update_body = generate_on_iteration(&self.on_iteration);
 
-        let update_body = update_body.replace("self.is_spiking", "neuron.is_spiking()");
-        let update_body = update_body.replace("self.dt", "neuron.get_dt()");
-        let update_body = update_body.replace("self.current_voltage", "neuron.get_current_voltage()");
+        let update_body = replace_self_var(update_body, "is_spiking", "neuron.is_spiking()");
+        let update_body = replace_self_var(update_body, "dt", "neuron.get_dt()");
+        let update_body = replace_self_var(update_body, "current_voltage", "neuron.get_current_voltage()");
 
         let update_body = format!(
             "fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {{\n{}\n}}",
@@ -1234,8 +1258,8 @@ impl ReceptorKineticsDefinition {
 
         let update_body = generate_on_iteration(&self.on_iteration);
 
-        let update_body = update_body.replace("self.t", "t");
-        let update_body = update_body.replace("self.dt", "neuron.get_dt()");
+        let update_body = replace_self_var(update_body, "t", "t");
+        let update_body = replace_self_var(update_body, "dt", "neuron.get_dt()");
 
         let update_body = format!(
             "fn apply_r_change(&mut self, t: f32, dt: f32) {{\n{}\n}}",
@@ -1450,25 +1474,37 @@ impl ReceptorsDefinition {
                 defaults.join(",\n"),
             );
 
-            let iterate_block = on_iteration.generate();
-            let iterate_block = iterate_block.replace("self.r.", "self.r.get_r().");
-            let iterate_block = iterate_block.replace("self.r ", "self.r.get_r()");
-            let iterate_block = iterate_block.replace("self.r)", "self.r.get_r())");
-            let iterate_block = iterate_block.replace("self.r;", "self.r.get_r();");
-            let iterate_block = iterate_block.replace("self.current_voltage.", "current_voltage.");
-            let iterate_block = iterate_block.replace("self.current_voltage ", "current_voltage");
-            let iterate_block = iterate_block.replace("self.current_voltage)", "current_voltage)");
-            let iterate_block = iterate_block.replace("self.current_voltage;", "current_voltage;");
+            let mut iterate_block = on_iteration.generate();
+            if *has_top_level_vars {
+                for i in generate_fields_as_names(self.top_level_vars.as_ref().unwrap()) {
+                    iterate_block = replace_self_var(iterate_block, &i, &format!("*{}", i));
+                }
+            }
+            iterate_block = replace_self_var(iterate_block, "r", "self.r.get_r()");
+            iterate_block = replace_self_var(iterate_block, "current_voltage", "current_voltage");
 
-            let receptor_impl = format!(
-                "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
-                    fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
-                    fn iterate(&mut self, current_voltage: f32, dt: f32) {{ {} }}
-                }}
-                ",
-                type_name.generate(),
-                iterate_block,
-            );
+            let receptor_impl = if !has_top_level_vars {
+                format!(
+                    "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
+                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
+                        fn iterate(&mut self, current_voltage: f32, dt: f32) {{ {} }}
+                    }}
+                    ",
+                    type_name.generate(),
+                    iterate_block,
+                )
+            } else {
+                format!(
+                    "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
+                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
+                        fn iterate(&mut self, current_voltage: f32, dt: f32, {}) {{ {} }}
+                    }}
+                    ",
+                    type_name.generate(),
+                    generate_fields_as_args(self.top_level_vars.as_ref().unwrap()).join(", "),
+                    iterate_block,
+                )
+            };
 
             receptors.push(
                 format!(
@@ -1621,19 +1657,35 @@ impl ReceptorsDefinition {
             );
         }
 
-        let set_receptor_currents = has_current.iter()
+        let set_receptor_currents = receptor_names.iter()
             .map(|name| 
-                format!(
-                    "if let Some(receptor_type) = self.receptors.get_mut(&{}::{}) {{
-                        if let {}Type::{}(receptor) = receptor_type {{
-                            receptor.iterate(current_voltage, dt);
-                        }}
-                    }}",
-                    neurotransmitters_name,
-                    name,
-                    self.type_name.generate(),
-                    name
-                )
+                if !has_top_level_vars {
+                    format!(
+                        "if let Some(receptor_type) = self.receptors.get_mut(&{}::{}) {{
+                            if let {}Type::{}(receptor) = receptor_type {{
+                                receptor.iterate(current_voltage, dt);
+                            }}
+                        }}",
+                        neurotransmitters_name,
+                        name,
+                        self.type_name.generate(),
+                        name
+                    )
+                } else {
+                    format!(
+                        "if let Some(receptor_type) = self.receptors.get_mut(&{}::{}) {{
+                            if let {}Type::{}(receptor) = receptor_type {{
+                                receptor.iterate(current_voltage, dt, {});
+                            }}
+                        }}",
+                        neurotransmitters_name,
+                        name,
+                        self.type_name.generate(),
+                        name,
+                        generate_fields_as_args_to_pass(self.top_level_vars.as_ref().unwrap())
+                            .join(", "),
+                    )
+                }
             )
             .collect::<Vec<String>>()
             .join("\n");
