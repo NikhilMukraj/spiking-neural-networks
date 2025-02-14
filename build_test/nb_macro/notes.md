@@ -53,6 +53,8 @@
       - should have option to customize receptors
   - [ ] metabotropic receptors
 - [ ] neuronal chemical testing
+  - [ ] custom chemical on iteration
+    - need to use this if only metabotropic since it lacks set and get receptor currents
 - [ ] function definition blocks
 - [ ] spike train block
 - [x] eventually remove vars declaration without vars
