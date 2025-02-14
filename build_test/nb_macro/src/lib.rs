@@ -317,6 +317,7 @@ struct NeuronDefinition {
     on_iteration: Ast,
     spike_detection: Ast,
     ion_channels: Option<Ast>,
+    receptors: Ast,
 }
 
 const ITERATION_HEADER: &str = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
@@ -422,20 +423,26 @@ impl NeuronDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
         let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
         let receptor_kinetics = "ApproximateReceptor";
-        let neurotransmitter_kind = "IonotropicNeurotransmitterType";
+        let neurotransmitter_kind = format!("{}NeurotransmitterType", self.receptors.generate());
 
-        let mut kinetics_import = vec![format!(
+        let mut imports = vec![format!(
             "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
             neurotransmitter_kinetics,
             receptor_kinetics,
         )];
 
-        kinetics_import.push(
-            format!(
-                "use spiking_neural_networks::neuron::iterate_and_spike::{};",
-                neurotransmitter_kind,
-            )
-        );
+
+        if self.receptors.generate() == "DefaultReceptors" {
+            imports.push(
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::DefaultReceptors;")
+            );
+            imports.push(
+                format!(
+                    "use spiking_neural_networks::neuron::iterate_and_spike::{};",
+                    neurotransmitter_kind,
+                )
+            );
+        }
 
         let macros = "#[derive(Debug, Clone, IterateAndSpikeBase)]";
         let header = format!(
@@ -454,7 +461,7 @@ impl NeuronDefinition {
         let is_spiking_field = String::from("pub is_spiking: bool");
         let last_firing_time_field = String::from("pub last_firing_time: Option<usize>");
         let neurotransmitter_field = format!("pub synaptic_neurotransmitters: Neurotransmitters<{}, T>", neurotransmitter_kind);
-        let receptors_field = String::from("pub receptors: LigandGatedChannels<R>");
+        let receptors_field = format!("pub receptors: {}<R>", self.receptors.generate());
 
         fields.insert(0, current_voltage_field);
         fields.push(gap_conductance_field);
@@ -515,7 +522,7 @@ impl NeuronDefinition {
             defaults.push(String::from("is_spiking: false"));
             defaults.push(String::from("last_firing_time: None"));
             defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
-            defaults.push(String::from("receptors: LigandGatedChannels::<R>::default()"));
+            defaults.push(format!("receptors: {}::<R>::default()", self.receptors.generate()));
 
             let default_fields = defaults.join(",\n\t");
             
@@ -637,7 +644,7 @@ impl NeuronDefinition {
         );
 
         (
-            kinetics_import,
+            imports,
             format!(
                 "{}\n{}\n{}\n}}\n\n{}\n\n{}\n{}", 
                 macros, 
@@ -778,14 +785,14 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                 parse_spike_detection(pair)
             }
             Rule::vars_with_default_def => {
-                // assignment should be just a number
-                // in order to prevent duplicate, key should be "vars"
-
                 parse_vars_with_default(pair)
             },
             Rule::ion_channels_def => {
                 parse_ion_channels(pair)
             },
+            Rule::receptors_param_def => {
+                parse_type_definition(pair)
+            }
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
 
@@ -818,6 +825,10 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     
     let on_spike = definitions.remove("on_spike");
     let ion_channels = definitions.remove("ion_channels");
+    let receptors = match definitions.remove("receptors") {
+        Some(val) => val,
+        None => Ast::TypeDefinition(String::from("DefaultReceptors")),
+    };
 
     Ok(
         NeuronDefinition {
@@ -827,6 +838,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             on_iteration,
             on_spike,
             ion_channels,
+            receptors,
         }
     )
 }
@@ -1462,7 +1474,7 @@ impl ReceptorsDefinition {
             }
 
             let struct_def = format!(
-                "pub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
+                "#[derive(Debug, Clone)]\npub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
                 type_name.generate(),
                 vars.join(",\n")
             );
@@ -1522,7 +1534,7 @@ impl ReceptorsDefinition {
         // otherwise add it to the currents to sum together ionotropically
 
         let receptor_enum = format!(
-            "pub enum {}Type<T: ReceptorKinetics> {{\n{}\n}}",
+            "#[derive(Debug, Clone)]\npub enum {}Type<T: ReceptorKinetics> {{\n{}\n}}",
             self.type_name.generate(),
             receptor_names.iter()
                 .map(|i| format!("{}({}Receptor<T>)", i, i))
@@ -1532,14 +1544,14 @@ impl ReceptorsDefinition {
 
         let receptors_struct = if !has_top_level_vars {
             format!(
-                "pub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                "#[derive(Debug, Clone)]\npub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
                 self.type_name.generate(),
                 neurotransmitters_name,
                 self.type_name.generate(),
             )  
         } else {
             format!(
-                "pub struct {}<T: ReceptorKinetics> {{\n{},\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                "#[derive(Debug, Clone)]\npub struct {}<T: ReceptorKinetics> {{\n{},\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
                 self.type_name.generate(),
                 generate_fields(self.top_level_vars.as_ref().unwrap()).join(",\n"),
                 neurotransmitters_name,
@@ -2042,7 +2054,7 @@ fn build_function(model_description: String) -> TokenStream {
     let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
     let neuron_necessary_imports = [
         "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
-        "Timestep", "IterateAndSpike", "LigandGatedChannels", 
+        "Timestep", "IterateAndSpike", 
         "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
         "NeurotransmitterConcentrations"
     ];
