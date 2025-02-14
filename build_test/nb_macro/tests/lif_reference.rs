@@ -1,8 +1,8 @@
 use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;
-use spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType;
+use spiking_neural_networks::neuron::iterate_and_spike::DefaultReceptorsNeurotransmitterType;
 use spiking_neural_networks::neuron::iterate_and_spike::{
     CurrentVoltage, GapConductance, IsSpiking, IterateAndSpike, LastFiringTime,
-    LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics,
+    DefaultReceptors, NeurotransmitterConcentrations, NeurotransmitterKinetics,
     Neurotransmitters, ReceptorKinetics, Timestep,
 };
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
@@ -19,8 +19,8 @@ pub struct ReferenceIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorKin
     pub c_m: f32,
     pub is_spiking: bool,
     pub last_firing_time: Option<usize>,
-    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
-    pub ligand_gates: LigandGatedChannels<R>,
+    pub synaptic_neurotransmitters: Neurotransmitters<DefaultReceptorsNeurotransmitterType, T>,
+    pub receptors: DefaultReceptors<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> ReferenceIntegrateAndFire<T, R> {
@@ -36,7 +36,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> ReferenceIntegrateAndFire
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike
     for ReferenceIntegrateAndFire<T, R>
 {
-    type N = IonotropicNeurotransmitterType;
+    type N = DefaultReceptorsNeurotransmitterType;
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
     }
@@ -52,12 +52,12 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike
         input_current: f32,
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors
             .set_receptor_currents(self.current_voltage, self.dt);
         let dv = ((self.current_voltage - self.e) + input_current) * self.dt;
         self.current_voltage += dv;
-        self.current_voltage += self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        self.current_voltage += self.receptors.get_receptor_currents(self.dt, self.c_m);
         self.synaptic_neurotransmitters
             .apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
         self.handle_spiking()
@@ -77,8 +77,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for ReferenceInte
             is_spiking: false,
             last_firing_time: None,
             synaptic_neurotransmitters:
-                Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
-            ligand_gates: LigandGatedChannels::<R>::default(),
+                Neurotransmitters::<DefaultReceptorsNeurotransmitterType, T>::default(),
+            receptors: DefaultReceptors::<R>::default(),
         }
     }
 }
