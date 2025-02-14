@@ -92,13 +92,13 @@ on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ eq_assignments }
 on_iteration_def = { "on_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
 spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
 ion_channels_def = { ion_channels_def_with_assignment ~ NEWLINE+ }
-ligand_gates_def = { "ligand_gates:" ~ " "* ~ name ~ NEWLINE+ }
+receptors_param_def = { "receptors:" ~ " "* ~ name ~ NEWLINE+ }
 
 neuron_definition = {
     "[neuron]" ~ NEWLINE ~ 
 	(
 		on_iteration_def | type_def | on_spike_def | spike_detection_def | 
-		vars_with_default_def | ion_channels_def
+		vars_with_default_def | ion_channels_def | receptors_param_def
 	){5,} ~ 
 	"[end]"
 }
