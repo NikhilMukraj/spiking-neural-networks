@@ -678,6 +678,123 @@ impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
 impl_exp_decay_receptor_default!(GABAbDefault, gabab_default);
 impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 
+#[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
+pub enum DefaultReceptorsNeurotransmitterType {
+    X,
+}
+
+impl NeurotransmitterType for DefaultReceptorsNeurotransmitterType {}
+
+#[derive(Debug, Clone)]
+pub struct XReceptor<T: ReceptorKinetics> {
+    pub current: f32,
+    pub g: f32,
+    pub e: f32,
+    pub r: T,
+}
+
+impl<T: ReceptorKinetics> Default for XReceptor<T> {
+    fn default() -> Self {
+        XReceptor {
+            current: 0.,
+            g: 1.,
+            e: 0.,
+            r: T::default(),
+        }
+    }
+}
+
+impl<T: ReceptorKinetics> XReceptor<T> {
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r.apply_r_change(t, dt);
+    }
+    fn iterate(&mut self, current_voltage: f32, _dt: f32) {
+        self.current = self.g * self.r.get_r() * (current_voltage - self.e);
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum DefaultReceptorsType<T: ReceptorKinetics> {
+    X(XReceptor<T>),
+}
+
+#[derive(Debug, Clone)]
+pub struct DefaultReceptors<T: ReceptorKinetics> {
+    receptors: HashMap<DefaultReceptorsNeurotransmitterType, DefaultReceptorsType<T>>,
+}
+
+impl<T: ReceptorKinetics> DefaultReceptors<T> {
+    pub fn update_receptor_kinetics(
+        &mut self,
+        t_total: &NeurotransmitterConcentrations<DefaultReceptorsNeurotransmitterType>,
+        dt: f32,
+    ) {
+        t_total.iter().for_each(|(key, value)| {
+            if let Some(receptor_type) = self.receptors.get_mut(key) {
+                match receptor_type {
+                    DefaultReceptorsType::X(receptor) => {
+                        receptor.apply_r_change(*value, dt);
+                    }
+                }
+            }
+        });
+    }
+
+    pub fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {
+        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X) {
+            receptor.iterate(current_voltage, dt);
+        }
+    }
+
+    pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
+        let mut total = 0.;
+        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+            total += receptor.current;
+        };
+        total * (dt / c_m)
+    }
+
+    pub fn get(
+        &self,
+        neurotransmitter_type: &DefaultReceptorsNeurotransmitterType,
+    ) -> Option<&DefaultReceptorsType<T>> {
+        self.receptors.get(neurotransmitter_type)
+    }
+
+    pub fn get_mut(
+        &mut self,
+        neurotransmitter_type: &DefaultReceptorsNeurotransmitterType,
+    ) -> Option<&mut DefaultReceptorsType<T>> {
+        self.receptors.get_mut(neurotransmitter_type)
+    }
+
+    pub fn len(&self) -> usize {
+        self.receptors.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.receptors.is_empty()
+    }
+
+    pub fn insert(
+        &mut self,
+        neurotransmitter_type: DefaultReceptorsNeurotransmitterType,
+        receptor_type: DefaultReceptorsType<T>,
+    ) -> Result<(), ReceptorNeurotransmitterError> {
+        self.receptors.insert(neurotransmitter_type, receptor_type);
+
+        Ok(())
+    }
+}
+
+impl<T: ReceptorKinetics> Default for DefaultReceptors<T> {
+    fn default() -> Self {
+        DefaultReceptors {
+            receptors: HashMap::new(),
+        }
+    }
+}
+
 /// Enum containing the type of ionotropic ligand gated receptor
 /// containing a modifier to use when calculating current
 #[derive(Debug, Clone, PartialEq)]
