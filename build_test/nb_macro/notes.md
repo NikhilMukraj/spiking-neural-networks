@@ -58,6 +58,7 @@
 - [ ] function definition blocks
 - [ ] spike train block
 - [x] eventually remove vars declaration without vars
+- [ ] ion channel use timestep also checks each expr for a dt too
 - [ ] comments/docs in/around blocks
 - [ ] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
 - [ ] standardize whitespace in pest ast
