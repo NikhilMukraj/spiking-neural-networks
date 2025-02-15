@@ -600,7 +600,7 @@ impl NeuronDefinition {
         let receptors_update = "self.receptors.update_receptor_kinetics(t_total, self.dt);";
         let receptors_set_current = "self.receptors.set_receptor_currents(self.current_voltage, self.dt);";
 
-        let update_with_receptor_current = "self.current_voltage += self.receptors.get_receptor_currents(self.dt, self.c_m);";
+        let update_with_receptor_current = "self.current_voltage -= self.receptors.get_receptor_currents(self.dt, self.c_m);";
 
         let iteration_with_neurotransmitter_body = format!(
             "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
@@ -661,6 +661,15 @@ impl NeuronDefinition {
 fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
     (
         String::from("type"), 
+        Ast::TypeDefinition(
+            String::from(pair.into_inner().next().unwrap().as_str())
+        )
+    )
+}
+
+fn parse_receptor_params_def(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("receptors_param_def"), 
         Ast::TypeDefinition(
             String::from(pair.into_inner().next().unwrap().as_str())
         )
@@ -791,7 +800,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
                 parse_ion_channels(pair)
             },
             Rule::receptors_param_def => {
-                parse_type_definition(pair)
+                parse_receptor_params_def(pair)
             }
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
@@ -825,7 +834,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     
     let on_spike = definitions.remove("on_spike");
     let ion_channels = definitions.remove("ion_channels");
-    let receptors = match definitions.remove("receptors") {
+    let receptors = match definitions.remove("receptors_param_def") {
         Some(val) => val,
         None => Ast::TypeDefinition(String::from("DefaultReceptors")),
     };
@@ -1440,6 +1449,7 @@ impl ReceptorsDefinition {
             String::from("use std::collections::HashMap;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterConcentrations;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterType;"),
             String::from("use spiking_neural_networks::error::ReceptorNeurotransmitterError;"),
         ];
 
@@ -1448,10 +1458,13 @@ impl ReceptorsDefinition {
             .map(|i| i.0.generate())
             .collect();
 
+        let impl_neurotransmitter_type = format!("impl NeurotransmitterType for {} {{}}", neurotransmitters_name);
+
         let neurotransmitters_definiton = format!(
-            "#[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]\npub enum {} {{\n{}\n}}", 
+            "#[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]\npub enum {} {{\n{}\n}}\n{}", 
             neurotransmitters_name,
             neurotransmitter_types.join(",\n"),
+            impl_neurotransmitter_type,
         );
 
         let has_top_level_vars = &self.top_level_vars.is_some();
