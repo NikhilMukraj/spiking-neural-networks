@@ -32,9 +32,9 @@ inh_weights_scalar = 1
 skew = 0.05
 c_m = 100
 
-trials = 30
+trials = 10
 
-filename = "bayesian_inf_noisy_c1_d2_inh_glu_induce_low.json"
+filename = "verify_bayesian_inf_noisy_c1_d2_inh_glu_induce_low.json"
 
 [variables]
 spike_train_to_exc = [1000]
