@@ -1,7 +1,14 @@
+mod shared_receptors;
+
 #[cfg(test)]
 mod test {
     use nb_macro::neuron_builder;
     use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;
+    use crate::shared_receptors::{
+        MultipleReceptors, AReceptor, BReceptor, MultipleReceptorsNeurotransmitterType,
+        MultipleReceptorsType, MixedReceptorsType, IonoReceptor, MetaReceptor, 
+        MixedReceptorsNeurotransmitterType, MixedReceptors
+    };
 
     // need to implement multiple receptor values
     // could default to always assuming one receptor until specified otherwise
@@ -16,36 +23,11 @@ mod test {
     [end]
 
     [receptors]
-        type: MultipleReceptors
-        neurotransmitter: A
-        vars: current = 0, g = 1, e = 0
-        on_iteration:
-            current = g * r * (v - e)
-        neurotransmitter: B
-        vars: current = 0, g = 1, e = 0
-        on_iteration:
-            current = 2 * g * r * (v - e)
-    [end]
-
-    [receptors]
         type: OneMetabotropic
         neurotransmitter: M
         vars: m = 0
         on_iteration:
             m = r ^ 2
-    [end]
-
-    [receptors]
-        type: MixedReceptors
-        vars: m = 0
-        neurotransmitter: Iono
-        vars: current = 0, g = 1, e = 0
-        on_iteration:
-            current = g * m * r * (v - e)
-        neurotransmitter: Meta
-        vars: s = 1
-        on_iteration:
-            m = s * r
     [end]
     "#);
 
