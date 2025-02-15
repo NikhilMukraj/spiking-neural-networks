@@ -57,7 +57,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike
             .set_receptor_currents(self.current_voltage, self.dt);
         let dv = ((self.current_voltage - self.e) + input_current) * self.dt;
         self.current_voltage += dv;
-        self.current_voltage += self.receptors.get_receptor_currents(self.dt, self.c_m);
+        self.current_voltage -= self.receptors.get_receptor_currents(self.dt, self.c_m);
         self.synaptic_neurotransmitters
             .apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
         self.handle_spiking()
