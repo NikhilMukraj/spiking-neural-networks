@@ -34,7 +34,7 @@ c_m = 100
 
 trials = 10
 
-filename = "bayesian_inf_noisy_c1_d2_inh_glu_induce_low.json"
+filename = "verify_input.json"
 
 [variables]
 spike_train_to_exc = [1000]
