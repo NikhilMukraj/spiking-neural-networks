@@ -149,21 +149,23 @@ impl Ast {
                     )
             },
             Ast::StructCall { name, attribute, args } => {
-                format!(
-                    "self.{}.{}{}", 
-                    name, 
-                    attribute,
-                    match args {
-                        Some(args) => {
+                match args {
+                    Some(args) => {
+                        format!(
+                            "self.{}.{}({})", 
+                            name, 
+                            attribute,
                             args.iter()
                                 .map(|i| i.generate())
                                 .collect::<Vec<String>>()
                                 .join(", ")
-                        },
-                        None => String::from(""),
+                        )
+                    },
+                    None => {
+                        format!("self.{}.{}", name, attribute)
                     }
-                )
-            },
+                }
+            }
             Ast::StructFunctionCall { name, attribute, args } => {
                 format!(
                     "self.{}.{}({});", 
@@ -317,7 +319,8 @@ struct NeuronDefinition {
     on_iteration: Ast,
     spike_detection: Ast,
     ion_channels: Option<Ast>,
-    receptors: Ast,
+    on_electrochemical_iteration: Option<Ast>,
+    receptors: Option<Ast>,
 }
 
 const ITERATION_HEADER: &str = "fn iterate_and_spike(&mut self, input_current: f32) -> bool {";
@@ -325,7 +328,7 @@ const ITERATION_WITH_NEUROTRANSMITTER_START: &str = "fn iterate_with_neurotransm
 const ITERATION_WITH_NEUROTRANSMITTER_ARGS: [&str; 3] = [
     "&mut self", 
     "input_current: f32",
-    "t_total: &NeurotransmitterConcentrations<Self::N>",
+    "t: &NeurotransmitterConcentrations<Self::N>",
 ];
 
 fn generate_iteration_with_neurotransmitter_header() -> String {
@@ -423,7 +426,13 @@ impl NeuronDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
         let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
         let receptor_kinetics = "ApproximateReceptor";
-        let neurotransmitter_kind = format!("{}NeurotransmitterType", self.receptors.generate());
+
+        let receptors_name = match &self.receptors {
+            Some(val) => val.generate(),
+            None => String::from("DefaultReceptors"),
+        };
+
+        let neurotransmitter_kind = format!("{}NeurotransmitterType", receptors_name);
 
         let mut imports = vec![format!(
             "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
@@ -432,7 +441,7 @@ impl NeuronDefinition {
         )];
 
 
-        if self.receptors.generate() == "DefaultReceptors" {
+        if self.receptors.is_none() {
             imports.push(
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::DefaultReceptors;")
             );
@@ -461,7 +470,7 @@ impl NeuronDefinition {
         let is_spiking_field = String::from("pub is_spiking: bool");
         let last_firing_time_field = String::from("pub last_firing_time: Option<usize>");
         let neurotransmitter_field = format!("pub synaptic_neurotransmitters: Neurotransmitters<{}, T>", neurotransmitter_kind);
-        let receptors_field = format!("pub receptors: {}<R>", self.receptors.generate());
+        let receptors_field = format!("pub receptors: {}<R>", receptors_name);
 
         fields.insert(0, current_voltage_field);
         fields.push(gap_conductance_field);
@@ -522,7 +531,7 @@ impl NeuronDefinition {
             defaults.push(String::from("is_spiking: false"));
             defaults.push(String::from("last_firing_time: None"));
             defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
-            defaults.push(format!("receptors: {}::<R>::default()", self.receptors.generate()));
+            defaults.push(format!("receptors: {}::<R>::default()", receptors_name));
 
             let default_fields = defaults.join(",\n\t");
             
@@ -597,26 +606,69 @@ impl NeuronDefinition {
 
         let iteration_with_neurotransmitter_header = generate_iteration_with_neurotransmitter_header();
 
-        let receptors_update = "self.receptors.update_receptor_kinetics(t_total, self.dt);";
-        let receptors_set_current = "self.receptors.set_receptor_currents(self.current_voltage, self.dt);";
+        let receptors_update = "self.receptors.update_receptor_kinetics(t, self.dt)";
+        let receptors_set_current = "self.receptors.set_receptor_currents(self.current_voltage, self.dt)";
+        let receptors_get_current = "self.receptors.get_receptor_currents(self.dt, self.c_m)";
 
-        let update_with_receptor_current = "self.current_voltage -= self.receptors.get_receptor_currents(self.dt, self.c_m);";
+        let iteration_with_neurotransmitter_function = match &self.on_electrochemical_iteration {
+            Some(val) => {
+                let iteration = generate_on_iteration(val);
+                let iteration = replace_self_var(iteration, "input_current", "input_current");
+                let iteration = replace_self_var(iteration, "t", "t");
 
-        let iteration_with_neurotransmitter_body = format!(
-            "\t{}\n\t{}\n\t{}\n\t{}\n\t{}\n\t{}",
-            receptors_update,
-            receptors_set_current,
-            generate_on_iteration(&self.on_iteration),
-            update_with_receptor_current,
-            handle_neurotransmitter_conc,
-            handle_spiking_call,
-        );
+                // let re = Regex::new(r"self.receptors\.update_receptor_kinetics\([^,]+,\s*[^)]+\)").unwrap();
 
-        let iteration_with_neurotransmitter_function = format!(
-            "{}\n{}\n}}", 
-            iteration_with_neurotransmitter_header,
-            iteration_with_neurotransmitter_body,
-        );
+                // let iteration = re.replace_all(&iteration, receptors_update).to_string();
+
+                // let re = Regex::new(r"self.receptors\.set_receptor_currents\([^,]+,\s*[^)]+\)").unwrap();
+
+                // let iteration = re.replace_all(&iteration, receptors_set_current).to_string();
+
+                // let re = Regex::new(r"self.receptors\.get_receptor_currents\([^,]+,\s*[^)]+\)").unwrap();
+
+                // let iteration = re.replace_all(&iteration, receptors_get_current).to_string();
+
+                let iteration = replace_self_var(
+                    iteration, 
+                    "synaptic_neurotransmitters.apply_t_changes()", 
+                    handle_neurotransmitter_conc,
+                );
+
+                let iteration_body = format!(
+                    "{}\n{}",
+                    iteration,
+                    handle_spiking_call,
+                );
+
+                format!(
+                    "{}\n{}\n}}",
+                    iteration_with_neurotransmitter_header,
+                    iteration_body,
+                )
+            },
+            None => {
+                let update_with_receptor_current = format!(
+                    "self.current_voltage -= {};",
+                    receptors_get_current,
+                );
+        
+                let iteration_with_neurotransmitter_body = format!(
+                    "\t{};\n\t{};\n\t{}\n\t{}\n\t{}\n\t{}",
+                    receptors_update,
+                    receptors_set_current,
+                    generate_on_iteration(&self.on_iteration),
+                    update_with_receptor_current,
+                    handle_neurotransmitter_conc,
+                    handle_spiking_call,
+                );
+
+                format!(
+                    "{}\n{}\n}}", 
+                    iteration_with_neurotransmitter_header,
+                    iteration_with_neurotransmitter_body,
+                )
+            }
+        };
 
         let impl_header = format!(
             "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> {}<T, R> {{", 
@@ -676,16 +728,27 @@ fn parse_receptor_params_def(pair: Pair<'_, Rule>) -> (String, Ast) {
     )
 }
 
-fn parse_on_iteration(pair: Pair<'_, Rule>) -> (String, Ast) {
+fn parse_iteration_internals(pair: Pair<'_, Rule>) -> Ast {
     let inner_rules = pair.into_inner();
 
+    Ast::OnIteration(
+        inner_rules
+        .map(|i| parse_declaration(i))
+        .collect::<Vec<Ast>>()
+    )
+}
+
+fn parse_on_iteration(pair: Pair<'_, Rule>) -> (String, Ast) {
     (
         String::from("on_iteration"),
-        Ast::OnIteration(
-            inner_rules
-            .map(|i| parse_declaration(i))
-            .collect::<Vec<Ast>>()
-        )
+        parse_iteration_internals(pair)
+    )
+}
+
+fn parse_on_electrochemical_iteration(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("on_electrochemical_iteration"),
+        parse_iteration_internals(pair)
     )
 }
 
@@ -801,7 +864,10 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             },
             Rule::receptors_param_def => {
                 parse_receptor_params_def(pair)
-            }
+            },
+            Rule::on_electrochemical_iteration_def => {
+                parse_on_electrochemical_iteration(pair)
+            },
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
 
@@ -834,10 +900,8 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     
     let on_spike = definitions.remove("on_spike");
     let ion_channels = definitions.remove("ion_channels");
-    let receptors = match definitions.remove("receptors_param_def") {
-        Some(val) => val,
-        None => Ast::TypeDefinition(String::from("DefaultReceptors")),
-    };
+    let receptors = definitions.remove("receptors_param_def");
+    let on_electrochemical_iteration = definitions.remove("on_electrochemical_iteration");
 
     Ok(
         NeuronDefinition {
@@ -847,6 +911,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             on_iteration,
             on_spike,
             ion_channels,
+            on_electrochemical_iteration,
             receptors,
         }
     )
@@ -899,6 +964,16 @@ impl IonChannelDefinition {
                         use_timestep = true;
                     } else if let Ast::StructFunctionCall { args, .. } = i {
                         for arg in args {
+                            if arg.generate() == "self.dt" {
+                                use_timestep = true;
+                            }
+                        }
+                    } else if let Ast::StructCall { args, .. } = i {
+                        if args.is_none() {
+                            continue;
+                        }
+
+                        for arg in args.as_ref().unwrap() {
                             if arg.generate() == "self.dt" {
                                 use_timestep = true;
                             }
@@ -1573,8 +1648,8 @@ impl ReceptorsDefinition {
         };
 
         let update_receptor_kinetics = format!(
-            "pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<{}>, dt: f32) {{
-                t_total.iter()
+            "pub fn update_receptor_kinetics(&mut self, t: &NeurotransmitterConcentrations<{}>, dt: f32) {{
+                t.iter()
                     .for_each(|(key, value)| {{
                         if let Some(receptor_type) = self.receptors.get_mut(key) {{
                             match receptor_type {{
