@@ -13,8 +13,10 @@ mod test {
 
     use nb_macro::neuron_builder;
     use crate::shared_receptors::{
-        AReceptor, BReceptor, IonoReceptor, MetaReceptor, MixedReceptors, MixedReceptorsType,
-        MixedReceptorsNeurotransmitterType, MultipleReceptors, MultipleReceptorsNeurotransmitterType, 
+        AReceptor, BReceptor, CombinedReceptor, CombinedReceptors, 
+        CombinedReceptorsNeurotransmitterType, CombinedReceptorsType, 
+        IonoReceptor, MetaReceptor, MixedReceptors, MixedReceptorsNeurotransmitterType, 
+        MixedReceptorsType, MultipleReceptors, MultipleReceptorsNeurotransmitterType, 
         MultipleReceptorsType,
     };
 
@@ -56,6 +58,17 @@ mod test {
             dv/dt = (v - e) + i
             v = (modifier * -receptors.get_receptor_currents(dt, c_m)) + v
             synaptic_neurotransmitters.apply_t_changes()
+    [end]
+
+    [neuron]
+        type: CombinedIntegrateAndFire
+        receptors: CombinedReceptors
+        vars: e = 0, v_reset = -75, v_th = -55
+        on_spike: 
+            v = v_reset
+        spike_detection: v >= v_th
+        on_iteration:
+            dv/dt = (v - e) + i
     [end]
     "#);
 
@@ -277,5 +290,85 @@ mod test {
         }
 
         assert!(total_spikes1 > total_spikes2);
+    }
+
+    #[test]
+    fn test_combined_receptors() {
+        for t in [0., 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.] {
+            let mut to_test: CombinedIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor> =
+                CombinedIntegrateAndFire::default();
+            let mut ref_neuron: MultiIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor> =
+                MultiIntegrateAndFire::default();
+
+            to_test.dt = 1.;
+            ref_neuron.dt = 1.;
+
+            to_test.receptors.insert(
+                CombinedReceptorsNeurotransmitterType::Combined, 
+                CombinedReceptorsType::Combined(CombinedReceptor::default())
+            ).unwrap();
+
+            ref_neuron.receptors.insert(
+                MultipleReceptorsNeurotransmitterType::A,
+                MultipleReceptorsType::A(AReceptor { g: 2., ..AReceptor::default() }),
+            ).unwrap();
+            ref_neuron.receptors.insert(
+                MultipleReceptorsNeurotransmitterType::B,
+                MultipleReceptorsType::B(BReceptor { g: 1., ..BReceptor::default() }),
+            ).unwrap();
+
+            let to_test_conc = HashMap::from([
+                (CombinedReceptorsNeurotransmitterType::Combined, t),
+            ]);
+
+            let ref_conc = HashMap::from([
+                (MultipleReceptorsNeurotransmitterType::A, t),
+                (MultipleReceptorsNeurotransmitterType::B, t),
+            ]);
+
+            for _ in 0..1000 {
+                let is_spiking1 = to_test.iterate_with_neurotransmitter_and_spike(
+                    0.,
+                    &to_test_conc,
+                );
+                let is_spiking2 = ref_neuron.iterate_with_neurotransmitter_and_spike(
+                    0.,
+                    &ref_conc
+                );
+
+                // assert!(
+                //     to_test.receptors.get(&CombinedReceptorsNeurotransmitterType::Combined).unwrap().get_r() ==
+                //     to_test.receptors.get(&CombinedReceptorsNeurotransmitterType::Combined).unwrap().get_r() ==
+                //     ref_neuron.receptors.get(&MultipleReceptorsNeurotransmitterType::A).unwrap().get_r() ==
+                //     ref_neuron.receptors.get(&MultipleReceptorsNeurotransmitterType::B).unwrap().get_r()
+                // );
+
+                #[allow(irrefutable_let_patterns)]
+                if let CombinedReceptorsType::Combined(receptor) = to_test.receptors.get(&CombinedReceptorsNeurotransmitterType::Combined).unwrap() {
+                    assert_eq!(receptor.r1.get_r(), t);
+                }
+                #[allow(irrefutable_let_patterns)]
+                if let CombinedReceptorsType::Combined(receptor) = to_test.receptors.get(&CombinedReceptorsNeurotransmitterType::Combined).unwrap() {
+                    assert_eq!(receptor.r2.get_r(), t);
+                }
+                if let MultipleReceptorsType::A(receptor) = ref_neuron.receptors.get(&MultipleReceptorsNeurotransmitterType::A).unwrap() {
+                    assert_eq!(receptor.r.get_r(), t);
+                }
+                if let MultipleReceptorsType::B(receptor) = ref_neuron.receptors.get(&MultipleReceptorsNeurotransmitterType::B).unwrap() {
+                    assert_eq!(receptor.r.get_r(), t);
+                }
+
+                assert_eq!(is_spiking1, is_spiking2);
+
+                if to_test.current_voltage.is_finite() && ref_neuron.current_voltage.is_finite() {
+                    assert!(
+                        ((to_test.current_voltage - ref_neuron.current_voltage) / ref_neuron.current_voltage).abs() < 0.01,
+                        "{} != {}",
+                        to_test.current_voltage,
+                        ref_neuron.current_voltage,
+                    );
+                }
+            }
+        }
     }
 }
