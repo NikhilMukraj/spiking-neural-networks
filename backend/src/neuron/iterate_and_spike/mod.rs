@@ -713,6 +713,44 @@ impl<T: ReceptorKinetics> XReceptor<T> {
     }
 }
 
+/// An encapsulation for necessary receptor traits
+pub trait Receptors {
+    type T: ReceptorKinetics;
+    type N: NeurotransmitterType;
+    type R;
+
+    /// Updates the receptor gating values of all the inserted receptors
+    fn update_receptor_kinetics(
+        &mut self,
+        t_total: &NeurotransmitterConcentrations<Self::N>,
+        dt: f32,
+    );
+    /// Retrieves a reference to a receptor for the given neurotransmitter
+    fn get(&self, neurotransmitter_type: &Self::N) -> Option<&Self::R>;
+    /// Retrieves a mutable reference to a receptor for the given neurotransmitter
+    fn get_mut(&mut self, neurotransmitter_type: &Self::N) -> Option<&mut Self::R>;
+    /// Returns how many receptors are present
+    fn len(&self) -> usize;
+    /// Returns whether receptors are present
+    fn is_empty(&self) -> bool;
+    /// Inserts a new receptor and checks that it is of the correct neurotransmitter and receptor type
+    fn insert(
+        &mut self,
+        neurotransmitter_type: Self::N,
+        receptor_type: Self::R,
+    ) -> Result<(), ReceptorNeurotransmitterError>;
+    /// Removes a given receptor and returns it if the receptor was present
+    fn remove(&mut self, neurotransmitter_type: Self::N) -> Option<Self::R>;
+}
+
+/// An encapsulation of behaviors for receptors with ionotropic mechanisms
+pub trait IonotropicReception: Receptors {
+    /// Sets the receptor currents given a voltage and timestep
+    fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32);
+    /// Gets the currents given a timestep and capacitance
+    fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32;
+}
+
 #[derive(Debug, Clone)]
 pub enum DefaultReceptorsType<T: ReceptorKinetics> {
     X(XReceptor<T>),
@@ -723,8 +761,12 @@ pub struct DefaultReceptors<T: ReceptorKinetics> {
     receptors: HashMap<DefaultReceptorsNeurotransmitterType, DefaultReceptorsType<T>>,
 }
 
-impl<T: ReceptorKinetics> DefaultReceptors<T> {
-    pub fn update_receptor_kinetics(
+impl<T: ReceptorKinetics> Receptors for DefaultReceptors<T> {
+    type T = T;
+    type N = DefaultReceptorsNeurotransmitterType;
+    type R = DefaultReceptorsType<T>;
+
+    fn update_receptor_kinetics(
         &mut self,
         t_total: &NeurotransmitterConcentrations<DefaultReceptorsNeurotransmitterType>,
         dt: f32,
@@ -740,43 +782,29 @@ impl<T: ReceptorKinetics> DefaultReceptors<T> {
         });
     }
 
-    pub fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {
-        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X) {
-            receptor.iterate(current_voltage, dt);
-        }
-    }
-
-    pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
-        let mut total = 0.;
-        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
-            total += receptor.current;
-        };
-        total * (dt / c_m)
-    }
-
-    pub fn get(
+    fn get(
         &self,
         neurotransmitter_type: &DefaultReceptorsNeurotransmitterType,
     ) -> Option<&DefaultReceptorsType<T>> {
         self.receptors.get(neurotransmitter_type)
     }
 
-    pub fn get_mut(
+    fn get_mut(
         &mut self,
         neurotransmitter_type: &DefaultReceptorsNeurotransmitterType,
     ) -> Option<&mut DefaultReceptorsType<T>> {
         self.receptors.get_mut(neurotransmitter_type)
     }
 
-    pub fn len(&self) -> usize {
+    fn len(&self) -> usize {
         self.receptors.len()
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.receptors.is_empty()
     }
 
-    pub fn insert(
+    fn insert(
         &mut self,
         neurotransmitter_type: DefaultReceptorsNeurotransmitterType,
         receptor_type: DefaultReceptorsType<T>,
@@ -784,6 +812,26 @@ impl<T: ReceptorKinetics> DefaultReceptors<T> {
         self.receptors.insert(neurotransmitter_type, receptor_type);
 
         Ok(())
+    }
+
+    fn remove(&mut self, neurotransmitter_type: DefaultReceptorsNeurotransmitterType) -> Option<DefaultReceptorsType<T>> {
+        self.receptors.remove(&neurotransmitter_type)
+    }
+}
+
+impl<T: ReceptorKinetics> IonotropicReception for DefaultReceptors<T> {
+    fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {
+        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X) {
+            receptor.iterate(current_voltage, dt);
+        }
+    }
+
+    fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
+        let mut total = 0.;
+        if let Some(DefaultReceptorsType::X(receptor)) = self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+            total += receptor.current;
+        };
+        total * (dt / c_m)
     }
 }
 
