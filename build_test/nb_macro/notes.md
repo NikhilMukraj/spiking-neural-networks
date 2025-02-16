@@ -64,3 +64,4 @@
 - [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] gpu implementations
+- [ ] more descriptive error handling
