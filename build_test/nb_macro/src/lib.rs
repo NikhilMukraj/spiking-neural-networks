@@ -434,12 +434,15 @@ impl NeuronDefinition {
 
         let neurotransmitter_kind = format!("{}NeurotransmitterType", receptors_name);
 
-        let mut imports = vec![format!(
-            "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
-            neurotransmitter_kinetics,
-            receptor_kinetics,
-        )];
-
+        let mut imports = vec![
+            format!(
+                "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
+                neurotransmitter_kinetics,
+                receptor_kinetics,
+            ),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::Receptors;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::IonotropicReception;"),
+        ];
 
         if self.receptors.is_none() {
             imports.push(
@@ -1406,14 +1409,30 @@ impl ReceptorKineticsDefinition {
 struct ReceptorsDefinition {
     type_name: Ast,
     top_level_vars: Option<Ast>,
-    blocks: Vec<(Ast, Ast, Ast)>,
+    blocks: Vec<(Ast, Ast, Ast, Ast)>,
+}
+
+fn parse_receptor_vars_def(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let inner_rules = pair.into_inner();
+
+    let assignments: Vec<Ast> = inner_rules 
+        .map(|i| {
+            Ast::Name(String::from(i.as_str()))
+        })
+        .collect(); 
+
+
+    (
+        String::from("receptors_var_def"),
+        Ast::VariablesAssignments(assignments),
+    )
 }
 
 fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
     // hashmap for top level vars and type name and nested hashmap for tuples in generate function 
 
     let mut definitions: HashMap<String, Ast> = HashMap::new();
-    let mut blocks: Vec<(Ast, Ast, Ast)> = vec![];
+    let mut blocks: Vec<(Ast, Ast, Ast, Ast)> = vec![];
 
     for pair in pairs {
         match pair.as_rule() {
@@ -1460,6 +1479,9 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
                         Rule::on_iteration_def => {
                             parse_on_iteration(inner_pair)
                         },
+                        Rule::receptor_vars_def => {
+                            parse_receptor_vars_def(inner_pair)
+                        }
                         definition => unreachable!("Unexpected definition: {:#?}", definition)
                     };
 
@@ -1484,12 +1506,19 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
                         return Err(Error::new(ErrorKind::InvalidData, "Missing on iteration definition"))
                     }
                 };
+                let receptors_var_def_block = match new_block.remove("receptors_var_def") {
+                    Some(val) => val,
+                    None => {
+                        Ast::VariablesAssignments(vec![Ast::Name(String::from("r"))])
+                    }
+                };
 
                 blocks.push(
                     (
                         neurotransmitter_block,
                         vars_block,
                         on_iteration_block,
+                        receptors_var_def_block,
                     )
                 );
             }
@@ -1520,10 +1549,11 @@ impl ReceptorsDefinition {
     // then move to metabotropic
     // should have simple way to edit gmax when receptors struct is initialized
     fn to_code(&self) -> (Vec<String>, String) {
-        let imports = vec![
+        let mut imports = vec![
             String::from("use std::collections::HashMap;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterConcentrations;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::Receptors;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterType;"),
             String::from("use spiking_neural_networks::error::ReceptorNeurotransmitterError;"),
         ];
@@ -1548,14 +1578,18 @@ impl ReceptorsDefinition {
         let mut receptor_names = vec![];
         let mut has_current = vec![];
 
-        for (type_name, vars_def, on_iteration) in &self.blocks {
+        for (type_name, vars_def, on_iteration, receptor_vars) in &self.blocks {
             receptor_names.push(type_name.generate());
 
             let mut vars = generate_fields(vars_def);
             let mut defaults = generate_defaults(vars_def);
 
-            vars.push(String::from("pub r: T"));
-            defaults.push(String::from("r: T::default()"));
+            if let Ast::VariablesAssignments(inner_vars) = receptor_vars {
+                for var in inner_vars {
+                    vars.push(format!("pub {}: T", var.generate().replace("self.", "")));
+                    defaults.push(format!("{}: T::default()", var.generate().replace("self.", "")));
+                }
+            }
 
             if vars.contains(&String::from("pub current: f32")) {
                 has_current.push(type_name.generate());
@@ -1580,27 +1614,46 @@ impl ReceptorsDefinition {
                     iterate_block = replace_self_var(iterate_block, &i, &format!("*{}", i));
                 }
             }
-            iterate_block = replace_self_var(iterate_block, "r", "self.r.get_r()");
+
+            if let Ast::VariablesAssignments(inner_vars) = receptor_vars {
+                for var in inner_vars {
+                    iterate_block = replace_self_var(
+                        iterate_block, 
+                        &var.generate().replace("self.", ""), 
+                        &format!("{}.get_r()", var.generate()),
+                    );
+                }
+            }
+            
             iterate_block = replace_self_var(iterate_block, "current_voltage", "current_voltage");
+
+            let mut apply_r_changes = vec![];
+            if let Ast::VariablesAssignments(inner_vars) = receptor_vars {
+                for var in inner_vars {
+                    apply_r_changes.push(format!("{}.apply_r_change(t, dt);", var.generate()))
+                }
+            }
 
             let receptor_impl = if !has_top_level_vars {
                 format!(
                     "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
-                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
+                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ {} }}
                         fn iterate(&mut self, current_voltage: f32, dt: f32) {{ {} }}
                     }}
                     ",
                     type_name.generate(),
+                    apply_r_changes.join("\n"),
                     iterate_block,
                 )
             } else {
                 format!(
                     "impl<T: ReceptorKinetics> {}Receptor<T> {{ 
-                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ self.r.apply_r_change(t, dt); }}
+                        fn apply_r_change(&mut self, t: f32, dt: f32) {{ {} }}
                         fn iterate(&mut self, current_voltage: f32, dt: f32, {}) {{ {} }}
                     }}
                     ",
                     type_name.generate(),
+                    apply_r_changes.join("\n"),
                     generate_fields_as_args(self.top_level_vars.as_ref().unwrap()).join(", "),
                     iterate_block,
                 )
@@ -1648,7 +1701,7 @@ impl ReceptorsDefinition {
         };
 
         let update_receptor_kinetics = format!(
-            "pub fn update_receptor_kinetics(&mut self, t: &NeurotransmitterConcentrations<{}>, dt: f32) {{
+            "fn update_receptor_kinetics(&mut self, t: &NeurotransmitterConcentrations<{}>, dt: f32) {{
                 t.iter()
                     .for_each(|(key, value)| {{
                         if let Some(receptor_type) = self.receptors.get_mut(key) {{
@@ -1689,7 +1742,7 @@ impl ReceptorsDefinition {
 
         let insert = format!(
             "
-                pub fn insert(&mut self, neurotransmitter_type: {}, receptor_type: {}Type<T>) -> Result<(), ReceptorNeurotransmitterError> {{
+                fn insert(&mut self, neurotransmitter_type: {}, receptor_type: {}Type<T>) -> Result<(), ReceptorNeurotransmitterError> {{
                     let mut is_valid = false;
 
                     {}
@@ -1725,21 +1778,29 @@ impl ReceptorsDefinition {
 
         if has_current.is_empty() {
             let receptors_impl = format!(
-                "impl<T: ReceptorKinetics> {}<T> {{
+                "impl<T: ReceptorKinetics> Receptors for {}<T> {{
+                    type T = T;
+                    type N = {};
+                    type R = {}Type<T>;
                     {}
-                    pub fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
-                    pub fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
-                    pub fn len(&self) -> usize {{\nself.receptors.len()\n}}
-                    pub fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
+                    fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
+                    fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
+                    fn len(&self) -> usize {{\nself.receptors.len()\n}}
+                    fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
+                    fn remove(&mut self, neurotransmitter_type: {}) -> Option<{}Type<T>> {{ self.receptors.remove(&neurotransmitter_type) }}
                     {}
                 }}
                 ",
+                self.type_name.generate(),
+                neurotransmitters_name,
                 self.type_name.generate(),
                 update_receptor_kinetics,
                 neurotransmitters_name,
                 self.type_name.generate(), 
                 neurotransmitters_name,
                 self.type_name.generate(), 
+                neurotransmitters_name,
+                self.type_name.generate(),
                 insert,
             );
             
@@ -1756,6 +1817,8 @@ impl ReceptorsDefinition {
                 )
             );
         }
+
+        imports.push(String::from("use spiking_neural_networks::neuron::iterate_and_spike::IonotropicReception;"));
 
         let set_receptor_currents = receptor_names.iter()
             .map(|name| 
@@ -1813,26 +1876,38 @@ impl ReceptorsDefinition {
         );
 
         let receptors_impl = format!(
-            "impl<T: ReceptorKinetics> {}<T> {{
+            "impl<T: ReceptorKinetics> Receptors for {}<T> {{
+                type T = T;
+                type N = {};
+                type R = {}Type<T>;
                 {}
-                pub fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {{\n{}\n}}
-                pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {{\n{}\n}}
-                pub fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
-                pub fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
-                pub fn len(&self) -> usize {{\nself.receptors.len()\n}}
-                pub fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
+                fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
+                fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
+                fn len(&self) -> usize {{\nself.receptors.len()\n}}
+                fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
+                fn remove(&mut self, neurotransmitter_type: {}) -> Option<{}Type<T>> {{ self.receptors.remove(&neurotransmitter_type) }}
                 {}
+            }}
+
+            impl<T: ReceptorKinetics> IonotropicReception for {}<T> {{
+                fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {{\n{}\n}}
+                fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {{\n{}\n}}
             }}
             ",
             self.type_name.generate(),
+            neurotransmitters_name,
+            self.type_name.generate(),
             update_receptor_kinetics,
+            neurotransmitters_name,
+            self.type_name.generate(), 
+            neurotransmitters_name,
+            self.type_name.generate(), 
+            neurotransmitters_name,
+            self.type_name.generate(),
+            insert,
+            self.type_name.generate(),
             set_receptor_currents,
             get_receptor_currents,
-            neurotransmitters_name,
-            self.type_name.generate(), 
-            neurotransmitters_name,
-            self.type_name.generate(), 
-            insert,
         );
 
         (
