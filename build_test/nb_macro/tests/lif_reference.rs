@@ -3,7 +3,7 @@ use spiking_neural_networks::neuron::iterate_and_spike::DefaultReceptorsNeurotra
 use spiking_neural_networks::neuron::iterate_and_spike::{
     CurrentVoltage, GapConductance, IsSpiking, IterateAndSpike, LastFiringTime,
     DefaultReceptors, NeurotransmitterConcentrations, NeurotransmitterKinetics,
-    Neurotransmitters, ReceptorKinetics, Timestep,
+    Neurotransmitters, ReceptorKinetics, Timestep, Receptors, IonotropicReception,
 };
 use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 
