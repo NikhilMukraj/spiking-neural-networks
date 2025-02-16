@@ -43,17 +43,18 @@
   - [ ] default impl trait maybe
 - [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
 - [x] ion channel update current in neuron refactor
-- [ ] replace statements should be replaced with regex that makes sure that it is the end of the variable, or just check for a space, `)`, or `;` at the end and see if that works as an acceptable delimiter
-- [ ] rename ligand gates to receptors
+- [x] replace statements should be replaced with regex that makes sure that it is the end of the variable, or just check for a space, `)`, or `;` at the end and see if that works as an acceptable delimiter
+- [x] rename ligand gates to receptors
 - [ ] receptors
-  - [ ] ionotropic receptors
-    - [ ] option to have multiple receptor values (`r1`, `r2`, etc)
-    - [ ] default ligand gated channel
+  - [x] ionotropic receptors
+    - [x] option to have multiple receptor values (`r1`, `r2`, etc)
+    - [x] default ligand gated channel
       - default operation with receptors is just to add receptor currents
       - should have option to customize receptors
-  - [ ] metabotropic receptors
-- [ ] neuronal chemical testing
-  - [ ] custom chemical on iteration
+  - [x] metabotropic receptors
+  - [ ] receptor blocks should have an arbitrary ordering between neurotransmitter defs
+- [x] neuronal chemical testing
+  - [x] custom chemical on iteration
     - need to use this if only metabotropic since it lacks set and get receptor currents
 - [ ] function definition blocks
 - [ ] spike train block
