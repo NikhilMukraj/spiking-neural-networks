@@ -117,8 +117,9 @@ ion_channel_definition = {
 neurotransmitter_kinetics_definition= {"[neurotransmitter_kinetics]" ~ NEWLINE ~ (type_def | vars_with_default_def | on_iteration_def){3,} ~ "[end]" }
 receptor_kinetics_definition = {"[receptor_kinetics]" ~ NEWLINE ~ (type_def | vars_with_default_def | on_iteration_def){3,} ~ "[end]" }
 
+receptor_vars_def = { "receptors:" ~ WHITESPACE* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ NEWLINE+ }
 receptor_block = {
-	neurotransmitter_def ~ NEWLINE* ~ vars_with_default_def ~ 
+	neurotransmitter_def ~ NEWLINE* ~ receptor_vars_def{0,1} ~ NEWLINE* ~ vars_with_default_def ~ 
 	NEWLINE* ~ on_iteration_def ~ NEWLINE*
 }
 
