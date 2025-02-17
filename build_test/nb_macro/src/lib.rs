@@ -435,14 +435,22 @@ impl NeuronDefinition {
         let neurotransmitter_kind = format!("{}NeurotransmitterType", receptors_name);
 
         let mut imports = vec![
-            format!(
-                "use spiking_neural_networks::neuron::iterate_and_spike::{{{}, {}}};",
-                neurotransmitter_kinetics,
-                receptor_kinetics,
-            ),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;"),
+            format!("use spiking_neural_networks::neuron::iterate_and_spike::{};", neurotransmitter_kinetics),
+            format!("use spiking_neural_networks::neuron::iterate_and_spike::{};", receptor_kinetics),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::Receptors;"),
-            String::from("use spiking_neural_networks::neuron::iterate_and_spike::IonotropicReception;"),
         ];
+
+        let neuron_necessary_imports = [
+            "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
+            "Timestep", "IterateAndSpike", 
+            "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
+            "NeurotransmitterConcentrations"
+        ];
+
+        for i in neuron_necessary_imports {
+            imports.push(format!("use spiking_neural_networks::neuron::iterate_and_spike::{};", i));
+        }
 
         if self.receptors.is_none() {
             imports.push(
@@ -619,18 +627,6 @@ impl NeuronDefinition {
                 let iteration = replace_self_var(iteration, "input_current", "input_current");
                 let iteration = replace_self_var(iteration, "t", "t");
 
-                // let re = Regex::new(r"self.receptors\.update_receptor_kinetics\([^,]+,\s*[^)]+\)").unwrap();
-
-                // let iteration = re.replace_all(&iteration, receptors_update).to_string();
-
-                // let re = Regex::new(r"self.receptors\.set_receptor_currents\([^,]+,\s*[^)]+\)").unwrap();
-
-                // let iteration = re.replace_all(&iteration, receptors_set_current).to_string();
-
-                // let re = Regex::new(r"self.receptors\.get_receptor_currents\([^,]+,\s*[^)]+\)").unwrap();
-
-                // let iteration = re.replace_all(&iteration, receptors_get_current).to_string();
-
                 let iteration = replace_self_var(
                     iteration, 
                     "synaptic_neurotransmitters.apply_t_changes()", 
@@ -642,6 +638,22 @@ impl NeuronDefinition {
                     iteration,
                     handle_spiking_call,
                 );
+
+                if iteration.contains("self.receptors.set_receptor_currents") || 
+                    iteration.contains("self.receptors.get_receptor_currents") {
+                    imports.push(
+                        String::from(
+                            "use spiking_neural_networks::neuron::iterate_and_spike::IonotropicReception;"
+                        )
+                    );
+                }
+                if iteration.contains("self.synaptic_neurotransmitters.apply_t_changes") {
+                    imports.push(
+                        String::from(
+                            "use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;"
+                        )
+                    );
+                }
 
                 format!(
                     "{}\n{}\n}}",
@@ -663,6 +675,17 @@ impl NeuronDefinition {
                     update_with_receptor_current,
                     handle_neurotransmitter_conc,
                     handle_spiking_call,
+                );
+
+                imports.push(
+                    String::from(
+                        "use spiking_neural_networks::neuron::iterate_and_spike::IonotropicReception;"
+                    )
+                );
+                imports.push(
+                    String::from(
+                        "use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;"
+                    )
                 );
 
                 format!(
@@ -1252,11 +1275,10 @@ fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<Neurotransmi
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
         let imports = vec![
-            String::from(
-                "use spiking_neural_networks::neuron::iterate_and_spike::{{
-                    CurrentVoltage, Timestep, IsSpiking, NeurotransmitterKinetics
-                }};"
-            )
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::CurrentVoltage;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::Timestep;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::IsSpiking;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;"),
         ];
 
         let header = format!(
@@ -2214,22 +2236,6 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
 // }
 
 fn build_function(model_description: String) -> TokenStream {
-    let iterate_and_spike_base = "use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;";
-    let neuron_necessary_imports = [
-        "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
-        "Timestep", "IterateAndSpike", 
-        "Neurotransmitters", "NeurotransmitterKinetics", "ReceptorKinetics",
-        "NeurotransmitterConcentrations"
-    ];
-    let neuron_necessary_imports = format!(
-        "
-        use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;\n
-        use spiking_neural_networks::neuron::iterate_and_spike::{{{}}};
-        ",
-        neuron_necessary_imports.join(", ")
-    );
-    let neuron_necessary_imports = format!("{}\n{}", iterate_and_spike_base, neuron_necessary_imports);
-    
     let mut imports = vec![];
     let mut code: HashMap<String, HashMap<String, String>> = HashMap::new();
     
@@ -2243,9 +2249,6 @@ fn build_function(model_description: String) -> TokenStream {
     
                         let (neuron_imports, neuron_code) = neuron_definition.to_code();
     
-                        if !imports.contains(&neuron_necessary_imports) {
-                            imports.push(neuron_necessary_imports.clone());
-                        }
                         for i in &neuron_imports {
                             if !imports.contains(i) {
                                 imports.push(i.clone());
