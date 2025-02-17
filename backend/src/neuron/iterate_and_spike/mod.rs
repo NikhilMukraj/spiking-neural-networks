@@ -740,7 +740,7 @@ pub trait Receptors {
         receptor_type: Self::R,
     ) -> Result<(), ReceptorNeurotransmitterError>;
     /// Removes a given receptor and returns it if the receptor was present
-    fn remove(&mut self, neurotransmitter_type: Self::N) -> Option<Self::R>;
+    fn remove(&mut self, neurotransmitter_type: &Self::N) -> Option<Self::R>;
 }
 
 /// An encapsulation of behaviors for receptors with ionotropic mechanisms
@@ -814,7 +814,7 @@ impl<T: ReceptorKinetics> Receptors for DefaultReceptors<T> {
         Ok(())
     }
 
-    fn remove(&mut self, neurotransmitter_type: DefaultReceptorsNeurotransmitterType) -> Option<DefaultReceptorsType<T>> {
+    fn remove(&mut self, neurotransmitter_type: &DefaultReceptorsNeurotransmitterType) -> Option<DefaultReceptorsType<T>> {
         self.receptors.remove(&neurotransmitter_type)
     }
 }
