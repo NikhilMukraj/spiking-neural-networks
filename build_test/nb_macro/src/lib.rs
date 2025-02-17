@@ -1764,7 +1764,7 @@ impl ReceptorsDefinition {
 
         let insert = format!(
             "
-                fn insert(&mut self, neurotransmitter_type: {}, receptor_type: {}Type<T>) -> Result<(), ReceptorNeurotransmitterError> {{
+                fn insert(&mut self, neurotransmitter_type: Self::N, receptor_type: Self::R) -> Result<(), ReceptorNeurotransmitterError> {{
                     let mut is_valid = false;
 
                     {}
@@ -1778,8 +1778,6 @@ impl ReceptorsDefinition {
                     Ok(())
                 }}
             ",
-            neurotransmitters_name,
-            self.type_name.generate(),
             check_receptor_neurotransmitter_type.join("\n"),
         );
  
@@ -1805,11 +1803,11 @@ impl ReceptorsDefinition {
                     type N = {};
                     type R = {}Type<T>;
                     {}
-                    fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
-                    fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
+                    fn get(&self, neurotransmitter_type: &Self::N) -> Option<&Self::R> {{\nself.receptors.get(neurotransmitter_type)\n}}
+                    fn get_mut(&mut self, neurotransmitter_type: &Self::N) -> Option<&mut Self::R> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
                     fn len(&self) -> usize {{\nself.receptors.len()\n}}
                     fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
-                    fn remove(&mut self, neurotransmitter_type: {}) -> Option<{}Type<T>> {{ self.receptors.remove(&neurotransmitter_type) }}
+                    fn remove(&mut self, neurotransmitter_type: &Self::N) -> Option<Self::R> {{ self.receptors.remove(&neurotransmitter_type) }}
                     {}
                 }}
                 ",
@@ -1817,12 +1815,6 @@ impl ReceptorsDefinition {
                 neurotransmitters_name,
                 self.type_name.generate(),
                 update_receptor_kinetics,
-                neurotransmitters_name,
-                self.type_name.generate(), 
-                neurotransmitters_name,
-                self.type_name.generate(), 
-                neurotransmitters_name,
-                self.type_name.generate(),
                 insert,
             );
             
@@ -1903,11 +1895,11 @@ impl ReceptorsDefinition {
                 type N = {};
                 type R = {}Type<T>;
                 {}
-                fn get(&self, neurotransmitter_type: &{}) -> Option<&{}Type<T>> {{\nself.receptors.get(neurotransmitter_type)\n}}
-                fn get_mut(&mut self, neurotransmitter_type: &{}) -> Option<&mut {}Type<T>> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
+                fn get(&self, neurotransmitter_type: &Self::N) -> Option<&Self::R> {{\nself.receptors.get(neurotransmitter_type)\n}}
+                fn get_mut(&mut self, neurotransmitter_type: &Self::N) -> Option<&mut Self::R> {{\nself.receptors.get_mut(neurotransmitter_type)\n}}
                 fn len(&self) -> usize {{\nself.receptors.len()\n}}
                 fn is_empty(&self) -> bool {{\nself.receptors.is_empty()\n}}
-                fn remove(&mut self, neurotransmitter_type: {}) -> Option<{}Type<T>> {{ self.receptors.remove(&neurotransmitter_type) }}
+                fn remove(&mut self, neurotransmitter_type: &Self::N) -> Option<Self::R> {{ self.receptors.remove(&neurotransmitter_type) }}
                 {}
             }}
 
@@ -1920,12 +1912,6 @@ impl ReceptorsDefinition {
             neurotransmitters_name,
             self.type_name.generate(),
             update_receptor_kinetics,
-            neurotransmitters_name,
-            self.type_name.generate(), 
-            neurotransmitters_name,
-            self.type_name.generate(), 
-            neurotransmitters_name,
-            self.type_name.generate(),
             insert,
             self.type_name.generate(),
             set_receptor_currents,
