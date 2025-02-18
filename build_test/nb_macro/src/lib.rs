@@ -303,6 +303,95 @@ impl Ast {
             }
         }
     }
+
+    #[cfg(gpu)]
+    fn generate_non_kernel_gpu(&self) -> String {
+        match &self {
+            Ast::Number(n) => {
+                if n % 1. != 0. {
+                    n.to_string()
+                } else {
+                    format!("{}.0", n)
+                }
+            },
+            Ast::Bool(val) => val.to_string(),
+            Ast::Name(name) => {
+                if name == "v" {
+                    String::from("current_voltage")
+                } else if name == "i" {
+                    String::from("input_current")
+                } else {
+                    name.to_string()
+                }
+            },
+            Ast::UnaryMinus(expr) => format!("-{}", expr.generate()),
+            Ast::NotOperator(expr) => format!("!{}", expr.generate()),
+            Ast::BinOp { lhs, op, rhs } => {
+                match op {
+                    Op::Add => format!("({} + {})", lhs.generate(), rhs.generate()),
+                    Op::Subtract => format!("({} - {})", lhs.generate(), rhs.generate()),
+                    Op::Multiply => format!("({} * {})", lhs.generate(), rhs.generate()),
+                    Op::Divide => format!("({} / {})", lhs.generate(), rhs.generate()),
+                    Op::Power => format!("pow({}, {}))", lhs.generate(), rhs.generate()),
+                    Op::Equal => format!("{} == {}", lhs.generate(), rhs.generate()),
+                    Op::NotEqual => format!("{} != {}", lhs.generate(), rhs.generate()),
+                    Op::GreaterThan => format!("{} > {}", lhs.generate(), rhs.generate()),
+                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.generate(), rhs.generate()),
+                    Op::LessThan => format!("{} < {}", lhs.generate(), rhs.generate()),
+                    Op::LessThanOrEqual => format!("{} <= {}", lhs.generate(), rhs.generate()),
+                    Op::And => format!("{} && {}", lhs.generate(), rhs.generate()),
+                    Op::Or => format!("{} || {}", lhs.generate(), rhs.generate()),
+                }
+            }
+            Ast::Function { name, args } => {
+                format!(
+                    "{}({})",
+                    name, 
+                    args.iter()
+                        .map(|i| i.generate())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    )
+            },
+            Ast::StructCall { name, attribute, args } => {
+                match args {
+                    Some(args) => {
+                        format!(
+                            "{}_{}({})", 
+                            name, 
+                            attribute,
+                            args.iter()
+                                .map(|i| i.generate())
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        )
+                    },
+                    None => {
+                        format!("{}_{}", name, attribute)
+                    }
+                }
+            }
+            Ast::EqAssignment { name, expr } => {
+                let name = if name == "v" {
+                    String::from("current_voltage")
+                } else {
+                    name.to_string()
+                };
+
+                format!("{} = {};", name, expr.generate())
+            },
+            Ast::DiffEqAssignment { name, expr } => {
+                format!("d{} = ({}) * dt;", name, expr.generate())
+            },
+            Ast::OnIteration(assignments) => {
+                assignments.iter()
+                    .map(|i| i.generate())
+                    .collect::<Vec<String>>()
+                    .join("\n\t\t")
+            },
+            ast => panic!("Non kernel GPU code for {:#?} is not implemented", ast)
+        }
+    }
 }
 
 fn add_indents(input: &str, indent: &str) -> String {
@@ -1272,6 +1361,62 @@ fn generate_neurotransmitter_kinetics(pairs: Pairs<Rule>) -> Result<Neurotransmi
     Ok(NeurotransmitterKineticsDefinition { type_name, vars, on_iteration })    
 }
 
+#[cfg(gpu)]
+fn generate_non_kernel_gpu_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "float",
+                            NumOrBool::Bool(_) => "uint",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!("{} {}", type_name, var_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(gpu)]
+fn generate_non_kernel_gpu_on_iteration(on_iteration: &Ast) -> String {
+    let on_iteration_assignments = on_iteration.generate_non_kernel_gpu();
+
+    let changes = match on_iteration {
+        Ast::OnIteration(assignments) => {
+            let mut assignments_strings = vec![];
+
+            for i in assignments {
+                if let Ast::DiffEqAssignment { name, .. } =  i {
+                    let change_string = if name == "v" {
+                        "current_voltage += dv;".to_string()
+                    } else {
+                        format!("{} += d{}", name, name)
+                    };
+
+                    assignments_strings.push(change_string);
+                }
+            }
+
+            assignments_strings.join("\t\n")
+        },
+        _ => panic!("Expected on iteration AST")
+    };
+
+    format!("{}\n{}\n", on_iteration_assignments, changes)
+}
+
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
         let imports = vec![
@@ -1342,6 +1487,24 @@ impl NeurotransmitterKineticsDefinition {
                 set_t,
             )
         )
+    }
+
+    #[cfg(gpu)]
+    fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let function_header = format!(
+            "float {}({}) {{", 
+            self.type_name.generate(),
+            generate_non_kernel_gpu_args(&self.vars).join(", "),
+        );
+
+        let body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
+
+        let function = format!("{}\n{}}}", function_header, body);
+
+        // need to import correct opencl3 gpu types
+        // need to also impl neurotransmitterkineticsgpu for given kinetics 
+
+        (vec![], function)
     }
 }
 
