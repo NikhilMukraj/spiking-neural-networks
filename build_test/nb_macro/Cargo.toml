@@ -15,5 +15,12 @@ pest = "2.6"
 pest_derive = "2.6"
 regex = "1.10.6"
 
+[features]
+gpu = []
+default = ["gpu"]
+
+[dev-dependecies]
+opencl3 = "0.9.5"
+
 [lib]
 proc-macro = true
