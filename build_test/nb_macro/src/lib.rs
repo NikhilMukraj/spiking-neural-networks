@@ -1642,7 +1642,23 @@ impl NeurotransmitterKineticsDefinition {
 
         // format fns together and get imports
 
-        (vec![], function);
+        (
+            vec![], 
+            format!("
+                    {}
+                    {}
+                    {}
+                    {}
+                    {}
+                }} 
+                ",
+                impl_header,
+                get_function,
+                set_function,
+                attribute_names_functions,
+                get_update_function,
+            )
+        )
     }
 }
 
