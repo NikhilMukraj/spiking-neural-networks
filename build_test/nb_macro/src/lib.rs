@@ -1493,6 +1493,19 @@ fn generate_gpu_attributes_vec(vars: &Ast) -> Vec<String> {
     )
 }
 
+#[cfg(gpu)]
+fn generate_gpu_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+    generate_non_kernel_gpu_matching(
+        vars, 
+        |var_name, _| { 
+            format!(
+                r#"(String::from("neurotransmitters${}")"#,
+                var_name,
+            )
+        }
+    )
+}
+
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
         let imports = vec![
@@ -1581,7 +1594,7 @@ impl NeurotransmitterKineticsDefinition {
         // need to also impl neurotransmitterkineticsgpu for given kinetics 
 
         let impl_header = format!("impl NeurotransmitterKineticsGPU for {} {{", self.type_name.generate());
-        let get_attribute_header = String::from("fn get_attribute(&self, value: &str) -> Option<BufferType> {{");
+        let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
             "match value {{ {},\n_ => None", 
             generate_gpu_attribute_matching(&self.vars).join(",\n")
@@ -1589,7 +1602,7 @@ impl NeurotransmitterKineticsDefinition {
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
 
-        let set_attribute_header = String::from("fn set_attribute(&mut self, attribute: &str, value: BufferType) {{");
+        let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
         let set_attribute_body = format!(
             "match attribute {{ {},\n_ => unreachable!()",
             generate_gpu_attribute_setting(&self.vars).join(",\n")
@@ -1597,14 +1610,39 @@ impl NeurotransmitterKineticsDefinition {
 
         let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
 
-        let vector_return_header = String::from("fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {");
+        let vector_return_header = "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {";
         let vector_return_function = format!(
-            r#"{}\vec![{}]\n}}"#, 
+            "{}\\vec![{}]\n}}", 
             vector_return_header
             generate_gpu_attributes_vec(&self.vars).join(",\n"),
         );
 
-        (vec![], function)
+        let attribute_names_functions = r#"
+            fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
+                HashSet::from_iter(
+                    Self::get_attribute_names_as_vector()
+                )
+            }
+
+            fn get_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)> {
+                Self::get_attribute_names_as_vector().into_iter().collect()
+            }
+            "#;
+
+        let mandatory_args = r#"String::from("current_voltage"), String::from("is_spiking"), String::from("dt")"#;
+
+        let get_update_function_header = "fn get_update_function() -> ((Vec<String>, Vec<String>), String) {";
+        let get_update_function = format!(
+            "{}\n((vec![{}], [vec![{}]), String::from(\"{}\"))\n}}",
+            get_update_function_header,
+            mandatory_args,
+            generate_gpu_attributes_vec_no_types(&self.vars).join(","),
+            function,
+        );
+
+        // format fns together and get imports
+
+        (vec![], function);
     }
 }
 
