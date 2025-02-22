@@ -23,7 +23,7 @@ c_m = 100
 
 trials = 10
 
-filename = "d2_inh_vary_glu_gaba_cc_with_weights.json"
+filename = "d2_inh_vary_gmax_with_weights.json"
 
 [variables]
 spike_train_to_exc = [0, 4]
