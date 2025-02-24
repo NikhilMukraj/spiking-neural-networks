@@ -19,7 +19,7 @@ regex = "1.10.6"
 default = ["gpu"]
 gpu = ["spiking_neural_networks/gpu"]
 
-[dev-dependecies]
+[dev-dependencies]
 opencl3 = "0.9.5"
 
 [lib]

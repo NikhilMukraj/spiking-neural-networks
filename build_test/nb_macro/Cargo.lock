@@ -178,6 +178,7 @@ name = "nb_macro"
 version = "0.1.0"
 dependencies = [
  "lazy_static",
+ "opencl3",
  "pest",
  "pest_derive",
  "proc-macro2",
