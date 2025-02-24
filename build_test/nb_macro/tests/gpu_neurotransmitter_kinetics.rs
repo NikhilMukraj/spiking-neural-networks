@@ -2,6 +2,17 @@
 #[cfg(test)]
 mod test {
     use nb_macro::neuron_builder; 
+    use spiking_neural_networks::{
+        error::SpikingNeuralNetworksError,
+        neuron::iterate_and_spike::{
+            Neurotransmitters, DefaultReceptorsNeurotransmitterType
+        }
+    };
+    use opencl3::{
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
+        context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
+    };
+    
 
     neuron_builder!(r#"
     [neurotransmitter_kinetics]
@@ -19,4 +30,275 @@ mod test {
             t = min(max(t, 0), t_max)
     [end]
     "#);
+
+    type GridType = Vec<Vec<Neurotransmitters<DefaultReceptorsNeurotransmitterType, BasicNeurotransmitterKinetics>>>;
+
+    #[test]
+    pub fn test_empty_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let neurotransmitters_grid: GridType = vec![];
+
+        let gpu_conversion = Neurotransmitters::convert_to_gpu(
+            &neurotransmitters_grid,
+            &context,
+            &queue,
+        )?;
+
+        let mut cpu_conversion = neurotransmitters_grid.clone();
+        Neurotransmitters::convert_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            &queue,
+            0,
+            0,
+        )?;
+
+        for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
+            for (actual, expected) in row1.iter().zip(row2.iter()) {
+                assert_eq!(
+                    actual, 
+                    expected,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
+        let mut neurotransmitters1 = Neurotransmitters::default();
+        neurotransmitters1.insert(
+            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics {
+                t_max: 0.5,
+                ..BasicNeurotransmitterKinetics::default()
+            }
+        );
+        let mut neurotransmitters2 = Neurotransmitters::default();
+        neurotransmitters2.insert(
+            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics {
+                c: 0.02,
+                ..BasicNeurotransmitterKinetics::default()
+            }
+        );
+        let mut neurotransmitters3 = Neurotransmitters::default();
+        neurotransmitters3.insert(
+            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics::default()
+        );
+        neurotransmitters3.insert(
+            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics::default()
+        );
+        let neurotransmitters4 = Neurotransmitters::default();
+
+        let neurotransmitters_grid = vec![
+            vec![neurotransmitters1, neurotransmitters2, neurotransmitters3, neurotransmitters4]
+        ];
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let gpu_conversion = Neurotransmitters::convert_to_gpu(
+            &neurotransmitters_grid,
+            &context,
+            &queue,
+        )?;
+
+        let mut cpu_conversion: GridType = vec![
+            vec![
+                Neurotransmitters::default(), Neurotransmitters::default(), 
+                Neurotransmitters::default(), Neurotransmitters::default()
+            ]
+        ];
+        Neurotransmitters::convert_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            &queue,
+            1,
+            4,
+        )?;
+
+        for (row1, row2) in cpu_conversion.iter().zip(neurotransmitters_grid.iter()) {
+            for (actual, expected) in row1.iter().zip(row2.iter()) {
+                assert_eq!(
+                    actual, 
+                    expected,
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    // test 2x3 grid
+
+    // type GetGPUAttribute = dyn Fn(&HashMap<String, BufferGPU>, &CommandQueue, &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError>;
+
+    // fn iterate_neuron(
+    //     gpu_get_attribute: &GetGPUAttribute,
+    //     electrical: bool,
+    // ) -> Result<Vec<f32>, SpikingNeuralNetworksError> {
+    //     let iterations = 1000;
+        
+    //     let mut neuron = PoissonNeuron::default_impl();
+    //     neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
+    //     neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
+    //     neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
+
+    //     neuron.set_dt(1.);
+
+    //     neuron.chance_of_firing = 0.05;
+
+    //     let cell_grid = vec![vec![neuron]];
+
+    //     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+    //         .expect("Could not get GPU devices")
+    //         .first()
+    //         .expect("No GPU found");
+    //     let device = Device::new(device_id);
+
+    //     let context = match Context::from_device(&device) {
+    //         Ok(value) => value,
+    //         Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),
+    //     };
+
+    //     let queue =  match CommandQueue::create_default_with_properties(
+    //             &context, 
+    //             CL_QUEUE_PROFILING_ENABLE,
+    //             CL_QUEUE_SIZE,
+    //         ) {
+    //             Ok(value) => value,
+    //             Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),
+    //         };
+
+    //     let iterate_kernel = if electrical {
+    //         SpikeTrainType::spike_train_electrical_kernel(&context)?
+    //     } else {
+    //         SpikeTrainType::spike_train_electrochemical_kernel(&context)?
+    //     };
+
+    //     let gpu_cell_grid = SpikeTrainType::convert_electrochemical_to_gpu(&cell_grid, &context, &queue)?;
+
+    //     let index_to_position_buffer = unsafe {
+    //         create_and_write_buffer(&context, &queue, 1, 0.0)?
+    //     };
+
+    //     let mut gpu_tracker = vec![];
+
+    //     for _ in 0..iterations {
+    //         let iterate_event = unsafe {
+    //             let mut kernel_execution = ExecuteKernel::new(&iterate_kernel.kernel);
+
+    //             let mut counter = 0;
+
+    //             for i in iterate_kernel.argument_names.iter() {
+    //                 if i == "number_of_types" {
+    //                     kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
+    //                 } else if i == "index_to_position" {
+    //                     kernel_execution.set_arg(&index_to_position_buffer);
+    //                 } else if i == "skip_index" { 
+    //                     kernel_execution.set_arg(&0);
+    //                 } else if i == "neuro_flags" {
+    //                     match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
+    //                         BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+    //                         _ => unreachable!("Could not retrieve neurotransmitter flags"),
+    //                     };
+    //                 } else {
+    //                     match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
+    //                         BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+    //                         BufferGPU::OptionalUInt(buffer) => kernel_execution.set_arg(buffer),
+    //                         BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+    //                     };
+    //                 }
+    //                 counter += 1;
+    //             }
+
+    //             assert_eq!(
+    //                 counter,
+    //                 kernel_execution.num_args, 
+    //                 "counter: {} != num_args: {}",
+    //                 counter,
+    //                 kernel_execution.num_args,
+    //             );
+
+    //             match kernel_execution.set_global_work_size(1)
+    //                 .enqueue_nd_range(&queue) {
+    //                     Ok(value) => value,
+    //                     Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::QueueFailure)),
+    //                 }
+    //         };
+
+    //         match iterate_event.wait() {
+    //             Ok(_) => {},
+    //             Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+    //         };
+
+    //         gpu_get_attribute(&gpu_cell_grid, &queue, &mut gpu_tracker)?;
+    //     }
+
+    //     Ok(gpu_tracker)
+    // }
+
+    // fn gpu_get_ampa_neurotransmitter(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+    //     match gpu_cell_grid.get("neurotransmitters$t").unwrap() {
+    //         BufferGPU::Float(buffer) => {
+    //             let mut read_vector = vec![0., 0., 0., 0.];
+
+    //             let read_event = unsafe {
+    //                 match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+    //                     Ok(value) => value,
+    //                     Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+    //                 }
+    //             };
+    
+    //             match read_event.wait() {
+    //                 Ok(value) => value,
+    //                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+    //             };
+
+    //             gpu_tracker.push(read_vector[0]);
+    //         },
+    //         _ => unreachable!(),
+    //     }
+
+    //     Ok(())
+    // }
+
+    // test that when neurotransmitter spikes it follows exp curve
+    // #[test]
+    // pub fn test_ampa() -> Result<(), SpikingNeuralNetworksError> {
+    //     let ampas = iterate_neuron(&gpu_get_ampa_neurotransmitter, false)?;
+
+    //     for i in ampas {
+    //         assert!(i <= 1.);
+    //         assert!(i >= 0.);
+    //     }
+
+    //     Ok(())
+    // } 
 }
