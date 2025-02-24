@@ -12,6 +12,7 @@ mod tests {
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
+    
     type GridType = Vec<Vec<Neurotransmitters<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>>>;
 
     #[test]
