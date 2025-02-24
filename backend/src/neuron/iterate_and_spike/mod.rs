@@ -685,6 +685,29 @@ pub enum DefaultReceptorsNeurotransmitterType {
 
 impl NeurotransmitterType for DefaultReceptorsNeurotransmitterType {}
 
+#[cfg(feature = "gpu")]
+impl NeurotransmitterTypeGPU for DefaultReceptorsNeurotransmitterType {
+    fn type_to_numeric(&self) -> usize {
+        match &self {
+            DefaultReceptorsNeurotransmitterType::X => 0,
+        }
+    }
+
+    fn number_of_types() -> usize {
+        1
+    }
+
+    fn get_all_types() -> BTreeSet<Self> {
+        BTreeSet::from([
+            DefaultReceptorsNeurotransmitterType::X,
+        ])
+    }
+
+    fn to_string(&self) -> String {
+        String::from("X")
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct XReceptor<T: ReceptorKinetics> {
     pub current: f32,
