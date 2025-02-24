@@ -1573,7 +1573,7 @@ impl NeurotransmitterKineticsDefinition {
         ];
 
         let header = format!(
-            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
+            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{", 
             self.type_name.generate(),
         );
         
