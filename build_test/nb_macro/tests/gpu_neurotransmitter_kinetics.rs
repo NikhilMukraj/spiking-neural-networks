@@ -33,6 +33,10 @@ mod test {
 
     type GridType = Vec<Vec<Neurotransmitters<DefaultReceptorsNeurotransmitterType, BasicNeurotransmitterKinetics>>>;
 
+    // get neurotransmitters program source from neurotransmitters struct and then
+    // check that program source compiles
+    // compile Neurotransmitters::<T>::get_neurotransmitter_update_kernel_code() from string
+
     #[test]
     pub fn test_empty_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
