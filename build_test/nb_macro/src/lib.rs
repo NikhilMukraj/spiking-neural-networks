@@ -330,7 +330,7 @@ impl Ast {
                 match op {
                     Op::Add => format!("({} + {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Subtract => format!("({} - {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
-                    Op::Multiply => format!("({} * {})", lhs.generate(), rhs.generate_non_kernel_gpu()),
+                    Op::Multiply => format!("({} * {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Divide => format!("({} / {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Power => format!("pow({}, {}))", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Equal => format!("{} == {}", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
@@ -419,7 +419,7 @@ impl Ast {
                         "if ({}) {{\n{}\n}}", 
                         conditions[0].generate_non_kernel_gpu(), 
                         declarations[0].iter()
-                            .map(|i| i.generate())
+                            .map(|i| i.generate_non_kernel_gpu())
                             .collect::<Vec<String>>()
                             .join("\n")
                     ));
@@ -1638,14 +1638,13 @@ impl NeurotransmitterKineticsDefinition {
     #[cfg(feature="gpu")] 
     fn to_gpu_code(&self) -> (Vec<String>, String) {
         let kinetics_function_header = format!(
-            "float {}(float current_voltage, float dt, uint is_spiking, {}) {{", 
-            self.type_name.generate(),
+            "float get_t(float current_voltage, uint is_spiking, float dt, float t, {}) {{", 
             generate_non_kernel_gpu_args(&self.vars).join(", "),
         );
 
         let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
 
-        let kinetics_function = format!("{}\n{}}}", kinetics_function_header, kinetics_body);
+        let kinetics_function = format!("{}\n{}\nreturn t;\n}}", kinetics_function_header, kinetics_body);
 
         // need to import correct opencl3 gpu types
         // need to also impl neurotransmitterkineticsgpu for given kinetics 
@@ -1653,15 +1652,20 @@ impl NeurotransmitterKineticsDefinition {
         let impl_header = format!("impl NeurotransmitterKineticsGPU for {} {{", self.type_name.generate());
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
-            "match value {{ {},\n_ => None }}", 
+            "match value {{ \"neurotransmitters$t\" => Some(BufferType::Float(self.t)),\n{},\n_ => None }}", 
             generate_gpu_attribute_matching(&self.vars).join(",\n")
         );
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
 
         let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
+        let set_t_attribute = "\"neurotransmitters$t\" => self.t = match value {
+                BufferType::Float(nested_val) => nested_val,
+                _ => unreachable!(\"Incorrect type passed\"),
+            }";
         let set_attribute_body = format!(
-            "match attribute {{ {},\n_ => unreachable!() }}",
+            "match attribute {{ {},\n{},\n_ => unreachable!() }}",
+            set_t_attribute,
             generate_gpu_attribute_setting(&self.vars).join(",\n")
         );
 
@@ -1669,7 +1673,7 @@ impl NeurotransmitterKineticsDefinition {
 
         let vector_return_header = "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {";
         let vector_return_function = format!(
-            "{}vec![{}\n]\n}}", 
+            "{}vec![(String::from(\"neurotransmitters$t\"), AvailableBufferType::Float), {}\n]\n}}", 
             vector_return_header,
             generate_gpu_attributes_vec(&self.vars).join(",\n"),
         );
@@ -1690,7 +1694,7 @@ impl NeurotransmitterKineticsDefinition {
 
         let get_update_function_header = "fn get_update_function() -> ((Vec<String>, Vec<String>), String) {";
         let get_update_function = format!(
-            "{}\n((vec![{}],\nvec![{}]),\nString::from(\"{}\"))\n}}",
+            "{}\n((vec![{}],\nvec![String::from(\"neurotransmitters$t\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
             mandatory_args,
             generate_gpu_attributes_vec_no_types(&self.vars).join(","),
@@ -2803,9 +2807,7 @@ fn build_function(model_description: String) -> TokenStream {
             } else {
                 all_code
             };
-    
-            // println!("{}\n\n\n{}", imports.join("\n"), all_code);
-    
+        
             format!("{}\n\n\n{}", imports.join("\n"), all_code)
                 .parse::<TokenStream>().unwrap()
         }
