@@ -38,7 +38,11 @@ mod test {
 
     #[test]
     pub fn test_compiles() -> Result<(), SpikingNeuralNetworksError> {
-        let program_source = Neurotransmitters::<DefaultReceptorsNeurotransmitterType, BasicNeurotransmitterKinetics>::get_neurotransmitter_update_kernel_code();
+        let program_source = format!(
+            "{}\n{}",
+            BasicNeurotransmitterKinetics::get_update_function().1,
+            Neurotransmitters::<DefaultReceptorsNeurotransmitterType, BasicNeurotransmitterKinetics>::get_neurotransmitter_update_kernel_code()
+        );
 
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
             .expect("Could not get GPU devices")
@@ -49,6 +53,8 @@ mod test {
         let context = Context::from_device(&device).expect("Context::from_device failed");
 
         let kernel_name = String::from("neurotransmitters_update");
+
+        println!("{}", program_source);
 
         let program = match Program::create_and_build_from_source(&context, &program_source, "") {
             Ok(value) => value,
@@ -125,7 +131,10 @@ mod test {
         );
         let mut neurotransmitters3 = Neurotransmitters::default();
         neurotransmitters3.insert(
-            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics::default()
+            DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics {
+                t: 0.02,
+                ..BasicNeurotransmitterKinetics::default()
+            }
         );
         neurotransmitters3.insert(
             DefaultReceptorsNeurotransmitterType::X, BasicNeurotransmitterKinetics::default()
