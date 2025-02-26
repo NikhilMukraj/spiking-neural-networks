@@ -3,14 +3,13 @@
 mod test {
     use nb_macro::neuron_builder; 
     use spiking_neural_networks::{
-        error::SpikingNeuralNetworksError,
+        error::{GPUError, SpikingNeuralNetworksError},
         neuron::iterate_and_spike::{
-            Neurotransmitters, DefaultReceptorsNeurotransmitterType
+            DefaultReceptorsNeurotransmitterType, Neurotransmitters
         }
     };
     use opencl3::{
-        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
-        context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::Kernel, program::Program
     };
     
 
@@ -36,6 +35,31 @@ mod test {
     // get neurotransmitters program source from neurotransmitters struct and then
     // check that program source compiles
     // compile Neurotransmitters::<T>::get_neurotransmitter_update_kernel_code() from string
+
+    #[test]
+    pub fn test_compiles() -> Result<(), SpikingNeuralNetworksError> {
+        let program_source = Neurotransmitters::<DefaultReceptorsNeurotransmitterType, BasicNeurotransmitterKinetics>::get_neurotransmitter_update_kernel_code();
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let kernel_name = String::from("neurotransmitters_update");
+
+        let program = match Program::create_and_build_from_source(&context, &program_source, "") {
+            Ok(value) => value,
+            Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::ProgramCompileFailure)),
+        };
+
+        match Kernel::create(&program, &kernel_name) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SpikingNeuralNetworksError::from(GPUError::KernelCompileFailure)),
+        }
+    }
 
     #[test]
     pub fn test_empty_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
