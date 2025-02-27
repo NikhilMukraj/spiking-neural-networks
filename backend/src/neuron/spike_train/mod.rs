@@ -545,6 +545,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                     index, 
                     number_of_types,
                     neuro_flags,
+                    current_voltage,
                     is_spiking,
                     dt,
                     {}
