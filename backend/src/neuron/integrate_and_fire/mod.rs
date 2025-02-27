@@ -506,6 +506,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     index, 
                     number_of_types,
                     neuro_flags,
+                    current_voltage,
                     is_spiking,
                     dt,
                     {}
