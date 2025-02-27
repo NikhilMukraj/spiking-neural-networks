@@ -309,9 +309,9 @@ impl Ast {
         match &self {
             Ast::Number(n) => {
                 if n % 1. != 0. {
-                    n.to_string()
+                    format!("{}f", n)
                 } else {
-                    format!("{}.0", n)
+                    format!("{}.0f", n)
                 }
             },
             Ast::Bool(val) => val.to_string(),
