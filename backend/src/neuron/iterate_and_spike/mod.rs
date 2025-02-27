@@ -357,7 +357,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         (
             (
                 vec![
-                    String::from("is_spiking"), String::from("dt"), 
+                    String::from("current_voltage"), String::from("is_spiking"), String::from("dt"), 
                 ],
                 vec![
                     String::from("neurotransmitters$t"),
@@ -366,6 +366,7 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
             ),
             String::from("
                 float get_t(
+                    float current_voltage,
                     float is_spiking, 
                     float dt,
                     float neurotransmitters_t,
