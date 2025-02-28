@@ -1503,7 +1503,7 @@ fn generate_non_kernel_gpu_matching(vars: &Ast, format_type: fn(&str, &str) -> S
 }
 
 #[cfg(feature="gpu")] 
-fn generate_gpu_attribute_matching(vars: &Ast) -> Vec<String> {
+fn generate_gpu_neurotransmitters_attribute_matching(vars: &Ast) -> Vec<String> {
     generate_non_kernel_gpu_matching(
         vars, 
         |var_name, type_name| { 
@@ -1518,7 +1518,7 @@ fn generate_gpu_attribute_matching(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature="gpu")] 
-fn generate_gpu_attribute_setting(vars: &Ast) -> Vec<String> {
+fn generate_gpu_neurotransmitters_attribute_setting(vars: &Ast) -> Vec<String> {
     generate_non_kernel_gpu_matching(
         vars, 
         |var_name, type_name| { 
@@ -1537,7 +1537,7 @@ fn generate_gpu_attribute_setting(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature="gpu")] 
-fn generate_gpu_attributes_vec(vars: &Ast) -> Vec<String> {
+fn generate_gpu_neurotransmitters_attributes_vec(vars: &Ast) -> Vec<String> {
     generate_non_kernel_gpu_matching(
         vars, 
         |var_name, type_name| { 
@@ -1551,7 +1551,7 @@ fn generate_gpu_attributes_vec(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature="gpu")] 
-fn generate_gpu_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+fn generate_gpu_neurotransmitters_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
     generate_non_kernel_gpu_matching(
         vars, 
         |var_name, _| { 
@@ -1562,6 +1562,67 @@ fn generate_gpu_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
         }
     )
 }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attribute_matching(vars: &Ast) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""receptors${}" => Some(BufferType::{}(self.{}))"#,
+//                 var_name,
+//                 type_name,
+//                 var_name,
+//             )
+//         }
+//     )
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attribute_setting(vars: &Ast) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""receptors${}" => self.{} = match value {{ 
+//                     BufferType::{}(nested_val) => nested_val,
+//                     _ => unreachable!("Incorrect type passed"),
+//                 }}   
+//                 "#,
+//                 var_name,
+//                 var_name,
+//                 type_name,
+//             )
+//         }
+//     )
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attributes_vec(vars: &Ast) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#"(String::from("receptors${}"), AvailableBufferType::{})"#,
+//                 var_name,
+//                 type_name,
+//             )
+//         }
+//     )
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, _| { 
+//             format!(
+//                 r#"(String::from("receptors${}"))"#,
+//                 var_name,
+//             )
+//         }
+//     )
+// }
 
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
@@ -1653,7 +1714,7 @@ impl NeurotransmitterKineticsDefinition {
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
             "match value {{ \"neurotransmitters$t\" => Some(BufferType::Float(self.t)),\n{},\n_ => None }}", 
-            generate_gpu_attribute_matching(&self.vars).join(",\n")
+            generate_gpu_neurotransmitters_attribute_matching(&self.vars).join(",\n")
         );
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
@@ -1666,7 +1727,7 @@ impl NeurotransmitterKineticsDefinition {
         let set_attribute_body = format!(
             "match attribute {{ {},\n{},\n_ => unreachable!() }}",
             set_t_attribute,
-            generate_gpu_attribute_setting(&self.vars).join(",\n")
+            generate_gpu_neurotransmitters_attribute_setting(&self.vars).join(",\n")
         );
 
         let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
@@ -1675,7 +1736,7 @@ impl NeurotransmitterKineticsDefinition {
         let vector_return_function = format!(
             "{}vec![(String::from(\"neurotransmitters$t\"), AvailableBufferType::Float), {}\n]\n}}", 
             vector_return_header,
-            generate_gpu_attributes_vec(&self.vars).join(",\n"),
+            generate_gpu_neurotransmitters_attributes_vec(&self.vars).join(",\n"),
         );
 
         let attribute_names_functions = r#"
@@ -1697,7 +1758,7 @@ impl NeurotransmitterKineticsDefinition {
             "{}\n((vec![{}],\nvec![String::from(\"neurotransmitters$t\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
             mandatory_args,
-            generate_gpu_attributes_vec_no_types(&self.vars).join(","),
+            generate_gpu_neurotransmitters_attributes_vec_no_types(&self.vars).join(","),
             kinetics_function,
         );
 
@@ -2319,6 +2380,83 @@ impl ReceptorsDefinition {
             )
         )
     }
+
+    // #[cfg(feature = "gpu")]
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+    //     let kinetics_function_header = format!(
+    //         "float get_r(float t, float dt, {}) {{", 
+    //         generate_non_kernel_gpu_args(&self.vars).join(", "),
+    //     );
+
+    //     let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
+
+    //     let kinetics_function = format!("{}\n{}\nreturn r;\n}}", kinetics_function_header, kinetics_body);
+
+    //     // need to import correct opencl3 gpu types
+    //     // need to also impl neurotransmitterkineticsgpu for given kinetics 
+
+    //     let impl_header = format!("impl ReceptorKineticsGPU for {} {{", self.type_name.generate());
+    //     let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
+    //     let get_attribute_body = format!(
+    //         "match value {{ \"receptors$r\" => Some(BufferType::Float(self.t)),\n{},\n_ => None }}", 
+    //         generate_gpu_receptors_attribute_matching(&self.vars).join(",\n")
+    //     );
+        
+    //     let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
+
+    //     let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
+    //     let set_r_attribute = "\"receptors$t\" => self.t = match value {
+    //             BufferType::Float(nested_val) => nested_val,
+    //             _ => unreachable!(\"Incorrect type passed\"),
+    //         }";
+    //     let set_attribute_body = format!(
+    //         "match attribute {{ {},\n{},\n_ => unreachable!() }}",
+    //         set_r_attribute,
+    //         generate_gpu_receptors_attribute_setting(&self.vars).join(",\n")
+    //     );
+
+    //     let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
+
+    //     let vector_return_header = "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {";
+    //     let vector_return_function = format!(
+    //         "{}vec![(String::from(\"receptors$r\"), AvailableBufferType::Float), {}\n]\n}}", 
+    //         vector_return_header,
+    //         generate_gpu_receptors_attributes_vec(&self.vars).join(",\n"),
+    //     );
+
+    //     let get_update_function_header = "fn get_update_function() -> (Vec<String>, String) {";
+    //     let get_update_function = format!(
+    //         "{}\n((\nvec![String::from(\"receptors$t\"), {}]),\nString::from(\"{}\"))\n}}",
+    //         get_update_function_header,
+    //         generate_gpu_receptors_attributes_vec_no_types(&self.vars).join(","),
+    //         kinetics_function,
+    //     );
+
+    //     // format fns together and get imports
+
+    //     let imports = vec![
+    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
+    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
+    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
+    //     ];
+
+    //     (
+    //         imports,
+    //         format!("
+    //                 {}
+    //                 {}
+    //                 {}
+    //                 {}
+    //             }} 
+    //             ",
+    //             impl_header,
+    //             get_function,
+    //             set_function,
+    //             vector_return_function,
+    //             get_update_function,
+    //         )
+    //     )
+    // }
 }
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
