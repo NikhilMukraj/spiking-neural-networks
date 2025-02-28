@@ -194,8 +194,6 @@ mod test {
         Ok(())
     }
 
-    // test 2x3 grid
-
     unsafe fn create_and_write_buffer<T>(
         context: &Context,
         queue: &CommandQueue,
@@ -360,5 +358,21 @@ mod test {
         Ok(())
     } 
 
-    // test that when neurotransmitter spikes it follows exp curve too
+    #[test]
+    pub fn test_decay() -> Result<(), SpikingNeuralNetworksError> {
+        let ts = iterate_neuron(&gpu_get_neurotransmitter)?;
+
+        for i in 0..(ts.len() - 1) {
+            if ts[i + 1] != 1.0 {
+                let decayed = ts[i] + -0.001 * ts[i];
+                assert!(
+                    (ts[i + 1] - decayed).abs() < 0.01, 
+                    "{} to {}, expected: {}", 
+                    ts[i], ts[i + 1], decayed
+                );
+            }
+        }
+
+        Ok(())
+    }
 }
