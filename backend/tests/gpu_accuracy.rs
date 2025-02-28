@@ -11,8 +11,13 @@ mod tests {
                 QuadraticIntegrateAndFireNeuron, 
                 SimpleLeakyIntegrateAndFire,
             }, iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType, LigandGatedChannel
-            }, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice
+                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor,
+                IonotropicNeurotransmitterType, LigandGatedChannel
+            }, 
+            plasticity::STDP, 
+            spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
+            GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork, 
+            SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice
         }
     };
 
