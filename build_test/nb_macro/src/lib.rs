@@ -449,6 +449,179 @@ impl Ast {
             ast => panic!("Non kernel GPU code for {:#?} is not implemented", ast)
         }
     }
+
+    // #[cfg(feature = "gpu")]
+    // fn generate_kernel_gpu(&self) -> String {
+    //     match self {
+    //         Ast::Number(n) => {
+    //             if n % 1. != 0. {
+    //                 n.to_string()
+    //             } else {
+    //                 format!("{}.0f", n)
+    //             }
+    //         },
+    //         Ast::Bool(val) => val.to_string(),
+    //         Ast::Name(name) => {
+    //             if name == "v" {
+    //                 String::from("current_voltage[index]")
+    //             } else if name == "i" {
+    //                 String::from("input_current[index]")
+    //             } else {
+    //                 format!("{}[index]", name)
+    //             }
+    //         },
+    //         Ast::UnaryMinus(expr) => format!("-{}", expr.generate_kernel_gpu()),
+    //         Ast::NotOperator(expr) => format!("!{}", expr.generate_kernel_gpu()),
+    //         Ast::BinOp { lhs, op, rhs } => {
+    //             match op {
+    //                 Op::Add => format!("({} + {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Subtract => format!("({} - {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Multiply => format!("({} * {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Divide => format!("({} / {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Power => format!("({}.powf({}))", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Equal => format!("{} == {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::NotEqual => format!("{} != {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::GreaterThan => format!("{} > {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::GreaterThanOrEqual => format!("{} >= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::LessThan => format!("{} < {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::LessThanOrEqual => format!("{} <= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::And => format!("{} && {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //                 Op::Or => format!("{} || {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+    //             }
+    //         }
+    //         Ast::Function { name, args } => {
+    //             format!(
+    //                 "{}({})",
+    //                 name, 
+    //                 args.iter()
+    //                     .map(|i| i.generate_kernel_gpu())
+    //                     .collect::<Vec<String>>()
+    //                     .join(", ")
+    //                 )
+    //         },
+    //         Ast::StructCall { name, attribute, args } => {
+    //             match args {
+    //                 Some(args) => {
+    //                     format!(
+    //                         "{}_{}({})", 
+    //                         name, 
+    //                         attribute,
+    //                         args.iter()
+    //                             .map(|i| i.generate())
+    //                             .collect::<Vec<String>>()
+    //                             .join(", ")
+    //                     )
+    //                 },
+    //                 None => {
+    //                     format!("{}_{}", name, attribute)
+    //                 }
+    //             }
+    //         }
+    //         Ast::StructFunctionCall { name, attribute, args } => {
+    //             format!(
+    //                 "{}_{}({});", 
+    //                 name, 
+    //                 attribute,
+    //                 args.iter()
+    //                     .map(|i| i.generate_kernel_gpu())
+    //                     .collect::<Vec<String>>()
+    //                     .join(", ")
+    //             )
+    //         },
+    //         Ast::EqAssignment { name, expr } => {
+    //             let name = if name == "v" {
+    //                 String::from("current_voltage[index]")
+    //             } else {
+    //                 format!("{}[index]", name)
+    //             };
+
+    //             format!("{} = {};", name, expr.generate())
+    //         },
+    //         Ast::DiffEqAssignment { name, expr } => {
+    //             format!("d{}[index] = ({}) * dt[index];", name, expr.generate_kernel_gpu())
+    //         },
+    //         Ast::TypeDefinition(string) => string.clone(),
+    //         Ast::OnSpike(assignments) => {
+    //             assignments.iter()
+    //                 .map(|i| i.generate_kernel_gpu())
+    //                 .collect::<Vec<String>>()
+    //                 .join("\n")
+    //         },
+    //         Ast::OnIteration(assignments) => {
+    //             assignments.iter()
+    //                 .map(|i| i.generate_kernel_gpu())
+    //                 .collect::<Vec<String>>()
+    //                 .join("\n\t\t")
+    //         },
+    //         Ast::SpikeDetection(expr) => { expr.generate_kernel_gpu() },
+    //         Ast::VariableAssignment { name, value } => {
+    //             let value_str = match value {
+    //                 NumOrBool::Number(x) => x.to_string(),
+    //                 NumOrBool::Bool(x) => x.to_string(),
+    //             };
+
+    //             format!("{} = {}", name, value_str)
+    //         },
+    //         Ast::IfStatement { conditions, declarations } => {
+    //             if conditions.len() == 1 && declarations.len() == 1 {
+    //                 format!(
+    //                     "if ({}) {{\n{}\n}}", 
+    //                     conditions[0].generate_kernel_gpu(), 
+    //                     declarations[0].iter()
+    //                         .map(|i| i.generate_kernel_gpu())
+    //                         .collect::<Vec<String>>()
+    //                         .join("\n")
+    //                 )
+    //             } else if conditions.len() == 1 {
+    //                 format!(
+    //                     "if ({}) {{\n{}\n}} else {{\n{}\n}}",
+    //                     conditions[0].generate_kernel_gpu(), 
+    //                     declarations[0].iter()
+    //                         .map(|i| i.generate_kernel_gpu())
+    //                         .collect::<Vec<String>>()
+    //                         .join("\n"),
+    //                     declarations[1].iter()
+    //                         .map(|i| i.generate_kernel_gpu())
+    //                         .collect::<Vec<String>>()
+    //                         .join("\n"),
+    //                 )
+    //             } else {
+    //                 let mut result = String::new();
+
+    //                 result.push_str(&format!(
+    //                     "if ({}) {{\n{}\n}}", 
+    //                     conditions[0].generate_kernel_gpu(), 
+    //                     declarations[0].iter()
+    //                         .map(|i| i.generate_kernel_gpu())
+    //                         .collect::<Vec<String>>()
+    //                         .join("\n")
+    //                 ));
+
+    //                 for i in 1..conditions.len() {
+    //                     result.push_str(&format!(
+    //                         " else if ({}) {{\n{}\n}}", 
+    //                         conditions[i].generate_kernel_gpu(), 
+    //                         declarations[i].iter()
+    //                             .map(|i| i.generate_kernel_gpu())
+    //                             .collect::<Vec<String>>()
+    //                             .join("\n")
+    //                     ));
+    //                 }
+
+    //                 result.push_str(&format!(
+    //                     " else {{\n{}\n}}", 
+    //                     declarations[declarations.len() - 1].iter()
+    //                         .map(|i| i.generate_kernel_gpu())
+    //                         .collect::<Vec<String>>()
+    //                         .join("\n")
+    //                 ));
+
+    //                 result
+    //             }
+    //         },
+    //         ast => panic!("{:#?} is unimplemented for GPU kernel", ast),
+    //     }
+    // }
 }
 
 fn add_indents(input: &str, indent: &str) -> String {
@@ -1563,66 +1736,66 @@ fn generate_gpu_neurotransmitters_attributes_vec_no_types(vars: &Ast) -> Vec<Str
     )
 }
 
-// #[cfg(feature = "gpu")]
-// fn generate_gpu_receptors_attribute_matching(vars: &Ast) -> Vec<String> {
-//     generate_non_kernel_gpu_matching(
-//         vars, 
-//         |var_name, type_name| { 
-//             format!(
-//                 r#""receptors${}" => Some(BufferType::{}(self.{}))"#,
-//                 var_name,
-//                 type_name,
-//                 var_name,
-//             )
-//         }
-//     )
-// }
+#[cfg(feature = "gpu")]
+fn generate_gpu_receptors_attribute_matching(vars: &Ast) -> Vec<String> {
+    generate_non_kernel_gpu_matching(
+        vars, 
+        |var_name, type_name| { 
+            format!(
+                r#""receptors${}" => Some(BufferType::{}(self.{}))"#,
+                var_name,
+                type_name,
+                var_name,
+            )
+        }
+    )
+}
 
-// #[cfg(feature = "gpu")]
-// fn generate_gpu_receptors_attribute_setting(vars: &Ast) -> Vec<String> {
-//     generate_non_kernel_gpu_matching(
-//         vars, 
-//         |var_name, type_name| { 
-//             format!(
-//                 r#""receptors${}" => self.{} = match value {{ 
-//                     BufferType::{}(nested_val) => nested_val,
-//                     _ => unreachable!("Incorrect type passed"),
-//                 }}   
-//                 "#,
-//                 var_name,
-//                 var_name,
-//                 type_name,
-//             )
-//         }
-//     )
-// }
+#[cfg(feature = "gpu")]
+fn generate_gpu_receptors_attribute_setting(vars: &Ast) -> Vec<String> {
+    generate_non_kernel_gpu_matching(
+        vars, 
+        |var_name, type_name| { 
+            format!(
+                r#""receptors${}" => self.{} = match value {{ 
+                    BufferType::{}(nested_val) => nested_val,
+                    _ => unreachable!("Incorrect type passed"),
+                }}   
+                "#,
+                var_name,
+                var_name,
+                type_name,
+            )
+        }
+    )
+}
 
-// #[cfg(feature = "gpu")]
-// fn generate_gpu_receptors_attributes_vec(vars: &Ast) -> Vec<String> {
-//     generate_non_kernel_gpu_matching(
-//         vars, 
-//         |var_name, type_name| { 
-//             format!(
-//                 r#"(String::from("receptors${}"), AvailableBufferType::{})"#,
-//                 var_name,
-//                 type_name,
-//             )
-//         }
-//     )
-// }
+#[cfg(feature = "gpu")]
+fn generate_gpu_receptors_attributes_vec(vars: &Ast) -> Vec<String> {
+    generate_non_kernel_gpu_matching(
+        vars, 
+        |var_name, type_name| { 
+            format!(
+                r#"(String::from("receptors${}"), AvailableBufferType::{})"#,
+                var_name,
+                type_name,
+            )
+        }
+    )
+}
 
-// #[cfg(feature = "gpu")]
-// fn generate_gpu_receptors_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
-//     generate_non_kernel_gpu_matching(
-//         vars, 
-//         |var_name, _| { 
-//             format!(
-//                 r#"(String::from("receptors${}"))"#,
-//                 var_name,
-//             )
-//         }
-//     )
-// }
+#[cfg(feature = "gpu")]
+fn generate_gpu_receptors_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+    generate_non_kernel_gpu_matching(
+        vars, 
+        |var_name, _| { 
+            format!(
+                r#"(String::from("receptors${}"))"#,
+                var_name,
+            )
+        }
+    )
+}
 
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
@@ -1706,9 +1879,6 @@ impl NeurotransmitterKineticsDefinition {
         let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
 
         let kinetics_function = format!("{}\n{}\nreturn t;\n}}", kinetics_function_header, kinetics_body);
-
-        // need to import correct opencl3 gpu types
-        // need to also impl neurotransmitterkineticsgpu for given kinetics 
 
         let impl_header = format!("impl NeurotransmitterKineticsGPU for {} {{", self.type_name.generate());
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
@@ -1872,6 +2042,80 @@ impl ReceptorKineticsDefinition {
                 update_body, 
                 get_r,
                 set_r,
+            )
+        )
+    }
+
+    #[cfg(feature = "gpu")]
+    fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let kinetics_function_header = format!(
+            "float get_r(float t, float dt, float r, {}) {{", 
+            generate_non_kernel_gpu_args(&self.vars).join(", "),
+        );
+
+        let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
+
+        let kinetics_function = format!("{}\n{}\nreturn r;\n}}", kinetics_function_header, kinetics_body);
+
+        let impl_header = format!("impl ReceptorKineticsGPU for {} {{", self.type_name.generate());
+        let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
+        let get_attribute_body = format!(
+            "match value {{ \"receptors$r\" => Some(BufferType::Float(self.r)),\n{},\n_ => None }}", 
+            generate_gpu_receptors_attribute_matching(&self.vars).join(",\n")
+        );
+        
+        let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
+
+        let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
+        let set_r_attribute = "\"receptors$r\" => self.r = match value {
+                BufferType::Float(nested_val) => nested_val,
+                _ => unreachable!(\"Incorrect type passed\"),
+            }";
+        let set_attribute_body = format!(
+            "match attribute {{ {},\n{},\n_ => unreachable!() }}",
+            set_r_attribute,
+            generate_gpu_receptors_attribute_setting(&self.vars).join(",\n")
+        );
+
+        let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
+
+        let vector_return_header = "fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {";
+        let vector_return_function = format!(
+            "{}HashSet::from([(String::from(\"receptors$r\"), AvailableBufferType::Float), {}\n])\n}}", 
+            vector_return_header,
+            generate_gpu_receptors_attributes_vec(&self.vars).join(",\n"),
+        );
+
+        let get_update_function_header = "fn get_update_function() -> (Vec<String>, String) {";
+        let get_update_function = format!(
+            "{}\n((\nvec![String::from(\"receptors$t\"), String::from(\"dt\"), String::from(\"receptors$r\"), {}]),\nString::from(\"{}\"))\n}}",
+            get_update_function_header,
+            generate_gpu_receptors_attributes_vec_no_types(&self.vars).join(","),
+            kinetics_function,
+        );
+
+        let imports = vec![
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
+            String::from("use std::collections::HashSet;"),
+        ];
+
+        (
+            imports,
+            format!("
+                    {}
+                    {}
+                    {}
+                    {}
+                    {}
+                }} 
+                ",
+                impl_header,
+                get_function,
+                set_function,
+                vector_return_function,
+                get_update_function,
             )
         )
     }
@@ -2380,83 +2624,6 @@ impl ReceptorsDefinition {
             )
         )
     }
-
-    // #[cfg(feature = "gpu")]
-    // fn to_gpu_code(&self) -> (Vec<String>, String) {
-    //     let kinetics_function_header = format!(
-    //         "float get_r(float t, float dt, {}) {{", 
-    //         generate_non_kernel_gpu_args(&self.vars).join(", "),
-    //     );
-
-    //     let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
-
-    //     let kinetics_function = format!("{}\n{}\nreturn r;\n}}", kinetics_function_header, kinetics_body);
-
-    //     // need to import correct opencl3 gpu types
-    //     // need to also impl neurotransmitterkineticsgpu for given kinetics 
-
-    //     let impl_header = format!("impl ReceptorKineticsGPU for {} {{", self.type_name.generate());
-    //     let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
-    //     let get_attribute_body = format!(
-    //         "match value {{ \"receptors$r\" => Some(BufferType::Float(self.t)),\n{},\n_ => None }}", 
-    //         generate_gpu_receptors_attribute_matching(&self.vars).join(",\n")
-    //     );
-        
-    //     let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
-
-    //     let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
-    //     let set_r_attribute = "\"receptors$t\" => self.t = match value {
-    //             BufferType::Float(nested_val) => nested_val,
-    //             _ => unreachable!(\"Incorrect type passed\"),
-    //         }";
-    //     let set_attribute_body = format!(
-    //         "match attribute {{ {},\n{},\n_ => unreachable!() }}",
-    //         set_r_attribute,
-    //         generate_gpu_receptors_attribute_setting(&self.vars).join(",\n")
-    //     );
-
-    //     let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
-
-    //     let vector_return_header = "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {";
-    //     let vector_return_function = format!(
-    //         "{}vec![(String::from(\"receptors$r\"), AvailableBufferType::Float), {}\n]\n}}", 
-    //         vector_return_header,
-    //         generate_gpu_receptors_attributes_vec(&self.vars).join(",\n"),
-    //     );
-
-    //     let get_update_function_header = "fn get_update_function() -> (Vec<String>, String) {";
-    //     let get_update_function = format!(
-    //         "{}\n((\nvec![String::from(\"receptors$t\"), {}]),\nString::from(\"{}\"))\n}}",
-    //         get_update_function_header,
-    //         generate_gpu_receptors_attributes_vec_no_types(&self.vars).join(","),
-    //         kinetics_function,
-    //     );
-
-    //     // format fns together and get imports
-
-    //     let imports = vec![
-    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
-    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
-    //         String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
-    //     ];
-
-    //     (
-    //         imports,
-    //         format!("
-    //                 {}
-    //                 {}
-    //                 {}
-    //                 {}
-    //             }} 
-    //             ",
-    //             impl_header,
-    //             get_function,
-    //             set_function,
-    //             vector_return_function,
-    //             get_update_function,
-    //         )
-    //     )
-    // }
 }
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
@@ -2849,6 +3016,21 @@ fn build_function(model_description: String) -> TokenStream {
                         receptor_kinetics_code_map.insert(
                             receptor_kinetics_type_name, receptor_kinetics_code
                         );
+
+                        #[cfg(feature="gpu")] 
+                        {
+                            let (receptor_kinetics_imports, receptor_kinetics_code) = receptor_kinetics.to_gpu_code();
+
+                            for i in receptor_kinetics_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            receptor_kinetics_code_map.insert(
+                                format!("{}GPU", receptor_kinetics.type_name.generate()), receptor_kinetics_code
+                            );
+                        }
                     },
                     Rule::receptors_definition => {
                         let receptors = generate_receptors(pair.into_inner())
