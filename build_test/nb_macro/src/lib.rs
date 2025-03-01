@@ -465,7 +465,7 @@ impl Ast {
     //             if name == "v" {
     //                 String::from("current_voltage[index]")
     //             } else if name == "i" {
-    //                 String::from("input_current[index]")
+    //                 String::from("inputs[index]")
     //             } else {
     //                 format!("{}[index]", name)
     //             }
@@ -1053,6 +1053,46 @@ impl NeuronDefinition {
             )
         )
     }
+
+    // #[cfg(feature = "gpu")]
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+    //     let impl_header = "pub trait IterateAndSpikeGPU: IterateAndSpike {";
+
+    //     let iterate_and_spike_electrical_kernel_header = "fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
+    //     let kernel_name = "iterate_and_spike"; 
+    //     let mandatory_variables = vec!["current_voltage", "dt", "is_spiking", "gap_conductance", "c_m"];
+    //     let argument_names = format!(
+    //         "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}]",
+    //         mandatory_variables.iter().map(|i| format!("String::from(\"i\")")).join(","),
+    //         self.vars,
+    //     );
+
+    //     let iterate_and_spike_electrical_kernel_footer = "
+    //         let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, "") {
+    //             Ok(value) => value,
+    //             Err(_) => return Err(GPUError::ProgramCompileFailure),
+    //         };
+    //         let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
+    //             Ok(value) => value,
+    //             Err(_) => return Err(GPUError::KernelCompileFailure),
+    //         };
+
+    //         Ok(
+    //             KernelFunction { 
+    //                 kernel, 
+    //                 program_source, 
+    //                 kernel_name, 
+    //                 argument_names, 
+    //             }
+    //         )\n}";
+
+        // leave unimplemented versions of functions with todo!()
+        
+    //     (
+    //         imports,
+    //         format!(),
+    //     )
+    // }
 }
 
 fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
