@@ -450,178 +450,178 @@ impl Ast {
         }
     }
 
-    // #[cfg(feature = "gpu")]
-    // fn generate_kernel_gpu(&self) -> String {
-    //     match self {
-    //         Ast::Number(n) => {
-    //             if n % 1. != 0. {
-    //                 n.to_string()
-    //             } else {
-    //                 format!("{}.0f", n)
-    //             }
-    //         },
-    //         Ast::Bool(val) => val.to_string(),
-    //         Ast::Name(name) => {
-    //             if name == "v" {
-    //                 String::from("current_voltage[index]")
-    //             } else if name == "i" {
-    //                 String::from("inputs[index]")
-    //             } else {
-    //                 format!("{}[index]", name)
-    //             }
-    //         },
-    //         Ast::UnaryMinus(expr) => format!("-{}", expr.generate_kernel_gpu()),
-    //         Ast::NotOperator(expr) => format!("!{}", expr.generate_kernel_gpu()),
-    //         Ast::BinOp { lhs, op, rhs } => {
-    //             match op {
-    //                 Op::Add => format!("({} + {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Subtract => format!("({} - {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Multiply => format!("({} * {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Divide => format!("({} / {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Power => format!("({}.powf({}))", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Equal => format!("{} == {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::NotEqual => format!("{} != {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::GreaterThan => format!("{} > {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::GreaterThanOrEqual => format!("{} >= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::LessThan => format!("{} < {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::LessThanOrEqual => format!("{} <= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::And => format!("{} && {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //                 Op::Or => format!("{} || {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-    //             }
-    //         }
-    //         Ast::Function { name, args } => {
-    //             format!(
-    //                 "{}({})",
-    //                 name, 
-    //                 args.iter()
-    //                     .map(|i| i.generate_kernel_gpu())
-    //                     .collect::<Vec<String>>()
-    //                     .join(", ")
-    //                 )
-    //         },
-    //         Ast::StructCall { name, attribute, args } => {
-    //             match args {
-    //                 Some(args) => {
-    //                     format!(
-    //                         "{}_{}({})", 
-    //                         name, 
-    //                         attribute,
-    //                         args.iter()
-    //                             .map(|i| i.generate())
-    //                             .collect::<Vec<String>>()
-    //                             .join(", ")
-    //                     )
-    //                 },
-    //                 None => {
-    //                     format!("{}_{}", name, attribute)
-    //                 }
-    //             }
-    //         }
-    //         Ast::StructFunctionCall { name, attribute, args } => {
-    //             format!(
-    //                 "{}_{}({});", 
-    //                 name, 
-    //                 attribute,
-    //                 args.iter()
-    //                     .map(|i| i.generate_kernel_gpu())
-    //                     .collect::<Vec<String>>()
-    //                     .join(", ")
-    //             )
-    //         },
-    //         Ast::EqAssignment { name, expr } => {
-    //             let name = if name == "v" {
-    //                 String::from("current_voltage[index]")
-    //             } else {
-    //                 format!("{}[index]", name)
-    //             };
+    #[cfg(feature = "gpu")]
+    fn generate_kernel_gpu(&self) -> String {
+        match self {
+            Ast::Number(n) => {
+                if n % 1. != 0. {
+                    n.to_string()
+                } else {
+                    format!("{}.0f", n)
+                }
+            },
+            Ast::Bool(val) => val.to_string(),
+            Ast::Name(name) => {
+                if name == "v" {
+                    String::from("current_voltage[index]")
+                } else if name == "i" {
+                    String::from("inputs[index]")
+                } else {
+                    format!("{}[index]", name)
+                }
+            },
+            Ast::UnaryMinus(expr) => format!("-{}", expr.generate_kernel_gpu()),
+            Ast::NotOperator(expr) => format!("!{}", expr.generate_kernel_gpu()),
+            Ast::BinOp { lhs, op, rhs } => {
+                match op {
+                    Op::Add => format!("({} + {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Subtract => format!("({} - {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Multiply => format!("({} * {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Divide => format!("({} / {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Power => format!("({}.powf({}))", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Equal => format!("{} == {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::NotEqual => format!("{} != {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::GreaterThan => format!("{} > {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::GreaterThanOrEqual => format!("{} >= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::LessThan => format!("{} < {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::LessThanOrEqual => format!("{} <= {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::And => format!("{} && {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Or => format!("{} || {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                }
+            }
+            Ast::Function { name, args } => {
+                format!(
+                    "{}({})",
+                    name, 
+                    args.iter()
+                        .map(|i| i.generate_kernel_gpu())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                    )
+            },
+            Ast::StructCall { name, attribute, args } => {
+                match args {
+                    Some(args) => {
+                        format!(
+                            "{}_{}({})", 
+                            name, 
+                            attribute,
+                            args.iter()
+                                .map(|i| i.generate())
+                                .collect::<Vec<String>>()
+                                .join(", ")
+                        )
+                    },
+                    None => {
+                        format!("{}_{}", name, attribute)
+                    }
+                }
+            }
+            Ast::StructFunctionCall { name, attribute, args } => {
+                format!(
+                    "{}_{}({});", 
+                    name, 
+                    attribute,
+                    args.iter()
+                        .map(|i| i.generate_kernel_gpu())
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+            },
+            Ast::EqAssignment { name, expr } => {
+                let name = if name == "v" {
+                    String::from("current_voltage[index]")
+                } else {
+                    format!("{}[index]", name)
+                };
 
-    //             format!("{} = {};", name, expr.generate())
-    //         },
-    //         Ast::DiffEqAssignment { name, expr } => {
-    //             format!("d{}[index] = ({}) * dt[index];", name, expr.generate_kernel_gpu())
-    //         },
-    //         Ast::TypeDefinition(string) => string.clone(),
-    //         Ast::OnSpike(assignments) => {
-    //             assignments.iter()
-    //                 .map(|i| i.generate_kernel_gpu())
-    //                 .collect::<Vec<String>>()
-    //                 .join("\n")
-    //         },
-    //         Ast::OnIteration(assignments) => {
-    //             assignments.iter()
-    //                 .map(|i| i.generate_kernel_gpu())
-    //                 .collect::<Vec<String>>()
-    //                 .join("\n\t\t")
-    //         },
-    //         Ast::SpikeDetection(expr) => { expr.generate_kernel_gpu() },
-    //         Ast::VariableAssignment { name, value } => {
-    //             let value_str = match value {
-    //                 NumOrBool::Number(x) => x.to_string(),
-    //                 NumOrBool::Bool(x) => x.to_string(),
-    //             };
+                format!("{} = {};", name, expr.generate())
+            },
+            Ast::DiffEqAssignment { name, expr } => {
+                format!("float d{} = ({}) * dt[index];", name, expr.generate_kernel_gpu())
+            },
+            Ast::TypeDefinition(string) => string.clone(),
+            Ast::OnSpike(assignments) => {
+                assignments.iter()
+                    .map(|i| i.generate_kernel_gpu())
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            },
+            Ast::OnIteration(assignments) => {
+                assignments.iter()
+                    .map(|i| i.generate_kernel_gpu())
+                    .collect::<Vec<String>>()
+                    .join("\n\t\t")
+            },
+            Ast::SpikeDetection(expr) => { expr.generate_kernel_gpu() },
+            Ast::VariableAssignment { name, value } => {
+                let value_str = match value {
+                    NumOrBool::Number(x) => x.to_string(),
+                    NumOrBool::Bool(x) => x.to_string(),
+                };
 
-    //             format!("{} = {}", name, value_str)
-    //         },
-    //         Ast::IfStatement { conditions, declarations } => {
-    //             if conditions.len() == 1 && declarations.len() == 1 {
-    //                 format!(
-    //                     "if ({}) {{\n{}\n}}", 
-    //                     conditions[0].generate_kernel_gpu(), 
-    //                     declarations[0].iter()
-    //                         .map(|i| i.generate_kernel_gpu())
-    //                         .collect::<Vec<String>>()
-    //                         .join("\n")
-    //                 )
-    //             } else if conditions.len() == 1 {
-    //                 format!(
-    //                     "if ({}) {{\n{}\n}} else {{\n{}\n}}",
-    //                     conditions[0].generate_kernel_gpu(), 
-    //                     declarations[0].iter()
-    //                         .map(|i| i.generate_kernel_gpu())
-    //                         .collect::<Vec<String>>()
-    //                         .join("\n"),
-    //                     declarations[1].iter()
-    //                         .map(|i| i.generate_kernel_gpu())
-    //                         .collect::<Vec<String>>()
-    //                         .join("\n"),
-    //                 )
-    //             } else {
-    //                 let mut result = String::new();
+                format!("{} = {}", name, value_str)
+            },
+            Ast::IfStatement { conditions, declarations } => {
+                if conditions.len() == 1 && declarations.len() == 1 {
+                    format!(
+                        "if ({}) {{\n{}\n}}", 
+                        conditions[0].generate_kernel_gpu(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate_kernel_gpu())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                } else if conditions.len() == 1 {
+                    format!(
+                        "if ({}) {{\n{}\n}} else {{\n{}\n}}",
+                        conditions[0].generate_kernel_gpu(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate_kernel_gpu())
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                        declarations[1].iter()
+                            .map(|i| i.generate_kernel_gpu())
+                            .collect::<Vec<String>>()
+                            .join("\n"),
+                    )
+                } else {
+                    let mut result = String::new();
 
-    //                 result.push_str(&format!(
-    //                     "if ({}) {{\n{}\n}}", 
-    //                     conditions[0].generate_kernel_gpu(), 
-    //                     declarations[0].iter()
-    //                         .map(|i| i.generate_kernel_gpu())
-    //                         .collect::<Vec<String>>()
-    //                         .join("\n")
-    //                 ));
+                    result.push_str(&format!(
+                        "if ({}) {{\n{}\n}}", 
+                        conditions[0].generate_kernel_gpu(), 
+                        declarations[0].iter()
+                            .map(|i| i.generate_kernel_gpu())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    ));
 
-    //                 for i in 1..conditions.len() {
-    //                     result.push_str(&format!(
-    //                         " else if ({}) {{\n{}\n}}", 
-    //                         conditions[i].generate_kernel_gpu(), 
-    //                         declarations[i].iter()
-    //                             .map(|i| i.generate_kernel_gpu())
-    //                             .collect::<Vec<String>>()
-    //                             .join("\n")
-    //                     ));
-    //                 }
+                    for i in 1..conditions.len() {
+                        result.push_str(&format!(
+                            " else if ({}) {{\n{}\n}}", 
+                            conditions[i].generate_kernel_gpu(), 
+                            declarations[i].iter()
+                                .map(|i| i.generate_kernel_gpu())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        ));
+                    }
 
-    //                 result.push_str(&format!(
-    //                     " else {{\n{}\n}}", 
-    //                     declarations[declarations.len() - 1].iter()
-    //                         .map(|i| i.generate_kernel_gpu())
-    //                         .collect::<Vec<String>>()
-    //                         .join("\n")
-    //                 ));
+                    result.push_str(&format!(
+                        " else {{\n{}\n}}", 
+                        declarations[declarations.len() - 1].iter()
+                            .map(|i| i.generate_kernel_gpu())
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    ));
 
-    //                 result
-    //             }
-    //         },
-    //         ast => panic!("{:#?} is unimplemented for GPU kernel", ast),
-    //     }
-    // }
+                    result
+                }
+            },
+            ast => panic!("{:#?} is unimplemented for GPU kernel", ast),
+        }
+    }
 }
 
 fn add_indents(input: &str, indent: &str) -> String {
@@ -734,6 +734,54 @@ fn replace_self_var(original: String, var: &str, replace_with: &str) -> String {
     let original = original.replace(&format!("self.{})", var), &format!("{})", replace_with));
     let original = original.replace(&format!("self.{},", var), &format!("{},", replace_with));
     original.replace(&format!("self.{};", var), &format!("{};", replace_with))
+}
+
+#[cfg(feature="gpu")] 
+fn generate_kernel_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "float",
+                            NumOrBool::Bool(_) => "uint",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!("__global {} *{}", var_name, type_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature="gpu")] 
+fn generate_vars_as_arg_strings(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    format!("String::from(\"{}\")", var_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
 }
 
 impl NeuronDefinition {
@@ -1054,45 +1102,141 @@ impl NeuronDefinition {
         )
     }
 
-    // #[cfg(feature = "gpu")]
-    // fn to_gpu_code(&self) -> (Vec<String>, String) {
-    //     let impl_header = "pub trait IterateAndSpikeGPU: IterateAndSpike {";
+    #[cfg(feature = "gpu")]
+    fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let impl_header = format!("impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU for {}<T, R> {{", self.type_name.generate());
 
-    //     let iterate_and_spike_electrical_kernel_header = "fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
-    //     let kernel_name = "iterate_and_spike"; 
-    //     let mandatory_variables = vec!["current_voltage", "dt", "is_spiking", "gap_conductance", "c_m"];
-    //     let argument_names = format!(
-    //         "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}]",
-    //         mandatory_variables.iter().map(|i| format!("String::from(\"i\")")).join(","),
-    //         self.vars,
-    //     );
+        let iterate_and_spike_electrical_kernel_header = "fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
+        let kernel_name = "let kernel_name = String::from(\"iterate_and_spike\");"; 
+        let mandatory_variables = [
+            ("current_voltage", "float"), 
+            ("dt", "float"), 
+            ("is_spiking", "uint"), 
+            ("gap_conductance", "float"), 
+            ("c_m", "float"),
+        ];
+        let argument_names = format!(
+            "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];",
+            mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+            generate_vars_as_arg_strings(&self.vars).join(", "),
+        );
 
-    //     let iterate_and_spike_electrical_kernel_footer = "
-    //         let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, "") {
-    //             Ok(value) => value,
-    //             Err(_) => return Err(GPUError::ProgramCompileFailure),
-    //         };
-    //         let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
-    //             Ok(value) => value,
-    //             Err(_) => return Err(GPUError::KernelCompileFailure),
-    //         };
+        let kernel_header = format!(
+            "__kernel void quadratic_integrate_and_fire_iterate_and_spike(
+                __global const float *inputs,
+                __global const uint *index_to_position,
+                {},
+                {},
+            ) {{
+                int gid = get_global_id(0);
+                int index = index_to_position[gid];",
+            mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+            generate_kernel_args(&self.vars).join(",\n"),
+        );
 
-    //         Ok(
-    //             KernelFunction { 
-    //                 kernel, 
-    //                 program_source, 
-    //                 kernel_name, 
-    //                 argument_names, 
-    //             }
-    //         )\n}";
+        let kernel_body = self.on_iteration.generate_kernel_gpu();
+
+        let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
+
+        let iterate_and_spike_electrical_kernel_footer = "
+            let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, \"\") {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::ProgramCompileFailure),
+            };
+            let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::KernelCompileFailure),
+            };
+
+            Ok(
+                KernelFunction { 
+                    kernel, 
+                    program_source, 
+                    kernel_name, 
+                    argument_names, 
+                }
+            )\n}";
+
+        let iterate_and_spike_electrical_function = format!(
+            "{}\n{}\n{}\n{}\n{}", 
+            iterate_and_spike_electrical_kernel_header, 
+            kernel_name,
+            argument_names,
+            kernel,
+            iterate_and_spike_electrical_kernel_footer,
+        );
 
         // leave unimplemented versions of functions with todo!()
-        
-    //     (
-    //         imports,
-    //         format!(),
-    //     )
-    // }
+
+        let iterate_and_spike_electrochemical_function = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
+        let convert_to_gpu = "
+            fn convert_to_gpu(
+                cell_grid: &[Vec<Self>], 
+                context: &Context,
+                queue: &CommandQueue,
+            ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }
+            ";
+        let convert_to_cpu = "
+            fn convert_to_cpu(
+                cell_grid: &mut Vec<Vec<Self>>,
+                buffers: &HashMap<String, BufferGPU>,
+                rows: usize,
+                cols: usize,
+                queue: &CommandQueue,
+            ) -> Result<(), GPUError> { todo!() }
+            ";
+        let convert_electrochemical_to_gpu = "
+            fn convert_electrochemical_to_gpu(
+                cell_grid: &[Vec<Self>], 
+                context: &Context,
+                queue: &CommandQueue,
+            ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }";
+        let convert_electrochemical_to_cpu = "
+            fn convert_electrochemical_to_cpu(
+                cell_grid: &mut Vec<Vec<Self>>,
+                buffers: &HashMap<String, BufferGPU>,
+                rows: usize,
+                cols: usize,
+                queue: &CommandQueue,
+            ) -> Result<(), GPUError> { todo!() }";
+
+        let imports = vec![
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::IterateAndSpikeGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKineticsGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
+            String::from("use spiking_neural_networks::error::GPUError;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::KernelFunction;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
+            String::from("use std::collections::HashMap;"),
+            String::from("use opencl3::context::Context;"),
+            String::from("use opencl3::program::Program;"),
+            String::from("use opencl3::kernel::Kernel;"),
+            String::from("use opencl3::command_queue::CommandQueue;"),
+        ];
+
+        (
+            imports,
+            format!(
+                "
+                {}
+                {}
+                {}
+                {}
+                {}
+                {}
+                {}
+                }}
+                ",
+                impl_header,
+                iterate_and_spike_electrical_function,
+                iterate_and_spike_electrochemical_function,
+                convert_to_gpu,
+                convert_to_cpu,
+                convert_electrochemical_to_gpu,
+                convert_electrochemical_to_cpu,
+            ),
+        )
+    }
 }
 
 fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
@@ -2980,6 +3124,21 @@ fn build_function(model_description: String) -> TokenStream {
                             .or_default();
                     
                         neuron_code_map.insert(neuron_type_name, neuron_code);
+
+                        #[cfg(feature = "gpu")]
+                        {
+                            let (neuron_imports, neuron_code) = neuron_definition.to_gpu_code();
+
+                            for i in neuron_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            neuron_code_map.insert(
+                                format!("{}GPU", neuron_definition.type_name.generate()), neuron_code
+                            );
+                        }
                     },
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner())
