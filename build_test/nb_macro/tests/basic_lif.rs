@@ -3,7 +3,6 @@ mod lif_reference;
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
     use nb_macro::neuron_builder;
     use spiking_neural_networks::neuron::iterate_and_spike::{XReceptor, DefaultReceptorsType}; 
     use crate::lif_reference::ReferenceIntegrateAndFire;

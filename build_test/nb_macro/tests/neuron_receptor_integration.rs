@@ -9,8 +9,6 @@ mod shared_receptors;
 #[allow(clippy::assign_op_pattern)]
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
-
     use nb_macro::neuron_builder;
     use crate::shared_receptors::{
         AReceptor, BReceptor, CombinedReceptor, CombinedReceptors, 
