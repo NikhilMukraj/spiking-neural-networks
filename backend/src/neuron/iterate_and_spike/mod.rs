@@ -1712,6 +1712,7 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
 
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! read_and_set_buffer {
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
         if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
@@ -1763,9 +1764,10 @@ macro_rules! read_and_set_buffer {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use read_and_set_buffer;
+pub use read_and_set_buffer;
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! write_buffer {
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float) => {
         let mut $name = unsafe {
@@ -1880,9 +1882,10 @@ macro_rules! write_buffer {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use write_buffer;
+pub use write_buffer;
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! flatten_and_retrieve_field {
     ($grid:expr, $field:ident, f32) => {
         $grid.iter()
@@ -1907,9 +1910,10 @@ macro_rules! flatten_and_retrieve_field {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use flatten_and_retrieve_field;
+pub use flatten_and_retrieve_field;
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! create_float_buffer {
     ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
         let flattened_field = flatten_and_retrieve_field!($grid, $field, f32);
@@ -1925,9 +1929,10 @@ macro_rules! create_float_buffer {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use create_float_buffer;
+pub use create_float_buffer;
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! create_uint_buffer {
     ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
         let flattened_field = flatten_and_retrieve_field!($grid, $field, u32);
@@ -1943,9 +1948,10 @@ macro_rules! create_uint_buffer {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use create_uint_buffer;
+pub use create_uint_buffer;
 
 #[cfg(feature = "gpu")]
+#[macro_export]
 macro_rules! create_optional_uint_buffer {
     ($name:ident, $context:expr, $queue:expr, $grid:expr, $field:ident) => {
         let flattened_field = flatten_and_retrieve_field!($grid, $field, OptionalUInt);
@@ -1961,7 +1967,7 @@ macro_rules! create_optional_uint_buffer {
 }
 
 #[cfg(feature = "gpu")]
-pub(crate) use create_optional_uint_buffer;
+pub use create_optional_uint_buffer;
 
 #[cfg(feature = "gpu")]
 fn extract_or_pad_neurotransmitter<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU>(
