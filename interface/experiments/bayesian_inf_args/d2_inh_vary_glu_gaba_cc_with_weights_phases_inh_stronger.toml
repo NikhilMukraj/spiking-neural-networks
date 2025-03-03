@@ -20,7 +20,7 @@ a = -1
 b = 0
 
 weights_scalar = 1.5
-inh_weights_scalar = 3
+inh_weights_scalar = 2.5
 skew = 0.05
 c_m = 100
 
