@@ -784,6 +784,164 @@ fn generate_vars_as_arg_strings(vars: &Ast) -> Vec<String> {
     }
 }
 
+#[cfg(feature="gpu")] 
+fn generate_vars_as_create_buffers(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "float",
+                            NumOrBool::Bool(_) => "uint",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", 
+                        type_name,
+                        var_name,
+                        var_name,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature="gpu")] 
+fn generate_vars_as_insert_buffers(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "Float",
+                            NumOrBool::Bool(_) => "UInt",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "buffers.insert(String::from(\"{}\"), BufferGPU::{}({}_buffer));", 
+                        var_name,
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_vars_as_field_vecs(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let (type_name, default_var) = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => ("f32", "0.0"),
+                            NumOrBool::Bool(_) => ("u32", "0"),
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "let mut {}: Vec<{}> = vec![{}; rows * cols];", 
+                        var_name,
+                        type_name,
+                        default_var,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_vars_as_read_and_set(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "Float",
+                            NumOrBool::Bool(_) => "UInt",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "read_and_set_buffer!(buffers, queue, \"{}\", &mut {}, {});", 
+                        var_name,
+                        var_name,
+                        type_name,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => format!("cell.{} = {}[idx];", var_name, var_name),
+                            NumOrBool::Bool(_) => format!("cell.{} = {}[idx] == 1;", var_name, var_name),
+                        },
+                        _ => unreachable!(),
+                    }
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -1169,22 +1327,135 @@ impl NeuronDefinition {
         // leave unimplemented versions of functions with todo!()
 
         let iterate_and_spike_electrochemical_function = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
-        let convert_to_gpu = "
+        let convert_to_gpu = format!("
             fn convert_to_gpu(
                 cell_grid: &[Vec<Self>], 
                 context: &Context,
                 queue: &CommandQueue,
-            ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }
-            ";
-        let convert_to_cpu = "
+            ) -> Result<HashMap<String, BufferGPU>, GPUError> {{
+                if cell_grid.is_empty() || cell_grid.iter().all(|i| i.is_empty()) {{
+                    return Ok(HashMap::new());
+                }}
+
+                let mut buffers = HashMap::new();
+
+                {}
+
+                {}
+
+                create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time, last);
+
+                {}
+
+                {}
+
+                buffers.insert(String::from(\"last_firing_time\"), BufferGPU::OptionalUInt(last_firing_time_buffer));
+
+                Ok(buffers)
+            }}
+            ",
+            mandatory_variables.iter()
+                .map(|(i, j)| 
+                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", j, i, i)
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_create_buffers(&self.vars).join("\n"),
+            mandatory_variables.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "buffers.insert(String::from(\"{}\"), BufferGPU::{}({}_buffer));", 
+                        i, 
+                        if *j == "float" { "Float" } else { "UInt" }, 
+                        i
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_insert_buffers(&self.vars).join("\n"),
+        );
+        let convert_to_cpu = format!("
             fn convert_to_cpu(
                 cell_grid: &mut Vec<Vec<Self>>,
                 buffers: &HashMap<String, BufferGPU>,
                 rows: usize,
                 cols: usize,
                 queue: &CommandQueue,
-            ) -> Result<(), GPUError> { todo!() }
-            ";
+            ) -> Result<(), GPUError> {{ 
+                if rows == 0 || cols == 0 {{
+                    cell_grid.clear();
+
+                    return Ok(());
+                }}
+
+                {}
+
+                {}
+
+                let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
+
+                {}
+
+                {}
+
+                read_and_set_buffer!(buffers, queue, \"last_firing_time\", &mut last_firing_time, OptionalUInt);
+
+                for i in 0..rows {{
+                    for j in 0..cols {{
+                        let idx = i * cols + j;
+                        let cell = &mut cell_grid[i][j];
+                        
+                        {}
+
+                        {}
+
+                        cell.last_firing_time = if last_firing_time[idx] == -1 {{
+                            None
+                        }} else {{
+                            Some(last_firing_time[idx] as usize)
+                        }};
+                    }}
+                }}
+
+                Ok(())
+            }}
+            ",
+            mandatory_variables.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "let mut {}: Vec<{}> = vec![{}; rows * cols];", 
+                        i, 
+                        if *j == "float" { "f32" } else { "u32" },
+                        if *j == "float" { "0.0" } else { "0" },
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_field_vecs(&self.vars).join("\n"),
+            mandatory_variables.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "read_and_set_buffer!(buffers, queue, \"{}\", &mut {}, {});", 
+                        i, 
+                        i,
+                        if *j == "float" { "Float" } else { "UInt" },
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_read_and_set(&self.vars).join("\n"),
+            mandatory_variables.iter()
+                .map(|(i, j)| 
+                    if *j == "float" {
+                        format!("cell.{} = {}[idx];", i, i)
+                    } else {
+                        format!("cell.{} = {}[idx] == 1;", i, i)
+                    }
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_field_setters(&self.vars).join("\n"),
+        );
         let convert_electrochemical_to_gpu = "
             fn convert_electrochemical_to_gpu(
                 cell_grid: &[Vec<Self>], 
@@ -1207,7 +1478,21 @@ impl NeuronDefinition {
             String::from("use spiking_neural_networks::error::GPUError;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::KernelFunction;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_float_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_uint_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_optional_uint_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::read_and_set_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::flatten_and_retrieve_field;"),
             String::from("use std::collections::HashMap;"),
+            String::from("use std::ptr;"),
+            String::from("use opencl3::memory::Buffer;"),
+            String::from("use opencl3::memory::CL_MEM_READ_WRITE;"),
+            String::from("use opencl3::types::CL_BLOCKING;"),
+            String::from("use opencl3::types::CL_NON_BLOCKING;"),
+            String::from("use opencl3::types::cl_float;"),
+            String::from("use opencl3::types::cl_uint;"),
+            String::from("use opencl3::types::cl_int;"),
             String::from("use opencl3::context::Context;"),
             String::from("use opencl3::program::Program;"),
             String::from("use opencl3::kernel::Kernel;"),
