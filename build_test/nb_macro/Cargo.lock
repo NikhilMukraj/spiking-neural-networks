@@ -183,6 +183,7 @@ dependencies = [
  "pest_derive",
  "proc-macro2",
  "quote",
+ "rand",
  "regex",
  "spiking_neural_networks",
  "syn 1.0.109",
