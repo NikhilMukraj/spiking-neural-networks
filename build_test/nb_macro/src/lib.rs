@@ -736,16 +736,84 @@ fn replace_self_var(original: String, var: &str, replace_with: &str) -> String {
     original.replace(&format!("self.{};", var), &format!("{};", replace_with))
 }
 
+// make sure to check for `continous()``
+fn generate_handle_spiking(on_spike: &Option<Ast>, spike_detection: &Ast) -> String {
+    let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
 
-// // make sure to check for `continous()``
-// fn generate_handle_spiking(handle_spiking: &Ast, spike_detection: &Ast) -> String {
+    let handle_spiking_function = match on_spike {
+        Some(value) => {
+            let handle_spiking_check = "\tif self.is_spiking {";
+            let handle_spiking_function = format!("\t\t{}", value.generate());
 
-// }
+            format!("{}\n{}\n\t}}", handle_spiking_check, handle_spiking_function)
+        },
+        None => String::from(""),
+    };
 
-// #[cfg(feature = "gpu")]
-// fn generate_gpu_kernel_handle_spiking(handle_spiking: &Ast, spike_detection: &Ast) -> String {
-    
-// }
+    if spike_detection.generate() != "continuous()" {
+        let handle_is_spiking_calc = format!("\tself.is_spiking = {};", spike_detection.generate());
+
+        format!(
+            "{}\n{}\n{}\n\n\tself.is_spiking\n}}", 
+            handle_spiking_header, 
+            handle_is_spiking_calc,
+            handle_spiking_function,
+        )
+    } else {
+        let handle_is_spiking_calc = [
+            "let increasing_right_now = last_voltage < self.current_voltage;",
+            "let threshold_crossed = self.current_voltage > self.v_th;",
+            "let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;",
+            "self.is_spiking = is_spiking;",
+            "self.was_increasing = increasing_right_now;"
+        ];
+        let handle_is_spiking_calc = add_indents(&handle_is_spiking_calc.join("\n"), "\t");
+
+        format!(
+            "{}\n{}\n{}\n\tself.is_spiking\n}}",
+            handle_spiking_header, 
+            handle_is_spiking_calc,
+            handle_spiking_function,
+        )
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_gpu_kernel_handle_spiking(on_spike: &Option<Ast>, spike_detection: &Ast) -> String {
+    let handle_is_spiking = match on_spike {
+        Some(value) => {
+            format!(
+                "if (is_spiking[index]) {{\n{}\n}}",
+                value.generate_kernel_gpu(),
+            )
+        },
+        None => String::from(""),
+    };
+
+    if spike_detection.generate() != "continuous()" {
+        let handle_is_spiking_calc = format!("self.is_spiking = {};", spike_detection.generate());
+
+        format!(
+            "{}\n{}",  
+            handle_is_spiking_calc,
+            handle_is_spiking,
+        )
+    } else {
+        let handle_is_spiking_calc = [
+            "float last_voltage = current_voltage[index]",
+            "uint increasing_right_now = last_voltage < current_voltage[index];",
+            "uint threshold_crossed = current_voltage[index] > v_th[index];",
+            "is_spiking[index] = threshold_crossed && was_increasing[index] && !increasing_right_now;",
+            "was_increasing[index] = increasing_right_now;",
+        ];
+
+        format!(
+            "{}\n{}",
+            handle_is_spiking_calc.join("\n"),
+            handle_is_spiking,
+        )
+    }
+}
 
 #[cfg(feature = "gpu")]
 fn generate_gpu_kernel_on_iteration(on_iteration: &Ast) -> String {
@@ -760,7 +828,7 @@ fn generate_gpu_kernel_on_iteration(on_iteration: &Ast) -> String {
                     let change_string = if name == "v" {
                         "current_voltage[index] += dv;".to_string()
                     } else {
-                        format!("{}[index] += d{}", name, name)
+                        format!("{}[index] += d{};", name, name)
                     };
 
                     assignments_strings.push(change_string);
@@ -1126,44 +1194,7 @@ impl NeuronDefinition {
             String::from("")
         };
 
-        let handle_spiking_header = "fn handle_spiking(&mut self) -> bool {";
-
-        let handle_spiking_function = match &self.on_spike {
-            Some(value) => {
-                let handle_spiking_check = "\tif self.is_spiking {";
-                let handle_spiking_function = format!("\t\t{}", value.generate());
-
-                format!("{}\n{}\n\t}}", handle_spiking_check, handle_spiking_function)
-            },
-            None => String::from(""),
-        };
-
-        let handle_spiking = if self.spike_detection.generate() != "continuous()" {
-            let handle_is_spiking_calc = format!("\tself.is_spiking = {};", self.spike_detection.generate());
-    
-            format!(
-                "{}\n{}\n{}\n\n\tself.is_spiking\n}}", 
-                handle_spiking_header, 
-                handle_is_spiking_calc,
-                handle_spiking_function,
-            )
-        } else {
-            let handle_is_spiking_calc = [
-                "let increasing_right_now = last_voltage < self.current_voltage;",
-                "let threshold_crossed = self.current_voltage > self.v_th;",
-                "let is_spiking = threshold_crossed && self.was_increasing && !increasing_right_now;",
-                "self.is_spiking = is_spiking;",
-                "self.was_increasing = increasing_right_now;"
-            ];
-            let handle_is_spiking_calc = add_indents(&handle_is_spiking_calc.join("\n"), "\t");
-
-            format!(
-                "{}\n{}\n{}\n\tself.is_spiking\n}}",
-                handle_spiking_header, 
-                handle_is_spiking_calc,
-                handle_spiking_function,
-            )
-        };
+        let handle_spiking = generate_handle_spiking(&self.on_spike, &self.spike_detection);
 
         let get_concentrations_header = "fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {";
         let get_concentrations_body = "self.synaptic_neurotransmitters.get_concentrations()";
@@ -1331,7 +1362,11 @@ impl NeuronDefinition {
             generate_kernel_args(&self.vars).join(",\n"),
         );
 
-        let kernel_body = generate_gpu_kernel_on_iteration(&self.on_iteration);
+        let kernel_body = format!(
+            "{}\n{}",
+            generate_gpu_kernel_on_iteration(&self.on_iteration), 
+            generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+        );
 
         let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
