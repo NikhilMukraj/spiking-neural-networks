@@ -67,3 +67,4 @@
 - [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
 - [ ] gpu implementations
 - [ ] more descriptive error handling
+- [ ] handle spiking with continous spike detection
