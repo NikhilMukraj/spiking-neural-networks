@@ -736,7 +736,46 @@ fn replace_self_var(original: String, var: &str, replace_with: &str) -> String {
     original.replace(&format!("self.{};", var), &format!("{};", replace_with))
 }
 
-#[cfg(feature="gpu")] 
+
+// // make sure to check for `continous()``
+// fn generate_handle_spiking(handle_spiking: &Ast, spike_detection: &Ast) -> String {
+
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_kernel_handle_spiking(handle_spiking: &Ast, spike_detection: &Ast) -> String {
+    
+// }
+
+#[cfg(feature = "gpu")]
+fn generate_gpu_kernel_on_iteration(on_iteration: &Ast) -> String {
+    let on_iteration_assignments = on_iteration.generate_kernel_gpu();
+
+    let changes = match on_iteration {
+        Ast::OnIteration(assignments) => {
+            let mut assignments_strings = vec![];
+
+            for i in assignments {
+                if let Ast::DiffEqAssignment { name, .. } =  i {
+                    let change_string = if name == "v" {
+                        "current_voltage[index] += dv;".to_string()
+                    } else {
+                        format!("{}[index] += d{}", name, name)
+                    };
+
+                    assignments_strings.push(change_string);
+                }
+            }
+
+            assignments_strings.join("\t\n")
+        },
+        _ => panic!("Expected on iteration AST")
+    };
+
+    format!("{}\n{}\n", on_iteration_assignments, changes)
+}
+
+#[cfg(feature = "gpu")] 
 fn generate_kernel_args(vars: &Ast) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
@@ -1292,7 +1331,7 @@ impl NeuronDefinition {
             generate_kernel_args(&self.vars).join(",\n"),
         );
 
-        let kernel_body = self.on_iteration.generate_kernel_gpu();
+        let kernel_body = generate_gpu_kernel_on_iteration(&self.on_iteration);
 
         let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
