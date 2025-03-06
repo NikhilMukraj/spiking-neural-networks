@@ -23,6 +23,12 @@
     - [ ] Test if neurotransmitter changes increases distance between clusters (may need to use same patterns and vary neurotransmitters)
   - [ ] Manifold for liquid
     - [ ] Test if manifold can capture MNIST digits in liquid
+- [ ] Heuristic search instead of grid search
+  - Define target behavior
+    - Probably as a Python function
+  - Assume that trends are linear and will continue in that direction
+  - Track which changes contribute to which trends
+  - Go in direction of desired target
 
 ## Todo
 
