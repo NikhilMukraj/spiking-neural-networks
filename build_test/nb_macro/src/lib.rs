@@ -535,7 +535,7 @@ impl Ast {
                     format!("{}[index]", name)
                 };
 
-                format!("{} = {};", name, expr.generate())
+                format!("{} = {};", name, expr.generate_kernel_gpu())
             },
             Ast::DiffEqAssignment { name, expr } => {
                 format!("float d{} = ({}) * dt[index];", name, expr.generate_kernel_gpu())
@@ -780,23 +780,15 @@ fn generate_handle_spiking(on_spike: &Option<Ast>, spike_detection: &Ast) -> Str
 
 #[cfg(feature = "gpu")]
 fn generate_gpu_kernel_handle_spiking(on_spike: &Option<Ast>, spike_detection: &Ast) -> String {
-    let handle_is_spiking = match on_spike {
-        Some(value) => {
-            format!(
-                "if (is_spiking[index]) {{\n{}\n}}",
-                value.generate_kernel_gpu(),
-            )
-        },
-        None => String::from(""),
-    };
+    if on_spike.is_none() {
+        return String::from("")
+    }
 
     if spike_detection.generate() != "continuous()" {
-        let handle_is_spiking_calc = format!("self.is_spiking = {};", spike_detection.generate());
-
         format!(
-            "{}\n{}",  
-            handle_is_spiking_calc,
-            handle_is_spiking,
+            "if ({}) {{\nis_spiking[index] = 1;\n{}\n}} else {{\nis_spiking[index] = 0;\n}}",  
+            spike_detection.generate_kernel_gpu(),
+            on_spike.as_ref().unwrap().generate_kernel_gpu(),
         )
     } else {
         let handle_is_spiking_calc = [
@@ -810,7 +802,7 @@ fn generate_gpu_kernel_handle_spiking(on_spike: &Option<Ast>, spike_detection: &
         format!(
             "{}\n{}",
             handle_is_spiking_calc.join("\n"),
-            handle_is_spiking,
+            on_spike.as_ref().unwrap().generate_kernel_gpu(),
         )
     }
 }
@@ -863,7 +855,7 @@ fn generate_kernel_args(vars: &Ast) -> Vec<String> {
                         _ => unreachable!(),
                     };
 
-                    format!("__global {} *{}", var_name, type_name)
+                    format!("__global {} *{}", type_name, var_name)
                 })
                 .collect::<Vec<String>>()
         },
@@ -1350,11 +1342,11 @@ impl NeuronDefinition {
         );
 
         let kernel_header = format!(
-            "__kernel void quadratic_integrate_and_fire_iterate_and_spike(
+            "__kernel void iterate_and_spike(
                 __global const float *inputs,
                 __global const uint *index_to_position,
                 {},
-                {},
+                {}
             ) {{
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];",
