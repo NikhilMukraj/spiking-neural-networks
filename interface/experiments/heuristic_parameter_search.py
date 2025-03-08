@@ -15,10 +15,14 @@
 # find the most correlated linear trend and move in the direction of closer to target
 analysis = {}
 
+# get initialization bounds for target vector
 
 # features are likely correlated with one another
 # may need polynomial regression that takes in all features and 
 # use that polynomial equation to determine direction to take
+
+# must take derivative of regression and then use that to get step in right direction
+
 # need to first gather random data and then use heuristic
 # eplison greedy algo (random change if x < eplison, else heuristic change)
 # def return_new_parameters(analysis, target, step_size):
