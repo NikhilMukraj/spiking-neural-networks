@@ -67,4 +67,5 @@
 - [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
 - [ ] gpu implementations
 - [ ] more descriptive error handling
+- [ ] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
