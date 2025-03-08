@@ -5,9 +5,9 @@
 #   - Go in direction of desired target
 # Start with Bayesian inference pipeline
 
-import numpy as np
-from sklearn.linear_model import LinearRegression
-from scipy.stats import pearsonr
+# import numpy as np
+# from sklearn.linear_model import LinearRegression
+# from scipy.stats import pearsonr
 
 
 # key is parameters, value is score
