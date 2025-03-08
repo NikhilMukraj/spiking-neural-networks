@@ -2286,6 +2286,23 @@ fn generate_gpu_receptors_attribute_matching(vars: &Ast) -> Vec<String> {
     )
 }
 
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attribute_matching_inner_receptor(vars: &Ast, receptor_type_name: String, neurotransmitter: String) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""receptors${}" => match &self.receptors.get(&{}NeurotransmitterType::{}) {{\nSome(val) => Some(BufferType::{}(val.{})),\n_ => None\n}}"#,
+//                 var_name,
+//                 receptor_type_name,
+//                 neurotransmitter,
+//                 type_name,
+//                 var_name,
+//             )
+//         }
+//     )
+// }
+
 #[cfg(feature = "gpu")]
 fn generate_gpu_receptors_attribute_setting(vars: &Ast) -> Vec<String> {
     generate_non_kernel_gpu_matching(
@@ -2304,6 +2321,27 @@ fn generate_gpu_receptors_attribute_setting(vars: &Ast) -> Vec<String> {
         }
     )
 }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_receptors_attribute_setting_inner_receptor(vars: &Ast, receptor_type_name: String, neurotransmitter: String) -> Vec<String> {
+//     generate_non_kernel_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""receptors${}" => self.{} = match (self.receptors.get(&{}NeurotransmitterType::{}), value) {{ 
+//                     (Some(receptors), BufferType::{}(nested_val)) => receptors.nested_val,
+//                     _ => unreachable!("Incorrect type passed"),
+//                 }}   
+//                 "#,
+//                 var_name,
+//                 var_name,
+//                 receptor_type_name,
+//                 neurotransmitter,
+//                 type_name,
+//             )
+//         }
+//     )
+// }
 
 #[cfg(feature = "gpu")]
 fn generate_gpu_receptors_attributes_vec(vars: &Ast) -> Vec<String> {
@@ -3159,6 +3197,62 @@ impl ReceptorsDefinition {
             )
         )
     }
+
+    // #[cfg(feature = "gpu")]
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+    //     let impl_header = format!("impl<T: ReceptorKineticsGPU> {}<T> {{", self.type_name.generate());
+
+    //     let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
+        // check if type exists in current map, if it doesnt return none, else retrieve attribute
+        // let get_attribute_body = match self.top_level_vars {
+        //     Some(vars) => {
+        //         format!(
+        //             "match attribute {{\n{},\n{}\n}}",
+        //             generate_gpu_receptors_attribute_matching(self.top_level_vars),
+        //             self.blocks.iter().map(|(_, i, _)| {
+        //                 generate_gpu_receptors_attribute_matching_inner_receptor(&i)
+        //             })
+        //             .collect::<Vec<String>>()
+        //             .join(",\n")
+        //         )
+        //     },
+        //     None => {
+        //         format!(
+        //             "match attribute {{\n{}\n}}",
+        //             self.blocks.iter().map(|(_, i, _)| {
+        //                 generate_gpu_receptors_attribute_matching_inner_receptor(&i)
+        //             })
+        //             .collect::<Vec<String>>()
+        //             .join(",\n")
+        //         )
+        //     }
+        // };
+
+        // let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) {";
+        // let get_attribute_body = match self.top_level_vars {
+        //     Some(vars) => {
+        //         format!(
+        //             "match attribute {{\n{},\n{}\n}}",
+        //             generate_gpu_receptors_attribute_matching(self.top_level_vars),
+        //             self.blocks.iter().map(|(_, i, _)| {
+        //                 generate_gpu_receptors_attribute_setting_inner_receptor(&i)
+        //             })
+        //             .collect::<Vec<String>>()
+        //             .join(",\n")
+        //         )
+        //     },
+        //     None => {
+        //         format!(
+        //             "match attribute {{\n{}\n}}",
+        //             self.blocks.iter().map(|(_, i, _)| {
+        //                 generate_gpu_receptors_attribute_setting_inner_receptor(&i)
+        //             })
+        //             .collect::<Vec<String>>()
+        //             .join(",\n")
+        //         )
+        //     }
+        // };
+    // }
 }
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
