@@ -3226,7 +3226,7 @@ impl ReceptorsDefinition {
         // rewrite receptor kinetics to have an option to prefix each attribute
         // use the prefixes to differentiate receptor
         // exhaust getter/setters on each receptor until done or attr found
-        // receptor$kinetics$neuro$name$attr
+        // receptor$neuro$name$kinetics$attr
 
         let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
         // check if type exists in current map, if it doesnt return none, else retrieve attribute
