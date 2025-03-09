@@ -22,6 +22,7 @@ analysis = {}
 # use that polynomial equation to determine direction to take
 
 # must take derivative of regression and then use that to get step in right direction
+# deriv = np.polyder(ridge.coef_[::-1])
 
 # need to first gather random data and then use heuristic
 # eplison greedy algo (random change if x < eplison, else heuristic change)
