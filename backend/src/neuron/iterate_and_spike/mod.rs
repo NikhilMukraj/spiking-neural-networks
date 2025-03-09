@@ -5,7 +5,7 @@
 use std::{
     collections::{hash_map::{Entry, Keys, Values, ValuesMut}, HashMap, HashSet},
     fmt::Debug,
-    hash::Hash,
+    hash::Hash, io::Error,
 };
 use crate::error::ReceptorNeurotransmitterError;
 #[cfg(feature = "gpu")]
@@ -189,7 +189,7 @@ pub trait NeurotransmitterKineticsGPU: NeurotransmitterKinetics + Default {
     /// Retrieves the given attribute
     fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
     /// Sets the given value
-    fn set_attribute(&mut self, attribute: &str, value: BufferType);
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), Error>;
     /// Retrieves all attribute names
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
     /// Retrieves all attribute names as a vector
@@ -317,22 +317,24 @@ impl NeurotransmitterKineticsGPU for ApproximateNeurotransmitter {
         }
     }
 
-    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), Error> {
         match attribute {
             "neurotransmitters$t" => self.t = match value {
                 BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
+                _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
             },
             "neurotransmitters$t_max" => self.t_max = match value {
                 BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
+                _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
             },
             "neurotransmitters$clearance_constant" => self.clearance_constant = match value {
                 BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
+                _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
             },
-            _ => unreachable!(),
+            _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute")),
         }
+
+        Ok(())
     }
 
     fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {
@@ -501,7 +503,7 @@ pub trait ReceptorKineticsGPU: ReceptorKinetics {
     /// Retrieves the given attribute
     fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
     /// Sets the given value
-    fn set_attribute(&mut self, attribute: &str, value: BufferType);
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), Error>;
     /// Retrieves all attribute names
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
@@ -585,14 +587,16 @@ impl ReceptorKineticsGPU for ApproximateReceptor {
         }
     }
 
-    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), Error> {
         match attribute {
             "ligand_gates$r" => self.r = match value {
                 BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
+                _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
             },
-            _ => unreachable!(),
+            _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute")),
         }
+
+        Ok(())
     }
 
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
@@ -1123,7 +1127,7 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
                 _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
             }
             _ => {
-                self.receptor.set_attribute(attribute, value)
+                self.receptor.set_attribute(attribute, value).unwrap()
             },
         }
     }
@@ -2207,7 +2211,8 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                                     grid_value.neurotransmitters
                                         .get_mut(&i)
                                         .unwrap()
-                                        .set_attribute(&attribute.0, values[index]);
+                                        .set_attribute(&attribute.0, values[index])
+                                        .unwrap();
                                 }
                             }
                         } else {
