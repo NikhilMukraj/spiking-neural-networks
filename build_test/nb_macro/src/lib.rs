@@ -3223,10 +3223,9 @@ impl ReceptorsDefinition {
     fn to_gpu_code(&self) -> (Vec<String>, String) {
         let impl_header = format!("impl<T: ReceptorKineticsGPU> {}<T> {{", self.type_name.generate());
 
-        // rewrite neurotransmitter/receptor kinetics to have an option to prefix each attribute
+        // rewrite receptor kinetics to have an option to prefix each attribute
         // use the prefixes to differentiate receptor
         // exhaust getter/setters on each receptor until done or attr found
-        // make sure that neurotransmitter kinetics is fixed too
 
         let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
         // check if type exists in current map, if it doesnt return none, else retrieve attribute
