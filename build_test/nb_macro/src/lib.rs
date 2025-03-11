@@ -2290,14 +2290,6 @@ fn generate_gpu_receptors_attribute_matching(vars: &Ast, prefix: &str) -> Vec<St
     )
 }
 
-// if let Some(receptor_type) = self.receptors.get_mut(key) {
-//     match receptor_type {
-//         OneMetabotropicType::M(receptor) => {
-//             receptor.apply_r_change(*value, dt);
-//         }
-//     }
-// }
-
 #[cfg(feature = "gpu")]
 fn generate_gpu_receptors_attribute_matching_inner_receptor(vars: &Ast, receptor_type_name: String, neurotransmitter: String) -> Vec<String> {
     generate_gpu_matching(
@@ -2850,6 +2842,25 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
     )
 }
 
+// #[cfg(feature = "gpu")]
+// fn generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>) -> Vec<String> {
+//     let mut output = vec![];
+
+//     for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
+//         for name in names.iter() {
+//             output.push(format!(
+//                 "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType) {{ Some(inner) => inner.{}.set_attribute(stripped) }}"
+//                 neuro,
+//                 name,
+//                 neuro,
+//                 name,
+//             ));
+//         }
+//     }
+
+//     output
+// }
+
 impl ReceptorsDefinition {
     // generate neurotransmitter type from the blocks
     // for each neurotransmitter type create a receptors enum with structs in enum
@@ -3233,11 +3244,11 @@ impl ReceptorsDefinition {
         // if split.len() != 5 { return None; }
         // let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
         // if receptor != "receptor" || kinetics != "kinetics" { return None; }
-        // let strippd = format!("receptors$kinetics${}", name);
-        // matching
-        // "{neuro}" => match self.receptors.get(&{neuro}NeurotransmitterType) {{ Some(inner) => inner.{name}.set_attribute({stripped})  }}
+        // let stripped = format!("receptors$kinetics${}", name);
+        // match format!("{}${}", neuro, name)
+        // "{neuro}${name}" => match self.receptors.get(&{neuro}NeurotransmitterType) {{ Some(inner) => inner.{name}.set_attribute({stripped})  }}
         // match {{ {} }}
-        // for (current_type, _, _, receptor_vars) { neurotransmitters_to_receptor_vars.insert(current_type.generate()); for name in receptors { add } }
+        // for (current_type, _, _, receptor_vars) { neurotransmitters_to_receptor_vars.insert(current_type.generate(), vec![]); if let VariableAssignments(receptors) = receptor_vars {} for name in receptors { neurotransmitters_to_receptor_vars.get_mut(&current_type.generate()).push(name.generate()); } }
         // generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>)
 
         let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
