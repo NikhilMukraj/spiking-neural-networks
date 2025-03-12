@@ -2843,13 +2843,32 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
 }
 
 // #[cfg(feature = "gpu")]
-// fn generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>) -> Vec<String> {
+// fn generate_receptor_setting_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>) -> Vec<String> {
 //     let mut output = vec![];
 
 //     for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
 //         for name in names.iter() {
 //             output.push(format!(
 //                 "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType) {{ Some(inner) => inner.{}.set_attribute(stripped) }}"
+//                 neuro,
+//                 name,
+//                 neuro,
+//                 name,
+//             ));
+//         }
+//     }
+
+//     output
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>) -> Vec<String> {
+//     let mut output = vec![];
+
+//     for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
+//         for name in names.iter() {
+//             output.push(format!(
+//                 "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType) {{ Some(inner) => inner.{}.get_attribute(stripped) }}"
 //                 neuro,
 //                 name,
 //                 neuro,
@@ -3240,16 +3259,29 @@ impl ReceptorsDefinition {
         // receptor$neuro$name$kinetics$attr
 
         // preprocessing
-        // let split = attribute.split("$").collect::<Vec<String>>();
-        // if split.len() != 5 { return None; }
-        // let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
-        // if receptor != "receptor" || kinetics != "kinetics" { return None; }
-        // let stripped = format!("receptors$kinetics${}", name);
+        // let preprocessing_kinetics_parsing = "
+        //     let split = attribute.split(\"$\").collect::<Vec<String>>();
+        //     if split.len() != 5 { return None; }
+        //     let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
+        //     if receptor != \"receptor\" || kinetics != \"kinetics\" { return None; }
+        //     let stripped = format!(\"receptors$kinetics${}\", name);
+        // ";
         // match format!("{}${}", neuro, name)
-        // "{neuro}${name}" => match self.receptors.get(&{neuro}NeurotransmitterType) {{ Some(inner) => inner.{name}.set_attribute({stripped})  }}
-        // match {{ {} }}
-        // for (current_type, _, _, receptor_vars) { neurotransmitters_to_receptor_vars.insert(current_type.generate(), vec![]); if let VariableAssignments(receptors) = receptor_vars {} for name in receptors { neurotransmitters_to_receptor_vars.get_mut(&current_type.generate()).push(name.generate()); } }
         // generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>)
+
+        // let mut neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>> = HashMap::new();
+        // for (current_type, _, _, receptor_vars) in self.blocks.iter() {
+        //     neurotransmitters_to_receptor_vars.insert(current_type.generate(), vec![]);
+        //     if let Ast::VariablesAssignments(receptors) = receptor_vars {
+        //         for name in receptors { 
+        //             neurotransmitters_to_receptor_vars.get_mut(&current_type.generate())
+        //                 .unwrap()
+        //                 .push(name.generate()); 
+        //         }
+        //     } else {
+        //         unreachable!()
+        //     } 
+        // }
 
         let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
         // check if type exists in current map, if it doesnt return none, else retrieve attribute
