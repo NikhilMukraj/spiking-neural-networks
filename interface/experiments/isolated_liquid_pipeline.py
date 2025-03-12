@@ -318,7 +318,7 @@ for current_state in tqdm(all_states):
             data = [i.flatten() for i in np.array(hist)]
             peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
 
-            current_state = [[int(item) for item in sublist] for sublist in peaks]
+            current_state['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
 
         key = generate_key(parsed_toml, current_state)
 
