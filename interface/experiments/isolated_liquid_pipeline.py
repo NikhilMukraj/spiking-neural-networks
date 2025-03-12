@@ -16,7 +16,7 @@ import itertools
 import numpy as np
 from tqdm import tqdm
 from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise, find_peaks_above_threshold
-from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing
+from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing, determine_return_to_baseline
 import lixirnet as ln
 
 
@@ -115,16 +115,6 @@ def generate_key(parsed, current_state):
         generate_key_helper(current_state, key, parsed, field)
 
     return ', '.join(key)
-
-def determine_return_to_baseline(voltages, settling_period, on_phase, off_phase, tolerance):
-    baseline = np.array(voltages[1000:off_phase]).mean()
-
-    for i in range(off_phase):
-        current_voltage_average = np.array(voltages[off_phase + on_phase + i:]).mean()
-        if abs(baseline - current_voltage_average) < tolerance:
-            return i
-    
-    return off_phase
 
 with open(sys.argv[1], 'r') as f:
     parsed_toml = parse_toml(f)
