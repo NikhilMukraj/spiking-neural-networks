@@ -4,13 +4,157 @@
 # option to connect second spike train group to either liquid or inh
 # vary parameters to determine effect of stability based on neuromodulation
 
+import toml
+import json
+import sys
+import itertools
+import numpy as np
+from tqdm import tqdm
+from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise, find_peaks_above_threshold
+from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing, determine_return_to_baseline
+import lixirnet as ln
+
+
+def fill_defaults(parsed):
+    if 'simulation_parameters' not in parsed:
+        raise ValueError('Requires `simulation_parameters` table')
+
+    if 'filename' not in parsed['simulation_parameters']:
+        raise ValueError('Requires `filename` field in `simulation_parameters`')
+    
+    if 'variables' not in parsed:
+        raise ValueError('Requires `variables` table')
+
+    if 'exc_only' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['exc_only'] = True
+
+    if 'on_phase' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['on_phase'] = 1000
+    if 'off_phase' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['off_phase'] = 5000
+    if 'settling_period' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['settling_period'] = 1000
+    if 'tolerance' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['tolerance'] = 2
+
+    if 'peaks_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['peaks_on'] = False
+
+    if 'trials' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['trials'] = 10
+
+    if 'skew' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['skew'] = 1
+
+    if 'exc_n' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['exc_n'] = 7
+    if 'inh_n' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['inh_n'] = 3
+
+    if 'd1' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['d1'] = False
+    if 'd2' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['d2'] = False
+
+    if 'dt' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['dt'] = 1
+    if 'c_m' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['c_m'] = 25
+
+    if 'cue_firing_rate' not in parsed['variables']:
+        parsed['variables']['cue_firing_rate'] = [0.01]
+    if 'dopamine_firing_rate' not in parsed['variables']:
+        parsed['variables']['dopamine_firing_rate'] = [0.01]
+
+    if 'connectivity' not in parsed['variables']:
+        parsed['variables']['connectivity'] = [0.25]
+    if 'inh_connectivity' not in parsed['variables']:
+        parsed['variables']['inh_connectivity'] = [0.25]
+    if 'exc_to_inh_connectivity' not in parsed['variables']:
+        parsed['variables']['exc_to_inh_connectivity'] = [0.15]
+    if 'inh_to_exc_connectivity' not in parsed['variables']:
+        parsed['variables']['inh_to_exc_connectivity'] = [0.15]
+    if 'spike_train_connectivity' not in parsed['variables']:
+        parsed['variables']['spike_train_connectivity'] = [0.5]
+    
+    if 'internal_scalar' not in parsed['variables']:
+        parsed['variables']['internal_scalar'] = [0.5]
+    if 'spike_train_to_exc' not in parsed['variables']:
+        parsed['variables']['spike_train_to_exc'] = [3]
+    if 'exc_to_inh_weight' not in parsed['variables']:
+        parsed['variables']['exc_to_inh_weight'] = [0.0125]
+    if 'inh_to_exc_weight' not in parsed['variables']:
+        parsed['variables']['inh_to_exc_weight'] = [0.0125]
+    if 'inh_internal_scalar' not in parsed['variables']:
+        parsed['variables']['inh_internal_scalar'] = [2]
+
+    if 'nmda_g' not in parsed['variables']:
+        parsed['variables']['nmda_g'] = [0.6]
+    if 'ampa_g' not in parsed['variables']:
+        parsed['variables']['ampa_g'] = [1]
+    if 'gabaa_g' not in parsed['variables']:
+        parsed['variables']['gabaa_g'] = [1.2]
+
+    if 's_d1' not in parsed['variables']:
+        parsed['variables']['s_d1'] = [1]
+    if 's_d2' not in parsed['variables']:
+        parsed['variables']['s_d2'] = [0.025]
+
+    if 'glutamate_clearance' not in parsed['variables']:
+        parsed['variables']['glutamate_clearance'] = [0.001]
+    if 'gabaa_clearance' not in parsed['variables']:
+        parsed['variables']['gabaa_clearance'] = [0.001]
+    if 'dopamine_clearance' not in parsed['variables']:
+        parsed['variables']['dopamine_clearance'] = [0.001]
+
+def generate_key(parsed, current_state):
+    key = []
+
+    key.append(f'trial: {current_state["trial"]}')
+
+    fields = [
+        'cue_firing_rate', 'dopamine_firing_rate',
+        'connectivity', 'spike_train_connectivity', 'inh_connectivity', 'exc_to_inh_connectivity', 'inh_to_exc_connectivity',
+        'spike_train_to_exc', 'internal_scalar', 'inh_internal_scalar', 'exc_to_inh_weight', 'inh_to_exc_weight',
+        'nmda_g', 'ampa_g', 'gabaa_g', 's_d1', 's_d2',
+        'glutamate_clearance', 'gabaa_clearance', 'dopamine_clearance',
+    ]
+    
+    for field in fields:
+        generate_key_helper(current_state, key, parsed, field)
+
+    return ', '.join(key)
+
+with open(sys.argv[1], 'r') as f:
+    parsed_toml = parse_toml(f)
+
+fill_defaults(parsed_toml)
+
+exc_n = parsed_toml['simulation_parameters']['exc_n']
+num = exc_n * exc_n
+
+inh_n = parsed_toml['simulation_parameters']['inh_n']
+inh_num = inh_n * inh_n
+
+setup_neuron = generate_setup_neuron(
+    parsed_toml['simulation_parameters']['c_m'], 
+    0.1,
+)
+
+combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
+
+all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for combination in combinations]
+
+print(json.dumps(parsed_toml, indent=4))
+
+np.seterr(divide='ignore', invalid='ignore')
 
 e1 = 0
 i1 = 1
 c1 = 2
 c2 = 3
 
-# add option to change freq of dopamine spike train
+simulation_output = {}
 
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
@@ -24,6 +168,7 @@ for current_state in tqdm(all_states):
             )
 
         start_firing = generate_start_firing(current_state['cue_firing_rate'])
+        dopamine_firing = generate_start_firing(current_state['dopamine_firing_rate'])
 
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glu_clearance'])
         exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
@@ -89,6 +234,12 @@ for current_state in tqdm(all_states):
         spike_train_lattice = ln.DopaPoissonLattice(c2)
         spike_train_lattice.populate(dopamine_poisson_neuron, exc_n, exc_n)
 
+        network.apply_spike_train_lattice(
+            c2,
+            dopamine_firing
+        )
+        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
+
         if not parsed_toml['simulation_parameters']['exc_only']:
             inh_lattice = ln.DopaIzhikevichLattice(i1)
             inh_lattice.populate(inh_neuron, inh_n, inh_n)
@@ -143,19 +294,19 @@ for current_state in tqdm(all_states):
         network.chemical_synapse = True
 
         network.apply_spike_train_lattice(
-            1,
+            c1,
             stop_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         network.apply_spike_train_lattice(
-            1,
+            c1,
             start_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['on_phase'])
 
         network.apply_spike_train_lattice(
-            1,
+            c1,
             stop_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
