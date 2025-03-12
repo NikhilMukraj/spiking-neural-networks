@@ -15,7 +15,7 @@ import sys
 import itertools
 import numpy as np
 from tqdm import tqdm
-from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise
+from pipeline_setup import parse_toml, generate_key_helper, generate_setup_neuron, signal_to_noise, find_peaks_above_threshold
 from lsm_setup import generate_liquid_weights, generate_start_firing, stop_firing
 import lixirnet as ln
 
@@ -41,6 +41,9 @@ def fill_defaults(parsed):
         parsed['simulation_parameters']['settling_period'] = 1000
     if 'tolerance' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['tolerance'] = 2
+
+    if 'peaks_on' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['peaks_on'] = False
 
     if 'trials' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['trials'] = 10
@@ -309,6 +312,13 @@ for current_state in tqdm(all_states):
         current_value['voltages'] = voltages
 
         current_state['trial'] = trial
+
+        if parsed_toml['simulation_parameters']['peaks_on']:
+            hist = network.get_lattice(0).history
+            data = [i.flatten() for i in np.array(hist)]
+            peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+            current_state = [[int(item) for item in sublist] for sublist in peaks]
 
         key = generate_key(parsed_toml, current_state)
 
