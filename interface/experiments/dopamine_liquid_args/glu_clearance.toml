@@ -1,0 +1,20 @@
+[simulation_parameters]
+measure_snr = true
+
+exc_only = true
+
+off_phase = 5000
+iterations2 = 0
+
+internal_weights_scalar = 0.5
+skew = 1
+tolerance = 2
+
+trials = 20
+
+filename = "dopamine_glu_liquid.json"
+
+[variables]
+spike_train_to_exc = [2]
+glu_clearance = [0.001, 0.0025, 0.005, 0.0075, 0.01]
+dopamine_firing_rate = [0.0, 0.05]
