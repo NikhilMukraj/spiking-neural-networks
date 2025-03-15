@@ -155,7 +155,7 @@ for current_state in tqdm(all_states):
 
         start_firing = generate_start_firing(current_state['cue_firing_rate'])
 
-        glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glu_clearance'])
+        glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
         exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
         exc_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Glutamate, glu_neuro)
 
