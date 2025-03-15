@@ -2570,7 +2570,7 @@ pub enum BufferGPU {
 }
 
 #[cfg(feature = "gpu")]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 /// An encapsulation of a float or unsigned integer for converting to the GPU
 pub enum BufferType {
     Float(f32),
