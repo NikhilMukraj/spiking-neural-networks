@@ -362,6 +362,8 @@ mod test {
     pub fn test_decay() -> Result<(), SpikingNeuralNetworksError> {
         let ts = iterate_neuron(&gpu_get_neurotransmitter)?;
 
+        assert!(ts.iter().sum::<f32>() > 0.);
+
         for i in 0..(ts.len() - 1) {
             if ts[i + 1] != 1.0 {
                 let decayed = ts[i] + -0.001 * ts[i];
