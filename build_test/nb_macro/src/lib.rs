@@ -2316,7 +2316,7 @@ fn generate_gpu_receptors_attribute_setting(vars: &Ast, prefix: &str) -> Vec<Str
         vars, 
         |var_name, type_name| { 
             format!(
-                r#""receptors${}_{}" => self.{} = match value {{ 
+                r#""receptors${}{}" => self.{} = match value {{ 
                     BufferType::{}(nested_val) => nested_val,
                     _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
                 }}   
@@ -2360,7 +2360,7 @@ fn generate_gpu_receptors_attributes_vec(vars: &Ast, prefix: &str) -> Vec<String
         vars, 
         |var_name, type_name| { 
             format!(
-                r#"(String::from("receptors${}_{}"), AvailableBufferType::{})"#,
+                r#"(String::from("receptors${}{}"), AvailableBufferType::{})"#,
                 prefix,
                 var_name,
                 type_name,
@@ -2375,7 +2375,7 @@ fn generate_gpu_receptors_attributes_vec_no_types(vars: &Ast, prefix: &str) -> V
         vars, 
         |var_name, _| { 
             format!(
-                r#"(String::from("receptors${}_{}"))"#,
+                r#"(String::from("receptors${}{}"))"#,
                 prefix,
                 var_name,
             )
@@ -2646,14 +2646,14 @@ impl ReceptorKineticsDefinition {
         let impl_header = format!("impl ReceptorKineticsGPU for {} {{", self.type_name.generate());
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
-            "match value {{ \"receptors$kinetics_r\" => Some(BufferType::Float(self.r)),\n{},\n_ => None }}", 
+            "match value {{ \"receptors$kinetics$r\" => Some(BufferType::Float(self.r)),\n{},\n_ => None }}", 
             generate_gpu_receptors_attribute_matching(&self.vars, "kinetics$").join(",\n")
         );
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
 
         let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error> {";
-        let set_r_attribute = "\"receptors$kinetics_r\" => self.r = match value {
+        let set_r_attribute = "\"receptors$kinetics$r\" => self.r = match value {
                 BufferType::Float(nested_val) => nested_val,
                 _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid type\")),
             }";
@@ -2667,14 +2667,14 @@ impl ReceptorKineticsDefinition {
 
         let vector_return_header = "fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {";
         let vector_return_function = format!(
-            "{}HashSet::from([(String::from(\"receptors$kinetics_r\"), AvailableBufferType::Float), {}\n])\n}}", 
+            "{}HashSet::from([(String::from(\"receptors$kinetics$r\"), AvailableBufferType::Float), {}\n])\n}}", 
             vector_return_header,
             generate_gpu_receptors_attributes_vec(&self.vars, "kinetics$").join(",\n"),
         );
 
         let get_update_function_header = "fn get_update_function() -> (Vec<String>, String) {";
         let get_update_function = format!(
-            "{}\n((\nvec![String::from(\"neurotransmitters$t\"), String::from(\"dt\"), String::from(\"receptors$kinetics_r\"), {}]),\nString::from(\"{}\"))\n}}",
+            "{}\n((\nvec![String::from(\"neurotransmitters$t\"), String::from(\"dt\"), String::from(\"receptors$kinetics$r\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
             generate_gpu_receptors_attributes_vec_no_types(&self.vars, "kinetics$").join(","),
             kinetics_function,
@@ -2842,24 +2842,30 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
     )
 }
 
-// #[cfg(feature = "gpu")]
-// fn generate_receptor_setting_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>) -> Vec<String> {
-//     let mut output = vec![];
+#[cfg(feature = "gpu")]
+fn generate_receptor_setting_inner_kinetics(neurotransmitters_to_receptor_vars: &HashMap<String, Vec<String>>, receptor_type_name: &str) -> Vec<String> {
+    let mut output = vec![];
 
-//     for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
-//         for name in names.iter() {
-//             output.push(format!(
-//                 "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType) {{ Some(inner) => inner.{}.set_attribute(&stripped) }}"
-//                 neuro,
-//                 name,
-//                 neuro,
-//                 name,
-//             ));
-//         }
-//     }
+    for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
+        for name in names.iter() {
+            output.push(format!(
+                "\"{}${}\" => match self.receptors.get_mut(&{}NeurotransmitterType::{}) {{ 
+                    Some({}Type::{}(inner)) => inner.{}.set_attribute(&stripped, value)?,
+                    _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")), 
+                }}",
+                neuro,
+                &name[5..],
+                receptor_type_name,
+                neuro,
+                receptor_type_name,
+                neuro,
+                &name[5..],
+            ));
+        }
+    }
 
-//     output
-// }
+    output
+}
 
 #[cfg(feature = "gpu")]
 fn generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: &HashMap<String, Vec<String>>, receptor_type_name: &str) -> Vec<String> {
@@ -2868,7 +2874,10 @@ fn generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars:
     for (neuro, names) in neurotransmitters_to_receptor_vars.iter() {
         for name in names.iter() {
             output.push(format!(
-                "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType::{}) {{ Some({}Type::{}(inner)) => inner.{}.get_attribute(&stripped),\n_ => None, }}",
+                "\"{}${}\" => match self.receptors.get(&{}NeurotransmitterType::{}) {{ 
+                    Some({}Type::{}(inner)) => inner.{}.get_attribute(&stripped),
+                    _ => None, 
+                }}",
                 neuro,
                 &name[5..],
                 receptor_type_name,
@@ -3256,22 +3265,23 @@ impl ReceptorsDefinition {
     fn to_gpu_code(&self) -> (Vec<String>, String) {
         let impl_header = format!("impl<T: ReceptorKineticsGPU> {}<T> {{", self.type_name.generate());
 
-        // rewrite receptor kinetics to have an option to prefix each attribute
-        // use the prefixes to differentiate receptor
-        // exhaust getter/setters on each receptor until done or attr found
-        // receptor$neuro$name$kinetics$attr
-
-        // preprocessing
-        let preprocessing_kinetics_parsing = "
+        let get_preprocessing_kinetics_parsing = "
             let split = attribute.split(\"$\").collect::<Vec<&str>>();
             if split.len() != 5 { return None; }
-            let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
-            if *receptor != *\"receptor\".to_string() || *kinetics != *\"kinetics\".to_string() { return None; }
-            let stripped = format!(\"receptors$kinetics${}\", name);
+            let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);        
+            if *receptor != *\"receptors\".to_string() || *kinetics != *\"kinetics\".to_string() { return None; }
+            let stripped = format!(\"receptors$kinetics${}\", attr);
+            let to_match = format!(\"{}${}\", neuro, name);
         ";
-        // match format!("{}${}", neuro, name)
-        // generate_receptor_matching_inner_kinetics(neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>>)
-
+        let set_preprocessing_kinetics_parsing = "
+            let split = attribute.split(\"$\").collect::<Vec<&str>>();
+            if split.len() != 5 { return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")); }
+            let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
+            if *receptor != *\"receptors\".to_string() || *kinetics != *\"kinetics\".to_string() { return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")); }
+            let stripped = format!(\"receptors$kinetics${}\", attr);
+            let to_match = format!(\"{}${}\", neuro, name);
+        ";
+      
         let mut neurotransmitters_to_receptor_vars: HashMap<String, Vec<String>> = HashMap::new();
         for (current_type, _, _, receptor_vars) in self.blocks.iter() {
             neurotransmitters_to_receptor_vars.insert(current_type.generate(), vec![]);
@@ -3286,12 +3296,30 @@ impl ReceptorsDefinition {
             } 
         }
 
+        let get_kinetics = format!(
+            "{{\n{}\nmatch to_match.as_str() {{\n{},\n_ => None}} }}",
+            get_preprocessing_kinetics_parsing,
+            generate_receptor_matching_inner_kinetics(
+                &neurotransmitters_to_receptor_vars,
+                &self.type_name.generate(),
+            ).join(",\n"),
+        );
+
+        let set_kinetics = format!(
+            "{{\n{}\nmatch to_match.as_str() {{\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\"))}} }}",
+            set_preprocessing_kinetics_parsing,
+            generate_receptor_setting_inner_kinetics(
+                &neurotransmitters_to_receptor_vars,
+                &self.type_name.generate(),
+            ).join(",\n"),
+        );
+
         let get_attribute_header = "fn get_attribute(&self, attribute: &str) -> Option<BufferType> {";
         // check if type exists in current map, if it doesnt return none, else retrieve attribute
         let get_attribute_body = match &self.top_level_vars {
             Some(vars) => {
                 format!(
-                    "match attribute {{\n{},\n{},\n_ => {{\n{}\nmatch stripped.as_str() {{\n{},\n_ => None}} }}\n}}",
+                    "match attribute {{\n{},\n{},\n_ => {}\n}}",
                     generate_gpu_receptors_attribute_matching(vars, "top_").join(",\n"),
                     self.blocks.iter().map(|(current_type, current_vars, _, _)| {
                         generate_gpu_receptors_attribute_matching_inner_receptor(
@@ -3300,16 +3328,12 @@ impl ReceptorsDefinition {
                     })
                     .collect::<Vec<String>>()
                     .join(",\n"),
-                    preprocessing_kinetics_parsing,
-                    generate_receptor_matching_inner_kinetics(
-                        &neurotransmitters_to_receptor_vars,
-                        &self.type_name.generate(),
-                    ).join(",\n"),
+                    get_kinetics,
                 )
             },
             None => {
                 format!(
-                    "match attribute {{\n{},\n_ => None\n}}",
+                    "match attribute {{\n{},\n_ => {}\n}}",
                     self.blocks.iter().map(|(current_type, current_vars, _, _)| {
                         generate_gpu_receptors_attribute_matching_inner_receptor(
                             current_vars, self.type_name.generate(), current_type.generate()
@@ -3317,6 +3341,7 @@ impl ReceptorsDefinition {
                     })
                     .collect::<Vec<String>>()
                     .join(",\n"),
+                    get_kinetics,
                 )
             }
         };
@@ -3326,7 +3351,7 @@ impl ReceptorsDefinition {
         let set_attribute_body = match &self.top_level_vars {
             Some(vars) => {
                 format!(
-                    "match attribute {{\n{},\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\"))\n}};\nOk(())",
+                    "match attribute {{\n{},\n{},\n_ => {}\n}};\nOk(())",
                     generate_gpu_receptors_attribute_setting(vars, "top").join(",\n"),
                     self.blocks.iter().map(|(current_type, current_vars, _, _)| {
                         generate_gpu_receptors_attribute_setting_inner_receptor(
@@ -3335,11 +3360,12 @@ impl ReceptorsDefinition {
                     })
                     .collect::<Vec<String>>()
                     .join(",\n"),
+                    set_kinetics,
                 )
             },
             None => {
                 format!(
-                    "match attribute {{\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\"))\n}};\nOk(())",
+                    "match attribute {{\n{},\n_ => {}\n}};\nOk(())",
                     self.blocks.iter().map(|(current_type, current_vars, _, _)| {
                         generate_gpu_receptors_attribute_setting_inner_receptor(
                             current_vars, self.type_name.generate(), current_type.generate()
@@ -3347,6 +3373,7 @@ impl ReceptorsDefinition {
                     })
                     .collect::<Vec<String>>()
                     .join(",\n"),
+                    set_kinetics,
                 )
             }
         };
