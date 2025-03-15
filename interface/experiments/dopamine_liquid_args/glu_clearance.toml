@@ -15,5 +15,5 @@ filename = "dopamine_glu_liquid.json"
 
 [variables]
 spike_train_to_exc = [2]
-glu_clearance = [0.001, 0.0025, 0.005, 0.0075, 0.01]
+glutamate_clearance = [0.001, 0.0025, 0.005, 0.0075, 0.01]
 dopamine_firing_rate = [0.0, 0.05]
