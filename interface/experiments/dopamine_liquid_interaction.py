@@ -233,7 +233,7 @@ for current_state in tqdm(all_states):
 
         dopamine_spike_train_lattice = ln.DopaPoissonLattice(c2)
         dopamine_spike_train_lattice.populate(dopamine_poisson_neuron, exc_n, exc_n)
-        
+
         if not parsed_toml['simulation_parameters']['exc_only']:
             inh_lattice = ln.DopaIzhikevichLattice(i1)
             inh_lattice.populate(inh_neuron, inh_n, inh_n)
@@ -246,11 +246,11 @@ for current_state in tqdm(all_states):
             # inh_lattice.update_grid_history = True
 
             network = ln.DopaIzhikevichNetwork.generate_network(
-                [exc_lattice, inh_lattice], [spike_train_lattice],
+                [exc_lattice, inh_lattice], [spike_train_lattice, dopamine_spike_train_lattice],
             )
         else:
             network = ln.DopaIzhikevichNetwork.generate_network(
-                [exc_lattice], [spike_train_lattice],
+                [exc_lattice], [spike_train_lattice, dopamine_spike_train_lattice],
             )
 
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
