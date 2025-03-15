@@ -231,15 +231,9 @@ for current_state in tqdm(all_states):
         dopamine_poisson_neuron = ln.DopaPoissonNeuron()
         dopamine_poisson_neuron.set_neurotransmitters(dopamine_neurotransmitters)
 
-        spike_train_lattice = ln.DopaPoissonLattice(c2)
-        spike_train_lattice.populate(dopamine_poisson_neuron, exc_n, exc_n)
-
-        network.apply_spike_train_lattice(
-            c2,
-            dopamine_firing
-        )
-        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
-
+        dopamine_spike_train_lattice = ln.DopaPoissonLattice(c2)
+        dopamine_spike_train_lattice.populate(dopamine_poisson_neuron, exc_n, exc_n)
+        
         if not parsed_toml['simulation_parameters']['exc_only']:
             inh_lattice = ln.DopaIzhikevichLattice(i1)
             inh_lattice.populate(inh_neuron, inh_n, inh_n)
@@ -261,6 +255,15 @@ for current_state in tqdm(all_states):
 
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
         network.parallel = True
+
+        network.electrical_synapse = False
+        network.chemical_synapse = True
+
+        network.apply_spike_train_lattice(
+            c2,
+            dopamine_firing
+        )
+        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         if not parsed_toml['simulation_parameters']['exc_only']:
             network.connect(
