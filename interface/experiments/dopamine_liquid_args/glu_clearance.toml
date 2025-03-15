@@ -4,7 +4,6 @@ measure_snr = true
 exc_only = true
 
 off_phase = 5000
-iterations2 = 0
 
 internal_weights_scalar = 0.5
 skew = 1
