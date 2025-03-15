@@ -3352,7 +3352,7 @@ impl ReceptorsDefinition {
             Some(vars) => {
                 format!(
                     "match attribute {{\n{},\n{},\n_ => {}\n}};\nOk(())",
-                    generate_gpu_receptors_attribute_setting(vars, "top").join(",\n"),
+                    generate_gpu_receptors_attribute_setting(vars, "top_").join(",\n"),
                     self.blocks.iter().map(|(current_type, current_vars, _, _)| {
                         generate_gpu_receptors_attribute_setting_inner_receptor(
                             current_vars, self.type_name.generate(), current_type.generate()
