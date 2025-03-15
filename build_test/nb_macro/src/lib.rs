@@ -3393,6 +3393,8 @@ impl ReceptorsDefinition {
         //     inner_vars.extend(generate_gpu_receptors_attributes_vec(&self.current_vars, &neuro_prefix));
 
         //     // for i in receptor_var, use T::generate_attributes and parse out attrs
+        //     // j is attr in T::generate_attributes
+        //     // format!("let attr = format!(\"receptors${}$kinetics${}${{}}\");", neuro, name, j)
         //     // let attr = format!("receptors${}$kinetics${}${}", current_type.generate(), i.generate(), attr);
         // } 
 
