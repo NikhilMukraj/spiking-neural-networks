@@ -3383,24 +3383,62 @@ impl ReceptorsDefinition {
         // use T to list all attributes in each receptor var, and parse
         // out the individual attrs and add them to the hashset
 
-        // let get_all_attribute_names = "fn get_all_attribute_names() -> HashSet<String> {"
+        let get_all_attributes_header = "fn get_all_attributes() -> HashSet<(String, AvailableBufferType)> {";
         // for i in top level vars; for i in block { for var in block; for receptor in block { for attr in receptor } }
 
-        // let top_level_attrs = generate_gpu_receptors_attributes_vec(&self.top_level_vars, "top_");
-        // let mut inner_vars = vec![];
-        // for (current_type, current_vars, _, receptor_vars) in self.blocks.iter() {
-        //     let neuro_prefix = format!("{}_", current_type.generate());
-        //     inner_vars.extend(generate_gpu_receptors_attributes_vec(&self.current_vars, &neuro_prefix));
+        let mut all_attrs = match &self.top_level_vars {
+            Some(ref vals) => generate_gpu_receptors_attributes_vec(vals, "top_"),
+            None => vec![]
+        };
 
-        //     // for i in receptor_var, use T::generate_attributes and parse out attrs
-        //     // j is attr in T::generate_attributes
-        //     // format!("let attr = format!(\"receptors${}$kinetics${}${{}}\");", neuro, name, j)
-        //     // let attr = format!("receptors${}$kinetics${}${}", current_type.generate(), i.generate(), attr);
-        // } 
+        let mut receptor_attrs_generation = vec![];
+
+        for (current_type, current_vars, _, receptor_vars) in self.blocks.iter() {
+            let neuro_prefix = format!("{}_", current_type.generate());
+            all_attrs.extend(generate_gpu_receptors_attributes_vec(current_vars, &neuro_prefix));
+
+            if let Ast::VariablesAssignments(receptor_var_names) = receptor_vars {
+                for name in receptor_var_names {
+                    let receptor_kinetics_vars = format!(
+                        "attrs.extend(
+                            T::get_attribute_names().iter().map(|(i, j)|
+                                (
+                                    format!(
+                                        \"receptors${}${}$kinetics${{}}\", 
+                                        i.split(\"$\").collect::<Vec<_>>().last()
+                                            .expect(\"Invalid attribute\")
+                                    ), 
+                                    *j
+                                )
+                            ).collect::<Vec<(_, _)>>()
+                        );", 
+                        current_type.generate(), 
+                        &name.generate()[5..], 
+                    );
+
+                    receptor_attrs_generation.push(receptor_kinetics_vars);
+                }
+            } else {
+                unreachable!()
+            }
+        }
+
+        let get_all_attributes = format!(
+            "{}\nlet mut attrs = HashSet::from([{}]);\n{}\nattrs\n}}", 
+            get_all_attributes_header,
+            all_attrs.join(", "),
+            receptor_attrs_generation.join("\n"),
+        );
+
+        // convert to gpu
+        // convert to cpu
+        // needs to generate and read receptor flag vars
 
         let imports = vec![
+            String::from("use std::collections::HashSet;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
         ];
 
         (
@@ -3410,11 +3448,13 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
                 }}
                 ",
                 impl_header,
                 get_attribute,
                 set_attribute,
+                get_all_attributes,
             )
         )
     }
