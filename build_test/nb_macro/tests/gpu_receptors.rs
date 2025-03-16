@@ -15,6 +15,13 @@ mod test {
             r = min(max(t, 0), r_max)
     [end]
 
+    [receptor_kinetics]
+        type: ModulatedReceptorKinetics
+        vars: m = 1
+        on_iteration:
+            r = m * t
+    [end]
+
     [receptors]
         type: ExampleReceptors
         vars: m = 1
@@ -161,5 +168,69 @@ mod test {
         assert!(receptors.set_attribute("qwerty", BufferType::Float(1.)).is_err());
         assert!(receptors.set_attribute("qwerty", BufferType::UInt(1)).is_err());
         assert!(receptors.set_attribute("qwerty", BufferType::OptionalUInt(1)).is_err());
+    }
+
+    #[test]
+    fn test_get_attributes() {
+        let attrs = ExampleReceptors::<BoundedReceptorKinetics>::get_all_attributes();
+
+        assert!(attrs.iter().all(|(i, _)| i.contains("$")));
+        assert!(attrs.iter().all(|(i, _)| i.contains("receptors")));
+
+        assert!(!attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::OptionalUInt)));
+        assert!(attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Combined_g1"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_g2"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined_g1"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined_g2"), AvailableBufferType::UInt)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_e1"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_e2"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::UInt)));
+
+        assert!(attrs.contains(&(String::from("receptors$Combined$r1$kinetics$r"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r2$kinetics$r"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r1$kinetics$r_max"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r2$kinetics$r_max"), AvailableBufferType::Float)));
+
+        let attrs = ExampleReceptors::<ModulatedReceptorKinetics>::get_all_attributes();
+        
+        assert!(attrs.iter().all(|(i, _)| i.contains("$")));
+        assert!(attrs.iter().all(|(i, _)| i.contains("receptors")));
+
+        assert!(!attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::OptionalUInt)));
+        assert!(attrs.contains(&(String::from("receptors$top_m"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Combined_g1"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_g2"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined_g1"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined_g2"), AvailableBufferType::UInt)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_e1"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined_e2"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::UInt)));
+        assert!(!attrs.contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::UInt)));
+        assert!(attrs.contains(&(String::from("receptors$Basic$r$kinetics$m"), AvailableBufferType::Float)));
+
+        assert!(attrs.contains(&(String::from("receptors$Combined$r1$kinetics$r"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r2$kinetics$r"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined$r1$kinetics$r_max"), AvailableBufferType::Float)));
+        assert!(!attrs.contains(&(String::from("receptors$Combined$r2$kinetics$r_max"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r1$kinetics$m"), AvailableBufferType::Float)));
+        assert!(attrs.contains(&(String::from("receptors$Combined$r2$kinetics$m"), AvailableBufferType::Float)));
     }
 }
