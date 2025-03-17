@@ -742,7 +742,7 @@ impl<T: ReceptorKinetics> XReceptor<T> {
 }
 
 /// An encapsulation for necessary receptor traits
-pub trait Receptors {
+pub trait Receptors: Clone {
     type T: ReceptorKinetics;
     type N: NeurotransmitterType;
     type R;
@@ -777,6 +777,29 @@ pub trait IonotropicReception: Receptors {
     fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32);
     /// Gets the currents given a timestep and capacitance
     fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32;
+}
+
+#[cfg(feature = "gpu")]
+/// An encapsulation of behaviors for receptors on the GPU
+pub trait ReceptorsGPU: Receptors {
+    /// Gets a given attribute from the receptors
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
+    /// Gets a sets attribute in the receptors
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error>;
+    /// Gets all possible attributes
+    fn get_all_attributes() -> HashSet<(String, AvailableBufferType)>;
+    /// Converts the representation to one that can be used on the GPU
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts the GPU representation to a CPU representation
+    fn convert_to_cpu(
+        grid: &mut Vec<Vec<Self>>,
+        buffers: &HashMap<String, BufferGPU>,
+        rows: usize,
+        cols: usize,
+        queue: &CommandQueue,
+    ) -> Result<(), GPUError>;
 }
 
 #[derive(Debug, Clone)]
