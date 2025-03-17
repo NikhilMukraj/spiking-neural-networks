@@ -233,4 +233,16 @@ mod test {
         assert!(attrs.contains(&(String::from("receptors$Combined$r1$kinetics$m"), AvailableBufferType::Float)));
         assert!(attrs.contains(&(String::from("receptors$Combined$r2$kinetics$m"), AvailableBufferType::Float)));
     }
+
+    #[test]
+    fn test_neurotransmitter_gpu_type() {
+        assert_eq!(ExampleReceptorsNeurotransmitterType::number_of_types(), 2);
+        assert_eq!(
+            ExampleReceptorsNeurotransmitterType::get_all_types(), 
+            BTreeSet::from([
+                ExampleReceptorsNeurotransmitterType::Basic, 
+                ExampleReceptorsNeurotransmitterType::Combined
+            ])
+        );
+    }
 }
