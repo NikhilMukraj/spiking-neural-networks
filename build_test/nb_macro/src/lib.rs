@@ -3524,6 +3524,10 @@ impl ReceptorsDefinition {
         //         }
         //     }
 
+        //     write_buffer!(flag_buffer, context, queue, size, &current_attrs, UInt, last);
+
+        //     buffers.insert(attr.clone(), BufferGPU::UInt(flag_buffer));
+
         //     Ok(buffers)
         // }";
 
