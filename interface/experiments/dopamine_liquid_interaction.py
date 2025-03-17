@@ -351,6 +351,13 @@ for current_state in tqdm(all_states):
         current_value['return_to_baseline'] = return_to_baseline
         current_value['voltages'] = voltages
 
+        if parsed_toml['simulation_parameters']['peaks_on']:
+            hist = network.get_lattice(0).history
+            data = [i.flatten() for i in np.array(hist)]
+            peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+            current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
+
         current_state['trial'] = trial
 
         key = generate_key(parsed_toml, current_state)
