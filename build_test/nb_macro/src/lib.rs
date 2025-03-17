@@ -3263,6 +3263,45 @@ impl ReceptorsDefinition {
 
     #[cfg(feature = "gpu")]
     fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let neurotransmitter_gpu_impl = format!("
+            impl NeurotransmitterTypeGPU for {}NeurotransmitterType {{
+                fn type_to_numeric(&self) -> usize {{
+                    match &self {{
+                        {}
+                    }}
+                }}
+
+                fn number_of_types() -> usize {{
+                    {}
+                }}
+
+                fn get_all_types() -> BTreeSet<Self> {{
+                    BTreeSet::from([
+                        {}
+                    ])
+                }}
+
+                fn to_string(&self) -> String {{
+                    format!(\"{{:?}}\", self)
+                }}
+            }}",
+            self.type_name.generate(),
+            self.blocks.iter()
+                .enumerate()
+                .map(|(n, (current_type_name, _, _, _))| 
+                    format!("{}NeurotransmitterType::{} => {}", self.type_name.generate(), current_type_name.generate(), n)
+                )
+                .collect::<Vec<_>>()
+                .join(",\n"),
+            self.blocks.len(),
+            self.blocks.iter()
+                .map(|(current_type_name, _, _, _)| 
+                    format!("{}NeurotransmitterType::{}", self.type_name.generate(), current_type_name.generate())
+                )
+                .collect::<Vec<_>>()
+                .join(",\n"),
+        );
+
         let impl_header = format!("impl<T: ReceptorKineticsGPU> {}<T> {{", self.type_name.generate());
 
         let get_preprocessing_kinetics_parsing = "
@@ -3434,8 +3473,66 @@ impl ReceptorsDefinition {
         // convert to cpu
         // needs to generate and read receptor flag vars
 
+        // let convert_to_cpu_header = "fn convert_to_gpu(
+        //     grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+        // ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        //     if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
+        //         return Ok(HashMap::new());
+        //     }
+
+        //     let mut buffers = HashMap::new();
+            
+        //     for (attr, current_type) in Self::get_all_attributes() {
+        //         match current_type {
+        //             AvailiableBufferType::Float => {
+        //                 let mut current_attrs: Vec<f32> = vec![];
+        //                 for row in grid.iter() {
+        //                     for i in row.iter() {
+        //                         current_attrs.push(i.get_attribute(attr).unwrap_or(0.))
+        //                     }
+        //                 }
+
+        //                 write_buffer!(current_buffer, context, queue, size, &current_attrs, Float, last);
+
+        //                 buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
+        //             },
+        //             AvailiableBufferType::UInt => {
+        //                 let mut current_attrs: Vec<u32> = vec![];
+        //                 for row in grid.iter() {
+        //                     for i in row.iter() {
+        //                         current_attrs.push(i.get_attribute(attr).unwrap_or(0))
+        //                     }
+        //                 }
+
+        //                 write_buffer!(current_buffer, context, queue, size, &current_attrs, UInt, last);
+
+        //                 buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
+        //             },
+        //             _ => unreachable!(),
+        //         }
+        //     }
+
+        //     let mut receptor_flags
+        //     for row in grid.iter() {
+        //         for i in row.iter() {
+        //             for n in Self::N::get_all_types() {
+        //                 match i.receptors.get(&n) {
+        //                     Some(_) => receptor_flags.push(1),
+        //                     None => receptor_flags.push(0),
+        //                 }
+        //             }
+        //         }
+        //     }
+
+        //     Ok(buffers)
+        // }";
+
+        // need a ReceptorsGPU trait to associate neurotransmitter N type
+
         let imports = vec![
             String::from("use std::collections::HashSet;"),
+            String::from("use std::collections::BTreeSet;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterTypeGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
@@ -3449,9 +3546,12 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
                 }}
                 ",
+                neurotransmitter_gpu_impl,
                 impl_header,
+                // self.type_name.generate(),
                 get_attribute,
                 set_attribute,
                 get_all_attributes,
