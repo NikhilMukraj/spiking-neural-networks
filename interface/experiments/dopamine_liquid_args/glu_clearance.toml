@@ -1,5 +1,6 @@
 [simulation_parameters]
 measure_snr = true
+peaks_on = true
 
 exc_only = true
 
