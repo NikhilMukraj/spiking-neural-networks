@@ -71,3 +71,4 @@
 - [ ] handle spiking with continous spike detection
 - [ ] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [ ] **redo ligand gated channels using nb macro**
+- [ ] remove all `add_indents` calls
