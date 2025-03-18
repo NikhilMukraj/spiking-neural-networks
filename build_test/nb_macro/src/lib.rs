@@ -3430,6 +3430,8 @@ impl ReceptorsDefinition {
             None => vec![]
         };
 
+        let top_level_attrs = all_attrs.clone();
+
         let mut receptor_attrs_generation = vec![];
 
         for (current_type, current_vars, _, receptor_vars) in self.blocks.iter() {
@@ -3473,73 +3475,104 @@ impl ReceptorsDefinition {
         // convert to cpu
         // needs to generate and read receptor flag vars
 
-        // let convert_to_cpu_header = "fn convert_to_gpu(
-        //     grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
-        // ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        //     if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
-        //         return Ok(HashMap::new());
-        //     }
+        let convert_to_cpu = "fn convert_to_gpu(
+            grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+        ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+            if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
+                return Ok(HashMap::new());
+            }
 
-        //     let mut buffers = HashMap::new();
+            let mut buffers = HashMap::new();
+
+            let size: usize = grid.iter().map(|row| row.len()).sum();
             
-        //     for (attr, current_type) in Self::get_all_attributes() {
-        //         match current_type {
-        //             AvailiableBufferType::Float => {
-        //                 let mut current_attrs: Vec<f32> = vec![];
-        //                 for row in grid.iter() {
-        //                     for i in row.iter() {
-        //                         current_attrs.push(i.get_attribute(attr).unwrap_or(0.))
-        //                     }
-        //                 }
+            for (attr, current_type) in Self::get_all_attributes() {
+                match current_type {
+                    AvailableBufferType::Float => {
+                        let mut current_attrs: Vec<f32> = vec![];
+                        for row in grid.iter() {
+                            for i in row.iter() {
+                                match i.get_attribute(&attr) {
+                                    Some(BufferType::Float(val)) => current_attrs.push(val),
+                                    Some(_) => unreachable!(),
+                                    None => current_attrs.push(0.),
+                                };
+                            }
+                        }
 
-        //                 write_buffer!(current_buffer, context, queue, size, &current_attrs, Float, last);
+                        write_buffer!(current_buffer, context, queue, size, &current_attrs, Float, last);
 
-        //                 buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
-        //             },
-        //             AvailiableBufferType::UInt => {
-        //                 let mut current_attrs: Vec<u32> = vec![];
-        //                 for row in grid.iter() {
-        //                     for i in row.iter() {
-        //                         current_attrs.push(i.get_attribute(attr).unwrap_or(0))
-        //                     }
-        //                 }
+                        buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
+                    },
+                    AvailableBufferType::UInt => {
+                        let mut current_attrs: Vec<u32> = vec![];
+                        for row in grid.iter() {
+                            for i in row.iter() {
+                                match i.get_attribute(&attr) {
+                                    Some(BufferType::UInt(val)) => current_attrs.push(val),
+                                    Some(_) => unreachable!(),
+                                    None => current_attrs.push(0),
+                                };
+                            }
+                        }
 
-        //                 write_buffer!(current_buffer, context, queue, size, &current_attrs, UInt, last);
+                        write_buffer!(current_buffer, context, queue, size, &current_attrs, UInt, last);
 
-        //                 buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
-        //             },
-        //             _ => unreachable!(),
-        //         }
-        //     }
+                        buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
+                    },
+                    _ => unreachable!(),
+                }
+            }
 
-        //     let mut receptor_flags
-        //     for row in grid.iter() {
-        //         for i in row.iter() {
-        //             for n in Self::N::get_all_types() {
-        //                 match i.receptors.get(&n) {
-        //                     Some(_) => receptor_flags.push(1),
-        //                     None => receptor_flags.push(0),
-        //                 }
-        //             }
-        //         }
-        //     }
+            let mut receptor_flags: Vec<u32> = vec![];
+            for row in grid.iter() {
+                for i in row.iter() {
+                    for n in <Self as Receptors>::N::get_all_types() {
+                        match i.receptors.get(&n) {
+                            Some(_) => receptor_flags.push(1),
+                            None => receptor_flags.push(0),
+                        };
+                    }
+                }
+            }
 
-        //     write_buffer!(flag_buffer, context, queue, size, &current_attrs, UInt, last);
+            let flags_size = size * <Self as Receptors>::N::number_of_types();
 
-        //     buffers.insert(attr.clone(), BufferGPU::UInt(flag_buffer));
+            write_buffer!(flag_buffer, context, queue, flags_size, &receptor_flags, UInt, last);
 
-        //     Ok(buffers)
-        // }";
+            buffers.insert(String::from(\"receptors$flags\"), BufferGPU::UInt(flag_buffer));
+
+            Ok(buffers)
+        }";
+
+        let get_all_top_level_attributes = format!(
+            "fn get_all_top_level_attributes() -> HashSet<(String, AvailableBufferType)> {{
+                HashSet::from([{}])
+            }}",
+            top_level_attrs.join(", "),
+        );
 
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
         let imports = vec![
             String::from("use std::collections::HashSet;"),
             String::from("use std::collections::BTreeSet;"),
+            String::from("use std::ptr;"),
+            String::from("use opencl3::command_queue::CommandQueue;"),
+            String::from("use opencl3::context::Context;"),
+            String::from("use opencl3::memory::Buffer;"),
+            String::from("use opencl3::memory::CL_MEM_READ_WRITE;"),
+            String::from("use opencl3::types::cl_uint;"),
+            String::from("use opencl3::types::cl_float;"),
+            String::from("use opencl3::types::CL_BLOCKING;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterTypeGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
+            String::from("use spiking_neural_networks::error::GPUError;"),
         ];
 
         (
@@ -3551,14 +3584,17 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
+                {}
                 }}
                 ",
                 neurotransmitter_gpu_impl,
                 impl_header,
-                // self.type_name.generate(),
                 get_attribute,
                 set_attribute,
                 get_all_attributes,
+                convert_to_cpu,
+                get_all_top_level_attributes,
             )
         )
     }
