@@ -3552,6 +3552,17 @@ impl ReceptorsDefinition {
             top_level_attrs.join(", "),
         );
 
+        // match on neurotransmitter type
+        // return associated vars and associated receptor kinetics vars with that neurotransmitter type
+        // let get_attributes_associated_with = format!(
+        //     "fn get_attributes_associated_with(neurotransmitter: &{}NeurotransmitterType) -> HashSet<(String, AvailableBufferType)> {{
+        //         
+        //     }}",
+        //     self.type_name.generate()
+        // );
+
+        // convert to cpu fn
+
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
         let imports = vec![
