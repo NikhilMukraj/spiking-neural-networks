@@ -5,6 +5,7 @@ mod test {
     // works as intended
 
     use nb_macro::neuron_builder;
+    use opencl3::{command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}};
 
 
     neuron_builder!("
@@ -243,6 +244,48 @@ mod test {
                 ExampleReceptorsNeurotransmitterType::Basic, 
                 ExampleReceptorsNeurotransmitterType::Combined
             ])
+        );
+    }
+
+    #[test]
+    fn test_conversion() {
+        let mut receptors = ExampleReceptors::<BoundedReceptorKinetics>::default();
+
+        receptors.insert(
+            ExampleReceptorsNeurotransmitterType::Basic, 
+            ExampleReceptorsType::Basic(BasicReceptor::default())
+        ).unwrap();
+        receptors.insert(
+            ExampleReceptorsNeurotransmitterType::Combined, 
+            ExampleReceptorsType::Combined(CombinedReceptor::default())
+        ).unwrap();
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let gpu_grid = ExampleReceptors::convert_to_gpu(&[vec![receptors]], &context, &queue).unwrap();
+
+        assert!(gpu_grid.contains_key("receptors$flags"));
+
+        assert_eq!(
+            ExampleReceptors::<ModulatedReceptorKinetics>::get_all_top_level_attributes(), 
+            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
+        );
+        assert_eq!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_all_top_level_attributes(), 
+            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
         );
     }
 }
