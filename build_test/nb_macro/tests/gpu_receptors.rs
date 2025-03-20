@@ -287,5 +287,18 @@ mod test {
             ExampleReceptors::<BoundedReceptorKinetics>::get_all_top_level_attributes(), 
             HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
         );
+
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .iter().all(|i| !i.0.starts_with("receptors$top_"))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float))
+        );
     }
 }
