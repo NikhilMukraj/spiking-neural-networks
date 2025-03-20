@@ -3494,7 +3494,7 @@ impl ReceptorsDefinition {
         // convert to cpu
         // needs to generate and read receptor flag vars
 
-        let convert_to_cpu = "fn convert_to_gpu(
+        let convert_to_gpu = "fn convert_to_gpu(
             grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
         ) -> Result<HashMap<String, BufferGPU>, GPUError> {
             if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
@@ -3592,6 +3592,95 @@ impl ReceptorsDefinition {
 
         // convert to cpu fn
 
+        // let convert_to_cpu = "
+        //     fn convert_to_cpu(
+        //         grid: &mut [Vec<Self>],
+        //         buffers: &HashMap<String, BufferGPU>,
+        //         queue: &CommandQueue,
+        //         rows: usize,
+        //         cols: usize,
+        //     ) -> Result<(), GPUError> {
+        //         if rows == 0 || cols == 0 {
+        //             for inner in ligand_gates_grid {
+        //                 inner.clear();
+        //             }
+
+        //             return Ok(());
+        //         }
+
+        //         let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
+
+        //         for i in Self::<T>::get_all_attributes {
+        //             match key.1 {
+        //             AvailableBufferType::Float => {
+        //                 let mut current_contents = vec![0.; rows * cols];
+        //                 read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);
+
+        //                 let current_contents = current_contents.iter()
+        //                     .map(|i| BufferType::Float(*i))
+        //                     .collect::<Vec<BufferType>>();
+
+        //                 cpu_conversion.insert(key.0.clone(), current_contents);
+        //             },
+        //             AvailableBufferType::UInt => {
+        //                 let mut current_contents = vec![0; rows * cols];
+        //                 read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
+
+        //                 let current_contents = current_contents.iter()
+        //                     .map(|i| BufferType::UInt(*i))
+        //                     .collect::<Vec<BufferType>>();
+
+        //                 cpu_conversion.insert(key.0.clone(), current_contents);
+        //             },
+        //             _ => unreachable!(),
+        //         }
+
+        //         let mut current_contents = vec![0; rows * cols * <Self as Receptors>::N::number_of_types()];
+        //         read_and_set_buffer!(buffers, queue, \"receptors$flags\", &mut current_contents, UInt);
+
+        //         let flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
+
+        //         for row in 0..rows {
+        //             for col in 0..cols {
+        //                 let current_index = row * cols + col;
+
+        //                 for i in Self::get_all_top_level_attributes {
+        //                     grid[row][col].set_attribute(
+        //                         &i, 
+        //                         cpu_conversion.get(&i).unwrap()[current_index]
+        //                     ).unwrap();
+        //                 }
+        //                 for i in <Self as Receptors>::N::get_all_types {
+        //                     if flags[flag_index + i.to_numeric()] {
+        //                         for attr in Self::get_attributes_associated_with(&i) {
+        //                             match grid[row][col].receptors.get_mut(&i) {
+        //                                 Some(_) => receptors.set_attribute(
+        //                                     &i, 
+        //                                     cpu_conversion.get(&i).unwrap()[current_index]
+        //                                 ),
+        //                                 None => {
+        //                                     receptors.insert(
+        //                                         i,
+        //                                         i::get_associated_type()::default()
+        //                                     );
+        //                                     receptors.set_attribute(
+        //                                         &i, 
+        //                                         cpu_conversion.get(&i).unwrap()[current_index]
+        //                                     );
+        //                                 }
+        //                             };
+        //                         }
+        //                     } else {
+        //                         grid[row][col].receptors.remove(&i).unwrap();
+        //                     }
+        //                 }
+        //             }
+        //         }
+
+        //         Ok(())
+        //     }
+        // ";
+
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
         let imports = vec![
@@ -3634,7 +3723,7 @@ impl ReceptorsDefinition {
                 get_attribute,
                 set_attribute,
                 get_all_attributes,
-                convert_to_cpu,
+                convert_to_gpu,
                 get_all_top_level_attributes,
                 get_attributes_associated_with,
             )
