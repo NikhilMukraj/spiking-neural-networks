@@ -3430,17 +3430,19 @@ impl ReceptorsDefinition {
             None => vec![]
         };
 
+        let mut all_receptor_attrs_generation = vec![];
+
         let top_level_attrs = all_attrs.clone();
 
-        let mut receptor_attrs_generation = vec![];
-
-        let mut neurotransmitter_to_get_attr: HashMap<String, (Vec<String>, String)> = HashMap::new();
+        let mut neurotransmitter_to_get_attr: HashMap<String, (Vec<String>, Vec<String>)> = HashMap::new();
 
         for (current_type, current_vars, _, receptor_vars) in self.blocks.iter() {
             let neuro_prefix = format!("{}_", current_type.generate());
             let current_attrs = generate_gpu_receptors_attributes_vec(current_vars, &neuro_prefix);
 
             all_attrs.extend(current_attrs.clone());
+
+            let mut receptor_attrs_generation = vec![];
 
             if let Ast::VariablesAssignments(receptor_var_names) = receptor_vars {
                 for name in receptor_var_names {
@@ -3462,29 +3464,30 @@ impl ReceptorsDefinition {
                     );
 
                     receptor_attrs_generation.push(receptor_kinetics_vars.clone());
-
-                    neurotransmitter_to_get_attr.insert(
-                        format!(
-                            "{}NeurotransmitterType::{}", 
-                            self.type_name.generate(),
-                            current_type.generate(),
-                        ),
-                        (
-                            current_attrs.clone(),
-                            receptor_kinetics_vars,
-                        )
-                    );
+                    all_receptor_attrs_generation.push(receptor_kinetics_vars);
                 }
             } else {
                 unreachable!()
             }
+
+            neurotransmitter_to_get_attr.insert(
+                format!(
+                    "{}NeurotransmitterType::{}", 
+                    self.type_name.generate(),
+                    current_type.generate(),
+                ),
+                (
+                    current_attrs.clone(),
+                    receptor_attrs_generation,
+                )
+            );
         }
 
         let get_all_attributes = format!(
             "{}\nlet mut attrs = HashSet::from([{}]);\n{}\nattrs\n}}", 
             get_all_attributes_header,
             all_attrs.join(", "),
-            receptor_attrs_generation.join("\n"),
+            all_receptor_attrs_generation.join("\n"),
         );
 
         // convert to gpu
@@ -3582,7 +3585,7 @@ impl ReceptorsDefinition {
                     "{} => {{\nlet mut attrs = HashSet::from([{}]);\n{}\nattrs\n}}",
                     i,
                     attrs.join(", "),
-                    receptor_vars,
+                    receptor_vars.join("\n"),
                 )
             }).collect::<Vec<_>>().join(",\n")
         );
