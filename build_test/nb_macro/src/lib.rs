@@ -3434,9 +3434,13 @@ impl ReceptorsDefinition {
 
         let mut receptor_attrs_generation = vec![];
 
+        let mut neurotransmitter_to_get_attr: HashMap<String, (Vec<String>, String)> = HashMap::new();
+
         for (current_type, current_vars, _, receptor_vars) in self.blocks.iter() {
             let neuro_prefix = format!("{}_", current_type.generate());
-            all_attrs.extend(generate_gpu_receptors_attributes_vec(current_vars, &neuro_prefix));
+            let current_attrs = generate_gpu_receptors_attributes_vec(current_vars, &neuro_prefix);
+
+            all_attrs.extend(current_attrs.clone());
 
             if let Ast::VariablesAssignments(receptor_var_names) = receptor_vars {
                 for name in receptor_var_names {
@@ -3457,7 +3461,19 @@ impl ReceptorsDefinition {
                         &name.generate()[5..], 
                     );
 
-                    receptor_attrs_generation.push(receptor_kinetics_vars);
+                    receptor_attrs_generation.push(receptor_kinetics_vars.clone());
+
+                    neurotransmitter_to_get_attr.insert(
+                        format!(
+                            "{}NeurotransmitterType::{}", 
+                            self.type_name.generate(),
+                            current_type.generate(),
+                        ),
+                        (
+                            current_attrs.clone(),
+                            receptor_kinetics_vars,
+                        )
+                    );
                 }
             } else {
                 unreachable!()
@@ -3554,12 +3570,22 @@ impl ReceptorsDefinition {
 
         // match on neurotransmitter type
         // return associated vars and associated receptor kinetics vars with that neurotransmitter type
-        // let get_attributes_associated_with = format!(
-        //     "fn get_attributes_associated_with(neurotransmitter: &{}NeurotransmitterType) -> HashSet<(String, AvailableBufferType)> {{
-        //         
-        //     }}",
-        //     self.type_name.generate()
-        // );
+        let get_attributes_associated_with = format!(
+            "fn get_attributes_associated_with(neurotransmitter: &{}NeurotransmitterType) -> HashSet<(String, AvailableBufferType)> {{
+                match neurotransmitter {{
+                    {}
+                }}
+            }}",
+            self.type_name.generate(),
+            neurotransmitter_to_get_attr.iter().map(|(i, (attrs, receptor_vars))| {
+                format!(
+                    "{} => {{\nlet mut attrs = HashSet::from([{}]);\n{}\nattrs\n}}",
+                    i,
+                    attrs.join(", "),
+                    receptor_vars,
+                )
+            }).collect::<Vec<_>>().join(",\n")
+        );
 
         // convert to cpu fn
 
@@ -3597,6 +3623,7 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
                 }}
                 ",
                 neurotransmitter_gpu_impl,
@@ -3606,6 +3633,7 @@ impl ReceptorsDefinition {
                 get_all_attributes,
                 convert_to_cpu,
                 get_all_top_level_attributes,
+                get_attributes_associated_with,
             )
         )
     }
