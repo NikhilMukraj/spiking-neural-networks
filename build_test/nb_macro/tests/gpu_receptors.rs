@@ -248,6 +248,76 @@ mod test {
     }
 
     #[test]
+    fn test_get_attrs_subdivisions() {
+                assert_eq!(
+            ExampleReceptors::<ModulatedReceptorKinetics>::get_all_top_level_attributes(), 
+            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
+        );
+        assert_eq!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_all_top_level_attributes(), 
+            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
+        );
+
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .iter().all(|i| !i.0.starts_with("receptors$top_"))
+        );
+
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
+                .contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::Float))
+        );
+
+        assert!(
+            !ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float))
+        );
+        assert!(
+            !ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float))
+        );
+
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Combined_g1"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Combined_g2"), AvailableBufferType::Float))
+        );
+
+        assert!(
+            !ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Basic$r$kinetics$r"), AvailableBufferType::Float))
+        );
+        assert!(
+            !ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Basic$r$kinetics$r_max"), AvailableBufferType::Float))
+        );
+
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Combined$r1$kinetics$r"), AvailableBufferType::Float))
+        );
+        assert!(
+            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Combined)
+                .contains(&(String::from("receptors$Combined$r1$kinetics$r_max"), AvailableBufferType::Float))
+        );
+    }
+
+    #[test]
     fn test_conversion() {
         let mut receptors = ExampleReceptors::<BoundedReceptorKinetics>::default();
 
@@ -278,27 +348,5 @@ mod test {
         let gpu_grid = ExampleReceptors::convert_to_gpu(&[vec![receptors]], &context, &queue).unwrap();
 
         assert!(gpu_grid.contains_key("receptors$flags"));
-
-        assert_eq!(
-            ExampleReceptors::<ModulatedReceptorKinetics>::get_all_top_level_attributes(), 
-            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
-        );
-        assert_eq!(
-            ExampleReceptors::<BoundedReceptorKinetics>::get_all_top_level_attributes(), 
-            HashSet::from([(String::from("receptors$top_m"), AvailableBufferType::Float)])
-        );
-
-        assert!(
-            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
-                .iter().all(|i| !i.0.starts_with("receptors$top_"))
-        );
-        assert!(
-            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
-                .contains(&(String::from("receptors$Basic_g"), AvailableBufferType::Float))
-        );
-        assert!(
-            ExampleReceptors::<BoundedReceptorKinetics>::get_attributes_associated_with(&ExampleReceptorsNeurotransmitterType::Basic)
-                .contains(&(String::from("receptors$Basic_e"), AvailableBufferType::Float))
-        );
     }
 }
