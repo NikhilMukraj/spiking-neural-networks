@@ -263,7 +263,6 @@ for current_state in tqdm(all_states):
             c2,
             dopamine_firing
         )
-        network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         if not parsed_toml['simulation_parameters']['exc_only']:
             network.connect(
