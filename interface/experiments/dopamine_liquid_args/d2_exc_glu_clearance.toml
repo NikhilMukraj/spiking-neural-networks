@@ -6,7 +6,7 @@ exc_only = true
 
 off_phase = 5000
 
-s_d2 = true
+d2 = true
 
 skew = 1
 tolerance = 2
