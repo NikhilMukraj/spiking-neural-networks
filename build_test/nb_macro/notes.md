@@ -71,4 +71,5 @@
 - [ ] handle spiking with continous spike detection
 - [ ] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [ ] **redo ligand gated channels using nb macro**
+  - [ ] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
 - [ ] remove all `add_indents` calls
