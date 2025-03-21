@@ -6,6 +6,8 @@ exc_only = true
 
 off_phase = 5000
 
+s_d2 = true
+
 internal_weights_scalar = 0.5
 skew = 1
 tolerance = 2
