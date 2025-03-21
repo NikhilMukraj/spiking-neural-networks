@@ -8,7 +8,6 @@ off_phase = 5000
 
 s_d2 = true
 
-internal_weights_scalar = 0.5
 skew = 1
 tolerance = 2
 
@@ -17,6 +16,8 @@ trials = 20
 filename = "dopamine_glu_liquid.json"
 
 [variables]
+internal_weights_scalar = [0.125]
+inh_internal_scalar = [2]
 spike_train_to_exc = [2]
 glutamate_clearance = [0.001, 0.0025, 0.005, 0.0075, 0.01]
 dopamine_firing_rate = [0.0, 0.05]
