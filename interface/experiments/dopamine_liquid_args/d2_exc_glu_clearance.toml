@@ -13,7 +13,7 @@ tolerance = 2
 
 trials = 20
 
-filename = "dopamine_glu_liquid.json"
+filename = "d2_glu_liquid.json"
 
 [variables]
 internal_weights_scalar = [0.125]
