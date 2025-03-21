@@ -348,5 +348,9 @@ mod test {
         let gpu_grid = ExampleReceptors::convert_to_gpu(&[vec![receptors]], &context, &queue).unwrap();
 
         assert!(gpu_grid.contains_key("receptors$flags"));
+
+        for (attr, _) in ExampleReceptors::<BoundedReceptorKinetics>::get_all_attributes() {
+            assert!(gpu_grid.contains_key(&attr))
+        }
     }
 }
