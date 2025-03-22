@@ -2571,7 +2571,7 @@ impl ReceptorKineticsDefinition {
         ];
 
         let header = format!(
-            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
+            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{", 
             self.type_name.generate(),
         );
         
@@ -2947,7 +2947,7 @@ impl ReceptorsDefinition {
             }
 
             let struct_def = format!(
-                "#[derive(Debug, Clone)]\npub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
+                "#[derive(Debug, Clone, PartialEq)]\npub struct {}Receptor<T: ReceptorKinetics> {{\n{}\n}}", 
                 type_name.generate(),
                 vars.join(",\n")
             );
@@ -3026,7 +3026,7 @@ impl ReceptorsDefinition {
         // otherwise add it to the currents to sum together ionotropically
 
         let receptor_enum = format!(
-            "#[derive(Debug, Clone)]\npub enum {}Type<T: ReceptorKinetics> {{\n{}\n}}",
+            "#[derive(Debug, Clone, PartialEq)]\npub enum {}Type<T: ReceptorKinetics> {{\n{}\n}}",
             self.type_name.generate(),
             receptor_names.iter()
                 .map(|i| format!("{}({}Receptor<T>)", i, i))
@@ -3674,7 +3674,7 @@ impl ReceptorsDefinition {
                             ).unwrap();
                         }
                         for i in <Self as Receptors>::N::get_all_types() {
-                            if flags[current_index + i.type_to_numeric()] {
+                            if flags[current_index * <Self as Receptors>::N::number_of_types() + i.type_to_numeric()] {
                                 for attr in Self::get_attributes_associated_with(&i) {
                                     match grid[row][col].receptors.get_mut(&i) {
                                         Some(_) => grid[row][col].set_attribute(
@@ -3694,7 +3694,7 @@ impl ReceptorsDefinition {
                                     };
                                 }
                             } else {
-                                grid[row][col].receptors.remove(&i).unwrap();
+                                let _ = grid[row][col].receptors.remove(&i);
                             }
                         }
                     }
