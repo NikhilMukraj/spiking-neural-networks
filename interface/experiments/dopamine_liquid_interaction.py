@@ -138,7 +138,7 @@ inh_num = inh_n * inh_n
 
 setup_neuron = generate_setup_neuron(
     parsed_toml['simulation_parameters']['c_m'], 
-    0.1,
+    parsed['simulation_parameters']['skew'],
 )
 
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
