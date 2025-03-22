@@ -3704,6 +3704,12 @@ impl ReceptorsDefinition {
             }
         ";
 
+        // fns for each receptor iteration type
+        // when generating neuron type
+        // iterate over each function to add to main program
+        // iterate over each function signature to add to receptor updates
+        // need to also update the receptor kinetics depending on input
+
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
         let imports = vec![
