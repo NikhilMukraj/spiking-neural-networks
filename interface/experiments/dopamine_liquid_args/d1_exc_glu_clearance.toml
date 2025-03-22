@@ -16,7 +16,7 @@ trials = 20
 filename = "d1_glu_liquid.json"
 
 [variables]
-internal_weights_scalar = [0.125]
+internal_scalar = [0.125]
 inh_internal_scalar = [2]
 spike_train_to_exc = [2]
 glutamate_clearance = [0.001, 0.0025, 0.005, 0.0075, 0.01]

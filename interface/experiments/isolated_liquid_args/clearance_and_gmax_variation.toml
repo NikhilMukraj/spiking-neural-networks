@@ -16,7 +16,7 @@ filename = "clearance_and_gmax_variation.json"
 
 [variables]
 spike_train_to_exc = [0]
-internal_scalar = [0.5]
+internal_scalar = [0.125]
 glutamate_clearance = [0.001, 0.005, 0.01]
 gabaa_clearance = [0.001, 0.005, 0.01]
 nmda_g = [0.5, 1.0, 1.5]
