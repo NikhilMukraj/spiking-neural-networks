@@ -76,7 +76,7 @@ def fill_defaults(parsed):
         parsed['variables']['spike_train_connectivity'] = [0.5]
     
     if 'internal_scalar' not in parsed['variables']:
-        parsed['variables']['internal_scalar'] = [0.5]
+        parsed['variables']['internal_scalar'] = [0.125]
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = [3]
     if 'exc_to_inh_weight' not in parsed['variables']:
