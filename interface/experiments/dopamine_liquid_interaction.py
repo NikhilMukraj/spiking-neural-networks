@@ -59,7 +59,7 @@ def fill_defaults(parsed):
     if 'dt' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['dt'] = 1
     if 'c_m' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['c_m'] = 25
+        parsed['simulation_parameters']['c_m'] = 100
 
     if 'cue_firing_rate' not in parsed['variables']:
         parsed['variables']['cue_firing_rate'] = [0.01]
