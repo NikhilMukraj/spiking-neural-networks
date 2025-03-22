@@ -1,9 +1,6 @@
 #[cfg(feature = "gpu")]
 #[cfg(test)]
 mod test {
-    // check if getting and setting attributes (particularly with kinetics)
-    // works as intended
-
     use nb_macro::neuron_builder;
     use opencl3::{command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}};
 
@@ -323,11 +320,76 @@ mod test {
 
         receptors.insert(
             ExampleReceptorsNeurotransmitterType::Basic, 
-            ExampleReceptorsType::Basic(BasicReceptor::default())
+            ExampleReceptorsType::Basic(BasicReceptor {g: 0.1, ..BasicReceptor::default()})
         ).unwrap();
         receptors.insert(
             ExampleReceptorsNeurotransmitterType::Combined, 
-            ExampleReceptorsType::Combined(CombinedReceptor::default())
+            ExampleReceptorsType::Combined(CombinedReceptor {g1: 0.25, ..CombinedReceptor::default()})
+        ).unwrap();
+
+        receptors.m = 10.;
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let gpu_grid = ExampleReceptors::convert_to_gpu(&[vec![receptors.clone()]], &context, &queue).unwrap();
+
+        assert!(gpu_grid.contains_key("receptors$flags"));
+
+        for (attr, _) in ExampleReceptors::<BoundedReceptorKinetics>::get_all_attributes() {
+            assert!(gpu_grid.contains_key(&attr))
+        }
+
+        let mut conversion: Vec<Vec<ExampleReceptors<BoundedReceptorKinetics>>> = vec![vec![ExampleReceptors::default()]];
+
+        assert!(conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Basic).is_none());
+        assert!(conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Combined).is_none());
+
+        ExampleReceptors::convert_to_cpu(&mut conversion, &gpu_grid, &queue, 1, 1).unwrap();
+
+        assert_eq!(conversion[0][0].m, receptors.m);
+
+        assert!(conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Basic).is_some());
+        assert!(conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Combined).is_some());
+        assert_eq!(
+            conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Basic).unwrap(),
+            receptors.get(&ExampleReceptorsNeurotransmitterType::Basic).unwrap(),
+        );
+        assert_eq!(
+            conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Combined).unwrap(),
+            receptors.get(&ExampleReceptorsNeurotransmitterType::Combined).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_conversion_non_square() {
+        let mut receptors = ExampleReceptors::<BoundedReceptorKinetics>::default();
+
+        receptors.insert(
+            ExampleReceptorsNeurotransmitterType::Basic, 
+            ExampleReceptorsType::Basic(
+                BasicReceptor {
+                    g: 0.1, 
+                    r: BoundedReceptorKinetics { r_max: 0.5, r: 0. }, 
+                    ..BasicReceptor::default()
+                }
+            )
+        ).unwrap();
+        receptors.insert(
+            ExampleReceptorsNeurotransmitterType::Combined, 
+            ExampleReceptorsType::Combined(CombinedReceptor {g2: 0.25, ..CombinedReceptor::default()})
         ).unwrap();
 
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
@@ -345,12 +407,26 @@ mod test {
             )
             .expect("CommandQueue::create_default failed");
 
-        let gpu_grid = ExampleReceptors::convert_to_gpu(&[vec![receptors]], &context, &queue).unwrap();
+        let gpu_grid = ExampleReceptors::convert_to_gpu(
+            &[vec![receptors.clone(), ExampleReceptors::default()]], 
+            &context, 
+            &queue
+        ).unwrap();    
 
-        assert!(gpu_grid.contains_key("receptors$flags"));
+        let mut conversion: Vec<Vec<ExampleReceptors<BoundedReceptorKinetics>>> = vec![vec![ExampleReceptors::default(), ExampleReceptors::default()]];
 
-        for (attr, _) in ExampleReceptors::<BoundedReceptorKinetics>::get_all_attributes() {
-            assert!(gpu_grid.contains_key(&attr))
-        }
+        ExampleReceptors::convert_to_cpu(&mut conversion, &gpu_grid, &queue, 1, 2).unwrap();
+
+        assert_eq!(
+            conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Basic).unwrap(),
+            receptors.get(&ExampleReceptorsNeurotransmitterType::Basic).unwrap(),
+        );
+        assert_eq!(
+            conversion[0][0].get(&ExampleReceptorsNeurotransmitterType::Combined).unwrap(),
+            receptors.get(&ExampleReceptorsNeurotransmitterType::Combined).unwrap(),
+        );
+
+        assert!(conversion[0][1].get(&ExampleReceptorsNeurotransmitterType::Basic).is_none());
+        assert!(conversion[0][1].get(&ExampleReceptorsNeurotransmitterType::Combined).is_none());
     }
 }
