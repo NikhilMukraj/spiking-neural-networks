@@ -431,4 +431,7 @@ mod test {
        
         Ok(())
     }
+
+    // neuron will have to build receptor kinetics calls and receptor update calls
+    // from the given traits
 }
