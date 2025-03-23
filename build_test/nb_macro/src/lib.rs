@@ -3746,6 +3746,19 @@ impl ReceptorsDefinition {
         //     update_blocks.push((function, args));
         // }
 
+        // let get_updates = format!(
+        //     "fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>> {{
+        //         {}
+        //     }}",
+        //     update_blocks.iter().map(|(i, j)| {
+        //         format!(
+        //             "(String::from(\"{}\"), vec![{}])",
+        //             i,
+        //             j.join(", ")
+        //         )
+        //     }).collect::<Vec<String>>()
+        // );
+
         let imports = vec![
             String::from("use std::collections::HashSet;"),
             String::from("use std::collections::BTreeSet;"),
