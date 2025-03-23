@@ -3712,6 +3712,40 @@ impl ReceptorsDefinition {
 
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
+        // function itself, arg identifiers, arg type
+        // let update_blocks: Vec<(String, Vec<String>)> = vec![];
+
+        // for (current_type, current_vars, on_iteration, receptor_vars) in self.blocks {
+        //     let current_receptor_vars = vec![];
+        //     if let Ast::VariableAssignments(vars) = receptor_vars {
+        //         for i in vars {
+        //             current_receptor_vars.push(i);
+        //         }
+        //     }
+
+        //     let signature = format!(
+        //         "__kernel void update_{}(index, {}, {}) {{",
+        //         current_type.generate(),
+        //         current_receptor_vars.iter().map(|i| format!("float *{}", i)).join(", ")
+        //         generate_kernel_args(&current_vars).join(", "),
+        //     );
+
+        //     let body = generate_gpu_kernel_on_iteration(&on_iteration);
+
+        //     let function = format!("{}\n{}\n}}", signature, body);
+
+        //     let mut args = generate_gpu_receptors_attributes_vec(
+        //         &current_vars, &format!("{}_", current_type.generate())
+        //     );
+        //     args.extend(
+        //         current_receptor_vars.iter()
+        //             .map(|i| format!("(String::from(\"{}\"), AvailableBufferType::Float)"))
+        //             .collect::<Vec<String>>()
+        //     );
+
+        //     update_blocks.push((function, args));
+        // }
+
         let imports = vec![
             String::from("use std::collections::HashSet;"),
             String::from("use std::collections::BTreeSet;"),
@@ -3734,6 +3768,8 @@ impl ReceptorsDefinition {
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
             String::from("use spiking_neural_networks::error::GPUError;"),
         ];
+
+        // function that returns update blocks with args for neuron to use
 
         (
             imports,
