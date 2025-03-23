@@ -3734,9 +3734,12 @@ impl ReceptorsDefinition {
 
         //     let function = format!("{}\n{}\n}}", signature, body);
 
-        //     let mut args = generate_gpu_receptors_attributes_vec(
-        //         &current_vars, &format!("{}_", current_type.generate())
-        //     );
+        //     let mut args = vec![String::from("(String::from(\"index\"), AvailableBufferType::uint")];
+        //     args.extend(
+        //         generate_gpu_receptors_attributes_vec(
+        //              &current_vars, &format!("{}_", current_type.generate()
+        //         )
+        //      );
         //     args.extend(
         //         current_receptor_vars.iter()
         //             .map(|i| format!("(String::from(\"{}\"), AvailableBufferType::Float)"))
@@ -3748,7 +3751,7 @@ impl ReceptorsDefinition {
 
         // let get_updates = format!(
         //     "fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>> {{
-        //         {}
+        //         vec![{}]
         //     }}",
         //     update_blocks.iter().map(|(i, j)| {
         //         format!(
