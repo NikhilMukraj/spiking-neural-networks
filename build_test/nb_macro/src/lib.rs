@@ -3713,54 +3713,80 @@ impl ReceptorsDefinition {
         // need a ReceptorsGPU trait to associate neurotransmitter N type
 
         // function itself, arg identifiers, arg type
-        // let update_blocks: Vec<(String, Vec<String>)> = vec![];
+        let mut update_blocks: Vec<(String, Vec<String>)> = vec![];
 
-        // for (current_type, current_vars, on_iteration, receptor_vars) in self.blocks {
-        //     let current_receptor_vars = vec![];
-        //     if let Ast::VariableAssignments(vars) = receptor_vars {
-        //         for i in vars {
-        //             current_receptor_vars.push(i);
-        //         }
-        //     }
+        for (current_type, current_vars, on_iteration, receptor_vars) in self.blocks.iter() {
+            let mut current_receptor_vars = vec![];
+            if let Ast::VariablesAssignments(vars) = receptor_vars {
+                for i in vars {
+                    current_receptor_vars.push(i);
+                }
+            }
 
-        //     let signature = format!(
-        //         "__kernel void update_{}(index, {}, {}) {{",
-        //         current_type.generate(),
-        //         current_receptor_vars.iter().map(|i| format!("float *{}", i)).join(", ")
-        //         generate_kernel_args(&current_vars).join(", "),
-        //     );
+            let signature = if let Some(top_level) = &self.top_level_vars {
+                format!(
+                    "__kernel void update_{}(uint index, __global float *current_voltage, {}, {}, {}) {{",
+                    current_type.generate(),
+                    generate_kernel_args(top_level).join(", "),
+                    current_receptor_vars.iter().map(|i| format!("__global float *{}", &i.generate()[5..]))
+                        .collect::<Vec<_>>().join(", "),
+                    generate_kernel_args(current_vars).join(", "),
+                )
+            } else {
+                format!(
+                    "__kernel void update_{}(uint index, __global float *current_voltage, {}, {}) {{",
+                    current_type.generate(),
+                    current_receptor_vars.iter().map(|i| format!("__global float *{}", &i.generate()[5..]))
+                        .collect::<Vec<_>>().join(", "),
+                    generate_kernel_args(current_vars).join(", "),
+                )
+            };
 
-        //     let body = generate_gpu_kernel_on_iteration(&on_iteration);
+            let body = generate_gpu_kernel_on_iteration(on_iteration);
 
-        //     let function = format!("{}\n{}\n}}", signature, body);
+            let function = format!("{}\n{}\n}}", signature, body);
 
-        //     let mut args = vec![String::from("(String::from(\"index\"), AvailableBufferType::uint")];
-        //     args.extend(
-        //         generate_gpu_receptors_attributes_vec(
-        //              &current_vars, &format!("{}_", current_type.generate()
-        //         )
-        //      );
-        //     args.extend(
-        //         current_receptor_vars.iter()
-        //             .map(|i| format!("(String::from(\"{}\"), AvailableBufferType::Float)"))
-        //             .collect::<Vec<String>>()
-        //     );
+            let mut args = vec![
+                String::from("(String::from(\"index\"), AvailableBufferType::UInt)"),
+                String::from("(String::from(\"current_voltage\"), AvailableBufferType::Float)"),
+            ];
+            if let Some(top_level) = &self.top_level_vars {
+                args.extend(
+                    generate_gpu_receptors_attributes_vec(
+                        top_level, "top_"
+                    )
+                );
+            }
+            args.extend(
+                current_receptor_vars.iter()
+                    .map(|i| format!(
+                        "(String::from(\"receptors${}${}$kinetics$r\"), AvailableBufferType::Float)", 
+                        current_type.generate(),
+                        &i.generate()[5..],
+                    ))
+                    .collect::<Vec<String>>()
+            );
+            args.extend(
+                generate_gpu_receptors_attributes_vec(
+                    current_vars, &format!("{}_", current_type.generate())
+                )
+            );
 
-        //     update_blocks.push((function, args));
-        // }
+            update_blocks.push((function, args));
+        }
 
-        // let get_updates = format!(
-        //     "fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>> {{
-        //         vec![{}]
-        //     }}",
-        //     update_blocks.iter().map(|(i, j)| {
-        //         format!(
-        //             "(String::from(\"{}\"), vec![{}])",
-        //             i,
-        //             j.join(", ")
-        //         )
-        //     }).collect::<Vec<String>>()
-        // );
+        let get_updates = format!(
+            "fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>)> {{
+                vec![{}]
+            }}",
+            update_blocks.iter().map(|(i, j)| {
+                format!(
+                    "(String::from(\"{}\"), vec![{}])",
+                    i,
+                    j.join(", ")
+                )
+            }).collect::<Vec<String>>().join(", ")
+        );
 
         let imports = vec![
             String::from("use std::collections::HashSet;"),
@@ -3800,6 +3826,7 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
                 }}
                 ",
                 neurotransmitter_gpu_impl,
@@ -3811,6 +3838,7 @@ impl ReceptorsDefinition {
                 get_all_top_level_attributes,
                 get_attributes_associated_with,
                 convert_to_cpu,
+                get_updates,
             )
         )
     }
