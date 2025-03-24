@@ -114,10 +114,10 @@ impl<T: ReceptorKinetics> DopamineReceptor<T> {
     pub fn get_modifiers(&self, inh_modifier: &mut f32, nmda_modifier: &mut f32) {
         let mut d1_modifier = 0.;
         if self.d2_enabled {
-            *inh_modifier = 1. - (self.d2_r.get_r() * self.s_d2);
+            *inh_modifier = 1. - (self.d2_r.get_r().max(0.).min(1.) * self.s_d2);
         }
         if self.d1_enabled {
-            d1_modifier = self.d1_r.get_r() * self.s_d1;
+            d1_modifier = self.d1_r.get_r().max(0.).min(1.) * self.s_d1;
         }
         *nmda_modifier = 1. - d1_modifier;
     }
