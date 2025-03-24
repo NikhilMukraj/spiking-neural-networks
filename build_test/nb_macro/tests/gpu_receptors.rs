@@ -2,7 +2,12 @@
 #[cfg(test)]
 mod test {
     use nb_macro::neuron_builder;
-    use opencl3::{command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}};
+    use opencl3::{
+        command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
+        device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
+        program::Program
+    };
+    use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
 
     neuron_builder!("
@@ -428,5 +433,52 @@ mod test {
 
         assert!(conversion[0][1].get(&ExampleReceptorsNeurotransmitterType::Basic).is_none());
         assert!(conversion[0][1].get(&ExampleReceptorsNeurotransmitterType::Combined).is_none());
+    }
+
+    #[test]
+    fn test_get_updates() -> Result<(), SpikingNeuralNetworksError> {
+        let updates = ExampleReceptors::<BoundedReceptorKinetics>::get_updates();
+
+        assert_eq!(updates.len(), ExampleReceptorsNeurotransmitterType::number_of_types());
+
+        for (_, attrs) in updates.iter() {
+            for i in attrs {
+                if i.0 == "index" {
+                    continue;
+                }
+                if i.0 == "current_voltage" {
+                    continue;
+                }
+                assert!(
+                    ExampleReceptors::<BoundedReceptorKinetics>::get_all_attributes().contains(i), 
+                    "{:#?}", 
+                    i,
+                );
+            }
+        }
+
+        let mut program = String::from("");
+        for (function, _) in updates.iter() {
+            if !program.is_empty() {
+                program = format!("{}\n{}", program, function);
+            } else {
+                program = function.clone();
+            }
+        }
+
+        println!("{}", program);
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        match Program::create_and_build_from_source(&context, &program, "") {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SpikingNeuralNetworksError::from(GPUError::ProgramCompileFailure)),
+        }
     }
 }
