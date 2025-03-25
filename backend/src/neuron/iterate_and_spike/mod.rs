@@ -688,6 +688,16 @@ pub enum DefaultReceptorsNeurotransmitterType {
     X,
 }
 
+impl DefaultReceptorsNeurotransmitterType {
+    fn get_associated_receptor<T: ReceptorKinetics>(&self) -> DefaultReceptorsType<T> {
+        match &self {
+            DefaultReceptorsNeurotransmitterType::X => {
+                DefaultReceptorsType::X(XReceptor::<T>::default())
+            }
+        }
+    }
+}
+
 impl NeurotransmitterType for DefaultReceptorsNeurotransmitterType {}
 
 #[cfg(feature = "gpu")]
@@ -738,6 +748,282 @@ impl<T: ReceptorKinetics> XReceptor<T> {
     }
     fn iterate(&mut self, current_voltage: f32, _dt: f32) {
         self.current = self.g * self.r.get_r() * (current_voltage - self.e);
+    }
+}
+
+impl<T: ReceptorKineticsGPU> ReceptorsGPU for DefaultReceptors<T> {
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType> {
+        match attribute {
+            "receptors$X_current" => match &self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+                Some(DefaultReceptorsType::X(val)) => Some(BufferType::Float(val.current)),
+                _ => None
+            },
+            "receptors$X_g" => match &self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+                Some(DefaultReceptorsType::X(val)) => Some(BufferType::Float(val.g)),
+                _ => None
+            },
+            "receptors$X_e" => match &self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+                Some(DefaultReceptorsType::X(val)) => Some(BufferType::Float(val.e)),
+                _ => None
+            },
+            _ => {
+                let split = attribute.split("$").collect::<Vec<&str>>();
+                if split.len() != 5 { return None; }
+                let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);  
+
+                if *receptor != *"receptors".to_string() || *kinetics != *"kinetics".to_string() { return None; }  
+                let stripped = format!("receptors$kinetics${}", attr);
+                let to_match = format!("{}${}", neuro, name);
+
+                match to_match.as_str() {
+                    "X$r" => match self.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+                        Some(DefaultReceptorsType::X(inner)) => inner.r.get_attribute(&stripped),
+                        _ => None,
+                    },
+                    _ => None
+                } 
+            }
+        }
+    }
+
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error> {    
+        match attribute {
+                "receptors$X_current" => match (self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X), value) {     
+                    (Some(DefaultReceptorsType::X(receptors)), BufferType::Float(nested_val)) => receptors.current = nested_val,
+                    _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),    
+                },
+                "receptors$X_g" => match (self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X), value) {
+                    (Some(DefaultReceptorsType::X(receptors)), BufferType::Float(nested_val)) => receptors.g = nested_val,
+                    _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),    
+                    },
+                "receptors$X_e" => match (self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X), value) {
+                    (Some(DefaultReceptorsType::X(receptors)), BufferType::Float(nested_val)) => receptors.e = nested_val,
+                    _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),    
+                },
+            _ => {
+                let split = attribute.split("$").collect::<Vec<&str>>();
+                if split.len() != 5 { return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute")); }
+                let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);  
+                if *receptor != *"receptors".to_string() || *kinetics != *"kinetics".to_string() { return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute")); }
+                let stripped = format!("receptors$kinetics${}", attr);
+                let to_match = format!("{}${}", neuro, name);
+
+                match to_match.as_str() {
+                "X$r" => match self.receptors.get_mut(&DefaultReceptorsNeurotransmitterType::X) {
+                    Some(DefaultReceptorsType::X(inner)) => inner.r.set_attribute(&stripped, value)?,
+                    _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute")),
+                },
+                _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid attribute"))} 
+            }
+        };
+
+        Ok(())
+    }
+
+    fn get_all_attributes() -> HashSet<(String, AvailableBufferType)> {
+        let mut attrs = HashSet::from([(String::from("receptors$X_current"), AvailableBufferType::Float), (String::from("receptors$X_g"), AvailableBufferType::Float), (String::from("receptors$X_e"), AvailableBufferType::Float)]); 
+        attrs.extend(
+            T::get_attribute_names().iter().map(|(i, j)|
+                (
+                    format!(
+                        "receptors$X$r$kinetics${}",
+                        i.split("$").collect::<Vec<_>>().last()
+                            .expect("Invalid attribute")
+                    ),
+                    *j
+                )
+            ).collect::<Vec<(_, _)>>()
+        );
+
+        attrs
+    }
+
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
+            return Ok(HashMap::new());
+        }
+
+        let mut buffers = HashMap::new();
+
+        let size: usize = grid.iter().map(|row| row.len()).sum();
+
+        for (attr, current_type) in Self::get_all_attributes() {
+            match current_type {
+                AvailableBufferType::Float => {
+                    let mut current_attrs: Vec<f32> = vec![];
+                    for row in grid.iter() {
+                        for i in row.iter() {
+                            match i.get_attribute(&attr) {
+                                Some(BufferType::Float(val)) => current_attrs.push(val),
+                                Some(_) => unreachable!(),
+                                None => current_attrs.push(0.),
+                            };
+                        }
+                    }
+
+                    write_buffer!(current_buffer, context, queue, size, &current_attrs, Float, last);      
+
+                    buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
+                },
+                AvailableBufferType::UInt => {
+                    let mut current_attrs: Vec<u32> = vec![];
+                    for row in grid.iter() {
+                        for i in row.iter() {
+                            match i.get_attribute(&attr) {
+                                Some(BufferType::UInt(val)) => current_attrs.push(val),
+                                Some(_) => unreachable!(),
+                                None => current_attrs.push(0),
+                            };
+                        }
+                    }
+
+                    write_buffer!(current_buffer, context, queue, size, &current_attrs, UInt, last);       
+
+                    buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        let mut receptor_flags: Vec<u32> = vec![];
+        for row in grid.iter() {
+            for i in row.iter() {
+                for n in <Self as Receptors>::N::get_all_types() {
+                    match i.receptors.get(&n) {
+                        Some(_) => receptor_flags.push(1),
+                        None => receptor_flags.push(0),
+                    };
+                }
+            }
+        }
+
+        let flags_size = size * <Self as Receptors>::N::number_of_types();
+
+        write_buffer!(flag_buffer, context, queue, flags_size, &receptor_flags, UInt, last);
+
+        buffers.insert(String::from("receptors$flags"), BufferGPU::UInt(flag_buffer));
+
+        Ok(buffers)
+    }
+    fn get_all_top_level_attributes() -> HashSet<(String, AvailableBufferType)> {
+        HashSet::from([])
+    }
+    fn get_attributes_associated_with(neurotransmitter: &DefaultReceptorsNeurotransmitterType) -> HashSet<(String, AvailableBufferType)> {
+        match neurotransmitter {
+            DefaultReceptorsNeurotransmitterType::X => {
+                let mut attrs = HashSet::from([(String::from("receptors$X_current"), AvailableBufferType::Float), (String::from("receptors$X_g"), AvailableBufferType::Float), (String::from("receptors$X_e"), AvailableBufferType::Float)]); 
+                attrs.extend(
+                    T::get_attribute_names().iter().map(|(i, j)|
+                        (
+                            format!(
+                                "receptors$X$r$kinetics${}",
+                                i.split("$").collect::<Vec<_>>().last()
+                                    .expect("Invalid attribute")
+                            ), 
+                            *j
+                        )
+                    ).collect::<Vec<(_, _)>>()
+                );
+                attrs
+            }
+        }
+    }
+
+    fn convert_to_cpu(
+        grid: &mut [Vec<Self>],
+        buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            for inner in grid {
+                inner.clear();
+            }
+
+            return Ok(());
+        }
+
+        let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
+
+        for key in Self::get_all_attributes() {
+            match key.1 {
+                AvailableBufferType::Float => {
+                    let mut current_contents = vec![0.; rows * cols];
+                    read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);        
+
+                    let current_contents = current_contents.iter()
+                        .map(|i| BufferType::Float(*i))
+                        .collect::<Vec<BufferType>>();
+
+                    cpu_conversion.insert(key.0.clone(), current_contents);
+                },
+                AvailableBufferType::UInt => {
+                    let mut current_contents = vec![0; rows * cols];
+                    read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
+
+                    let current_contents = current_contents.iter()
+                        .map(|i| BufferType::UInt(*i))
+                        .collect::<Vec<BufferType>>();
+
+                    cpu_conversion.insert(key.0.clone(), current_contents);
+                },
+                _ => unreachable!(),
+            }
+        }
+
+        let mut current_contents = vec![0; rows * cols * <Self as Receptors>::N::number_of_types()];   
+        read_and_set_buffer!(buffers, queue, "receptors$flags", &mut current_contents, UInt);
+
+        let flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
+
+        for row in 0..rows {
+            for col in 0..cols {
+                let current_index = row * cols + col;
+
+                for i in Self::get_all_top_level_attributes() {
+                    grid[row][col].set_attribute(
+                        &i.0,
+                        cpu_conversion.get(&i.0).unwrap()[current_index]
+                    ).unwrap();
+                }
+                for i in <Self as Receptors>::N::get_all_types() {
+                    if flags[current_index * <Self as Receptors>::N::number_of_types() + i.type_to_numeric()] {
+                        for attr in Self::get_attributes_associated_with(&i) {
+                            match grid[row][col].receptors.get_mut(&i) {
+                                Some(_) => grid[row][col].set_attribute(
+                                    &attr.0,
+                                    cpu_conversion.get(&attr.0).unwrap()[current_index]
+                                ).unwrap(),
+                                None => {
+                                    grid[row][col].receptors.insert(
+                                        i,
+                                        i.get_associated_receptor()
+                                    );
+                                    grid[row][col].set_attribute(
+                                        &attr.0,
+                                        cpu_conversion.get(&attr.0).unwrap()[current_index]
+                                    ).unwrap();
+                                }
+                            };
+                        }
+                    } else {
+                        let _ = grid[row][col].receptors.remove(&i);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>)> {
+        vec![(String::from("__kernel void update_X(uint index, __global float *current_voltage, __global float *r, __global float *current, __global float *g, __global float *e) {
+        current[index] = ((g[index] * r[index]) * (current_voltage[index] - e[index]));
+        }"), 
+        vec![(String::from("index"), AvailableBufferType::UInt), (String::from("current_voltage"), AvailableBufferType::Float), (String::from("receptors$X$r$kinetics$r"), AvailableBufferType::Float), (String::from("receptors$X_current"), AvailableBufferType::Float), (String::from("receptors$X_g"), AvailableBufferType::Float), (String::from("receptors$X_e"), AvailableBufferType::Float)])]
     }
 }
 
