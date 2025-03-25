@@ -1528,6 +1528,46 @@ impl NeuronDefinition {
                 context: &Context,
                 queue: &CommandQueue,
             ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }";
+
+            // let receptors_name = match &self.receptors {
+            //     Some(val) => val.generate(),
+            //     None => String::from("DefaultReceptors"),
+            // };
+    
+            // let convert_electrochemical_to_gpu = format!("
+            //     fn convert_electrochemical_to_gpu(
+            //         cell_grid: &[Vec<Self>], 
+            //         context: &Context,
+            //         queue: &CommandQueue,
+            //     ) -> Result<HashMap<String, BufferGPU>, GPUError> {{
+            //         if cell_grid.is_empty() {{
+            //             return Ok(HashMap::new());
+            //         }}
+    
+            //         let mut buffers = Self::convert_to_gpu(cell_grid, context, queue)?;
+    
+            //         let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+            //             .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+            //             .collect();
+            //         let receptors: Vec<Vec<_>> = cell_grid.iter()
+            //             .map(|row| row.iter().map(|cell| cell.receptors.clone()).collect())
+            //             .collect();
+    
+            //         let neurotransmitter_buffers = Neurotransmitters::<, T>::convert_to_gpu(
+            //             &neurotransmitters, context, queue
+            //         )?;
+            //         let receptors_buffers = {}::<R>::convert_to_gpu(
+            //             &receptors, context, queue
+            //         )?;
+    
+            //         buffers.extend(neurotransmitter_buffers);
+            //         buffers.extend(receptors_buffers);
+    
+            //         Ok(buffers)
+            //     }}",
+            //     receptors_name,
+            //     receptors_name,
+            // );
         let convert_electrochemical_to_cpu = "
             fn convert_electrochemical_to_cpu(
                 cell_grid: &mut Vec<Vec<Self>>,
@@ -3326,7 +3366,7 @@ impl ReceptorsDefinition {
                 .join(",\n")
         );
 
-        let impl_header = format!("impl<T: ReceptorKineticsGPU> {}<T> {{", self.type_name.generate());
+        let impl_header = format!("impl<T: ReceptorKineticsGPU> ReceptorsGPU for {}<T> {{", self.type_name.generate());
 
         let get_preprocessing_kinetics_parsing = "
             let split = attribute.split(\"$\").collect::<Vec<&str>>();
@@ -3802,6 +3842,7 @@ impl ReceptorsDefinition {
             String::from("use opencl3::types::CL_NON_BLOCKING;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterTypeGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferType;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
