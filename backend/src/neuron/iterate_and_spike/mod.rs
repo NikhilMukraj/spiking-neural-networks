@@ -781,24 +781,36 @@ pub trait IonotropicReception: Receptors {
 
 #[cfg(feature = "gpu")]
 /// An encapsulation of behaviors for receptors on the GPU
-pub trait ReceptorsGPU: Receptors {
+pub trait ReceptorsGPU: Receptors 
+where
+    Self::T: ReceptorKineticsGPU,
+    Self::N: NeurotransmitterTypeGPU,
+{
     /// Gets a given attribute from the receptors
     fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
     /// Gets a sets attribute in the receptors
     fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error>;
     /// Gets all possible attributes
     fn get_all_attributes() -> HashSet<(String, AvailableBufferType)>;
+    /// Gets all attributes outside of individual receptors
+    fn get_all_top_level_attributes() -> HashSet<(String, AvailableBufferType)>;
+    /// Gets all attributes associated with a specific neurotransmitter type
+    fn get_attributes_associated_with(
+        neurotransmitter: &<Self as Receptors>::N,
+    ) -> HashSet<(String, AvailableBufferType)>;
+    /// Gets the functions to update each receptor
+    fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>)>;
     /// Converts the representation to one that can be used on the GPU
     fn convert_to_gpu(
         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts the GPU representation to a CPU representation
     fn convert_to_cpu(
-        grid: &mut Vec<Vec<Self>>,
+        grid: &mut [Vec<Self>],
         buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
         rows: usize,
         cols: usize,
-        queue: &CommandQueue,
     ) -> Result<(), GPUError>;
 }
 
