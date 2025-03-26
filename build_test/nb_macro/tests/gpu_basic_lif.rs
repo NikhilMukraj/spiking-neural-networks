@@ -7,7 +7,7 @@ mod test {
         command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
         device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel,
     };
-    use spiking_neural_networks::error::SpikingNeuralNetworksError;
+    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::iterate_and_spike::{DefaultReceptorsType, XReceptor}};
 
     
     neuron_builder!(r#"
@@ -61,21 +61,21 @@ mod test {
 
         assert_eq!(cpu_conversion.len(), 0);
 
-        // let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
-        //     &cell_grid,
-        //     &context,
-        //     &queue,
-        // )?;
+        let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
 
-        // BasicIntegrateAndFire::convert_electrochemical_to_cpu(
-        //     &mut cpu_conversion,
-        //     &gpu_conversion,
-        //     0,
-        //     0,
-        //     &queue,
-        // )?;
+        BasicIntegrateAndFire::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            0,
+            0,
+            &queue,
+        )?;
 
-        // assert_eq!(cpu_conversion.len(), 0);
+        assert_eq!(cpu_conversion.len(), 0);
 
         Ok(())
     }
@@ -117,21 +117,21 @@ mod test {
 
         assert_eq!(cpu_conversion.len(), 0);
 
-        // let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
-        //     &cell_grid,
-        //     &context,
-        //     &queue,
-        // )?;
+        let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
 
-        // BasicIntegrateAndFire::convert_electrochemical_to_cpu(
-        //     &mut cpu_conversion,
-        //     &gpu_conversion,
-        //     0,
-        //     0,
-        //     &queue,
-        // )?;
+        BasicIntegrateAndFire::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            0,
+            0,
+            &queue,
+        )?;
 
-        // assert_eq!(cpu_conversion.len(), 0);
+        assert_eq!(cpu_conversion.len(), 0);
 
         Ok(())
     }
@@ -415,7 +415,7 @@ mod test {
     }
 
     #[test]
-    pub fn test_single_neuron_voltage() -> Result<(), SpikingNeuralNetworksError> {
+    fn test_single_neuron_voltage() -> Result<(), SpikingNeuralNetworksError> {
         let (cpu_voltages, gpu_voltages) = iterate_neuron(
             5.,
             &get_voltage, 
@@ -429,6 +429,161 @@ mod test {
             assert!((i - j).abs() < 2., "({} - {}).abs() < 2.", i, j);
         }
        
+        Ok(())
+    }
+
+    #[test]
+    fn test_electrochemical_conversion() -> Result<(), SpikingNeuralNetworksError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let cell_grid: GridType = vec![vec![
+            BasicIntegrateAndFire { current_voltage: -100., ..BasicIntegrateAndFire::default() }
+        ]];
+
+        let mut cpu_conversion: GridType = vec![vec![BasicIntegrateAndFire::default()]];
+
+        let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
+
+        BasicIntegrateAndFire::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            1,
+            1,
+            &queue,
+        )?;
+
+        assert_eq!(cpu_conversion.len(), 1);
+        assert_eq!(cpu_conversion[0].len(), 1);
+        assert!(cpu_conversion[0][0].receptors.is_empty());
+        assert_eq!(cpu_conversion[0][0].current_voltage, -100.);
+
+        let mut cell_grid: GridType = vec![vec![
+            BasicIntegrateAndFire { current_voltage: -100., ..BasicIntegrateAndFire::default() }
+        ]];
+        cell_grid[0][0].receptors
+            .insert(
+                DefaultReceptorsNeurotransmitterType::X, 
+                DefaultReceptorsType::X(XReceptor{ g: 100., ..XReceptor::default() })
+            )?;
+        let neuro = ApproximateNeurotransmitter { t_max: 0.5, t: 0.1, clearance_constant: 0.002 };
+        cell_grid[0][0].synaptic_neurotransmitters
+            .insert(
+                DefaultReceptorsNeurotransmitterType::X,
+                neuro
+            );
+
+        let mut cpu_conversion: GridType = vec![vec![BasicIntegrateAndFire::default()]];
+
+        let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
+
+        BasicIntegrateAndFire::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            1,
+            1,
+            &queue,
+        )?;
+
+        assert_eq!(cpu_conversion.len(), 1);
+        assert_eq!(cpu_conversion[0].len(), 1);
+        assert_eq!(cpu_conversion[0][0].receptors.len(), 1);
+        match cpu_conversion[0][0].receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+            Some(DefaultReceptorsType::X(receptor)) => assert_eq!(receptor.g, 100.),
+            _ => panic!("Unexpected conversion") 
+        }
+        assert_eq!(cpu_conversion[0][0].current_voltage, -100.);
+        assert_eq!(
+            *cpu_conversion[0][0].synaptic_neurotransmitters.get(&DefaultReceptorsNeurotransmitterType::X).unwrap(), 
+            neuro
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_electrochemical_conversion_non_square() -> Result<(), SpikingNeuralNetworksError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let queue = CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            )
+            .expect("CommandQueue::create_default failed");
+
+        let mut cell_grid: GridType = vec![vec![
+            BasicIntegrateAndFire { current_voltage: -100., ..BasicIntegrateAndFire::default() },
+            BasicIntegrateAndFire { gap_conductance: 100., ..BasicIntegrateAndFire::default() },
+        ]];
+        cell_grid[0][1].receptors
+            .insert(
+                DefaultReceptorsNeurotransmitterType::X, 
+                DefaultReceptorsType::X(XReceptor{ g: 100., ..XReceptor::default() })
+            )?;
+        let neuro = ApproximateNeurotransmitter { t_max: 0.5, t: 0.1, clearance_constant: 0.002 };
+        cell_grid[0][1].synaptic_neurotransmitters
+            .insert(
+                DefaultReceptorsNeurotransmitterType::X,
+                neuro
+            );
+
+        let mut cpu_conversion: GridType = vec![vec![BasicIntegrateAndFire::default(), BasicIntegrateAndFire::default()]];
+
+        let gpu_conversion = BasicIntegrateAndFire::convert_electrochemical_to_gpu(
+            &cell_grid,
+            &context,
+            &queue,
+        )?;
+
+        BasicIntegrateAndFire::convert_electrochemical_to_cpu(
+            &mut cpu_conversion,
+            &gpu_conversion,
+            1,
+            2,
+            &queue,
+        )?;
+    
+        assert_eq!(cpu_conversion.len(), 1);
+        assert_eq!(cpu_conversion[0].len(), 2);
+        assert_eq!(cpu_conversion[0][1].receptors.len(), 1);
+        match cpu_conversion[0][1].receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+            Some(DefaultReceptorsType::X(receptor)) => assert_eq!(receptor.g, 100.),
+            _ => panic!("Unexpected conversion") 
+        }
+        assert_eq!(cpu_conversion[0][0].current_voltage, -100.);
+        assert_eq!(cpu_conversion[0][1].gap_conductance, 100.);
+        assert_eq!(
+            *cpu_conversion[0][1].synaptic_neurotransmitters.get(&DefaultReceptorsNeurotransmitterType::X).unwrap(), 
+            neuro
+        );
+
         Ok(())
     }
 
