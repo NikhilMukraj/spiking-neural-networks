@@ -582,14 +582,14 @@ impl ReceptorKinetics for ApproximateReceptor {
 impl ReceptorKineticsGPU for ApproximateReceptor {
     fn get_attribute(&self, value: &str) -> Option<BufferType> {
         match value {
-            "ligand_gates$r" => Some(BufferType::Float(self.r)),
+            "receptor$kinetics$r" => Some(BufferType::Float(self.r)),
             _ => None,
         }
     }
 
     fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), Error> {
         match attribute {
-            "ligand_gates$r" => self.r = match value {
+            "receptors$kinetics$r" => self.r = match value {
                 BufferType::Float(nested_val) => nested_val,
                 _ => return Err(Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
             },
@@ -600,17 +600,19 @@ impl ReceptorKineticsGPU for ApproximateReceptor {
     }
 
     fn get_attribute_names() -> HashSet<(String, AvailableBufferType)> {
-        HashSet::from([(String::from("ligand_gates$r"), AvailableBufferType::Float)])
+        HashSet::from([(String::from("receptors$kinetics$r"), AvailableBufferType::Float)])
     }
 
     fn get_update_function() -> (Vec<String>, String) {
         (
             vec![
-                String::from("neurotransmitters$t")
+                (String::from("neurotransmitters$t")),
+                (String::from("dt")),
+                (String::from("receptors$kinetics$r")),
             ],
             String::from("
                 float get_r(
-                    float t
+                    float t, float dt, float r
                 ) { 
                     return t;
                 }
