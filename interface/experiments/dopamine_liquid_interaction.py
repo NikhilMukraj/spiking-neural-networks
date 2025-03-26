@@ -288,6 +288,11 @@ for current_state in tqdm(all_states):
             lambda x, y: current_state['spike_train_to_exc']
         )
 
+        if parsed_toml['simulation_parameters']['d_acts_on_inh']:
+            lattice_to_connect_to = i1
+        else:
+            lattice_to_connect_to = e1
+
         network.connect(
             c2, 
             e1, 
