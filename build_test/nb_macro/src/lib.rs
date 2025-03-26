@@ -1547,7 +1547,7 @@ impl NeuronDefinition {
                     .map(|row| row.iter().map(|cell| cell.receptors.clone()).collect())
                     .collect();
 
-                let neurotransmitter_buffers = Neurotransmitters::<{}NeurotransmitterType, T>::convert_to_gpu(
+                let neurotransmitter_buffers = Neurotransmitters::<<{}::<R> as Receptors>::N, T>::convert_to_gpu(
                     &neurotransmitters, context, queue
                 )?;
                 let receptors_buffers = {}::<R>::convert_to_gpu(
@@ -1563,14 +1563,48 @@ impl NeuronDefinition {
             receptors_name,
         );
         
-        let convert_electrochemical_to_cpu = "
+        let convert_electrochemical_to_cpu = format!("
             fn convert_electrochemical_to_cpu(
                 cell_grid: &mut Vec<Vec<Self>>,
                 buffers: &HashMap<String, BufferGPU>,
                 rows: usize,
                 cols: usize,
                 queue: &CommandQueue,
-            ) -> Result<(), GPUError> { todo!() }";
+            ) -> Result<(), GPUError> {{ 
+                if rows == 0 || cols == 0 {{
+                    cell_grid.clear();
+
+                    return Ok(());
+                }}
+
+                let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+                    .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+                    .collect();
+                let mut receptors: Vec<Vec<_>> = cell_grid.iter()
+                    .map(|row| row.iter().map(|cell| cell.receptors.clone()).collect())
+                    .collect();
+
+                Self::convert_to_cpu(cell_grid, buffers, rows, cols, queue)?;
+                
+                Neurotransmitters::<<{}::<R> as Receptors>::N, T>::convert_to_cpu(
+                    &mut neurotransmitters, buffers, queue, rows, cols
+                )?;
+                {}::<R>::convert_to_cpu(
+                    &mut receptors, buffers, queue, rows, cols
+                )?;
+
+                for (i, row) in cell_grid.iter_mut().enumerate() {{
+                    for (j, cell) in row.iter_mut().enumerate() {{
+                        cell.synaptic_neurotransmitters = neurotransmitters[i][j].clone();
+                        cell.receptors = receptors[i][j].clone();
+                    }}
+                }}
+
+                Ok(())
+            }}",
+            receptors_name,
+            receptors_name,
+        );
 
         let imports = vec![
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::IterateAndSpikeGPU;"),
