@@ -1362,7 +1362,7 @@ impl NeuronDefinition {
 
         let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
-        let iterate_and_spike_electrical_kernel_footer = "
+        let iterate_and_spike_kernel_footer = "
             let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, \"\") {
                 Ok(value) => value,
                 Err(_) => return Err(GPUError::ProgramCompileFailure),
@@ -1387,7 +1387,7 @@ impl NeuronDefinition {
             kernel_name,
             argument_names,
             kernel,
-            iterate_and_spike_electrical_kernel_footer,
+            iterate_and_spike_kernel_footer,
         );
 
         // generate electrochemical kernel
@@ -1397,6 +1397,90 @@ impl NeuronDefinition {
         // for receptor kinetics iterate through receptor attrs list and use that to determine what
         // receptor kinetics functions to call
         // then replace receptor update function
+
+        // let iterate_and_spike_electrochemical_header = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
+
+        // let argument_names = format!(
+        //     "let argument_names = vec![
+        //         String::from(\"number_of_types\"), String::from(\"inputs\"), String::from(\"t\")
+        //         String::from(\"index_to_position\"), String::from(\"neurotransmitter$flags\"), String::from(\"receptors$flags\"),
+        //         {}, {}
+        //     ];",
+        //     mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+        //     generate_vars_as_arg_strings(&self.vars).join(", "),
+        // );
+
+        // let kernel_header = format!(
+        //     "__kernel void iterate_and_spike(
+        //         uint number_of_types,
+        //         __global const float *inputs,
+        //         __global const float *t,
+        //         __global const uint *index_to_position,
+        //         __global const uint *neurotransmitters_flags,
+        //         __global const uint *receptors_flags,
+        //         {},
+        //         {},
+        //         {{}}
+        //     ) {{
+        //         int gid = get_global_id(0);
+        //         int index = index_to_position[gid];",
+        //     mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+        //     generate_kernel_args(&self.vars).join(",\n"),
+        // );
+
+        // let neurotransmitter_vars_generation = "
+        //     let neuro_prefix = generate_unique_prefix(&argument_names, \"neurotransmitters\");
+        //     let neurotransmitter_args = T::get_attribute_names_as_vector()
+        //         .iter()
+        //         .map(|i| (
+        //             i.1, 
+        //             format!(
+        //                 \"{}{}\", neuro_prefix,
+        //                 i.0.split(\"\").collect::<Vec<&str>>()[1],
+        //             )
+        //         ))
+        //         .collect::<Vec<(AvailableBufferType, String)>>();
+        //     let neurotransmitter_arg_names = neurotransmitter_args.iter()
+        //         .map(|i| i.1.clone())
+        //         .collect::<Vec<String>>();
+        // ";
+
+        // let neurotransmitters_update_code = String::from("
+        //     neurotransmitters_update(
+        //         index, 
+        //         number_of_types,
+        //         neuro_flags,
+        //         current_voltage,
+        //         is_spiking,
+        //         dt,
+        //         {}
+        //     );",
+        // );
+
+        // let kernel_body = match self.on_electrochemical_iteration {
+        //     Some(body) => format!(
+        //         "{}\n{}",
+        //         generate_gpu_kernel_on_iteration(&body), 
+        //         generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+        //     ),
+        //     None => format!(
+        //         "{}\n{}\n{}",
+        //         generate_gpu_kernel_on_iteration(&self.on_iteration), 
+        //         generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+        //         neurotransmitters_update_code
+        //     )
+        // };
+
+        // let kernel = format!("let program_source = format!(\"{}\n{}\n}}\", neurotransmitter_arg_names.join(\",\n\"));", kernel_header, kernel_body);
+
+        // let iterate_and_spike_electrical_function = format!(
+        //     "{}\n{}\n{}\n{}\n{}", 
+        //     iterate_and_spike_electrochemical_header, 
+        //     kernel_name,
+        //     argument_names,
+        //     kernel,
+        //     iterate_and_spike_kernel_footer,
+        // );
 
         let iterate_and_spike_electrochemical_function = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
         let convert_to_gpu = format!("
