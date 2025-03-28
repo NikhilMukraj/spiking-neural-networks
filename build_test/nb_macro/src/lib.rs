@@ -1398,6 +1398,11 @@ impl NeuronDefinition {
         // receptor kinetics functions to call
         // then replace receptor update function
 
+        let receptors_name = match &self.receptors {
+            Some(val) => val.generate(),
+            None => String::from("DefaultReceptors"),
+        };
+
         // let iterate_and_spike_electrochemical_header = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
 
         // let argument_names = format!(
@@ -1471,7 +1476,16 @@ impl NeuronDefinition {
         //     )
         // };
 
-        // let kernel = format!("let program_source = format!(\"{}\n{}\n}}\", neurotransmitter_arg_names.join(\",\n\"));", kernel_header, kernel_body);
+        // let kernel = format!(
+        //     "let program_source = format!(
+        //     \"{{}}\n{{}}\n{}\n{{}}\n{}\n}}\", 
+        //     T::get_update_function().1, 
+        //     Neurotransmitters::<<{} as Receptors>::N, T>::get_neurotransmitter_update_kernel_code()
+        //     neurotransmitter_arg_names.join(\",\n\"));", 
+        //     kernel_header, 
+        //     kernel_body,
+        //     receptors_name
+        // );
 
         // let iterate_and_spike_electrical_function = format!(
         //     "{}\n{}\n{}\n{}\n{}", 
@@ -1613,11 +1627,6 @@ impl NeuronDefinition {
             generate_vars_as_field_setters(&self.vars).join("\n"),
         );
         
-        let receptors_name = match &self.receptors {
-            Some(val) => val.generate(),
-            None => String::from("DefaultReceptors"),
-        };
-
         let convert_electrochemical_to_gpu = format!("
             fn convert_electrochemical_to_gpu(
                 cell_grid: &[Vec<Self>], 
