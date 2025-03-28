@@ -1390,7 +1390,13 @@ impl NeuronDefinition {
             iterate_and_spike_electrical_kernel_footer,
         );
 
-        // leave unimplemented versions of functions with todo!()
+        // generate electrochemical kernel
+        // if no chemical iteration, add neurotransmitter update, receptor kinetics, receptor update to end
+        // if chemical iteration, replace associated functions with gpu functions
+        // start with synaptic neurotransmitter update
+        // for receptor kinetics iterate through receptor attrs list and use that to determine what
+        // receptor kinetics functions to call
+        // then replace receptor update function
 
         let iterate_and_spike_electrochemical_function = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
         let convert_to_gpu = format!("
