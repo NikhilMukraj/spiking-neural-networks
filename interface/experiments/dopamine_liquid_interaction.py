@@ -57,7 +57,7 @@ def fill_defaults(parsed):
         parsed['simulation_parameters']['d2'] = False
 
     if 'd_acts_on_inh' not in parsed['simulation_parameters']:
-        parsed['d_acts_on_inh']['simulation_parameters'] = False
+        parsed['simulation_parameters']['d_acts_on_inh'] = False
 
     if 'dt' not in parsed['simulation_parameters']:
         parsed['simulation_parameters']['dt'] = 1
