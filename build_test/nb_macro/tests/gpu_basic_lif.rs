@@ -587,6 +587,22 @@ mod test {
         Ok(())
     }
 
+    // #[test]
+    // pub fn test_electrochemical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
+    //     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+    //         .expect("Could not get GPU devices")
+    //         .first()
+    //         .expect("No GPU found");
+    //     let device = Device::new(device_id);
+
+    //     let context = Context::from_device(&device).expect("Context::from_device failed");
+
+    //     match BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrochemical_kernel(&context) {
+    //         Ok(_) => Ok(()),
+    //         Err(_) => Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::KernelCompileFailure)),
+    //     }
+    // }
+
     // neuron will have to build receptor kinetics calls and receptor update calls
     // from the given traits
 }
