@@ -1421,7 +1421,7 @@ impl NeuronDefinition {
                 __global const float *inputs,
                 __global const float *t,
                 __global const uint *index_to_position,
-                __global const uint *neurotransmitters_flags,
+                __global const uint *neuro_flags,
                 __global const uint *receptors_flags,
                 {},
                 {},
@@ -1441,7 +1441,7 @@ impl NeuronDefinition {
                     i.1, 
                     format!(
                         \"{}{}\", neuro_prefix,
-                        i.0.split(\"\").collect::<Vec<&str>>()[1],
+                        i.0.split(\"$\").collect::<Vec<&str>>()[1],
                     )
                 ))
                 .collect::<Vec<(AvailableBufferType, String)>>();
@@ -1494,10 +1494,10 @@ impl NeuronDefinition {
 
         let kernel = format!(
             "let program_source = format!(
-                \"{{}}\n{}\n{{}}\n{}\n}}}}\", 
+                \"{{}}\n{{}}\n{}\n{}\n}}}}\", 
                 T::get_update_function().1, 
-                neurotransmitter_arg_and_type.join(\",\n\"),
                 Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                neurotransmitter_arg_and_type.join(\",\n\"),
                 neurotransmitter_arg_names.join(\",\n\")
             );", 
             kernel_header, 
@@ -1506,7 +1506,7 @@ impl NeuronDefinition {
         );
 
         let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}", // println!(\"{{}}\", program_source);\n
+            "{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
             iterate_and_spike_electrochemical_header, 
             kernel_name,
             argument_names,
