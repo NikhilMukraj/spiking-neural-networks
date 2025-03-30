@@ -1448,6 +1448,18 @@ impl NeuronDefinition {
             let neurotransmitter_arg_names = neurotransmitter_args.iter()
                 .map(|i| i.1.clone())
                 .collect::<Vec<String>>();
+            let neurotransmitter_arg_and_type = neurotransmitter_args.iter()
+                .map(|(i, j)| 
+                    format!(
+                    \"__global {} *{}\", 
+                    match i { 
+                        AvailableBufferType::Float => \"float\",
+                        AvailableBufferType::UInt => \"uint\",
+                        _ => unreachable!(),
+                    }, 
+                    j
+                ))
+                .collect::<Vec<String>>();
         ";
 
         let neurotransmitters_update_code = String::from("
@@ -1484,8 +1496,8 @@ impl NeuronDefinition {
             "let program_source = format!(
                 \"{{}}\n{}\n{{}}\n{}\n}}}}\", 
                 T::get_update_function().1, 
+                neurotransmitter_arg_and_type.join(\",\n\"),
                 Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
-                neurotransmitter_arg_names.join(\",\n\"),
                 neurotransmitter_arg_names.join(\",\n\")
             );", 
             kernel_header, 
@@ -1494,7 +1506,7 @@ impl NeuronDefinition {
         );
 
         let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}", 
+            "{}\n{}\n{}\n{}\n{}\n{}", // println!(\"{{}}\", program_source);\n
             iterate_and_spike_electrochemical_header, 
             kernel_name,
             argument_names,
