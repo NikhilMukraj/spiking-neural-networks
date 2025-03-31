@@ -295,7 +295,7 @@ for current_state in tqdm(all_states):
 
         network.connect(
             c2, 
-            e1, 
+            lattice_to_connect_to, 
             lambda x, y: np.random.uniform(0, 1) < current_state['spike_train_connectivity'], 
             lambda x, y: current_state['spike_train_to_exc']
         )
