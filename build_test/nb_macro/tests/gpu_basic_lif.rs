@@ -246,11 +246,17 @@ mod test {
         input: f32,
         cpu_get_attribute: &dyn Fn(&FullNeuronType, &mut Vec<f32>),
         gpu_get_attribute: &GetGPUAttribute,
+        chemical: bool,
     ) -> Result<(Vec<f32>, Vec<f32>), SpikingNeuralNetworksError> {
         let iterations = 1000;
         
         let mut neuron: FullNeuronType = BasicIntegrateAndFire::default();
         neuron.set_dt(0.1);
+
+        neuron.synaptic_neurotransmitters.insert(
+            DefaultReceptorsNeurotransmitterType::X, 
+            ApproximateNeurotransmitter::default(),
+        );
 
         let mut cpu_neuron = neuron.clone();
 
@@ -285,11 +291,23 @@ mod test {
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),
             };
 
-        let iterate_kernel = BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context)?;
+        let iterate_kernel = if !chemical {
+            BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context)?
+        } else {
+            BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrochemical_kernel(&context)?
+        };
 
-        let gpu_cell_grid = BasicIntegrateAndFire::convert_to_gpu(&cell_grid, &context, &queue)?;
+        let gpu_cell_grid = if !chemical {
+            BasicIntegrateAndFire::convert_to_gpu(&cell_grid, &context, &queue)?
+        } else {
+            BasicIntegrateAndFire::convert_electrochemical_to_gpu(&cell_grid, &context, &queue)?
+        };
 
         let sums_buffer = unsafe {
+            create_and_write_buffer(&context, &queue, 1, input)?
+        };
+
+        let t_sums_buffer = unsafe {
             create_and_write_buffer(&context, &queue, 1, input)?
         };
     
@@ -308,6 +326,10 @@ mod test {
                         kernel_execution.set_arg(&sums_buffer);
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
+                    } else if i == "t" {
+                        kernel_execution.set_arg(&t_sums_buffer); 
+                    } else if i == "neuro_flags" {
+                        kernel_execution.set_arg(&gpu_cell_grid.get("neurotransmitters$flags").unwrap());
                     } else {
                         match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
@@ -403,6 +425,7 @@ mod test {
             5.,
             &get_is_spiking, 
             &gpu_get_is_spiking,
+            false,
         )?;
 
         let cpu_sum = cpu_spikings.iter().sum::<f32>();
@@ -420,6 +443,7 @@ mod test {
             5.,
             &get_voltage, 
             &get_gpu_voltage,
+            false,
         )?;
 
         for (i, j) in cpu_voltages.iter().zip(gpu_voltages.iter()) {
@@ -604,6 +628,39 @@ mod test {
     }
 
     // test if neurotransmitters update as expected
+
+    // fn get_neurotransmitter(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
+    //     let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&DefaultReceptorsNeurotransmitterType::X)
+    //         .expect("Could not get neurotransmitter")
+    //         .t;
+
+    //     tracker.push(ampa_neurotransmitter);
+    // }
+
+    // fn gpu_get_neurotransmitter(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+    //     match gpu_cell_grid.get("neurotransmitters$t").unwrap() {
+    //         BufferGPU::Float(buffer) => {
+    //             let mut read_vector = vec![0.];
+
+    //             let read_event = unsafe {
+    //                 match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+    //                     Ok(value) => value,
+    //                     Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+    //                 }
+    //             };
+    
+    //             match read_event.wait() {
+    //                 Ok(value) => value,
+    //                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+    //             };
+
+    //             gpu_tracker.push(read_vector[0]);
+    //         },
+    //         _ => unreachable!(),
+    //     }
+
+    //     Ok(())
+    // }
 
     // neuron will have to build receptor kinetics calls and receptor update calls
     // from the given traits
