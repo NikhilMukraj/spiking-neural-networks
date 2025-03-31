@@ -13,7 +13,7 @@ tolerance = 2
 
 trials = 20
 
-filename = "d1_exc_inh_glu_liquid.json"
+filename = "d1_glu_exc_inh_liquid.json"
 
 [variables]
 internal_scalar = [0.125]
