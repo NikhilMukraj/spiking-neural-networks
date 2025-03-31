@@ -677,6 +677,8 @@ mod test {
             true,
         ).unwrap();
 
+        assert!(gpu_ts.iter().sum::<f32>() > 0.);
+
         for (n, (cpu_t, gpu_t)) in cpu_ts.iter().zip(gpu_ts).enumerate() {
             let error = (cpu_t - gpu_t).abs();
             assert!(error < 0.1, "timestep: {} | error: {} < ({} - {})", n, error, cpu_t, gpu_t);
