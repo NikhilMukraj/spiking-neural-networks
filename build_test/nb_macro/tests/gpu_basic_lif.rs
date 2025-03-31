@@ -262,10 +262,20 @@ mod test {
 
         let mut cpu_tracker = vec![];
 
+        let mut neurotransmitter_input: NeurotransmitterConcentrations<DefaultReceptorsNeurotransmitterType> = HashMap::new();
+        neurotransmitter_input.insert(DefaultReceptorsNeurotransmitterType::X, 0.);
+
         for _ in 0..iterations {
-            cpu_neuron.iterate_and_spike(
-                input
-            );
+            if !chemical {
+                cpu_neuron.iterate_and_spike(
+                    input
+                );
+            } else {
+                cpu_neuron.iterate_with_neurotransmitter_and_spike(
+                    input, 
+                    &neurotransmitter_input,
+                );
+            }
             cpu_get_attribute(&cpu_neuron, &mut cpu_tracker);
         }
 
@@ -308,7 +318,7 @@ mod test {
         };
 
         let t_sums_buffer = unsafe {
-            create_and_write_buffer(&context, &queue, 1, input)?
+            create_and_write_buffer(&context, &queue, 1, 0.0)?
         };
     
         let index_to_position_buffer = unsafe {
