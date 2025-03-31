@@ -1195,9 +1195,8 @@ impl NeuronDefinition {
         let handle_neurotransmitter_conc = "self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));";
         let handle_spiking_call = "self.handle_spiking()";
         let iteration_body = format!(
-            "\n\t{}\n\t{}\n\t{}", 
+            "\n\t{}\n\t{}", 
             generate_on_iteration(&self.on_iteration), 
-            handle_neurotransmitter_conc,
             handle_spiking_call,
         );
         let iteration_function = format!("{}{}\n}}", ITERATION_HEADER, iteration_body);
