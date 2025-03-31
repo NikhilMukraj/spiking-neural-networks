@@ -1406,11 +1406,14 @@ impl NeuronDefinition {
         let iterate_and_spike_electrochemical_header = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
 
         let argument_names = format!(
-            "let argument_names = vec![
+            "let mut argument_names = vec![
                 String::from(\"number_of_types\"), String::from(\"inputs\"), String::from(\"t\"),
-                String::from(\"index_to_position\"), String::from(\"neurotransmitter$flags\"), String::from(\"receptors$flags\"),
+                String::from(\"index_to_position\"), String::from(\"neurotransmitters$flags\"), String::from(\"receptors$flags\"),
                 {}, {}
-            ];",
+            ];
+            argument_names.extend(
+                T::get_attribute_names_as_vector().iter().map(|(i, _)| i.clone()).collect::<Vec<_>>()
+            );",
             mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
             generate_vars_as_arg_strings(&self.vars).join(", "),
         );
@@ -1478,14 +1481,14 @@ impl NeuronDefinition {
             Some(body) => format!(
                 "{}\n{}\n{}",
                 generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
-                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
                 neurotransmitters_update_code,
+                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
             ),
             None => format!(
                 "{}\n{}\n{}",
                 generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
+                neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
-                neurotransmitters_update_code
             )
         };
 
