@@ -1464,6 +1464,32 @@ impl NeuronDefinition {
                 .collect::<Vec<String>>();
         ";
 
+        // let receptors_vars_generation = format!("
+        //     let receptor_prefix = generate_unique_prefix(
+        //         &argument_names,
+        //         \"receptors\"
+        //     );
+        //     let receptor_kinetics_prefix = generate_unique_prefix(
+        //         &argument_names,
+        //         \"receptor_kinetics\"
+        //     );
+
+        //     let mut receptor_args = vec![];
+        //     let mut receptor_kinetics_args: HashMap<(String, String), Vec<String>> = HashMap::new();
+        //     for (i, j) in {}::<R>::get_all_attributes().iter() {{
+        //         let current_split = i.split(\"$\").collect::<Vec<String>>();
+        //         if current_split.len() == 2 {{
+        //             receptor_args.push(format!(\"{{}}{{}}\", receptor_prefix, i[1]);
+        //         }} else {{
+        //             receptor_kinetics_args.entry((i[1], i[3]))
+        //                 .or_insert(Vec::new())
+        //                 .push(format!(\"{{}}{{}}_{{}}\", receptor_kinetics_prefix, i[1], i[4]);
+        //         }}
+        //     }}
+        //     ",
+        //     receptors_name
+        // );
+
         let neurotransmitters_update_code = String::from("
             neurotransmitters_update(
                 index, 
