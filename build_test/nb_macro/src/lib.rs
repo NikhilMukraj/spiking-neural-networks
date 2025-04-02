@@ -1486,8 +1486,25 @@ impl NeuronDefinition {
         //                 .push(format!(\"{{}}{{}}_{{}}\", receptor_kinetics_prefix, i[1], i[4]);
         //         }}
         //     }}
+
+        //     let mut conversion: HashMap<String, usize> = HashMap::new();
+        //     for i in <{}::<R> as Receptors>::N::get_all_types {{
+        //         conversion.insert(i, i.type_to_numeric);
+        //     }}
+
+        //     let mut update_receptor_kinetics = vec![];
+        //     for ((neuro, name), attrs) in receptor_kinetics_args {{
+        //         let update = format!(
+        //             \"{{}}{{}}_r[index] = get_r(t[index + {{}}], {{}});\", 
+        //             receptor_kinetics_prefix, 
+        //             name,
+        //             conversion[i], 
+        //             attrs.join(\", \")
+        //         );
+        //     }}
         //     ",
-        //     receptors_name
+        //     receptors_name,
+        //     receptors_name,
         // );
 
         let neurotransmitters_update_code = String::from("
