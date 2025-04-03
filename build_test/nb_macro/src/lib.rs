@@ -1464,48 +1464,50 @@ impl NeuronDefinition {
                 .collect::<Vec<String>>();
         ";
 
-        // let receptors_vars_generation = format!("
-        //     let receptor_prefix = generate_unique_prefix(
-        //         &argument_names,
-        //         \"receptors\"
-        //     );
-        //     let receptor_kinetics_prefix = generate_unique_prefix(
-        //         &argument_names,
-        //         \"receptor_kinetics\"
-        //     );
+        let receptors_vars_generation = format!("
+            let receptor_prefix = generate_unique_prefix(
+                &argument_names,
+                \"receptors\"
+            );
+            let receptor_kinetics_prefix = generate_unique_prefix(
+                &argument_names,
+                \"receptor_kinetics\"
+            );
 
-        //     let mut receptor_args = vec![];
-        //     let mut receptor_kinetics_args: HashMap<(String, String), Vec<String>> = HashMap::new();
-        //     for (i, j) in {}::<R>::get_all_attributes().iter() {{
-        //         let current_split = i.split(\"$\").collect::<Vec<String>>();
-        //         if current_split.len() == 2 {{
-        //             receptor_args.push(format!(\"{{}}{{}}\", receptor_prefix, i[1]);
-        //         }} else {{
-        //             receptor_kinetics_args.entry((i[1], i[3]))
-        //                 .or_insert(Vec::new())
-        //                 .push(format!(\"{{}}{{}}_{{}}\", receptor_kinetics_prefix, i[1], i[4]);
-        //         }}
-        //     }}
+            let mut receptor_args = vec![];
+            let mut receptor_kinetics_args: HashMap<(String, String), Vec<String>> = HashMap::new();
+            for (i, j) in {}::<R>::get_all_attributes().iter() {{
+                let current_split = i.split(\"$\").collect::<Vec<&str>>();
+                if current_split.len() == 2 {{
+                    receptor_args.push(format!(\"{{}}{{}}\", receptor_prefix, current_split[1]));
+                }} else {{
+                    receptor_kinetics_args.entry((current_split[1].to_string(), current_split[2].to_string()))
+                        .or_insert(Vec::new())
+                        .push(format!(\"{{}}{{}}_{{}}\", receptor_kinetics_prefix, current_split[1], current_split[4]));
+                }}
+            }}
 
-        //     let mut conversion: HashMap<String, usize> = HashMap::new();
-        //     for i in <{}::<R> as Receptors>::N::get_all_types {{
-        //         conversion.insert(i, i.type_to_numeric);
-        //     }}
+            let mut conversion: HashMap<String, usize> = HashMap::new();
+            for i in <{}::<R> as Receptors>::N::get_all_types().iter() {{
+                conversion.insert(i.to_string(), i.type_to_numeric());
+            }}
 
-        //     let mut update_receptor_kinetics = vec![];
-        //     for ((neuro, name), attrs) in receptor_kinetics_args {{
-        //         let update = format!(
-        //             \"{{}}{{}}_r[index] = get_r(t[index + {{}}], {{}});\", 
-        //             receptor_kinetics_prefix, 
-        //             name,
-        //             conversion[i], 
-        //             attrs.join(\", \")
-        //         );
-        //     }}
-        //     ",
-        //     receptors_name,
-        //     receptors_name,
-        // );
+            let mut update_receptor_kinetics = vec![];
+            for ((neuro, name), attrs) in receptor_kinetics_args.iter() {{
+                let update = format!(
+                    \"{{}}{{}}_{{}}[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});\", 
+                    receptor_kinetics_prefix, 
+                    neuro,
+                    name,
+                    conversion.get(neuro).unwrap(), 
+                    attrs.iter().map(|i| format!(\"{{}}[index]\", i)).collect::<Vec<_>>().join(\", \")
+                );
+                update_receptor_kinetics.push(update);
+            }}
+            ",
+            receptors_name,
+            receptors_name,
+        );
 
         let neurotransmitters_update_code = String::from("
             neurotransmitters_update(
@@ -1516,7 +1518,7 @@ impl NeuronDefinition {
                 is_spiking,
                 dt,
                 {}
-            );",
+            );"
         );
 
         let kernel_body = match &self.on_electrochemical_iteration {
@@ -1551,11 +1553,12 @@ impl NeuronDefinition {
         );
 
         let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
             iterate_and_spike_electrochemical_header, 
             kernel_name,
             argument_names,
             neurotransmitter_vars_generation,
+            receptors_vars_generation,
             kernel,
             iterate_and_spike_kernel_footer,
         );
@@ -1774,6 +1777,7 @@ impl NeuronDefinition {
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKineticsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKineticsGPU;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::ReceptorsGPU;"),
+            String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterTypeGPU;"),
             String::from("use spiking_neural_networks::error::GPUError;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::KernelFunction;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
