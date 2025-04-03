@@ -7,7 +7,7 @@ mod test {
         command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
         device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel,
     };
-    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::iterate_and_spike::{DefaultReceptorsType, NeurotransmitterTypeGPU, XReceptor}};
+    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::iterate_and_spike::{DefaultReceptorsType, XReceptor}};
 
     
     neuron_builder!(r#"
