@@ -1471,7 +1471,7 @@ impl NeuronDefinition {
             );
             let receptor_kinetics_prefix = generate_unique_prefix(
                 &argument_names,
-                \"receptor_kinetics\"
+                \"kinetics_receptors\"
             );
 
             let mut receptor_args = vec![];
@@ -1483,7 +1483,7 @@ impl NeuronDefinition {
                 }} else {{
                     receptor_kinetics_args.entry((current_split[1].to_string(), current_split[2].to_string()))
                         .or_insert(Vec::new())
-                        .push(format!(\"{{}}{{}}_{{}}\", receptor_kinetics_prefix, current_split[1], current_split[4]));
+                        .push(format!(\"{{}}{{}}_{{}}_{{}}\", receptor_kinetics_prefix, current_split[1], current_split[2], current_split[4]));
                 }}
             }}
 
@@ -1495,7 +1495,7 @@ impl NeuronDefinition {
             let mut update_receptor_kinetics = vec![];
             for ((neuro, name), attrs) in receptor_kinetics_args.iter() {{
                 let update = format!(
-                    \"{{}}{{}}_{{}}[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});\", 
+                    \"{{}}{{}}_{{}}_r[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});\", 
                     receptor_kinetics_prefix, 
                     neuro,
                     name,
