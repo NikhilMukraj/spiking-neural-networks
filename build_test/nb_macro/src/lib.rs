@@ -1427,6 +1427,7 @@ impl NeuronDefinition {
                 __global const uint *receptors_flags,
                 {},
                 {},
+                {{}},
                 {{}}
             ) {{{{
                 int gid = get_global_id(0);
@@ -1474,17 +1475,42 @@ impl NeuronDefinition {
                 \"kinetics_receptors\"
             );
 
-            let mut receptor_args = vec![];
+            let mut receptor_arg_and_type = vec![];
             let mut receptor_kinetics_args: HashMap<(String, String), Vec<String>> = HashMap::new();
             for (i, j) in {}::<R>::get_all_attributes().iter() {{
                 let current_split = i.split(\"$\").collect::<Vec<&str>>();
                 if current_split.len() == 2 {{
-                    receptor_args.push(format!(\"{{}}{{}}\", receptor_prefix, current_split[1]));
+                    let current_type = match &j {{
+                        AvailableBufferType::Float => \"float\",
+                        AvailableBufferType::UInt => \"uint\",
+                        _ => unreachable!(),
+                    }};
+                    receptor_arg_and_type.push(
+                        format!(\"__global {{}} *{{}}{{}}\", current_type, receptor_prefix, current_split[1])
+                    );
                 }} else {{
+                    let current_arg = format!(
+                        \"{{}}{{}}_{{}}_{{}}\", 
+                        receptor_kinetics_prefix, 
+                        current_split[1], 
+                        current_split[2], 
+                        current_split[4]
+                    );
                     receptor_kinetics_args.entry((current_split[1].to_string(), current_split[2].to_string()))
                         .or_insert(Vec::new())
-                        .push(format!(\"{{}}{{}}_{{}}_{{}}\", receptor_kinetics_prefix, current_split[1], current_split[2], current_split[4]));
+                        .push(current_arg.clone());
+
+                    let current_type = match &j {{
+                        AvailableBufferType::Float => \"float\",
+                        AvailableBufferType::UInt => \"uint\",
+                        _ => unreachable!(),
+                    }};
+                    receptor_arg_and_type.push(
+                        format!(\"__global {{}} *{{}}\", current_type, current_arg)
+                    );
                 }}
+
+                argument_names.push(i.clone());
             }}
 
             let mut conversion: HashMap<String, usize> = HashMap::new();
@@ -1493,14 +1519,23 @@ impl NeuronDefinition {
             }}
 
             let mut update_receptor_kinetics = vec![];
-            for ((neuro, name), attrs) in receptor_kinetics_args.iter() {{
+            for ((neuro, name), _) in receptor_kinetics_args.iter() {{
                 let update = format!(
                     \"{{}}{{}}_{{}}_r[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});\", 
                     receptor_kinetics_prefix, 
                     neuro,
                     name,
                     conversion.get(neuro).unwrap(), 
-                    attrs.iter().map(|i| format!(\"{{}}[index]\", i)).collect::<Vec<_>>().join(\", \")
+                    R::get_update_function().0.iter()
+                        .filter(|i| i.starts_with(\"receptors\"))
+                        .map(|i| format!(
+                            \"{{}}{{}}_{{}}_{{}}[index]\", 
+                            receptor_kinetics_prefix, 
+                            neuro,
+                            name,
+                            i.split(\"$\").collect::<Vec<_>>().last().unwrap()
+                        ))
+                        .collect::<Vec<_>>().join(\", \")
                 );
                 update_receptor_kinetics.push(update);
             }}
@@ -1523,13 +1558,13 @@ impl NeuronDefinition {
 
         let kernel_body = match &self.on_electrochemical_iteration {
             Some(body) => format!(
-                "{}\n{}\n{}",
+                "{}\n{}\n{{}}\n{}",
                 generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
             ),
             None => format!(
-                "{}\n{}\n{}",
+                "{}\n{}\n{{}}\n{}",
                 generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
@@ -1541,11 +1576,14 @@ impl NeuronDefinition {
 
         let kernel = format!(
             "let program_source = format!(
-                \"{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                \"{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                R::get_update_function().1,
                 T::get_update_function().1, 
                 Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
                 neurotransmitter_arg_and_type.join(\",\n\"),
-                neurotransmitter_arg_names.join(\",\n\")
+                receptor_arg_and_type.join(\",\n\"),
+                neurotransmitter_arg_names.join(\",\n\"),
+                update_receptor_kinetics.join(\"\n\"),
             );", 
             kernel_header, 
             kernel_body,
