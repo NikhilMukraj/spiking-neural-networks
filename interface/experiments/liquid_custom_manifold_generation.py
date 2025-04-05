@@ -64,27 +64,27 @@ def fill_defaults(parsed):
             for _ in parsed['simulation_parameters']['exc_n']
         ]]
 
-    if 'connectivity' not in parsed['variables']:
-        parsed['variables']['connectivity'] = [0.25]
-    if 'inh_connectivity' not in parsed['variables']:
-        parsed['variables']['inh_connectivity'] = [0.25]
+    if 'connectivity' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['connectivity'] = [0.25]
+    if 'inh_connectivity' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['inh_connectivity'] = [0.25]
     if 'exc_to_inh_connectivity' not in parsed['variables']:
         parsed['variables']['exc_to_inh_connectivity'] = [0.15]
     if 'inh_to_exc_connectivity' not in parsed['variables']:
         parsed['variables']['inh_to_exc_connectivity'] = [0.15]
     if 'spike_train_connectivity' not in parsed['variables']:
-        parsed['variables']['spike_train_connectivity'] = [0.5]
+        parsed['variables']['spike_train_connectivity'] = [1.0]
     
-    if 'internal_scalar' not in parsed['variables']:
-        parsed['variables']['internal_scalar'] = [0.125]
+    if 'internal_scalar' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['internal_scalar'] = [0.125]
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = [3]
     if 'exc_to_inh_weight' not in parsed['variables']:
         parsed['variables']['exc_to_inh_weight'] = [0.0125]
     if 'inh_to_exc_weight' not in parsed['variables']:
         parsed['variables']['inh_to_exc_weight'] = [0.0125]
-    if 'inh_internal_scalar' not in parsed['variables']:
-        parsed['variables']['inh_internal_scalar'] = [2]
+    if 'inh_internal_scalar' not in parsed['simulation_parameters']:
+        parsed['simulation_parameters']['inh_internal_scalar'] = [2]
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
@@ -105,8 +105,8 @@ def generate_key(parsed, current_state):
 
     fields = [
         'input_table', 
-        'connectivity', 'spike_train_connectivity', 'inh_connectivity', 'exc_to_inh_connectivity', 'inh_to_exc_connectivity',
-        'spike_train_to_exc', 'internal_scalar', 'inh_internal_scalar', 'exc_to_inh_weight', 'inh_to_exc_weight',
+        'connectivity', 'spike_train_connectivity', 'inh_connectivity', 
+        'spike_train_to_exc', 'exc_to_inh_weight', 'inh_to_exc_weight',
         'nmda_g', 'ampa_g', 'gabaa_g',
         'glutamate_clearance', 'gabaa_clearance', 
     ]
@@ -151,18 +151,18 @@ np.seterr(divide='ignore', invalid='ignore')
 
 simulation_output = {}
 
+w = generate_liquid_weights(
+    num, connectivity=parsed['simulation_parameters']['connectivity'], scalar=parsed['simulation_parameters']['internal_scalar']
+)
+
+if not parsed_toml['simulation_parameters']['exc_only']:
+    w_inh = generate_liquid_weights(
+        inh_num, connectivity=parsed['simulation_parameters']['inh_connectivity'], scalar=parsed['simulation_parameters']['inh_internal_scalar']
+    )
+
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
-        w = generate_liquid_weights(
-            num, connectivity=current_state['connectivity'], scalar=current_state['internal_scalar']
-        )
-
-        if not parsed_toml['simulation_parameters']['exc_only']:
-            w_inh = generate_liquid_weights(
-                inh_num, connectivity=current_state['inh_connectivity'], scalar=current_state['inh_internal_scalar']
-            )
-
-        start_firing = generate_start_firing(current_state['cue_firing_rate'])
+        start_firing = generate_start_firing(current_state['input_table'])
 
         glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
         exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
