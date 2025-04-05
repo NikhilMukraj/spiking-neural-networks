@@ -244,6 +244,7 @@ mod test {
 
     fn iterate_neuron(
         input: f32,
+        t: f32,
         cpu_get_attribute: &dyn Fn(&FullNeuronType, &mut Vec<f32>),
         gpu_get_attribute: &GetGPUAttribute,
         chemical: bool,
@@ -257,13 +258,17 @@ mod test {
             DefaultReceptorsNeurotransmitterType::X, 
             ApproximateNeurotransmitter::default(),
         );
+        neuron.receptors.insert(
+            DefaultReceptorsNeurotransmitterType::X,
+            DefaultReceptorsType::X(XReceptor::default())
+        ).unwrap();
 
         let mut cpu_neuron = neuron.clone();
 
         let mut cpu_tracker = vec![];
 
         let mut neurotransmitter_input: NeurotransmitterConcentrations<DefaultReceptorsNeurotransmitterType> = HashMap::new();
-        neurotransmitter_input.insert(DefaultReceptorsNeurotransmitterType::X, 0.);
+        neurotransmitter_input.insert(DefaultReceptorsNeurotransmitterType::X, t);
 
         for _ in 0..iterations {
             if !chemical {
@@ -318,7 +323,7 @@ mod test {
         };
 
         let t_sums_buffer = unsafe {
-            create_and_write_buffer(&context, &queue, 1, 0.0)?
+            create_and_write_buffer(&context, &queue, 1, t)?
         };
     
         let index_to_position_buffer = unsafe {
@@ -439,6 +444,7 @@ mod test {
     pub fn test_single_neuron_is_spiking() -> Result<(), SpikingNeuralNetworksError> {
         let (cpu_spikings, gpu_spikings) = iterate_neuron(
             5.,
+            0.,
             &get_is_spiking, 
             &gpu_get_is_spiking,
             false,
@@ -457,6 +463,7 @@ mod test {
     fn test_single_neuron_voltage() -> Result<(), SpikingNeuralNetworksError> {
         let (cpu_voltages, gpu_voltages) = iterate_neuron(
             5.,
+            0.,
             &get_voltage, 
             &get_gpu_voltage,
             false,
@@ -643,14 +650,12 @@ mod test {
         }
     }
 
-    // test if neurotransmitters update as expected
-
     fn get_neurotransmitter(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
-        let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&DefaultReceptorsNeurotransmitterType::X)
+        let neurotransmitter = neuron.synaptic_neurotransmitters.get(&DefaultReceptorsNeurotransmitterType::X)
             .expect("Could not get neurotransmitter")
             .t;
 
-        tracker.push(ampa_neurotransmitter);
+        tracker.push(neurotransmitter);
     }
 
     fn gpu_get_neurotransmitter(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
@@ -678,10 +683,44 @@ mod test {
         Ok(())
     }
 
+    fn get_r(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
+        if let Some(DefaultReceptorsType::X(val)) = neuron.receptors.get(&DefaultReceptorsNeurotransmitterType::X) {
+            tracker.push(val.r.r);
+        } else {
+            unreachable!()
+        }
+    }
+
+    fn gpu_get_r(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
+        match gpu_cell_grid.get("receptors$X$r$kinetics$r").unwrap() {
+            BufferGPU::Float(buffer) => {
+                let mut read_vector = vec![0.];
+
+                let read_event = unsafe {
+                    match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
+                        Ok(value) => value,
+                        Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::BufferReadError)),
+                    }
+                };
+    
+                match read_event.wait() {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::WaitError)),
+                };
+
+                gpu_tracker.push(read_vector[0]);
+            },
+            _ => unreachable!(),
+        }
+
+        Ok(())
+    }
+
     #[test]
     fn test_neurotransmitter_update() {
         let (cpu_ts, gpu_ts) = iterate_neuron( 
             5.,
+            0.,
             &get_neurotransmitter, 
             &gpu_get_neurotransmitter,
             true,
@@ -692,6 +731,24 @@ mod test {
         for (n, (cpu_t, gpu_t)) in cpu_ts.iter().zip(gpu_ts).enumerate() {
             let error = (cpu_t - gpu_t).abs();
             assert!(error < 0.1, "timestep: {} | error: {} < ({} - {})", n, error, cpu_t, gpu_t);
+        }
+    }
+
+    #[test]
+    fn test_receptor_kinetics_update() {
+        let (cpu_rs, gpu_rs) = iterate_neuron( 
+            5.,
+            0.1,
+            &get_r, 
+            &gpu_get_r,
+            true,
+        ).unwrap();
+
+        assert!(gpu_rs.iter().sum::<f32>() > 0.);
+
+        for (n, (cpu_r, gpu_r)) in cpu_rs.iter().zip(gpu_rs).enumerate() {
+            let error = (cpu_r - gpu_r).abs();
+            assert!(error < 0.1, "timestep: {} | error: {} < ({} - {})", n, error, cpu_r, gpu_r);
         }
     }
 
