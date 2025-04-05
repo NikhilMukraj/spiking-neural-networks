@@ -738,7 +738,7 @@ mod test {
     fn test_receptor_kinetics_update() {
         let (cpu_rs, gpu_rs) = iterate_neuron( 
             5.,
-            0.1,
+            0.5,
             &get_r, 
             &gpu_get_r,
             true,
