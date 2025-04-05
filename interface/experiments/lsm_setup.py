@@ -33,7 +33,6 @@ def stop_firing(neuron):
 
     return neuron
 
-
 def determine_return_to_baseline(voltages, settling_period, on_phase, off_phase, tolerance):
     baseline = np.array(voltages[1000:off_phase]).mean()
 
