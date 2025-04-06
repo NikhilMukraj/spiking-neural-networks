@@ -1,0 +1,24 @@
+[simulation_parameters]
+measure_snr = true
+peaks_on = true
+
+exc_only = false
+
+off_phase = 5000
+
+internal_weights_scalar = 0.5
+skew = 1
+tolerance = 2
+
+trials = 10
+
+filename = "clearance_and_gmax_variation_disturbance.json"
+
+[variables]
+spike_train_to_exc = [1, 2]
+internal_scalar = [0.125]
+glutamate_clearance = [0.001, 0.005, 0.01]
+gabaa_clearance = [0.001, 0.005, 0.01]
+nmda_g = [0.5, 1.0, 1.5]
+ampa_g = [0.5, 1.0, 1.5]
+gabaa_g = [0.5, 1.0, 1.5]
