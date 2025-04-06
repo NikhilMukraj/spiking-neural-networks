@@ -25,7 +25,7 @@
 - [ ] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
-- [ ] remove vars without defaults, all vars should have associated defaults
+- [x] remove vars without defaults, all vars should have associated defaults
 - [ ] `to_code` abstraction in generation
 - [x] kinetics
   - [x] neurotransmitter kinetics
@@ -45,14 +45,14 @@
 - [x] ion channel update current in neuron refactor
 - [x] replace statements should be replaced with regex that makes sure that it is the end of the variable, or just check for a space, `)`, or `;` at the end and see if that works as an acceptable delimiter
 - [x] rename ligand gates to receptors
-- [ ] receptors
+- [x] receptors
   - [x] ionotropic receptors
     - [x] option to have multiple receptor values (`r1`, `r2`, etc)
     - [x] default ligand gated channel
       - default operation with receptors is just to add receptor currents
       - should have option to customize receptors
   - [x] metabotropic receptors
-  - [ ] receptor blocks should have an arbitrary ordering between neurotransmitter defs
+  - [x] receptor blocks should have an arbitrary ordering between neurotransmitter defs
 - [x] neuronal chemical testing
   - [x] custom chemical on iteration
     - need to use this if only metabotropic since it lacks set and get receptor currents
@@ -72,5 +72,5 @@
 - [ ] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [ ] **redo ligand gated channels using nb macro**
   - [ ] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
-- [ ] Make seperate update function for only metabotropic receptors so the iterate function can be called
+- [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
 - [ ] remove all `add_indents` calls
