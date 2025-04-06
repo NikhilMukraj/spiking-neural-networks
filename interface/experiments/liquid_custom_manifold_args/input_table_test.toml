@@ -1,12 +1,11 @@
 [simulation_parameters]
 measure_snr = true
 
-exc_only = true
+exc_only = false
 
 off_phase = 5000
 iterations2 = 0
 
-internal_weights_scalar = 0.5
 skew = 1
 tolerance = 2
 
@@ -54,5 +53,5 @@ input_table = [
     ],
 ]
 spike_train_to_exc = [2]
-internal_scalar = [0.5]
+internal_scalar = [0.125]
 glu_clearance = [0.001]
