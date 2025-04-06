@@ -1521,7 +1521,11 @@ impl NeuronDefinition {
             let mut update_receptor_kinetics = vec![];
             for ((neuro, name), _) in receptor_kinetics_args.iter() {{
                 let update = format!(
-                    \"{{}}{{}}_{{}}_r[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});\", 
+                    \"
+                    if (receptors_flags[index * number_of_types + {{}}] == 1) {{{{
+                        {{}}{{}}_{{}}_r[index] = get_r(t[index * number_of_types + {{}}], dt[index], {{}});
+                    }}}}\", 
+                    conversion.get(neuro).unwrap(), 
                     receptor_kinetics_prefix, 
                     neuro,
                     name,
