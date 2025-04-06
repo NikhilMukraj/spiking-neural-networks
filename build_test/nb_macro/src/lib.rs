@@ -1465,6 +1465,11 @@ impl NeuronDefinition {
                 .collect::<Vec<String>>();
         ";
 
+        // generate set currents function from receptors get updates
+        // iterate over all types to only update them when receptor flags are enabled
+        // check which have current variables, if they have current variables
+        // use them in calculation of get receptor currents
+
         let receptors_vars_generation = format!("
             let receptor_prefix = generate_unique_prefix(
                 &argument_names,
