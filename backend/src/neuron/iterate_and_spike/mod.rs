@@ -909,9 +909,11 @@ impl<T: ReceptorKineticsGPU> ReceptorsGPU for DefaultReceptors<T> {
 
         Ok(buffers)
     }
+
     fn get_all_top_level_attributes() -> HashSet<(String, AvailableBufferType)> {
         HashSet::from([])
     }
+
     fn get_attributes_associated_with(neurotransmitter: &DefaultReceptorsNeurotransmitterType) -> HashSet<(String, AvailableBufferType)> {
         match neurotransmitter {
             DefaultReceptorsNeurotransmitterType::X => {
