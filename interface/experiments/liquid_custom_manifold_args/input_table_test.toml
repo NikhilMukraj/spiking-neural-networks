@@ -1,10 +1,10 @@
 [simulation_parameters]
 measure_snr = true
+peaks_on = true
 
 exc_only = false
 
 off_phase = 5000
-iterations2 = 0
 
 skew = 1
 tolerance = 2
