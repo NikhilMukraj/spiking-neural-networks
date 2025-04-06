@@ -248,6 +248,7 @@ mod test {
         cpu_get_attribute: &dyn Fn(&FullNeuronType, &mut Vec<f32>),
         gpu_get_attribute: &GetGPUAttribute,
         chemical: bool,
+        receptors_on: bool,
     ) -> Result<(Vec<f32>, Vec<f32>), SpikingNeuralNetworksError> {
         let iterations = 1000;
         
@@ -258,10 +259,12 @@ mod test {
             DefaultReceptorsNeurotransmitterType::X, 
             ApproximateNeurotransmitter::default(),
         );
-        neuron.receptors.insert(
-            DefaultReceptorsNeurotransmitterType::X,
-            DefaultReceptorsType::X(XReceptor::default())
-        ).unwrap();
+        if receptors_on {
+            neuron.receptors.insert(
+                DefaultReceptorsNeurotransmitterType::X,
+                DefaultReceptorsType::X(XReceptor::default())
+            ).unwrap();
+        }
 
         let mut cpu_neuron = neuron.clone();
 
@@ -330,10 +333,6 @@ mod test {
             create_and_write_buffer(&context, &queue, 1, 0.0)?
         };
 
-        let receptor_flags_buffer = unsafe {
-            create_and_write_buffer(&context, &queue, 1, 0.0)?
-        };
-
         let mut gpu_tracker = vec![];
 
         for _ in 0..iterations {
@@ -349,8 +348,6 @@ mod test {
                         kernel_execution.set_arg(&DefaultReceptorsNeurotransmitterType::number_of_types());
                     } else if i == "t" {
                         kernel_execution.set_arg(&t_sums_buffer); 
-                    } else if i == "receptors$flags" {
-                        kernel_execution.set_arg(&receptor_flags_buffer);
                     } else {
                         match &gpu_cell_grid.get(i).unwrap_or_else(|| panic!("Could not retrieve buffer: {}", i)) {
                             BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
@@ -448,6 +445,7 @@ mod test {
             &get_is_spiking, 
             &gpu_get_is_spiking,
             false,
+            false,
         )?;
 
         let cpu_sum = cpu_spikings.iter().sum::<f32>();
@@ -466,6 +464,7 @@ mod test {
             0.,
             &get_voltage, 
             &get_gpu_voltage,
+            false,
             false,
         )?;
 
@@ -691,6 +690,10 @@ mod test {
         }
     }
 
+    fn get_nothing(_: &FullNeuronType, _: &mut Vec<f32>) {
+        
+    }
+
     fn gpu_get_r(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
         match gpu_cell_grid.get("receptors$X$r$kinetics$r").unwrap() {
             BufferGPU::Float(buffer) => {
@@ -724,6 +727,7 @@ mod test {
             &get_neurotransmitter, 
             &gpu_get_neurotransmitter,
             true,
+            false,
         ).unwrap();
 
         assert!(gpu_ts.iter().sum::<f32>() > 0.);
@@ -742,6 +746,7 @@ mod test {
             &get_r, 
             &gpu_get_r,
             true,
+            true,
         ).unwrap();
 
         assert!(gpu_rs.iter().sum::<f32>() > 0.);
@@ -750,6 +755,20 @@ mod test {
             let error = (cpu_r - gpu_r).abs();
             assert!(error < 0.1, "timestep: {} | error: {} < ({} - {})", n, error, cpu_r, gpu_r);
         }
+    }
+
+    #[test]
+    fn test_receptor_kinetics_update_receptor_off() {
+        let (_, gpu_rs) = iterate_neuron( 
+            5.,
+            0.5,
+            &get_nothing, 
+            &gpu_get_r,
+            true,
+            false,
+        ).unwrap();
+
+        assert_eq!(gpu_rs.iter().sum::<f32>(), 0.);
     }
 
     // neuron will have to build receptor kinetics calls and receptor update calls
