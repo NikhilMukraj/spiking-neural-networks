@@ -1469,6 +1469,13 @@ impl NeuronDefinition {
         // iterate over all types to only update them when receptor flags are enabled
         // check which have current variables, if they have current variables
         // use them in calculation of get receptor currents
+        // format!(
+        //     "update_{}(index, current_voltage, dt, {});", 
+        //     neuro, 
+        //     update_args.iter().map(|i| format!("{}{}_{}", receptor_prefix, neuro, i))
+        //         .collect::<Vec<_>>()
+        //         .join(", "),
+        // )
 
         let receptors_vars_generation = format!("
             let receptor_prefix = generate_unique_prefix(
@@ -1585,9 +1592,10 @@ impl NeuronDefinition {
 
         let kernel = format!(
             "let program_source = format!(
-                \"{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
                 R::get_update_function().1,
                 T::get_update_function().1, 
+                <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
                 Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
                 neurotransmitter_arg_and_type.join(\",\n\"),
                 receptor_arg_and_type.join(\",\n\"),
@@ -1596,7 +1604,8 @@ impl NeuronDefinition {
             );", 
             kernel_header, 
             kernel_body,
-            receptors_name
+            receptors_name,
+            receptors_name,
         );
 
         let iterate_and_spike_electrochemical_function = format!(
