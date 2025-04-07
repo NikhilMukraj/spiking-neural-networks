@@ -32,7 +32,7 @@
 - [ ] Modeling brain regions
   - Hippocampus: point attractor
   - Thalamus/occipital lobe: cue/visual input (could be passed through multiple feedforward layers with somewhat noisy connectivities)
-  - Ventral Tegmental Area/Substantia nigra: dopamine input/biasing
+  - Ventral Tegmental Area/Substantia nigra: dopamine input/biasing (potentially modeled as liquid)
 
 ## Todo
 
