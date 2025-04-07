@@ -30,6 +30,9 @@
   - Track which changes contribute to which trends
   - Go in direction of desired target
 - [ ] Modeling brain regions
+  - Hippocampus: point attractor
+  - Thalamus/occipital lobe: cue/visual input (could be passed through multiple feedforward layers with somewhat noisy connectivities)
+  - Ventral Tegmental Area/Substantia nigra: dopamine input/biasing
 
 ## Todo
 
