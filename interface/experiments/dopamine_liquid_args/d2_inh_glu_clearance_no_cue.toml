@@ -5,7 +5,7 @@ peaks_on = true
 exc_only = false
 d_acts_on_inh = true
 
-off_phase = 5000
+off_phase = 10000
 
 d2 = true
 
