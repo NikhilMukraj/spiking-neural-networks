@@ -152,12 +152,12 @@ np.seterr(divide='ignore', invalid='ignore')
 simulation_output = {}
 
 w = generate_liquid_weights(
-    num, connectivity=parsed['simulation_parameters']['connectivity'], scalar=parsed['simulation_parameters']['internal_scalar']
+    num, connectivity=parsed_toml['simulation_parameters']['connectivity'], scalar=parsed_toml['simulation_parameters']['internal_scalar']
 )
 
 if not parsed_toml['simulation_parameters']['exc_only']:
     w_inh = generate_liquid_weights(
-        inh_num, connectivity=parsed['simulation_parameters']['inh_connectivity'], scalar=parsed['simulation_parameters']['inh_internal_scalar']
+        inh_num, connectivity=parsed_toml['simulation_parameters']['inh_connectivity'], scalar=parsed_toml['simulation_parameters']['inh_internal_scalar']
     )
 
 for current_state in tqdm(all_states):
