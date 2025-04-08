@@ -151,7 +151,6 @@ np.seterr(divide='ignore', invalid='ignore')
 
 simulation_output = {}
 
-print(parsed_toml['simulation_parameters']['connectivity'], parsed_toml['simulation_parameters']['internal_scalar'])
 w = generate_liquid_weights(
     num, connectivity=parsed_toml['simulation_parameters']['connectivity'], scalar=parsed_toml['simulation_parameters']['internal_scalar']
 )
