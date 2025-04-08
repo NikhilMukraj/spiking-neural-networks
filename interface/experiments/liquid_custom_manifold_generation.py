@@ -84,7 +84,7 @@ def fill_defaults(parsed):
     if 'inh_to_exc_weight' not in parsed['variables']:
         parsed['variables']['inh_to_exc_weight'] = [0.0125]
     if 'inh_internal_scalar' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['inh_internal_scalar'] = [2]
+        parsed['simulation_parameters']['inh_internal_scalar'] = 2
 
     if 'nmda_g' not in parsed['variables']:
         parsed['variables']['nmda_g'] = [0.6]
