@@ -141,6 +141,7 @@ setup_neuron = generate_setup_neuron(
     parsed_toml['simulation_parameters']['skew'],
 )
 
+print(i for i in parsed_toml['variables'].values())
 combinations = list(itertools.product(*[i for i in parsed_toml['variables'].values()]))
 
 all_states = [dict(zip(list(parsed_toml['variables'].keys()), combination)) for combination in combinations]
