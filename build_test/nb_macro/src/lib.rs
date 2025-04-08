@@ -1555,7 +1555,25 @@ impl NeuronDefinition {
                 );
                 update_receptor_kinetics.push(update);
             }}
+
+            let mut receptor_updates = vec![];
+            for (update, update_args) in <{}::<R> as ReceptorsGPU>::get_updates().iter() {{
+                let current_prefix = \"__kernel void update_\";
+                let rest = &update[current_prefix.len()..];
+                let end = rest.find('(').unwrap();
+                let neuro = &rest[..end];
+                
+                let current_update = format!(
+                    \"update_{{}}(index, current_voltage, dt, {{}});\", 
+                    neuro, 
+                    update_args.iter().map(|i| format!(\"{{}}{{}}_{{}}\", receptor_prefix, neuro, i.0))
+                        .collect::<Vec<_>>()
+                        .join(\", \"),
+                );
+                receptor_updates.push(current_update);
+            }}
             ",
+            receptors_name,
             receptors_name,
             receptors_name,
         );
