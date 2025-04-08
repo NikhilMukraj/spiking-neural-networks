@@ -261,7 +261,7 @@ for current_state in tqdm(all_states):
         )
         network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
-        network.apply_spike_train_lattice(
+        network.apply_spike_train_lattice_given_position(
             1,
             start_firing
         )
