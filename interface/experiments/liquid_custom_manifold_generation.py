@@ -105,7 +105,7 @@ def generate_key(parsed, current_state):
 
     fields = [
         'input_table', 
-        'connectivity', 'spike_train_connectivity', 'inh_connectivity', 
+        'spike_train_connectivity',
         'spike_train_to_exc', 'exc_to_inh_weight', 'inh_to_exc_weight',
         'nmda_g', 'ampa_g', 'gabaa_g',
         'glutamate_clearance', 'gabaa_clearance', 
