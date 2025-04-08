@@ -1469,14 +1469,7 @@ impl NeuronDefinition {
         // iterate over all types to only update them when receptor flags are enabled
         // check which have current variables, if they have current variables
         // use them in calculation of get receptor currents
-        // format!(
-        //     "update_{}(index, current_voltage, dt, {});", 
-        //     neuro, 
-        //     update_args.iter().map(|i| format!("{}{}_{}", receptor_prefix, neuro, i))
-        //         .collect::<Vec<_>>()
-        //         .join(", "),
-        // )
-
+    
         let receptors_vars_generation = format!("
             let receptor_prefix = generate_unique_prefix(
                 &argument_names,
