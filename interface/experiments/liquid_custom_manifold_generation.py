@@ -65,9 +65,9 @@ def fill_defaults(parsed):
         ]]
 
     if 'connectivity' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['connectivity'] = [0.25]
+        parsed['simulation_parameters']['connectivity'] = 0.25
     if 'inh_connectivity' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['inh_connectivity'] = [0.25]
+        parsed['simulation_parameters']['inh_connectivity'] = 0.25
     if 'exc_to_inh_connectivity' not in parsed['variables']:
         parsed['variables']['exc_to_inh_connectivity'] = [0.15]
     if 'inh_to_exc_connectivity' not in parsed['variables']:
@@ -76,7 +76,7 @@ def fill_defaults(parsed):
         parsed['variables']['spike_train_connectivity'] = [1.0]
     
     if 'internal_scalar' not in parsed['simulation_parameters']:
-        parsed['simulation_parameters']['internal_scalar'] = [0.125]
+        parsed['simulation_parameters']['internal_scalar'] = 0.125
     if 'spike_train_to_exc' not in parsed['variables']:
         parsed['variables']['spike_train_to_exc'] = [3]
     if 'exc_to_inh_weight' not in parsed['variables']:
