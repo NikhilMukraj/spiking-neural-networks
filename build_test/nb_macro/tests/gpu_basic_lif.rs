@@ -771,6 +771,27 @@ mod test {
         assert_eq!(gpu_rs.iter().sum::<f32>(), 0.);
     }
 
+    #[test]
+    fn test_single_neuron_voltage_electrochemical_iteration() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(
+            0.,
+            1.,
+            &get_voltage, 
+            &get_gpu_voltage,
+            true,
+            true,
+        )?;
+
+        for (i, j) in cpu_voltages.iter().zip(gpu_voltages.iter()) {
+            if !i.is_finite() || !j.is_finite() {
+                continue;
+            }
+            assert!((i - j).abs() < 2., "({} - {}).abs() < 2.", i, j);
+        }
+       
+        Ok(())
+    }
+
     // neuron will have to build receptor kinetics calls and receptor update calls
     // from the given traits
 }
