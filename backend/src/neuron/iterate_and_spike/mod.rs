@@ -753,6 +753,7 @@ impl<T: ReceptorKinetics> XReceptor<T> {
     }
 }
 
+#[cfg(feature = "gpu")]
 impl<T: ReceptorKineticsGPU> ReceptorsGPU for DefaultReceptors<T> {
     fn get_attribute(&self, attribute: &str) -> Option<BufferType> {
         match attribute {
