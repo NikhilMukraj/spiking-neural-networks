@@ -441,12 +441,22 @@ mod test {
 
         assert_eq!(updates.len(), ExampleReceptorsNeurotransmitterType::number_of_types());
 
+        let mut index_found = false;
+        let mut current_voltage_found = false;
+        let mut dt_found = false;
+
         for (_, attrs) in updates.iter() {
             for i in attrs {
                 if i.0 == "index" {
+                    index_found = true;
                     continue;
                 }
                 if i.0 == "current_voltage" {
+                    current_voltage_found = true;
+                    continue;
+                }
+                if i.0 == "dt" {
+                    dt_found = true;
                     continue;
                 }
                 assert!(
@@ -456,6 +466,10 @@ mod test {
                 );
             }
         }
+
+        assert!(index_found);
+        assert!(current_voltage_found);
+        assert!(dt_found);
 
         let mut program = String::from("");
         for (function, _) in updates.iter() {
