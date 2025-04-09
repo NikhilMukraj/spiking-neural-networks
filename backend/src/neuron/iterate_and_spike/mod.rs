@@ -1024,10 +1024,10 @@ impl<T: ReceptorKineticsGPU> ReceptorsGPU for DefaultReceptors<T> {
     }
 
     fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>)> {
-        vec![(String::from("__kernel void update_X(uint index, __global float *current_voltage, __global float *r, __global float *current, __global float *g, __global float *e) {
+        vec![(String::from("__kernel void update_X(uint index, __global float *current_voltage, __global float *dt, __global float *r, __global float *current, __global float *g, __global float *e) {
         current[index] = ((g[index] * r[index]) * (current_voltage[index] - e[index]));
         }"), 
-        vec![(String::from("index"), AvailableBufferType::UInt), (String::from("current_voltage"), AvailableBufferType::Float), (String::from("receptors$X$r$kinetics$r"), AvailableBufferType::Float), (String::from("receptors$X_current"), AvailableBufferType::Float), (String::from("receptors$X_g"), AvailableBufferType::Float), (String::from("receptors$X_e"), AvailableBufferType::Float)])]
+        vec![(String::from("index"), AvailableBufferType::UInt), (String::from("current_voltage"), AvailableBufferType::Float), (String::from("dt"), AvailableBufferType::Float), (String::from("receptors$X$r$kinetics$r"), AvailableBufferType::Float), (String::from("receptors$X_current"), AvailableBufferType::Float), (String::from("receptors$X_g"), AvailableBufferType::Float), (String::from("receptors$X_e"), AvailableBufferType::Float)])]
     }
 }
 
