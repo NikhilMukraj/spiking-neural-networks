@@ -1581,13 +1581,34 @@ impl NeuronDefinition {
                 }}
                 
                 let current_update = format!(
-                    \"update_{{}}(index, current_voltage, {{}});\", 
+                    \"
+                    if (receptors_flags[index * number_of_types + {{}}] == 1) {{{{
+                        update_{{}}(index, current_voltage, dt, {{}});
+                    }}}}\", 
+                    conversion.get(neuro).unwrap(),
                     neuro, 
                     current_args.join(\", \"),
                 );
                 receptor_updates.push(current_update);
             }}
+
+            let mut current_attrs = vec![];
+            for (i, _) in {}::<R>::get_all_attributes().iter() {{
+                let current_split = i.split(\"$\").collect::<Vec<&str>>();
+                if current_split.len() == 2 {{
+                    for neuro in conversion.keys() {{
+                        if format!(\"{{}}_current\", neuro) == *current_split.last().unwrap() {{
+                            current_attrs.push(format!(\"{{}}{{}}_current\", receptor_prefix, neuro));
+                        }}
+                    }}
+                }}
+            }}
+            let get_currents = current_attrs.iter()
+                .map(|i| format!(\"{{}}[index]\", i))
+                .collect::<Vec<_>>()
+                .join(\" + \");
             ",
+            receptors_name,
             receptors_name,
             receptors_name,
             receptors_name,
@@ -1607,13 +1628,13 @@ impl NeuronDefinition {
 
         let kernel_body = match &self.on_electrochemical_iteration {
             Some(body) => format!(
-                "{}\n{}\n{{}}\n{{}}\n{}",
+                "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
                 generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
             ),
             None => format!(
-                "{}\n{}\n{{}}\n{{}}\n{}",
+                "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
                 generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
@@ -1632,9 +1653,10 @@ impl NeuronDefinition {
                 Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
                 neurotransmitter_arg_and_type.join(\",\n\"),
                 receptor_arg_and_type.join(\",\n\"),
-                neurotransmitter_arg_names.join(\",\n\"),
                 update_receptor_kinetics.join(\"\n\"),
                 receptor_updates.join(\"\n\"),
+                format!(\"current_voltage[index] -= (dt[index] / c_m[index]) * ({{}});\", get_currents),
+                neurotransmitter_arg_names.join(\",\n\"),
             );", 
             kernel_header, 
             kernel_body,
@@ -4054,7 +4076,7 @@ impl ReceptorsDefinition {
 
             let signature = if let Some(top_level) = &self.top_level_vars {
                 format!(
-                    "__kernel void update_{}(uint index, __global float *current_voltage, {}, {}, {}) {{",
+                    "__kernel void update_{}(uint index, __global float *current_voltage, __global float *dt, {}, {}, {}) {{",
                     current_type.generate(),
                     generate_kernel_args(top_level).join(", "),
                     current_receptor_vars.iter().map(|i| format!("__global float *{}", &i.generate()[5..]))
@@ -4063,7 +4085,7 @@ impl ReceptorsDefinition {
                 )
             } else {
                 format!(
-                    "__kernel void update_{}(uint index, __global float *current_voltage, {}, {}) {{",
+                    "__kernel void update_{}(uint index, __global float *current_voltage, __global float *dt, {}, {}) {{",
                     current_type.generate(),
                     current_receptor_vars.iter().map(|i| format!("__global float *{}", &i.generate()[5..]))
                         .collect::<Vec<_>>().join(", "),
@@ -4078,6 +4100,7 @@ impl ReceptorsDefinition {
             let mut args = vec![
                 String::from("(String::from(\"index\"), AvailableBufferType::UInt)"),
                 String::from("(String::from(\"current_voltage\"), AvailableBufferType::Float)"),
+                String::from("(String::from(\"dt\"), AvailableBufferType::Float)"),
             ];
             if let Some(top_level) = &self.top_level_vars {
                 args.extend(
