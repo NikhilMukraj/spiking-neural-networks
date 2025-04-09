@@ -6,7 +6,6 @@ exc_only = false
 
 off_phase = 5000
 
-internal_scalar = 0.0625
 skew = 1
 tolerance = 2
 
@@ -54,4 +53,4 @@ input_table = [
     ],
 ]
 spike_train_to_exc = [2]
-glu_clearance = [0.01]
+glu_clearance = [0.001]
