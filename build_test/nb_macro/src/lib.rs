@@ -1555,13 +1555,35 @@ impl NeuronDefinition {
                 let rest = &update[current_prefix.len()..];
                 let end = rest.find('(').unwrap();
                 let neuro = &rest[..end];
+
+                let mut current_args = vec![];
+                for arg in update_args.iter() {{
+                    let current_split = arg.0.split(\"$\").collect::<Vec<_>>();
+                    if current_split.len() == 2 {{
+                        current_args.push(
+                            format!(
+                                \"{{}}{{}}\", 
+                                receptor_prefix, 
+                                current_split.last().unwrap()
+                            )
+                        );
+                    }} else if current_split.len() > 2 {{
+                        current_args.push(
+                            format!(
+                                \"{{}}{{}}_{{}}_{{}}\",
+                                receptor_kinetics_prefix,
+                                current_split[1], 
+                                current_split[2],
+                                current_split[4],
+                            )
+                        );
+                    }}
+                }}
                 
                 let current_update = format!(
-                    \"update_{{}}(index, current_voltage, dt, {{}});\", 
+                    \"update_{{}}(index, current_voltage, {{}});\", 
                     neuro, 
-                    update_args.iter().map(|i| format!(\"{{}}{{}}_{{}}\", receptor_prefix, neuro, i.0))
-                        .collect::<Vec<_>>()
-                        .join(\", \"),
+                    current_args.join(\", \"),
                 );
                 receptor_updates.push(current_update);
             }}
@@ -1585,13 +1607,13 @@ impl NeuronDefinition {
 
         let kernel_body = match &self.on_electrochemical_iteration {
             Some(body) => format!(
-                "{}\n{}\n{{}}\n{}",
+                "{}\n{}\n{{}}\n{{}}\n{}",
                 generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
             ),
             None => format!(
-                "{}\n{}\n{{}}\n{}",
+                "{}\n{}\n{{}}\n{{}}\n{}",
                 generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
                 neurotransmitters_update_code,
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
@@ -1612,6 +1634,7 @@ impl NeuronDefinition {
                 receptor_arg_and_type.join(\",\n\"),
                 neurotransmitter_arg_names.join(\",\n\"),
                 update_receptor_kinetics.join(\"\n\"),
+                receptor_updates.join(\"\n\"),
             );", 
             kernel_header, 
             kernel_body,
@@ -1620,7 +1643,7 @@ impl NeuronDefinition {
         );
 
         let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+            "{}\n{}\n{}\n{}\n{}\n{}\nprintln!(\"{{}}\", program_source);\n{}", // \nprintln!(\"{{}}\", program_source);
             iterate_and_spike_electrochemical_header, 
             kernel_name,
             argument_names,
