@@ -6,7 +6,6 @@ exc_only = false
 
 off_phase = 5000
 
-internal_weights_scalar = 0.5
 skew = 1
 tolerance = 2
 
