@@ -315,7 +315,7 @@ for current_state in tqdm(all_states):
         current_value['voltages'] = voltages
 
         if parsed_toml['simulation_parameters']['peaks_on']:
-            hist = network.get_lattice(0).history
+            hist = network.get_lattice(e1).history
             data = [i.flatten() for i in np.array(hist)]
             peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
 
