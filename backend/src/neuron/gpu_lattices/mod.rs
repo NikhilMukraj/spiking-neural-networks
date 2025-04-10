@@ -16,8 +16,14 @@ use super::{
     check_position, 
     impl_apply, 
     iterate_and_spike::{
-        generate_unique_prefix, AvailableBufferType, BufferGPU, IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterTypeGPU
-    }, plasticity::Plasticity, spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, Position, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice, SpikeTrainLatticeHistory
+        generate_unique_prefix, AvailableBufferType, BufferGPU, 
+        IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterTypeGPU
+    },
+    plasticity::Plasticity, 
+    spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, 
+    GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, CellGrid,
+    Position, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, 
+    SpikeTrainLattice, SpikeTrainLatticeHistory
 };
 use std::ptr;
 
@@ -776,6 +782,20 @@ where
         )?;
 
         Ok(())
+    }
+}
+
+impl<T, U, V, N> CellGrid for LatticeGPU<T, U, V, N>
+where
+    T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
+    U: Graph<K = (usize, usize), V = f32> + GraphToGPU<GraphGPU>,
+    V: LatticeHistory + LatticeHistoryGPU,
+    N: NeurotransmitterTypeGPU,
+{
+    type T = T;
+    
+    fn cell_grid(&self) -> &[Vec<T>] {
+        &self.cell_grid
     }
 }
 
