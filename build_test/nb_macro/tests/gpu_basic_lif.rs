@@ -10,7 +10,8 @@ mod test {
     use spiking_neural_networks::{
         error::SpikingNeuralNetworksError, 
         neuron::{
-            gpu_lattices::LatticeGPU, iterate_and_spike::{DefaultReceptorsType, XReceptor}, CellGrid, Lattice, RunLattice
+            gpu_lattices::LatticeGPU, iterate_and_spike::{DefaultReceptorsType, XReceptor}, 
+            CellGrid, Lattice, RunLattice
         }
     };
 
