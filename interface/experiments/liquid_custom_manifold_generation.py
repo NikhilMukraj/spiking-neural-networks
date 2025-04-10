@@ -160,6 +160,10 @@ if not parsed_toml['simulation_parameters']['exc_only']:
         inh_num, connectivity=parsed_toml['simulation_parameters']['inh_connectivity'], scalar=parsed_toml['simulation_parameters']['inh_internal_scalar']
     )
 
+e1 = 0
+i1 = 1
+c1 = 2
+
 for current_state in tqdm(all_states):
     for trial in range(parsed_toml['simulation_parameters']['trials']):
         start_firing = generate_start_firing(current_state['input_table'])
@@ -196,7 +200,7 @@ for current_state in tqdm(all_states):
         poisson_neuron = ln.DopaPoissonNeuron()
         poisson_neuron.set_neurotransmitters(exc_neurotransmitters)
 
-        exc_lattice = ln.DopaIzhikevichLattice(0)
+        exc_lattice = ln.DopaIzhikevichLattice(e1)
         exc_lattice.populate(exc_neuron, exc_n, exc_n)
         exc_lattice.apply(setup_neuron)
         position_to_index = exc_lattice.position_to_index
@@ -206,11 +210,11 @@ for current_state in tqdm(all_states):
         )
         exc_lattice.update_grid_history = True
 
-        spike_train_lattice = ln.DopaPoissonLattice(1)
+        spike_train_lattice = ln.DopaPoissonLattice(c1)
         spike_train_lattice.populate(poisson_neuron, exc_n, exc_n)
 
         if not parsed_toml['simulation_parameters']['exc_only']:
-            inh_lattice = ln.DopaIzhikevichLattice(2)
+            inh_lattice = ln.DopaIzhikevichLattice(i1)
             inh_lattice.populate(inh_neuron, inh_n, inh_n)
             inh_lattice.apply(setup_neuron)
             position_to_index = inh_lattice.position_to_index
@@ -233,21 +237,21 @@ for current_state in tqdm(all_states):
 
         if not parsed_toml['simulation_parameters']['exc_only']:
             network.connect(
-                2, 
-                0, 
+                i1, 
+                e1, 
                 lambda x, y: np.random.uniform(0, 1) < current_state['inh_to_exc_connectivity'], 
                 lambda x, y: current_state['inh_to_exc_weight'],
             )
             network.connect(
-                0, 
-                2, 
+                e1, 
+                i1, 
                 lambda x, y: np.random.uniform(0, 1) < current_state['exc_to_inh_connectivity'],
                 lambda x, y: current_state['exc_to_inh_weight'],
             )
 
         network.connect(
-            1, 
-            0, 
+            c1, 
+            e1, 
             lambda x, y: np.random.uniform(0, 1) < current_state['spike_train_connectivity'], 
             lambda x, y: current_state['spike_train_to_exc']
         )
@@ -256,24 +260,24 @@ for current_state in tqdm(all_states):
         network.chemical_synapse = True
 
         network.apply_spike_train_lattice(
-            1,
+            c1,
             stop_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
         network.apply_spike_train_lattice_given_position(
-            1,
+            c1,
             start_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['on_phase'])
 
         network.apply_spike_train_lattice(
-            1,
+            c1,
             stop_firing
         )
         network.run_lattices(parsed_toml['simulation_parameters']['off_phase'])
 
-        hist = network.get_lattice(0).history
+        hist = network.get_lattice(e1).history
         voltages = [float(np.array(i).mean()) for i in hist]
 
         return_to_baseline = determine_return_to_baseline(
