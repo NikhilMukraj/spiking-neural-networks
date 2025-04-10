@@ -1665,7 +1665,7 @@ impl NeuronDefinition {
         );
 
         let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\nprintln!(\"{{}}\", program_source);\n{}", // \nprintln!(\"{{}}\", program_source);
+            "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
             iterate_and_spike_electrochemical_header, 
             kernel_name,
             argument_names,
