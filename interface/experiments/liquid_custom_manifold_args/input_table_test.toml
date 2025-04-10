@@ -53,4 +53,4 @@ input_table = [
     ],
 ]
 spike_train_to_exc = [2]
-glu_clearance = [0.001]
+glutamate_clearance = [0.001]
