@@ -1626,43 +1626,66 @@ impl NeuronDefinition {
             );"
         );
 
-        let kernel_body = match &self.on_electrochemical_iteration {
-            Some(body) => format!(
-                "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
-                generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
-                neurotransmitters_update_code,
-                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
-            ),
-            None => format!(
-                "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
-                generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
-                neurotransmitters_update_code,
-                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
-            )
+        let kernel = match &self.on_electrochemical_iteration {
+            Some(_) => {
+                // let kernel_body = format!(
+                //     "{}\n{}",
+                //     generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
+                //     generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
+                // );
+
+                // // replace statements with correct gpu code by modifying program source
+
+                // format!(
+                //     "let program_source = format!(
+                //         \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                //         R::get_update_function().1,
+                //         T::get_update_function().1, 
+                //         <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
+                //         Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                //         neurotransmitter_arg_and_type.join(\",\n\"),
+                //         receptor_arg_and_type.join(\",\n\"),
+                //     );", 
+                //     kernel_header, 
+                //     kernel_body,
+                //     receptors_name,
+                //     receptors_name,
+                // )
+
+                String::from("let program_source = String::from(\"\");")
+            }
+            None => {
+                let kernel_body = format!(
+                    "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
+                    generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
+                    neurotransmitters_update_code,
+                    generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
+                );
+
+                format!(
+                    "let program_source = format!(
+                        \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                        R::get_update_function().1,
+                        T::get_update_function().1, 
+                        <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
+                        Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                        neurotransmitter_arg_and_type.join(\",\n\"),
+                        receptor_arg_and_type.join(\",\n\"),
+                        update_receptor_kinetics.join(\"\n\"),
+                        receptor_updates.join(\"\n\"),
+                        format!(\"current_voltage[index] -= (dt[index] / c_m[index]) * ({{}});\", get_currents),
+                        neurotransmitter_arg_names.join(\",\n\"),
+                    );", 
+                    kernel_header, 
+                    kernel_body,
+                    receptors_name,
+                    receptors_name,
+                )
+            }
         };
 
         // kernel should only add neurotransmitters update functions
         // and receptor functions if neurotranmsitters or receptors is called
-
-        let kernel = format!(
-            "let program_source = format!(
-                \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
-                R::get_update_function().1,
-                T::get_update_function().1, 
-                <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
-                Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
-                neurotransmitter_arg_and_type.join(\",\n\"),
-                receptor_arg_and_type.join(\",\n\"),
-                update_receptor_kinetics.join(\"\n\"),
-                receptor_updates.join(\"\n\"),
-                format!(\"current_voltage[index] -= (dt[index] / c_m[index]) * ({{}});\", get_currents),
-                neurotransmitter_arg_names.join(\",\n\"),
-            );", 
-            kernel_header, 
-            kernel_body,
-            receptors_name,
-            receptors_name,
-        );
 
         let iterate_and_spike_electrochemical_function = format!(
             "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
