@@ -57,6 +57,7 @@
   - [x] custom chemical on iteration
     - need to use this if only metabotropic since it lacks set and get receptor currents
 - [ ] function definition blocks
+  - [ ] prefix every function with string to differentiate from structure calls in gpu code
 - [ ] spike train block
 - [x] eventually remove vars declaration without vars
 - [ ] ion channel use timestep also checks each expr for a dt too
