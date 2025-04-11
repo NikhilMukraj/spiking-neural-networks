@@ -1635,6 +1635,7 @@ impl NeuronDefinition {
                 // );
 
                 // // replace statements with correct gpu code by modifying program source
+                // // "synaptic_neurotransmitters_apply_t_changes()"
 
                 // format!(
                 //     "let program_source = format!(
