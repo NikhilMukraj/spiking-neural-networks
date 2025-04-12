@@ -1593,18 +1593,25 @@ impl NeuronDefinition {
             }}
 
             let mut current_attrs = vec![];
+            let mut current_neuros = vec![];
             for (i, _) in {}::<R>::get_all_attributes().iter() {{
                 let current_split = i.split(\"$\").collect::<Vec<&str>>();
                 if current_split.len() == 2 {{
                     for neuro in conversion.keys() {{
                         if format!(\"{{}}_current\", neuro) == *current_split.last().unwrap() {{
                             current_attrs.push(format!(\"{{}}{{}}_current\", receptor_prefix, neuro));
+                            current_neuros.push(neuro.clone());
                         }}
                     }}
                 }}
             }}
             let get_currents = current_attrs.iter()
-                .map(|i| format!(\"{{}}[index]\", i))
+                .zip(current_neuros.iter())
+                .map(|(i, j)| format!(
+                    \"(((float) receptors_flags[index * number_of_types + {{}}]) * {{}}[index])\", 
+                    conversion.get(j).unwrap(),
+                    i,
+                ))
                 .collect::<Vec<_>>()
                 .join(\" + \");
             ",
