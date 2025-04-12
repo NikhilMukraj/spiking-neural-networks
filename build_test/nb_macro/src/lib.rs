@@ -1643,6 +1643,12 @@ impl NeuronDefinition {
 
                 // // replace statements with correct gpu code by modifying program source
                 // // "synaptic_neurotransmitters_apply_t_changes()"
+                // // let neurotransmitters_replace = format!(
+                // //   "format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"))", neurotransmitters_update_code,
+                // // );
+                // // "receptors.update_kinetic_kinetics(t, dt)"
+                // // update_receptor_kinetics.join(\"\n\")
+                // // need to find what is after t and use it in update receptor kinetics
 
                 // format!(
                 //     "let program_source = format!(
