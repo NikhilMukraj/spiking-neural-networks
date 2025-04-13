@@ -1647,11 +1647,14 @@ impl NeuronDefinition {
                     "let neurotransmitter_replace = format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"));", 
                     neurotransmitters_update_code,
                 );
-                // "receptors.update_kinetic_kinetics(t, dt)"
+                // "receptors.update_receptor_kinetics(t, dt)"
+                // "receptors_update_receptor_kinetics(t, dt);"
                 // update_receptor_kinetics.join(\"\n\")
                 // need to find what is after t and use it in update receptor kinetics
                 // search for this string and parse out the t, dt args
                 // then use the args in the function
+                // use ); to get end of struct call
+                // first arg will always be t, can replace dt with arbitrary arg
 
                 format!(
                     "
