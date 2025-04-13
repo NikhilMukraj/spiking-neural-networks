@@ -1634,39 +1634,43 @@ impl NeuronDefinition {
         );
 
         let kernel = match &self.on_electrochemical_iteration {
-            Some(_) => {
-                // let kernel_body = format!(
-                //     "{}\n{}",
-                //     generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
-                //     generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
-                // );
+            Some(body) => {
+                let kernel_body = format!(
+                    "{}\n{}",
+                    generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
+                    generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
+                );
 
-                // // replace statements with correct gpu code by modifying program source
-                // // "synaptic_neurotransmitters_apply_t_changes()"
-                // // let neurotransmitters_replace = format!(
-                // //   "format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"))", neurotransmitters_update_code,
-                // // );
-                // // "receptors.update_kinetic_kinetics(t, dt)"
-                // // update_receptor_kinetics.join(\"\n\")
-                // // need to find what is after t and use it in update receptor kinetics
+                // replace statements with correct gpu code by modifying program source
+                // "synaptic_neurotransmitters_apply_t_changes()"
+                let neurotransmitters_replace = format!(
+                    "let neurotransmitter_replace = format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"));", 
+                    neurotransmitters_update_code,
+                );
+                // "receptors.update_kinetic_kinetics(t, dt)"
+                // update_receptor_kinetics.join(\"\n\")
+                // need to find what is after t and use it in update receptor kinetics
+                // search for this string and parse out the t, dt args
+                // then use the args in the function
 
-                // format!(
-                //     "let program_source = format!(
-                //         \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
-                //         R::get_update_function().1,
-                //         T::get_update_function().1, 
-                //         <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
-                //         Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
-                //         neurotransmitter_arg_and_type.join(\",\n\"),
-                //         receptor_arg_and_type.join(\",\n\"),
-                //     );", 
-                //     kernel_header, 
-                //     kernel_body,
-                //     receptors_name,
-                //     receptors_name,
-                // )
-
-                String::from("let program_source = String::from(\"\");")
+                format!(
+                    "
+                    {}
+                    let program_source = format!(
+                        \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
+                        R::get_update_function().1,
+                        T::get_update_function().1, 
+                        <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
+                        Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                        neurotransmitter_arg_and_type.join(\",\n\"),
+                        receptor_arg_and_type.join(\",\n\"),
+                    ).replace(\"synaptic_neurotransmitters_apply_t_changes();\", &neurotransmitter_replace);", 
+                    neurotransmitters_replace,
+                    kernel_header, 
+                    kernel_body,
+                    receptors_name,
+                    receptors_name,
+                )
             }
             None => {
                 let kernel_body = format!(
