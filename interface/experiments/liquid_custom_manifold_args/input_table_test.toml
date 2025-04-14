@@ -52,5 +52,5 @@ input_table = [
         [0.01, 0.01, 0.0, 0.0, 0.0, 0.0, 0.0],
     ],
 ]
-spike_train_to_exc = [2]
+spike_train_to_exc = [5]
 glutamate_clearance = [0.001]
