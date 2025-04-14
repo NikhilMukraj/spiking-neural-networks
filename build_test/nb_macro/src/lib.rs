@@ -1654,12 +1654,36 @@ impl NeuronDefinition {
                 // search for this string and parse out the t, dt args
                 // then use the args in the function
                 // use ); to get end of struct call
-                // first arg will always be t, can replace dt with arbitrary arg
+                // first arg will always be t[index], can replace dt with arbitrary arg
+
+                let update_receptor_kinetics_replace = "
+                let kinetics_name = \"receptors_update_receptor_kinetics\";
+                let mut search_start = 0;
+
+                while let Some(func_start) = program_source[search_start..].find(&kinetics_name) {
+                    let args_start = search_start + func_start + kinetics_name.len() - 1;
+                    let remaining_text = &program_source[args_start..];
+
+                    if let Some(args_end) = remaining_text.find(')') {
+                        let args = &remaining_text[1..args_end];
+                        let args: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+
+                        let current_arg = args[1];
+                        let current_end = search_start + args_start + args_end + 1;
+
+                        program_source.replace_range(
+                            search_start..current_end, 
+                            update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1]).as_str()
+                        );
+
+                        search_start = current_end;
+                    }
+                }";
 
                 format!(
                     "
                     {}
-                    let program_source = format!(
+                    let mut program_source = format!(
                         \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
                         R::get_update_function().1,
                         T::get_update_function().1, 
@@ -1667,12 +1691,15 @@ impl NeuronDefinition {
                         Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
                         neurotransmitter_arg_and_type.join(\",\n\"),
                         receptor_arg_and_type.join(\",\n\"),
-                    ).replace(\"synaptic_neurotransmitters_apply_t_changes();\", &neurotransmitter_replace);", 
+                    ).replace(\"synaptic_neurotransmitters_apply_t_changes();\", &neurotransmitter_replace);
+                    
+                    {}", 
                     neurotransmitters_replace,
                     kernel_header, 
                     kernel_body,
                     receptors_name,
                     receptors_name,
+                    update_receptor_kinetics_replace,
                 )
             }
             None => {
