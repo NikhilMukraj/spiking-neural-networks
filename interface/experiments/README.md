@@ -33,6 +33,7 @@
   - Hippocampus: point attractor
   - Thalamus/occipital lobe: cue/visual input (could be passed through multiple feedforward layers with somewhat noisy connectivities)
   - Ventral Tegmental Area/Substantia nigra: dopamine input/biasing (potentially modeled as liquid)
+- [ ] Horizontal + vertical systems control
 
 ## Todo
 
@@ -88,6 +89,7 @@
   - [ ] Using $D_1$
   - [ ] Using $D_2$
 - [ ] Tolman Eichenbaum machine (with dopamine potentially)
+- [ ] Horizontal + vertical systems control
 
 ## Quick notes
 
