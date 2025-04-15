@@ -1656,6 +1656,9 @@ impl NeuronDefinition {
                 // use ); to get end of struct call
                 // first arg will always be t[index], can replace dt with arbitrary arg
 
+                // iterate over func names and associated replacement function
+                // that says how to use the args vec
+                // ensure code reuse
                 let update_receptor_kinetics_replace = "
                 let kinetics_name = \"receptors_update_receptor_kinetics\";
                 let mut search_start = 0;
