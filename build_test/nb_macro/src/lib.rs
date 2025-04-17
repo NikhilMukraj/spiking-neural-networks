@@ -1659,29 +1659,53 @@ impl NeuronDefinition {
                 // iterate over func names and associated replacement function
                 // that says how to use the args vec
                 // ensure code reuse
-                let update_receptor_kinetics_replace = "
-                let kinetics_name = \"receptors_update_receptor_kinetics\";
-                let mut search_start = 0;
+                let update_receptors_replace = "
+                    let kinetics_name = \"receptors_update_receptor_kinetics(\";
+                    let set_receptor_currents_name = \"receptors_set_receptor_currents(\";
+                    let get_receptor_currents_name = \"get_receptor_currents(\";
 
-                while let Some(func_start) = program_source[search_start..].find(&kinetics_name) {
-                    let args_start = search_start + func_start + kinetics_name.len() - 1;
-                    let remaining_text = &program_source[args_start..];
+                    let kinetics_replacement = |args: &Vec<&str>| -> String { 
+                        update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1])
+                    };
+                    let set_receptor_currents_replacement = |args: &Vec<&str>| -> String {
+                        receptor_updates.join(\"\n\").replace(\"current_voltage[index]\", args[0])
+                            .replace(\"dt[index]\", args[1])
+                    };
+                    let get_receptor_currents_replacement = |args: &Vec<&str>| -> String {
+                        format!(\"({} / {}) * {}\", args[0], args[1], get_currents)
+                    };
 
-                    if let Some(args_end) = remaining_text.find(')') {
-                        let args = &remaining_text[1..args_end];
-                        let args: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+                    let to_replace: Vec<(_, Box<dyn Fn(&Vec<&str>) -> String>)> = vec![
+                        (kinetics_name, Box::new(kinetics_replacement)), 
+                        (set_receptor_currents_name, Box::new(set_receptor_currents_replacement)),
+                        (get_receptor_currents_name, Box::new(get_receptor_currents_replacement)),
+                    ];
 
-                        let current_arg = args[1];
-                        let current_end = search_start + args_start + args_end + 1;
+                    for (name_to_replace, replacement_function) in to_replace.iter() {
+                        let mut result = String::new();
+                        let mut search_start = 0;
 
-                        program_source.replace_range(
-                            search_start..current_end, 
-                            update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1]).as_str()
-                        );
+                        while let Some(func_start) = program_source[search_start..].find(name_to_replace) {
+                            let args_start = search_start + func_start + name_to_replace.len() - 1;
+                            result.push_str(&program_source[search_start..args_start]);
+                            let remaining_text = &program_source[args_start..];
 
-                        search_start = current_end;
-                    }
-                }";
+                            if let Some(args_end) = remaining_text.find(')') {
+                                let args = &remaining_text[1..args_end];
+                                let args: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+
+                                let current_end = search_start + args_start + args_end + 1;
+
+                                result.push_str(&replacement_function(&args));
+
+                                search_start = current_end;
+                            }
+                        }
+
+                        result.push_str(&program_source[search_start..]);
+
+                        program_source = result;
+                    }";
 
                 format!(
                     "
@@ -1702,7 +1726,7 @@ impl NeuronDefinition {
                     kernel_body,
                     receptors_name,
                     receptors_name,
-                    update_receptor_kinetics_replace,
+                    update_receptors_replace,
                 )
             }
             None => {
