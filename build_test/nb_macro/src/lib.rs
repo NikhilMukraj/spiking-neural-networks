@@ -507,7 +507,7 @@ impl Ast {
                             name, 
                             attribute,
                             args.iter()
-                                .map(|i| i.generate())
+                                .map(|i| i.generate_kernel_gpu())
                                 .collect::<Vec<String>>()
                                 .join(", ")
                         )
@@ -1662,7 +1662,7 @@ impl NeuronDefinition {
                 let update_receptors_replace = "
                     let kinetics_name = \"receptors_update_receptor_kinetics(\";
                     let set_receptor_currents_name = \"receptors_set_receptor_currents(\";
-                    let get_receptor_currents_name = \"get_receptor_currents(\";
+                    let get_receptor_currents_name = \"receptors_get_receptor_currents(\";
 
                     let kinetics_replacement = |args: &Vec<&str>| -> String { 
                         update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1])
@@ -1687,12 +1687,29 @@ impl NeuronDefinition {
 
                         while let Some(func_start) = program_source[search_start..].find(name_to_replace) {
                             let args_start = search_start + func_start + name_to_replace.len() - 1;
-                            result.push_str(&program_source[search_start..args_start]);
+                            result.push_str(&program_source[search_start..search_start + func_start]);
                             let remaining_text = &program_source[args_start..];
 
                             if let Some(args_end) = remaining_text.find(')') {
-                                let args = &remaining_text[1..args_end];
-                                let args: Vec<&str> = args.split(',').map(|s| s.trim()).collect();
+                                let args_str = &remaining_text[1..args_end];
+
+                                let mut args = Vec::new();
+                                let mut depth = 0;
+                                let mut start = 0;
+
+                                for (i, c) in args_str.char_indices() {
+                                    match c {
+                                        '(' => depth += 1,
+                                        ')' => depth -= 1,
+                                        ',' if depth == 0 => {
+                                            args.push(args_str[start..i].trim());
+                                            start = i + 1;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                args.push(args_str[start..].trim());
 
                                 let current_end = search_start + args_start + args_end + 1;
 
