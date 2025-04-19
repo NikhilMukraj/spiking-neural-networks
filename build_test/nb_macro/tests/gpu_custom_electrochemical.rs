@@ -20,7 +20,7 @@ mod test {
             receptors.update_receptor_kinetics(t, dt)
             receptors.set_receptor_currents(v, dt)
             dv/dt = -(v - e) + i
-            v = (modifier * -receptors.get_receptor_currents(dt, modifier * c_m)) + v
+            v = (modifier * -receptors.get_receptor_currents(dt, (modifier / 2) * c_m)) + v
             synaptic_neurotransmitters.apply_t_changes()
     [end]
     "#);
