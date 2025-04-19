@@ -1683,43 +1683,42 @@ impl NeuronDefinition {
 
                     for (name_to_replace, replacement_function) in to_replace.iter() {
                         let mut result = String::new();
-                        let mut search_start = 0;
+                        let mut last_end = 0;
 
-                        while let Some(func_start) = program_source[search_start..].find(name_to_replace) {
-                            let args_start = search_start + func_start + name_to_replace.len() - 1;
-                            result.push_str(&program_source[search_start..search_start + func_start]);
+                        while let Some(func_start) = program_source[last_end..].find(name_to_replace) {
+                            let args_start = last_end + func_start + name_to_replace.len() - 1;
+                            result.push_str(&program_source[last_end..last_end + func_start]);
+
                             let remaining_text = &program_source[args_start..];
-
-                            if let Some(args_end) = remaining_text.find(')') {
-                                let args_str = &remaining_text[1..args_end];
-
-                                let mut args = Vec::new();
-                                let mut depth = 0;
-                                let mut start = 0;
-
-                                for (i, c) in args_str.char_indices() {
-                                    match c {
-                                        '(' => depth += 1,
-                                        ')' => depth -= 1,
-                                        ',' if depth == 0 => {
-                                            args.push(args_str[start..i].trim());
-                                            start = i + 1;
+                            
+                            let mut cursor = 1;
+                            let mut depth = 1;
+                            let mut args_end = 1;
+                            
+                            while cursor < remaining_text.len() {
+                                match remaining_text.chars().nth(cursor).unwrap() {
+                                    '(' => depth += 1,
+                                    ')' => {
+                                        depth -= 1;
+                                        if depth == 0 {
+                                            args_end = cursor;
+                                            break;
                                         }
-                                        _ => {}
-                                    }
+                                    },
+                                    _ => {}
                                 }
-
-                                args.push(args_str[start..].trim());
-
-                                let current_end = search_start + args_start + args_end + 1;
-
-                                result.push_str(&replacement_function(&args));
-
-                                search_start = current_end;
+                                cursor += 1;
                             }
+
+                            let args_str = &remaining_text[1..args_end];
+                            let args = args_str.split(\",\").collect::<Vec<_>>();
+                            
+                            result.push_str(&replacement_function(&args));
+                            
+                            last_end = args_start + args_end + 1;
                         }
 
-                        result.push_str(&program_source[search_start..]);
+                        result.push_str(&program_source[last_end..]);
 
                         program_source = result;
                     }";
