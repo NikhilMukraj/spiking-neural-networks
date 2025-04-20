@@ -503,7 +503,7 @@ impl Ast {
                 match args {
                     Some(args) => {
                         format!(
-                            "{}_{}({})", 
+                            "{}${}({})", 
                             name, 
                             attribute,
                             args.iter()
@@ -519,7 +519,7 @@ impl Ast {
             }
             Ast::StructFunctionCall { name, attribute, args } => {
                 format!(
-                    "{}_{}({});", 
+                    "{}${}({});", 
                     name, 
                     attribute,
                     args.iter()
@@ -1660,9 +1660,9 @@ impl NeuronDefinition {
                 // that says how to use the args vec
                 // ensure code reuse
                 let update_receptors_replace = "
-                    let kinetics_name = \"receptors_update_receptor_kinetics(\";
-                    let set_receptor_currents_name = \"receptors_set_receptor_currents(\";
-                    let get_receptor_currents_name = \"receptors_get_receptor_currents(\";
+                    let kinetics_name = \"receptors$update_receptor_kinetics(\";
+                    let set_receptor_currents_name = \"receptors$set_receptor_currents(\";
+                    let get_receptor_currents_name = \"receptors$get_receptor_currents(\";
 
                     let kinetics_replacement = |args: &Vec<&str>| -> String { 
                         update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1])
@@ -1734,7 +1734,7 @@ impl NeuronDefinition {
                         Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
                         neurotransmitter_arg_and_type.join(\",\n\"),
                         receptor_arg_and_type.join(\",\n\"),
-                    ).replace(\"synaptic_neurotransmitters_apply_t_changes();\", &neurotransmitter_replace);
+                    ).replace(\"synaptic_neurotransmitters$apply_t_changes();\", &neurotransmitter_replace);
                     
                     {}", 
                     neurotransmitters_replace,
