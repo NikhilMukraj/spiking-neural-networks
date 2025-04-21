@@ -88,6 +88,7 @@ assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 
 type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
 vars_with_default_def  = { variables_with_assignment ~ NEWLINE+ }
+kinetics_def = { "kinetics:" ~ " "* ~ name ~ " "* ~ "," ~ " "* ~ name ~ NEWLINE+ }
 on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ eq_assignments }
 on_iteration_def = { "on_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
 on_electrochemical_iteration_def = { "on_electrochemical_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
@@ -98,7 +99,7 @@ receptors_param_def = { "receptors:" ~ " "* ~ name ~ NEWLINE+ }
 neuron_definition = {
     "[neuron]" ~ NEWLINE ~ 
 	(
-		on_iteration_def | type_def | on_spike_def | spike_detection_def | 
+		on_iteration_def | type_def | kinetics_def | on_spike_def | spike_detection_def | 
 		vars_with_default_def |  ion_channels_def | on_electrochemical_iteration_def | 
 		receptors_param_def
 	){5,} ~ 
