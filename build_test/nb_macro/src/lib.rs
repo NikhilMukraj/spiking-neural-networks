@@ -67,6 +67,7 @@ enum Ast {
         expr: Box<Ast>,
     },
     TypeDefinition(String),
+    KineticsDefinition(String, String),
     OnSpike(Vec<Ast>),
     OnIteration(Vec<Ast>),
     SpikeDetection(Box<Ast>),
@@ -201,6 +202,7 @@ impl Ast {
                 )
             },
             Ast::TypeDefinition(string) => string.clone(),
+            Ast::KineticsDefinition(neuro, receptor) => format!("{}, {}", neuro, receptor),
             Ast::OnSpike(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate())
@@ -541,6 +543,7 @@ impl Ast {
                 format!("float d{} = ({}) * dt[index];", name, expr.generate_kernel_gpu())
             },
             Ast::TypeDefinition(string) => string.clone(),
+            Ast::KineticsDefinition(neuro, receptor) => format!("{}, {}", neuro, receptor),
             Ast::OnSpike(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate_kernel_gpu())
@@ -633,6 +636,7 @@ fn add_indents(input: &str, indent: &str) -> String {
 
 struct NeuronDefinition {
     type_name: Ast,
+    kinetics: Option<Ast>,
     vars: Ast,
     on_spike: Option<Ast>,
     on_iteration: Ast,
@@ -1048,8 +1052,11 @@ impl NeuronDefinition {
     // if neurotransmitter kinetics and receptor kinetics specified then
     // create default_impl() function
     fn to_code(&self) -> (Vec<String>, String) {
-        let neurotransmitter_kinetics = "ApproximateNeurotransmitter";
-        let receptor_kinetics = "ApproximateReceptor";
+        let (neurotransmitter_kinetics, receptor_kinetics) = if let Some(Ast::KineticsDefinition(neuro, receptor)) = &self.kinetics {
+            (neuro.clone(), receptor.clone())
+        } else {
+            (String::from("ApproximateNeurotransmitter"), String::from("ApproximateReceptor"))
+        };
 
         let receptors_name = match &self.receptors {
             Some(val) => val.generate(),
@@ -1060,10 +1067,21 @@ impl NeuronDefinition {
 
         let mut imports = vec![
             String::from("use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;"),
-            format!("use spiking_neural_networks::neuron::iterate_and_spike::{};", neurotransmitter_kinetics),
-            format!("use spiking_neural_networks::neuron::iterate_and_spike::{};", receptor_kinetics),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::Receptors;"),
         ];
+
+        if self.kinetics.is_none() {
+            imports.push(
+                String::from(
+                    "use spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter;"
+                )
+            );
+            imports.push(
+                String::from(
+                    "use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;"
+                )
+            );
+        }
 
         let neuron_necessary_imports = [
             "CurrentVoltage", "GapConductance", "LastFiringTime", "IsSpiking",
@@ -1139,52 +1157,55 @@ impl NeuronDefinition {
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
-        let impl_default = if !defaults.is_empty() {
-            defaults.push(String::from("current_voltage: 0."));
-            defaults.push(String::from("dt: 0.1"));
-            defaults.push(String::from("c_m: 1."));
-            defaults.push(String::from("gap_conductance: 10."));
+        defaults.push(String::from("current_voltage: 0."));
+        defaults.push(String::from("dt: 0.1"));
+        defaults.push(String::from("c_m: 1."));
+        defaults.push(String::from("gap_conductance: 10."));
 
-            let default_ion_channels = match &self.ion_channels {
-                Some(Ast::StructAssignments(variables)) => {
-                    variables.iter()
-                        .map(|i| {
-                            let (var_name, type_name) = match i {
-                                Ast::StructAssignment { name, type_name } => (name, type_name),
-                                _ => unreachable!(),
-                            };
-    
-                            format!("{}: {}::default()", var_name, type_name)
-                        })
-                        .collect::<Vec<String>>()
-                },
-                None => vec![],
-                _ => unreachable!()
-            };
+        let default_ion_channels = match &self.ion_channels {
+            Some(Ast::StructAssignments(variables)) => {
+                variables.iter()
+                    .map(|i| {
+                        let (var_name, type_name) = match i {
+                            Ast::StructAssignment { name, type_name } => (name, type_name),
+                            _ => unreachable!(),
+                        };
 
-            defaults.extend(default_ion_channels);
-            defaults.push(String::from("is_spiking: false"));
-            defaults.push(String::from("last_firing_time: None"));
-            defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
-            defaults.push(format!("receptors: {}::<R>::default()", receptors_name));
-
-            let default_fields = defaults.join(",\n\t");
-            
-            let default_function = format!(
-                "fn default() -> Self {{ {} {{\n\t{}\n}}", 
-                self.type_name.generate(),
-                default_fields,
-            );
-            let default_function = add_indents(&default_function, "\t");
-
-            format!(
-                "\nimpl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for {}<T, R> {{\n\t{}\n}}\n}}\n",
-                self.type_name.generate(),
-                default_function,
-            )
-        } else {
-            String::from("")
+                        format!("{}: {}::default()", var_name, type_name)
+                    })
+                    .collect::<Vec<String>>()
+            },
+            None => vec![],
+            _ => unreachable!()
         };
+
+        defaults.extend(default_ion_channels);
+        defaults.push(String::from("is_spiking: false"));
+        defaults.push(String::from("last_firing_time: None"));
+        defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
+        defaults.push(format!("receptors: {}::<R>::default()", receptors_name));
+
+        let default_fields = defaults.join(",\n\t");
+        
+        let default_function = format!(
+            "fn default() -> Self {{ {} {{\n\t{}\n}}", 
+            self.type_name.generate(),
+            default_fields,
+        );
+        let default_function = add_indents(&default_function, "\t");
+
+        let impl_default = format!(
+            "\nimpl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for {}<T, R> {{\n\t{}\n}}\n}}\n",
+            self.type_name.generate(),
+            default_function,
+        );
+
+        let impl_default_impl = format!(
+            "\nimpl {}<{}, {}> {{ fn default_impl() -> Self {{ Self::default() }} }}",
+            self.type_name.generate(),
+            neurotransmitter_kinetics,
+            receptor_kinetics,
+        );
 
         let handle_spiking = generate_handle_spiking(&self.on_spike, &self.spike_detection);
 
@@ -1310,13 +1331,14 @@ impl NeuronDefinition {
         (
             imports,
             format!(
-                "{}\n{}\n{}\n}}\n\n{}\n\n{}\n{}", 
+                "{}\n{}\n{}\n}}\n\n{}\n\n{}\n{}\n{}", 
                 macros, 
                 header, 
                 fields, 
                 impl_functions, 
                 impl_iterate_and_spike,
                 impl_default,
+                impl_default_impl,
             )
         )
     }
@@ -2053,6 +2075,11 @@ impl NeuronDefinition {
             ),
         )
     }
+
+    // #[cfg(feature = "py")]
+    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        
+    // }
 }
 
 fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
@@ -2061,6 +2088,17 @@ fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
         Ast::TypeDefinition(
             String::from(pair.into_inner().next().unwrap().as_str())
         )
+    )
+}
+
+fn parse_kinetics_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
+    let mut nested_rule = pair.into_inner();
+    let neuro = String::from(nested_rule.next().unwrap().as_str());
+    let receptor = String::from(nested_rule.next().unwrap().as_str());
+
+    (
+        String::from("kinetics_def"),
+        Ast::KineticsDefinition(neuro, receptor)
     )
 }
 
@@ -2104,8 +2142,8 @@ fn parse_on_spike(pair: Pair<'_, Rule>) -> (String, Ast) {
         String::from("on_spike"),
         Ast::OnSpike(
             inner_rules
-            .map(|i| parse_declaration(i))
-            .collect::<Vec<Ast>>()
+                .map(|i| parse_declaration(i))
+                .collect::<Vec<Ast>>()
         )
     )
 }
@@ -2192,6 +2230,9 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
             Rule::type_def => {
                 parse_type_definition(pair)
             },
+            Rule::kinetics_def => {
+                parse_kinetics_definition(pair)
+            },
             Rule::on_iteration_def => {
                 parse_on_iteration(pair)
             },
@@ -2243,6 +2284,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
     })?;
     
+    let kinetics = definitions.remove("kinetics_def");
     let on_spike = definitions.remove("on_spike");
     let ion_channels = definitions.remove("ion_channels");
     let receptors = definitions.remove("receptors_param_def");
@@ -2251,6 +2293,7 @@ fn generate_neuron(pairs: Pairs<Rule>) -> Result<NeuronDefinition> {
     Ok(
         NeuronDefinition {
             type_name,
+            kinetics,
             vars,
             spike_detection,
             on_iteration,
@@ -4309,6 +4352,11 @@ impl ReceptorsDefinition {
             )
         )
     }
+
+    // #[cfg(feature = "py")]
+    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        
+    // }
 }
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
