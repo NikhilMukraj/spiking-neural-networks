@@ -15,24 +15,6 @@ EEG processing with fourier transforms, and power spectral density calculations
 
 ## Todo Notes
 
-- To fit Izhikevich neuron to Hodgkin Huxley model, can either:
-  - Fit voltage changes in Izhikevich to voltage changes in Hodgkin Huxley
-  - Fit Izhikevich curve to Hodgkin Huxley
-    - Can either use a Fourier transform to compare or use mean squared error at each iteration
-    - Or, compare the difference between spike times and the amplitude of the spikes (spike time difference being post minus pre, could compare individual spike differences or average spike difference)
-      - Write trait for iterate function so coupled neuron firing code can be shared between Hodgkin Huxley and Izhikevich neurons
-      - Cell might need a rename to IntegrateAndFireModel
-      - Perform this for multiple static inputs, 0 to 100
-      - Or perform this with coupled neurons (might need to account for weights)
-      - Or both at the same time
-    - Fitting bursting Izhikevich to bursting Hodgkin Huxley
-      - Need way to detect bursts for Izhikevich fitting, probably something that has a burst tolerance (distance between spikes that differentiates either part of a burst group or the next set of bursts firing)
-      - Then comparing the distance between burst groups and the intervals of the burst groups
-      - **Can be done with correlation**
-        - Correlation of burst time between reference and fit could work for fitting bursting neurons could be tested with a bursting Hindmarsh-Rose neuron
-
-- Eventually remove existing genetic algorithm fit for matching an EEG signal and replace it with R-STDP one or at least genetic algorithm that changes weights rather that input equation
-
 - **Redo obsidian notes with new code**
 
 - Obsidian notes on STDP equations
@@ -43,24 +25,7 @@ EEG processing with fourier transforms, and power spectral density calculations
 - **Integrate and fire split**
   - Write code changes in obsidian
 
-- Lixirnet should be reworked after neurotransmission refactor, should just pull from backend
-  - Update by pulling from package
-    - Should have methods that iterate one timestep for each kind of simulation
-    - That way when exposed to Python there can be tqdm stuff
-  - Maybe each struct could have a flag that says it implements a certain trait, the backend for that struct could then be passed to functions that take in that trait (creating cell grid, spiking neuron coupling tests, etc)
-  - Check if struct has (private?) method `get_iterate_and_spike_backend`, if so call it and use it in a given function, coupled testing, generating cell grid, etc
-  - Use macros to generate getter and setter methods given the argument name
-    - For integrate and fire cell and Hodgkin Huxley model
-    - **Enable multiple-pymethods so the macro can be written**
-    - [Reference for macro](https://github.com/PyO3/pyo3/discussions/3628)
-  - For now Lixirnet can work with lattices by converting adjacency matrices in Numpy to Rust
-  - **Enum based implemenation might be might for now**
-  - *Cell grid struct for now could just use an enum that specifies one of the integrate and fire neurons using approximate neurotransmitter kinetics and approximate receptor kinetics, only use matrix and grid history for now*
-    - *Could also generate a different cell grid structure for each neuron using macros to get around lack of traits in Python*
-    - *Could also try a method that given a grid of neurons generates the appropriate cell grid structure and wraps it in a box on the heap*
-  - Allow basic testing with Hodgkin Huxley (coupled spiking tests)
-  - Should have an option to convert the matrix to and adjacency list later, or implement a direct conversion from dictionary to adjacency list
-  - **Lixirnet should expose EEG processing tools**
+- **Lixirnet should expose EEG processing tools**
 
 - **R-STDP**
   - Reward calculation
@@ -69,10 +34,6 @@ EEG processing with fourier transforms, and power spectral density calculations
   - Reward modulated lattice and reward modulated network (connecting graph has weights that are an enum, one is reward modulated and has a trace while the other is not), should have option to add non reward modulated lattices
   - Reward optimizer structure, takes in a reward modulated network and a reward function and a state structure and optimizes reward given the state structure, state structure encapsulates state of network (firing rate of readout for example) as well as a state representing something the network is interacting with, also needs a function that given parameters sets the state of network (for instance doing rate encoding on poisson lattice) based on the current state of the environment or the function the network is interacting with and trying to optimize
     - Maybe function optimized by rstdp contains a state within the closure that is mutated
-
-- **Use Rayon to thread calculations**
-  - Inputs should be calculated in parallel
-  - Could aggregate `HashMap<GraphPosition, WeightType>` when calculating weight changes from plasticity and then apply each change, calculation could then be threaded with rayon
 
 - Astrocytes
 
@@ -297,7 +258,7 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Izhikevich
   - [x] Izhikevich Leaky Hybrid
 - [x] Static input test
-- [ ] STDP test
+- [x] STDP test
   - [x] Single coupled neurons
   - [x] Multiple coupled neurons
   - [x] Single coupled R-STDP
@@ -358,8 +319,8 @@ EEG processing with fourier transforms, and power spectral density calculations
   - [x] Ion channels
   - [x] Neuron model
   - [x] Basic functions
-  - [ ] Ligand gates
-  - [ ] Parameterizable neurotransmitter type
+  - [x] Ligand gates
+  - [x] Parameterizable neurotransmitter type
   - [ ] Plasticity
 - [ ] BCM rule
   - [ ] Reward modulated BCM
@@ -377,11 +338,9 @@ EEG processing with fourier transforms, and power spectral density calculations
     - Record how weights change over time
 - [ ] Simulating modulation of other neurotransmitters on lattice
 - [ ] Simulation of working memory (refer to guanfacine working memory model)
-  - [ ] Simple recurrent coupled neurons (a -> b -> c -> a), test how excitatory/inhibitory input at a single neuron effects the system
-  - [ ] Discrete state neuron
-  - [ ] Discrete learning rules
-  - [ ] Hopfield network
-  - [ ] Simple recurrent memory
+  - [x] Discrete state neuron
+  - [x] Discrete learning rules
+  - [x] Hopfield network
   - [ ] Liquid state machine
     - Should have a cue and retrieval system (for now supervised, could look into unsupervised methods later)
       - Present cue for duration, remove cue, see how long retrieval signal lasts
@@ -437,20 +396,6 @@ EEG processing with fourier transforms, and power spectral density calculations
     - [ ] Adjacency list
     - [x] Adjacency matrix
 - [ ] Parsing of `.nb` file into neuron model
-
-### GPU
-
-- [ ] WGPU
-  - [ ] Shader kernel for neuron model
-  - [ ] Associative map
-    - Graph could store positions in a vector and position in vector corresponds to its index instead of a hashmap
-  - [ ] Kernel for calculating inputs
-  - [ ] Kernel for plasticity
-- [ ] CUDA
-  - [ ] Shader kernel for neuron model
-  - [ ] Associative map
-  - [ ] Kernel for calculating inputs
-  - [ ] Kernel for plasticity
 
 <!-- ## Results
 
