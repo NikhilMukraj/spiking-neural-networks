@@ -959,7 +959,6 @@ macro_rules! impl_default_neuron_methods {
 #[pyo3(name = "IzhikevichNeuron")]
 #[derive(Clone)]
 pub struct PyIzhikevichNeuron {
-    // could try dyn neurotransmitter kinetics
     model: IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
 }
 
