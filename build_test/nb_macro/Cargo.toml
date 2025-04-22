@@ -22,6 +22,7 @@ gpu = ["spiking_neural_networks/gpu"]
 [dev-dependencies]
 rand = "0.8.5"
 opencl3 = "0.9.5"
+pyo3 = { version = "0.18.3", features = ["multiple-pymethods"] }
 
 [lib]
 proc-macro = true
