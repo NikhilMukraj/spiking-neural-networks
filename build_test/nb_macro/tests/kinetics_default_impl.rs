@@ -40,7 +40,7 @@ pub mod test {
     #[test]
     pub fn test_types() {
         assert_eq!(
-            "kinetics::test::BasicIntegrateAndFire<kinetics::test::BoundedNeurotransmitterKinetics, kinetics::test::BoundedReceptorKinetics>", 
+            "kinetics_default_impl::test::BasicIntegrateAndFire<kinetics_default_impl::test::BoundedNeurotransmitterKinetics, kinetics_default_impl::test::BoundedReceptorKinetics>", 
             std::any::type_name_of_val(&BasicIntegrateAndFire::default_impl()),
         );
     }
