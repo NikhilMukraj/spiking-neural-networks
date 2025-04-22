@@ -1045,6 +1045,51 @@ fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
     }
 }
 
+// #[cfg(feature = "py")]
+// fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
+//     match vars {
+//         Ast::VariablesAssignments(variables) => {
+//             variables.iter()
+//                 .map(|i| {
+//                     let var_name = match i {
+//                         Ast::VariableAssignment { name, .. } => name,
+//                         _ => unreachable!(),
+//                     };
+
+//                     match i {
+//                         Ast::VariableAssignment { value, .. } => {
+//                             let type_name = match value {
+//                                 NumOrBool::Number(_) => "f32",
+//                                 NumOrBool::Bool(_) => "bool",
+//                             };
+
+//                             format!("
+//                                 #[getter]
+//                                 fn get_{}(&self) -> {} {
+//                                     self.model.{}
+//                                 }
+
+//                                 #[setter]
+//                                 fn set_{}(&mut self, new_param: {}) {
+//                                     self.model.{} = new_param;
+//                                 }",
+//                                 var_name,
+//                                 type_name
+//                                 var_name,
+//                                 var_name,
+//                                 type_name,
+//                                 var_name,
+//                             )
+//                         }
+//                         _ => unreachable!(),
+//                     }
+//                 })
+//                 .collect()
+//         },
+//         _ => unreachable!(),
+//     }
+// }
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -2078,7 +2123,54 @@ impl NeuronDefinition {
 
     // #[cfg(feature = "py")]
     // fn to_pyo3_code(&self) -> (Vec<String>, String) {
-        
+    //     let (neurotransmitter_kinetics, receptor_kinetics) = if let Some(Ast::KineticsDefinition(neuro, receptor)) = &self.kinetics {
+    //         (neuro.clone(), receptor.clone())
+    //     } else {
+    //         (String::from("ApproximateNeurotransmitter"), String::from("ApproximateReceptor"))
+    //     };
+
+    //     let struct_def = format!("
+    //         #[pyclass]
+    //         #[pyo3(name = \"{}\")]
+    //         #[derive(Clone)]
+    //         pub struct Py{} {{
+    //             model: {}<{}, {}>,
+    //         }}",
+    //         self.type_name.generate(),
+    //         self.type_name.generate(),
+    //         self.type_name.generate(),
+    //         neurotransmitter_kinetics,
+    //         receptor_kinetics,
+    //     );
+
+    //     let basic_getter_setters = generate_vars_as_getter_settings(&self.vars);
+
+    //     let impl_pymethods = format!(
+    //         "
+    //         #[pymethods]
+    //         impl {} {{
+    //             {}
+    //         }}
+    //         "
+    //         self.type_name.generate(),
+    //         basic_getter_setters.join("\n"),
+    //     );
+
+    //     let imports = vec![
+    //         String::from("use pyo3::prelude::*;")
+    //     ];
+
+    //     (
+    //         imports,
+    //         format!(
+    //             "
+    //             {}
+    //             {}
+    //             ",
+    //             struct_def,
+    //             impl_pymethods,
+    //         )
+    //     )
     // }
 }
 
