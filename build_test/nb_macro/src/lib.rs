@@ -2143,7 +2143,11 @@ impl NeuronDefinition {
     //         receptor_kinetics,
     //     );
 
+
+    // make sure to include default vars here too
     //     let basic_getter_setters = generate_vars_as_getter_settings(&self.vars);
+
+    // add iterate and spike function as well as new function
 
     //     let impl_pymethods = format!(
     //         "
