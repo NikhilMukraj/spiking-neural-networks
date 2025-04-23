@@ -209,7 +209,6 @@ for current_state in tqdm(all_states):
                 lambda x, y: bool(float(w_inh[position_to_index[x]][position_to_index[y]]) != 0), 
                 lambda x, y: float(w_inh[position_to_index[x]][position_to_index[y]]),
             )
-            # inh_lattice.update_grid_history = True
 
             network = ln.DopaIzhikevichNetwork.generate_network(
                 [exc_lattice, inh_lattice], [spike_train_lattice],
