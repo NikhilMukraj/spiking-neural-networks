@@ -2149,15 +2149,28 @@ impl NeuronDefinition {
 
     // add iterate and spike function as well as new function
 
+    // let get_and_set_last_firing_time = "
+    //     #[getter(last_firing_time)]
+    //     fn get_last_firing_time(&self) -> Option<usize> {
+    //         self.model.get_last_firing_time()
+    //     }
+
+    //     #[setter(last_firing_time)]
+    //     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+    //         self.model.set_last_firing_time(timestep);
+    //     }";
+
     //     let impl_pymethods = format!(
     //         "
     //         #[pymethods]
     //         impl {} {{
     //             {}
+    //             {}
     //         }}
     //         "
     //         self.type_name.generate(),
     //         basic_getter_setters.join("\n"),
+    //         get_and_set_last_firing_time,
     //     );
 
     //     let imports = vec![
