@@ -2143,9 +2143,22 @@ impl NeuronDefinition {
     //         receptor_kinetics,
     //     );
 
+    // // defaults.push(String::from("current_voltage: 0."));
+    // // defaults.push(String::from("dt: 0.1"));
+    // // defaults.push(String::from("c_m: 1."));
+    // // defaults.push(String::from("gap_conductance: 10."));
+
+    // iterate to generate getter and setters
+    // let mandatory_vars = vec![
+        // ("dt", "f32"), 
+        // ("current_voltage", "f32"), 
+        // ("c_m", "f32"), 
+        // ("gap_conductance", "f32"), 
+        // ("is_spiking", "bool"),
+    // ];
 
     // make sure to include default vars here too
-    //     let basic_getter_setters = generate_vars_as_getter_settings(&self.vars);
+    //     let mut basic_getter_setters = generate_vars_as_getter_settings(&self.vars);    
 
     // add iterate and spike function as well as new function
 
@@ -2159,6 +2172,8 @@ impl NeuronDefinition {
     //     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
     //         self.model.set_last_firing_time(timestep);
     //     }";
+
+    // generate new method from default var assignments
 
     //     let impl_pymethods = format!(
     //         "
