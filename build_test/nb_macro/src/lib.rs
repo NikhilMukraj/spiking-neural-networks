@@ -1046,6 +1046,27 @@ fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
 }
 
 // #[cfg(feature = "py")]
+// fn generate_py_getter_and_setters(var_name: &str, type_name: &str) -> String {
+//     format!("
+//         #[getter]
+//         fn get_{}(&self) -> {} {
+//             self.model.{}
+//         }
+
+//         #[setter]
+//         fn set_{}(&mut self, new_param: {}) {
+//             self.model.{} = new_param;
+//         }",
+//         var_name,
+//         type_name
+//         var_name,
+//         var_name,
+//         type_name,
+//         var_name,
+//     )
+// }
+
+// #[cfg(feature = "py")]
 // fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
 //     match vars {
 //         Ast::VariablesAssignments(variables) => {
@@ -1063,23 +1084,7 @@ fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
 //                                 NumOrBool::Bool(_) => "bool",
 //                             };
 
-//                             format!("
-//                                 #[getter]
-//                                 fn get_{}(&self) -> {} {
-//                                     self.model.{}
-//                                 }
-
-//                                 #[setter]
-//                                 fn set_{}(&mut self, new_param: {}) {
-//                                     self.model.{} = new_param;
-//                                 }",
-//                                 var_name,
-//                                 type_name
-//                                 var_name,
-//                                 var_name,
-//                                 type_name,
-//                                 var_name,
-//                             )
+//                             generate_py_getter_and_setters(var_name, type_name)
 //                         }
 //                         _ => unreachable!(),
 //                     }
@@ -2157,8 +2162,13 @@ impl NeuronDefinition {
         // ("is_spiking", "bool"),
     // ];
 
+    // let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
+    //    .map(|(i, j)| generate_py_getter_and_setters(i, j))
+    //    .collect();
+
     // make sure to include default vars here too
-    //     let mut basic_getter_setters = generate_vars_as_getter_settings(&self.vars);    
+    //     let mut basic_getter_setters = generate_vars_as_getter_settings(&self.vars);  
+    //     basic_getter_setters.extend(mandatory_getter_and_setters);   
 
     // add iterate and spike function as well as new function
 
