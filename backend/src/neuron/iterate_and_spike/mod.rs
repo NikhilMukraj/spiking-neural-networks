@@ -3,9 +3,9 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{hash_map::{Entry, Keys, Values, ValuesMut}, HashMap, HashSet},
+    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap},
     fmt::Debug,
-    hash::Hash, io::Error,
+    hash::Hash,
 };
 use crate::error::ReceptorNeurotransmitterError;
 #[cfg(feature = "gpu")]
@@ -15,7 +15,7 @@ use opencl3::{
     types::{cl_float, cl_uint, cl_int, CL_BLOCKING, CL_NON_BLOCKING},
 };
 #[cfg(feature = "gpu")]
-use std::{ptr, collections::BTreeSet};
+use std::{ptr, collections::{BTreeSet, HashSet, hash_map::Entry}, io::Error};
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
 
@@ -690,6 +690,7 @@ pub enum DefaultReceptorsNeurotransmitterType {
     X,
 }
 
+#[cfg(feature = "gpu")]
 impl DefaultReceptorsNeurotransmitterType {
     fn get_associated_receptor<T: ReceptorKinetics>(&self) -> DefaultReceptorsType<T> {
         match &self {
@@ -2913,6 +2914,7 @@ pub enum AvailableBufferType {
     OptionalUInt
 }
 
+#[cfg(feature = "gpu")]
 impl AvailableBufferType {
     pub fn to_str(&self) -> &str {
         match self {
