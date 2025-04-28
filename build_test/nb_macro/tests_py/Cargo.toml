@@ -1,0 +1,17 @@
+[package]
+name = "tests_py"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "tests_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.18.3"
+nb_macro = { path = "../", default-features = false, features = ["py"] }
+spiking_neural_networks = { path = "../../../backend", default-features = false }
+
+[features]
+
