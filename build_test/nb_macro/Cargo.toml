@@ -15,7 +15,8 @@ pest = "2.6"
 pest_derive = "2.6"
 
 [features]
-default = ["gpu"]
+default = ["gpu", "py"]
+py = []
 gpu = ["spiking_neural_networks/gpu"]
 
 [dev-dependencies]
