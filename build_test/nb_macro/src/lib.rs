@@ -1045,55 +1045,55 @@ fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
     }
 }
 
-// #[cfg(feature = "py")]
-// fn generate_py_getter_and_setters(var_name: &str, type_name: &str) -> String {
-//     format!("
-//         #[getter]
-//         fn get_{}(&self) -> {} {
-//             self.model.{}
-//         }
+#[cfg(feature = "py")]
+fn generate_py_getter_and_setters(var_name: &str, type_name: &str) -> String {
+    format!("
+        #[getter]
+        fn get_{}(&self) -> {} {{
+            self.model.{}
+        }}
 
-//         #[setter]
-//         fn set_{}(&mut self, new_param: {}) {
-//             self.model.{} = new_param;
-//         }",
-//         var_name,
-//         type_name
-//         var_name,
-//         var_name,
-//         type_name,
-//         var_name,
-//     )
-// }
+        #[setter]
+        fn set_{}(&mut self, new_param: {}) {{
+            self.model.{} = new_param;
+        }}",
+        var_name,
+        type_name,
+        var_name,
+        var_name,
+        type_name,
+        var_name,
+    )
+}
 
-// #[cfg(feature = "py")]
-// fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
-//     match vars {
-//         Ast::VariablesAssignments(variables) => {
-//             variables.iter()
-//                 .map(|i| {
-//                     let var_name = match i {
-//                         Ast::VariableAssignment { name, .. } => name,
-//                         _ => unreachable!(),
-//                     };
+#[cfg(feature = "py")]
+fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
 
-//                     match i {
-//                         Ast::VariableAssignment { value, .. } => {
-//                             let type_name = match value {
-//                                 NumOrBool::Number(_) => "f32",
-//                                 NumOrBool::Bool(_) => "bool",
-//                             };
+                    match i {
+                        Ast::VariableAssignment { value, .. } => {
+                            let type_name = match value {
+                                NumOrBool::Number(_) => "f32",
+                                NumOrBool::Bool(_) => "bool",
+                            };
 
-//                             generate_py_getter_and_setters(var_name, type_name)
-//                         }
-//                         _ => unreachable!(),
-//                     }
-//                 })
-//                 .collect()
-//         },
-//         _ => unreachable!(),
-//     }
-// }
+                            generate_py_getter_and_setters(var_name, type_name)
+                        }
+                        _ => unreachable!(),
+                    }
+                })
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
 
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
@@ -2126,94 +2126,96 @@ impl NeuronDefinition {
         )
     }
 
-    // #[cfg(feature = "py")]
-    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
-    //     let (neurotransmitter_kinetics, receptor_kinetics) = if let Some(Ast::KineticsDefinition(neuro, receptor)) = &self.kinetics {
-    //         (neuro.clone(), receptor.clone())
-    //     } else {
-    //         (String::from("ApproximateNeurotransmitter"), String::from("ApproximateReceptor"))
-    //     };
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        let (neurotransmitter_kinetics, receptor_kinetics) = if let Some(Ast::KineticsDefinition(neuro, receptor)) = &self.kinetics {
+            (neuro.clone(), receptor.clone())
+        } else {
+            (String::from("ApproximateNeurotransmitter"), String::from("ApproximateReceptor"))
+        };
 
-    //     let struct_def = format!("
-    //         #[pyclass]
-    //         #[pyo3(name = \"{}\")]
-    //         #[derive(Clone)]
-    //         pub struct Py{} {{
-    //             model: {}<{}, {}>,
-    //         }}",
-    //         self.type_name.generate(),
-    //         self.type_name.generate(),
-    //         self.type_name.generate(),
-    //         neurotransmitter_kinetics,
-    //         receptor_kinetics,
-    //     );
+        let struct_def = format!("
+            #[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Clone)]
+            pub struct Py{} {{
+                model: {}<{}, {}>,
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+            neurotransmitter_kinetics,
+            receptor_kinetics,
+        );
 
-    // // defaults.push(String::from("current_voltage: 0."));
-    // // defaults.push(String::from("dt: 0.1"));
-    // // defaults.push(String::from("c_m: 1."));
-    // // defaults.push(String::from("gap_conductance: 10."));
+        // defaults.push(String::from("current_voltage: 0."));
+        // defaults.push(String::from("dt: 0.1"));
+        // defaults.push(String::from("c_m: 1."));
+        // defaults.push(String::from("gap_conductance: 10."));
 
-    // iterate to generate getter and setters
-    // let mandatory_vars = vec![
-        // ("dt", "f32"), 
-        // ("current_voltage", "f32"), 
-        // ("c_m", "f32"), 
-        // ("gap_conductance", "f32"), 
-        // ("is_spiking", "bool"),
-    // ];
+        // iterate to generate getter and setters
+        let mandatory_vars = [
+            ("dt", "f32"), 
+            ("current_voltage", "f32"), 
+            ("c_m", "f32"), 
+            ("gap_conductance", "f32"), 
+            ("is_spiking", "bool"),
+        ];
 
-    // let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
-    //    .map(|(i, j)| generate_py_getter_and_setters(i, j))
-    //    .collect();
+        let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
+            .map(|(i, j)| generate_py_getter_and_setters(i, j))
+            .collect();
 
-    // make sure to include default vars here too
-    //     let mut basic_getter_setters = generate_vars_as_getter_settings(&self.vars);  
-    //     basic_getter_setters.extend(mandatory_getter_and_setters);   
+        // make sure to include default vars here too
+        let mut basic_getter_setters = generate_vars_as_getter_setters(&self.vars);  
+        basic_getter_setters.extend(mandatory_getter_and_setters);   
 
-    // add iterate and spike function as well as new function
+        // add iterate and spike function as well as new function
 
-    // let get_and_set_last_firing_time = "
-    //     #[getter(last_firing_time)]
-    //     fn get_last_firing_time(&self) -> Option<usize> {
-    //         self.model.get_last_firing_time()
-    //     }
+        let get_and_set_last_firing_time = "
+            #[getter(last_firing_time)]
+            fn get_last_firing_time(&self) -> Option<usize> {
+                self.model.get_last_firing_time()
+            }
 
-    //     #[setter(last_firing_time)]
-    //     fn set_last_firing_time(&mut self, timestep: Option<usize>) {
-    //         self.model.set_last_firing_time(timestep);
-    //     }";
+            #[setter(last_firing_time)]
+            fn set_last_firing_time(&mut self, timestep: Option<usize>) {
+                self.model.set_last_firing_time(timestep);
+            }";
 
-    // generate new method from default var assignments
+        // generate new method from default var assignments
 
-    //     let impl_pymethods = format!(
-    //         "
-    //         #[pymethods]
-    //         impl {} {{
-    //             {}
-    //             {}
-    //         }}
-    //         "
-    //         self.type_name.generate(),
-    //         basic_getter_setters.join("\n"),
-    //         get_and_set_last_firing_time,
-    //     );
+        // synaptic neurotransmitters as pydict of neurotransmitter enum to kinetics structs
 
-    //     let imports = vec![
-    //         String::from("use pyo3::prelude::*;")
-    //     ];
+        let impl_pymethods = format!(
+            "
+            #[pymethods]
+            impl Py{} {{
+                {}
+                {}
+            }}
+            ",
+            self.type_name.generate(),
+            basic_getter_setters.join("\n"),
+            get_and_set_last_firing_time,
+        );
 
-    //     (
-    //         imports,
-    //         format!(
-    //             "
-    //             {}
-    //             {}
-    //             ",
-    //             struct_def,
-    //             impl_pymethods,
-    //         )
-    //     )
-    // }
+        let imports = vec![
+            String::from("use pyo3::prelude::*;")
+        ];
+
+        (
+            imports,
+            format!(
+                "
+                {}
+                {}
+                ",
+                struct_def,
+                impl_pymethods,
+            )
+        )
+    }
 }
 
 fn parse_type_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
@@ -4820,6 +4822,21 @@ fn build_function(model_description: String) -> TokenStream {
     
                             neuron_code_map.insert(
                                 format!("{}GPU", neuron_definition.type_name.generate()), neuron_code
+                            );
+                        }
+
+                        #[cfg(feature = "py")]
+                        {
+                            let (neuron_imports, neuron_code) = neuron_definition.to_pyo3_code();
+
+                            for i in neuron_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            neuron_code_map.insert(
+                                format!("{}PY", neuron_definition.type_name.generate()), neuron_code
                             );
                         }
                     },
