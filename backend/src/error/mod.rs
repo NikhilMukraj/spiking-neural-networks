@@ -255,6 +255,7 @@ impl Display for GPUError {
     }
 }
 
+#[cfg(feature = "gpu")]
 impl_debug_default!(GPUError);
 
 /// A set of errors that may occur when using the library
