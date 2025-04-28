@@ -4,11 +4,17 @@
 
 use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
-    AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, GABAaDefault, GABAbDefault, GapConductance, GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, LigandGatedChannels, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterKineticsGPU, Neurotransmitters, ReceptorKinetics, ReceptorKineticsGPU, Timestep
+    ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, 
+    GapConductance, GaussianParameters, 
+    IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
+    LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
+    Neurotransmitters, ReceptorKinetics, Timestep
 };
 use crate::neuron::intermediate_delegate::NeurotransmittersIntermediate;
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
+    NeurotransmitterKineticsGPU, ReceptorKineticsGPU,
+    AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
     IterateAndSpikeGPU, BufferGPU, KernelFunction, 
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
