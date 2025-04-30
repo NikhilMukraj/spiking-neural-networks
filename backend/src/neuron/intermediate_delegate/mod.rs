@@ -8,9 +8,9 @@ use crate::neuron::iterate_and_spike::{CurrentVoltage, IsSpiking, Timestep};
 /// An intermediate delegate to pass relevant information to the `Neurotransmitters` object
 #[derive(CurrentVoltage, IsSpiking, Timestep)]
 pub struct NeurotransmittersIntermediate {
-    current_voltage: f32,
-    is_spiking: bool,
-    dt: f32,
+    pub current_voltage: f32,
+    pub is_spiking: bool,
+    pub dt: f32,
 }
 
 impl NeurotransmittersIntermediate {
