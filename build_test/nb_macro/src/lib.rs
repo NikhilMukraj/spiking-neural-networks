@@ -1046,28 +1046,30 @@ fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature = "py")]
-fn generate_py_getter_and_setters(var_name: &str, type_name: &str) -> String {
+fn generate_py_getter_and_setters(field_name: &str, var_name: &str, type_name: &str) -> String {
     format!("
         #[getter]
         fn get_{}(&self) -> {} {{
-            self.model.{}
+            self.{}.{}
         }}
 
         #[setter]
         fn set_{}(&mut self, new_param: {}) {{
-            self.model.{} = new_param;
+            self.{}.{} = new_param;
         }}",
         var_name,
         type_name,
+        field_name,
         var_name,
         var_name,
         type_name,
+        field_name,
         var_name,
     )
 }
 
 #[cfg(feature = "py")]
-fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
+fn generate_vars_as_getter_setters(field_name: &str, vars: &Ast) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
             variables.iter()
@@ -1084,7 +1086,7 @@ fn generate_vars_as_getter_setters(vars: &Ast) -> Vec<String> {
                                 NumOrBool::Bool(_) => "bool",
                             };
 
-                            generate_py_getter_and_setters(var_name, type_name)
+                            generate_py_getter_and_setters(field_name, var_name, type_name)
                         }
                         _ => unreachable!(),
                     }
@@ -2172,10 +2174,10 @@ impl NeuronDefinition {
         ];
 
         let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
-            .map(|(i, j)| generate_py_getter_and_setters(i, j))
+            .map(|(i, j)| generate_py_getter_and_setters("model", i, j))
             .collect();
 
-        let mut basic_getter_setters = generate_vars_as_getter_setters(&self.vars);  
+        let mut basic_getter_setters = generate_vars_as_getter_setters("model", &self.vars);  
         basic_getter_setters.extend(mandatory_getter_and_setters);   
 
         let get_and_set_last_firing_time = "
@@ -3205,6 +3207,73 @@ impl NeurotransmitterKineticsDefinition {
                 vector_return_function,
                 attribute_names_functions,
                 get_update_function,
+            )
+        )
+    }
+
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        let struct_def = format!("
+            #[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Clone, Copy)]
+            pub struct Py{} {{
+                neurotransmitter: {},
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let mandatory_vars = [("t", "f32")];
+
+        let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
+            .map(|(i, j)| generate_py_getter_and_setters("neurotransmitter", i, j))
+            .collect();
+
+        let mut basic_getter_setters = generate_vars_as_getter_setters("neurotransmitter", &self.vars);  
+        basic_getter_setters.extend(mandatory_getter_and_setters);
+
+        let apply_t_changes_func = "fn apply_t_change(&mut self, voltage: f32, is_spiking: bool, dt: f32) {
+            self.neurotransmitter.apply_t_change(&NeurotransmittersIntermediate { current_voltage: voltage, is_spiking, dt });
+        }";
+
+        let constructor = format!(
+            "#[new]
+            fn new() -> Self {{
+                Py{} {{ neurotransmitter: {}::default() }}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.neurotransmitter)) }"#;
+
+        let imports = vec![String::from("use pyo3::prelude::*;")];
+
+        let py_impl = format!("
+                #[pymethods]
+                impl Py{} {{
+                    {}
+                    {}
+                    {}
+                    {}
+                }}
+            ",
+            self.type_name.generate(),
+            constructor,
+            repr,
+            basic_getter_setters.join("\n"),
+            apply_t_changes_func,
+        );
+
+        (
+            imports,
+            format!(
+                "{}
+                {}",
+                struct_def,
+                py_impl,
             )
         )
     }
@@ -4908,6 +4977,21 @@ fn build_function(model_description: String) -> TokenStream {
     
                             neurotransmitter_kinetics_code_map.insert(
                                 format!("{}GPU", neurotransmitter_kinetics.type_name.generate()), neurotransmitter_kinetics_code
+                            );
+                        }
+
+                        #[cfg(feature = "py")]
+                        {
+                            let (neurotransmitter_kinetics_imports, neurotransmitter_kinetics_code) = neurotransmitter_kinetics.to_pyo3_code();
+
+                            for i in neurotransmitter_kinetics_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            neurotransmitter_kinetics_code_map.insert(
+                                format!("{}PY", neurotransmitter_kinetics.type_name.generate()), neurotransmitter_kinetics_code
                             );
                         }
                     },
