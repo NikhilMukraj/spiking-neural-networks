@@ -2153,6 +2153,15 @@ impl NeuronDefinition {
         // defaults.push(String::from("c_m: 1."));
         // defaults.push(String::from("gap_conductance: 10."));
 
+        let constructor = format!(
+            "#[new]
+            fn new() -> Self {{ Py{} {{ model: {}::default() }} }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.model)) }"#;
+
         // iterate to generate getter and setters
         let mandatory_vars = [
             ("dt", "f32"), 
@@ -2166,11 +2175,8 @@ impl NeuronDefinition {
             .map(|(i, j)| generate_py_getter_and_setters(i, j))
             .collect();
 
-        // make sure to include default vars here too
         let mut basic_getter_setters = generate_vars_as_getter_setters(&self.vars);  
         basic_getter_setters.extend(mandatory_getter_and_setters);   
-
-        // add iterate and spike function as well as new function
 
         let get_and_set_last_firing_time = "
             #[getter(last_firing_time)]
@@ -2183,6 +2189,10 @@ impl NeuronDefinition {
                 self.model.set_last_firing_time(timestep);
             }";
 
+        let iterate_and_spike_function = "fn iterate_and_spike(&mut self, i: f32) -> bool {
+            self.model.iterate_and_spike(i)
+        }";
+
         // generate new method from default var assignments
 
         // synaptic neurotransmitters as pydict of neurotransmitter enum to kinetics structs
@@ -2193,11 +2203,17 @@ impl NeuronDefinition {
             impl Py{} {{
                 {}
                 {}
+                {}
+                {}
+                {}
             }}
             ",
             self.type_name.generate(),
+            constructor,
+            repr,
             basic_getter_setters.join("\n"),
             get_and_set_last_firing_time,
+            iterate_and_spike_function,
         );
 
         let imports = vec![
