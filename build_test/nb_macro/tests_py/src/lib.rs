@@ -43,3 +43,6 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
+
+// add tests to determine if iterate and spike works as intended
+// and that getter setters also work
