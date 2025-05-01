@@ -2253,6 +2253,14 @@ impl NeuronDefinition {
 
         // synaptic neurotransmitters as pydict of neurotransmitter enum to kinetics structs
 
+        // "#[getter(synaptic_neurotransmitters)]
+        // fn get_synaptic_neurotransmitters(&self) -> PyDict {{
+        // }}
+
+        // #[setter(synaptic_neurotransmitters)]
+        // fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: PyDict) -> PyResult<()> {{
+        // }}"
+
         let impl_pymethods = format!(
             "
             #[pymethods]
