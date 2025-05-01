@@ -1,6 +1,13 @@
 use nb_macro::neuron_builder;
 
 
+#[cfg(feature = "py")]
+#[pyclass]
+#[derive(Clone, Copy)]
+pub struct PyApproximateReceptor {
+    receptor: ApproximateReceptor
+}
+
 neuron_builder!(r#"
 [receptors]
     type: MultipleReceptors

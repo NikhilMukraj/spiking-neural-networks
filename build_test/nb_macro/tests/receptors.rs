@@ -3,7 +3,6 @@ mod shared_receptors;
 #[cfg(test)]
 mod test {
     use nb_macro::neuron_builder;
-    use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;
     use crate::shared_receptors::{
         MultipleReceptors, AReceptor, BReceptor, MultipleReceptorsNeurotransmitterType,
         MultipleReceptorsType, MixedReceptorsType, IonoReceptor, MetaReceptor, 
@@ -12,6 +11,13 @@ mod test {
 
     // need to implement multiple receptor values
     // could default to always assuming one receptor until specified otherwise
+
+    #[cfg(feature = "py")]
+    #[pyclass]
+    #[derive(Clone, Copy)]
+    pub struct PyApproximateReceptor {
+        receptor: ApproximateReceptor
+    }
 
     neuron_builder!(r#"
     [receptors]
