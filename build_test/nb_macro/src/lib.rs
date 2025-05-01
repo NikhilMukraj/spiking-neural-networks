@@ -68,6 +68,7 @@ enum Ast {
     },
     TypeDefinition(String),
     KineticsDefinition(String, String),
+    SingleKineticsDefinition(String),
     OnSpike(Vec<Ast>),
     OnIteration(Vec<Ast>),
     SpikeDetection(Box<Ast>),
@@ -203,6 +204,7 @@ impl Ast {
             },
             Ast::TypeDefinition(string) => string.clone(),
             Ast::KineticsDefinition(neuro, receptor) => format!("{}, {}", neuro, receptor),
+            Ast::SingleKineticsDefinition(string) => string.clone(),
             Ast::OnSpike(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate())
@@ -544,6 +546,7 @@ impl Ast {
             },
             Ast::TypeDefinition(string) => string.clone(),
             Ast::KineticsDefinition(neuro, receptor) => format!("{}, {}", neuro, receptor),
+            Ast::SingleKineticsDefinition(string) => string.clone(),
             Ast::OnSpike(assignments) => {
                 assignments.iter()
                     .map(|i| i.generate_kernel_gpu())
@@ -689,7 +692,7 @@ fn generate_on_iteration(on_iteration: &Ast) -> String {
     format!("{}\n{}\n", on_iteration_assignments, changes)
 }
 
-fn generate_fields_internal(vars: &Ast, format_type: fn(&str, &str) -> String) -> Vec<String> {
+fn generate_fields_internal<F: Fn(&str, &str) -> String>(vars: &Ast, format_type: F) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
             variables
@@ -722,6 +725,21 @@ fn generate_fields(vars: &Ast) -> Vec<String> {
 
 fn generate_fields_as_args(vars: &Ast) -> Vec<String> {
     generate_fields_internal(vars, |i, j| format!("{}: &mut {}", i, j))
+}
+
+#[cfg(feature = "py")]
+fn generate_fields_as_immutable_args(vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, j| format!("{}: {}", i, j))
+}
+
+#[cfg(feature = "py")]
+fn generate_fields_as_mutable_statements(prefix: &str, vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, _| format!("let mut {}_{} = {};", prefix, i, i))
+}
+
+#[cfg(feature = "py")]
+fn generate_fields_as_mutable_refs(prefix: &str, vars: &Ast) -> Vec<String> {
+    generate_fields_internal(vars, |i, _| format!("&mut {}_{}", prefix, i))
 }
 
 fn generate_fields_as_names(vars: &Ast) -> Vec<String> {
@@ -1076,7 +1094,7 @@ fn generate_vars_as_getter_setters(field_name: &str, vars: &Ast) -> Vec<String> 
                 .map(|i| {
                     let var_name = match i {
                         Ast::VariableAssignment { name, .. } => name,
-                        _ => unreachable!(),
+                        ast => unreachable!("Unreachable AST on individual variable: {:#?}", ast),
                     };
 
                     match i {
@@ -1088,12 +1106,48 @@ fn generate_vars_as_getter_setters(field_name: &str, vars: &Ast) -> Vec<String> 
 
                             generate_py_getter_and_setters(field_name, var_name, type_name)
                         }
-                        _ => unreachable!(),
+                        ast => unreachable!("Unreachable AST on individual variable: {:#?}", ast),
                     }
                 })
                 .collect()
         },
-        _ => unreachable!(),
+        ast => unreachable!("Unreachable AST on variable assignments: {:#?}", ast),
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_receptor_vars_as_getter_setters(type_name: &str, vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::Name(name) => name.clone(),
+                        ast => unreachable!("Unreachable AST on individual variable in receptors parsing: {:#?}", ast),
+                    };
+
+                    format!("
+                        #[getter]
+                        fn get_{}(&self) -> {} {{
+                            {} {{ receptor: self.receptor.{} }}
+                        }}
+
+                        #[setter]
+                        fn set_{}(&mut self, new_param: {}) {{
+                            self.receptor.{} = new_param.receptor;
+                        }}",
+                        var_name,
+                        type_name,
+                        type_name,
+                        var_name,
+                        var_name,
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        ast => unreachable!("Unreachable AST on receptor variables parsing: {:#?}", ast),
     }
 }
 
@@ -3508,8 +3562,18 @@ impl ReceptorKineticsDefinition {
 
 struct ReceptorsDefinition {
     type_name: Ast,
+    default_kinetics: Option<Ast>,
     top_level_vars: Option<Ast>,
     blocks: Vec<(Ast, Ast, Ast, Ast)>,
+}
+
+fn parse_single_kinetics_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("single_kinetics"), 
+        Ast::SingleKineticsDefinition(
+            String::from(pair.into_inner().next().unwrap().as_str())
+        )
+    )
 }
 
 fn parse_receptor_vars_def(pair: Pair<'_, Rule>) -> (String, Ast) {
@@ -3551,6 +3615,19 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
             },
             Rule::vars_with_default_def => {
                 let (key, current_ast) = parse_vars_with_default(pair);
+
+                if definitions.contains_key(&key) {
+                    return Err(
+                        Error::new(
+                            ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                        )
+                    )
+                }
+
+                definitions.insert(key, current_ast);
+            },
+            Rule::single_kinetics_def => {
+                let (key, current_ast) = parse_single_kinetics_definition(pair);
 
                 if definitions.contains_key(&key) {
                     return Err(
@@ -3629,12 +3706,13 @@ fn generate_receptors(pairs: Pairs<Rule>) -> Result<ReceptorsDefinition> {
     let type_name = definitions.remove("type").ok_or_else(|| {
         Error::new(ErrorKind::InvalidInput, "Type name definition expected")
     })?;
-
+    let default_kinetics = definitions.remove("single_kinetics");
     let vars = definitions.remove("vars");
 
     Ok(
         ReceptorsDefinition { 
             type_name,
+            default_kinetics,
             top_level_vars: vars, 
             blocks,
         }
@@ -3924,6 +4002,21 @@ impl ReceptorsDefinition {
             )
         };
 
+        if self.default_kinetics.is_none() {
+            imports.push(
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::ApproximateReceptor;")
+            );
+        }
+
+        let default_impl = format!(
+            "impl {}<{}> {{ fn default_impl() -> Self {{ {}::default() }} }}",
+            self.type_name.generate(),
+            self.default_kinetics.as_ref().unwrap_or(
+                &Ast::SingleKineticsDefinition(String::from("ApproximateReceptor"))
+            ).generate(),
+            self.type_name.generate(),
+        );
+
         if has_current.is_empty() {
             let receptors_impl = format!(
                 "impl<T: ReceptorKinetics> Receptors for {}<T> {{
@@ -3949,13 +4042,14 @@ impl ReceptorsDefinition {
             return (
                 imports,
                 format!(
-                    "{}\n{}\n{}\n{}\n{}\n{}", 
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}", 
                     neurotransmitters_definiton, 
                     receptors.join("\n"),
                     receptor_enum,
                     receptors_struct,
                     receptors_impl,
                     receptors_default,
+                    default_impl,
                 )
             );
         }
@@ -4049,13 +4143,14 @@ impl ReceptorsDefinition {
         (
             imports, 
             format!(
-                "{}\n{}\n{}\n{}\n{}\n{}", 
+                "{}\n{}\n{}\n{}\n{}\n{}\n{}", 
                 neurotransmitters_definiton, 
                 receptors.join("\n"),
                 receptor_enum,
                 receptors_struct,
                 receptors_impl,
                 receptors_default,
+                default_impl,
             )
         )
     }
@@ -4694,6 +4789,66 @@ impl ReceptorsDefinition {
             }}",
             neurotransmitters_name,
         );
+
+        let default_kinetics = self.default_kinetics.as_ref()
+            .unwrap_or(&Ast::SingleKineticsDefinition(String::from("ApproximateReceptor")))
+            .generate();
+
+        let mut receptor_impls = vec![];
+
+        for (type_name, vars_def, _, receptor_vars) in &self.blocks {
+            // vars.contains(&String::from("pub current: f32"))
+
+            let struct_def = format!(
+                "#[pyclass]
+                #[pyo3(name = \"{}Receptor\")]
+                #[derive(Debug, Clone, PartialEq)]\npub struct Py{}Receptor {{\nreceptor: {}Receptor<{}>\n}}", 
+                type_name.generate(),
+                type_name.generate(),
+                type_name.generate(),
+                default_kinetics,
+            );
+
+            let getters_and_setters = generate_vars_as_getter_setters("receptor", vars_def);
+            let receptor_getters_and_setters = generate_receptor_vars_as_getter_setters(
+                format!("Py{}", default_kinetics).as_str(), receptor_vars
+            );
+
+            let iterate_function = match &self.top_level_vars {
+                Some(top_level_vars) => format!(
+                    "fn iterate(&mut self, current_voltage: f32, dt: f32, {}) {{ {}\nself.receptor.iterate(current_voltage, dt, {}); }}",
+                    generate_fields_as_immutable_args(top_level_vars).join(", "),
+                    generate_fields_as_mutable_statements("processed", top_level_vars).join(", "),
+                    generate_fields_as_mutable_refs("processed", top_level_vars).join(", "),
+                ),
+                None => String::from(
+                    "fn iterate(&mut self, current_voltage: f32, dt: f32) {{ self.receptor.iterate(current_voltage, dt); }}"
+                ),
+            };
+
+            let py_impl = format!(
+                "#[pymethods]
+                impl Py{}Receptor {{
+                    #[new]
+                    fn new() -> Self {{ Py{}Receptor {{ receptor: {}Receptor::default() }} }}
+                    fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.receptor)) }}
+                    {}
+                    {}
+                    fn apply_r_changes(&mut self, t: f32, dt: f32) {{ self.receptor.apply_r_change(t, dt); }}
+                    {}
+                }}
+                ",
+                type_name.generate(),
+                type_name.generate(),
+                type_name.generate(),
+                getters_and_setters.join("\n"),
+                receptor_getters_and_setters.join("\n"),
+                iterate_function,
+            );
+
+            receptor_impls.push(struct_def);
+            receptor_impls.push(py_impl);
+        }
     
         let imports = vec![
             String::from("use pyo3::prelude::*;"),
@@ -4707,10 +4862,12 @@ impl ReceptorsDefinition {
             format!(
                 "{}
                 {}
+                {}
                 {}",
                 neurotransmitters_struct_def,
                 neurotransmitter_conversion_impl,
                 neurotransmitter_py_impl,
+                receptor_impls.join("\n"),
             )
         )
     }
