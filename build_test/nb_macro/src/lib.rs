@@ -3249,7 +3249,10 @@ impl NeurotransmitterKineticsDefinition {
 
         let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.neurotransmitter)) }"#;
 
-        let imports = vec![String::from("use pyo3::prelude::*;")];
+        let imports = vec![
+            String::from("use pyo3::prelude::*;"), 
+            String::from("use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;"),
+        ];
 
         let py_impl = format!("
                 #[pymethods]
@@ -3431,6 +3434,73 @@ impl ReceptorKineticsDefinition {
                 set_function,
                 vector_return_function,
                 get_update_function,
+            )
+        )
+    }
+
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        let struct_def = format!("
+            #[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Clone, Copy)]
+            pub struct Py{} {{
+                receptor: {},
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let mandatory_vars = [("r", "f32")];
+
+        let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
+            .map(|(i, j)| generate_py_getter_and_setters("receptor", i, j))
+            .collect();
+
+        let mut basic_getter_setters = generate_vars_as_getter_setters("receptor", &self.vars);  
+        basic_getter_setters.extend(mandatory_getter_and_setters);
+
+        let apply_r_changes_func = "fn apply_r_change(&mut self, t: f32, dt: f32) {
+            self.receptor.apply_r_change(t, dt);
+        }";
+
+        let constructor = format!(
+            "#[new]
+            fn new() -> Self {{
+                Py{} {{ receptor: {}::default() }}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.receptor)) }"#;
+
+        let imports = vec![String::from("use pyo3::prelude::*;")];
+
+        let py_impl = format!("
+                #[pymethods]
+                impl Py{} {{
+                    {}
+                    {}
+                    {}
+                    {}
+                }}
+            ",
+            self.type_name.generate(),
+            constructor,
+            repr,
+            basic_getter_setters.join("\n"),
+            apply_r_changes_func,
+        );
+
+        (
+            imports,
+            format!(
+                "{}
+                {}",
+                struct_def,
+                py_impl,
             )
         )
     }
@@ -4574,10 +4644,76 @@ impl ReceptorsDefinition {
         )
     }
 
-    // #[cfg(feature = "py")]
-    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
-        
-    // }
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        let neurotransmitters_name = format!("{}NeurotransmitterType", self.type_name.generate());
+
+        let neurotransmitter_types: Vec<String> = self.blocks.iter()
+            .map(|i| i.0.generate())
+            .collect();
+        let neurotransmitters_struct_def = format!(
+            "#[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Debug, Hash, PartialEq, Eq, Clone, Copy)]\npub enum Py{} {{\n{}\n}}",
+            neurotransmitters_name,
+            neurotransmitters_name,
+            neurotransmitter_types.join(",\n"),
+        );
+
+        let neurotransmitter_conversions = neurotransmitter_types.iter()
+            .map(|i| format!(
+                "Py{}::{} => {}::{}", 
+                neurotransmitters_name,
+                i,
+                neurotransmitters_name,
+                i,
+            ))
+            .collect::<Vec<_>>();
+
+        let neurotransmitter_conversion_impl = format!(
+            "impl Py{} {{
+                pub fn convert_type(&self) -> {} {{
+                    match self {{
+                        {}
+                    }}
+                }}
+            }}",
+            neurotransmitters_name,
+            neurotransmitters_name,
+            neurotransmitter_conversions.join(",\n"),
+        );
+
+        let neurotransmitter_py_impl = format!(
+            "#[pymethods]
+            impl Py{} {{
+                fn __hash__(&self) -> u64 {{
+                    let mut hasher = DefaultHasher::new();
+                    self.hash(&mut hasher);
+                    hasher.finish()
+                }}
+            }}",
+            neurotransmitters_name,
+        );
+    
+        let imports = vec![
+            String::from("use pyo3::prelude::*;"),
+            String::from("use std::collections::hash_map::DefaultHasher;"),
+            String::from("use std::hash::Hash;"),
+            String::from("use std::hash::Hasher;"),
+        ];
+
+        (
+            imports,
+            format!(
+                "{}
+                {}
+                {}",
+                neurotransmitters_struct_def,
+                neurotransmitter_conversion_impl,
+                neurotransmitter_py_impl,
+            )
+        )
+    }
 }
 
 fn parse_expr(pairs: Pairs<Rule>) -> Ast {
@@ -5030,6 +5166,21 @@ fn build_function(model_description: String) -> TokenStream {
                                 format!("{}GPU", receptor_kinetics.type_name.generate()), receptor_kinetics_code
                             );
                         }
+
+                        #[cfg(feature="py")] 
+                        {
+                            let (receptor_kinetics_imports, receptor_kinetics_code) = receptor_kinetics.to_pyo3_code();
+
+                            for i in receptor_kinetics_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            receptor_kinetics_code_map.insert(
+                                format!("{}PY", receptor_kinetics.type_name.generate()), receptor_kinetics_code
+                            );
+                        }
                     },
                     Rule::receptors_definition => {
                         let receptors = generate_receptors(pair.into_inner())
@@ -5064,6 +5215,21 @@ fn build_function(model_description: String) -> TokenStream {
     
                             receptors_code_map.insert(
                                 format!("{}GPU", receptors.type_name.generate()), receptors_code
+                            );
+                        }
+
+                        #[cfg(feature="py")] 
+                        {
+                            let (receptors_imports, receptors_code) = receptors.to_pyo3_code();
+
+                            for i in receptors_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            receptors_code_map.insert(
+                                format!("{}PY", receptors.type_name.generate()), receptors_code
                             );
                         }
                     }
