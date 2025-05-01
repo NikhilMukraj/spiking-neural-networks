@@ -124,13 +124,14 @@ receptor_block = {
 	NEWLINE* ~ on_iteration_def ~ NEWLINE*
 }
 
+single_kinetics_def = { "kinetics:" ~ " "* ~ name ~ NEWLINE+ }
 neurotransmitter_def = { "neurotransmitter:" ~ " "* ~ name ~ NEWLINE+ }
 receptors_definition = {
 	"[receptors]" ~ NEWLINE+ ~ 
 		(
-			type_def | vars_with_default_def | 
+			type_def | vars_with_default_def | single_kinetics_def |
 			receptor_block+
-		){2,3} ~ WHITESPACE* ~ "[end]"
+		){2,4} ~ WHITESPACE* ~ "[end]"
 }
 
 full = _{
