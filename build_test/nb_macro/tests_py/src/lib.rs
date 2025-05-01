@@ -26,6 +26,7 @@ neuron_builder!(r#"
 
 [receptors]
     type: TestReceptors
+    kinetics: BoundedReceptorKinetics
     neurotransmitter: X
     vars: current = 0, g = 1, e = 0
     on_iteration:
@@ -51,6 +52,7 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBoundedNeurotransmitterKinetics>()?;
     m.add_class::<PyBoundedReceptorKinetics>()?;
     m.add_class::<PyTestReceptorsNeurotransmitterType>()?;
+    m.add_class::<PyXReceptor>()?;
 
     Ok(())
 }
