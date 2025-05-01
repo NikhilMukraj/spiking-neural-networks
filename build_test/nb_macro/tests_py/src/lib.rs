@@ -24,9 +24,18 @@ neuron_builder!(r#"
         r = min(max(t, 0), r_max)
 [end]
 
+[receptors]
+    type: TestReceptors
+    neurotransmitter: X
+    vars: current = 0, g = 1, e = 0
+    on_iteration:
+        current = g * r * (v - e)
+[end]
+
 [neuron]
     type: BasicIntegrateAndFire
     kinetics: BoundedNeurotransmitterKinetics, BoundedReceptorKinetics
+    receptors: TestReceptors
     vars: e = 0, v_reset = -75, v_th = -55
     on_spike: 
         v = v_reset
@@ -40,6 +49,8 @@ neuron_builder!(r#"
 fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBasicIntegrateAndFire>()?;
     m.add_class::<PyBoundedNeurotransmitterKinetics>()?;
+    m.add_class::<PyBoundedReceptorKinetics>()?;
+    m.add_class::<PyTestReceptorsNeurotransmitterType>()?;
 
     Ok(())
 }
