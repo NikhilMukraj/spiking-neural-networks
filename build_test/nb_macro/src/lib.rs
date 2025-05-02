@@ -2256,52 +2256,59 @@ impl NeuronDefinition {
         // or maybe just use the conversion function, maybe conversion function needs to be
         // a 2-way conversion function
 
-        // let neurotransmitters_getter_and_setter = format!(
-        //     "#[getter(synaptic_neurotransmitters)]
-        //     fn get_synaptic_neurotransmitters(&self) -> PyDict {{
-        //         let mut map = HashMap::new();
-        //         for (key, value) in py_dict.iter() {{
-        //             let key_py = key.convert_to_py()?;
-        //             let val_py: i32 = Py{} {{ neurotransmitter: value }};
-        //             map.insert(key_py, val_py);
-        //         }}
+        let neurotransmitters_getter_and_setter = format!(
+            "fn get_synaptic_neurotransmitters<'py>(&self, py: Python<'py>) -> PyResult<&'py PyDict> {{
+                let dict = PyDict::new(py);
+                for (key, value) in self.model.synaptic_neurotransmitters.iter() {{
+                    let key_py = Py::new(py, key.convert_type_to_py())?;
+                    let val_py = Py::new(py, Py{} {{
+                        neurotransmitter: value.clone(),
+                    }})?;
+                    dict.set_item(key_py, val_py)?;
+                }}
 
-        //         map.into()
-        //     }}
+                Ok(dict)
+            }}
 
-        //     #[setter(synaptic_neurotransmitters)]
-        //     fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: PyDict) -> PyResult<()> {{
-        //         let current_copy = self.model.synaptic_neurotransmitters.clone();
-        //         for key in self.model.synaptic_neurotransmitters.keys() {{
-        //             self.model.synaptic_neurotransmitters.remove(key).unwrap();
-        //         }}
+            fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: &PyDict) -> PyResult<()> {{
+                let current_copy = self.model.synaptic_neurotransmitters.clone();
+                let keys: Vec<_> = self.model.synaptic_neurotransmitters.keys().cloned().collect();
+                for key in keys.iter() {{
+                    self.model.synaptic_neurotransmitters.remove(key).unwrap();
+                }}
 
-        //         for (key, value) in neurotransmitters.iter() {{
-        //             let current_type = <{} as Receptors>::N::convert_from_py();
-        //             if current_type.is_err() {{
-        //                 return Err(PyTypeError::new_err((\"Incorrect neurotransmitter type\"));
-        //             }}
-        //             let current_neurotransmitter = value.extract::<Py{}>();
-        //             if current_neurotransmitter.is_err() {{
-        //                 return Err(PyTypeError::new_err((\"Incorrect neurotransmitter kinetics type\"));
-        //             }}
-        //             self.model.synaptic_neurotransmitters.insert(
-        //                 current_type.unwrap(), 
-        //                 current_neurotransmitter.unwrap().neurotransmitter,
-        //             );
-        //         }}
+                for (key, value) in neurotransmitters.iter() {{
+                    let current_type = <{}<{}> as Receptors>::N::convert_from_py(key);
+                    if current_type.is_none() {{
+                        self.model.synaptic_neurotransmitters = current_copy;
+                        return Err(PyTypeError::new_err(\"Incorrect neurotransmitter type\"));
+                    }}
+                    let current_neurotransmitter = value.extract::<Py{}>();
+                    if current_neurotransmitter.is_err() {{
+                        self.model.synaptic_neurotransmitters = current_copy;
+                        return Err(PyTypeError::new_err(\"Incorrect neurotransmitter kinetics type\"));
+                    }}
+                    self.model.synaptic_neurotransmitters.insert(
+                        current_type.unwrap(), 
+                        current_neurotransmitter.unwrap().neurotransmitter.clone(),
+                    );
+                }}
 
-        //         Ok(())
-        //     }}",
-        //     neurotransmitter_kinetics,
-        //     self.receptors.unwrap_or(TypeDefinition::("DefaultReceptors")).generate(),
-        //     neurotransmitter_kinetics,
-        // );
+                Ok(())
+            }}",
+            neurotransmitter_kinetics,
+            self.receptors.as_ref()
+                .unwrap_or(&Ast::TypeDefinition(String::from("DefaultReceptors")))
+                .generate(),
+            receptor_kinetics,
+            neurotransmitter_kinetics,
+        );
 
         let impl_pymethods = format!(
             "
             #[pymethods]
             impl Py{} {{
+                {}
                 {}
                 {}
                 {}
@@ -2314,11 +2321,14 @@ impl NeuronDefinition {
             repr,
             basic_getter_setters.join("\n"),
             get_and_set_last_firing_time,
+            neurotransmitters_getter_and_setter,
             iterate_and_spike_function,
         );
 
         let imports = vec![
-            String::from("use pyo3::prelude::*;")
+            String::from("use pyo3::prelude::*;"),
+            String::from("use pyo3::types::PyDict;"),
+            String::from("use pyo3::exceptions::PyTypeError;"),
         ];
 
         (
@@ -4841,7 +4851,7 @@ impl ReceptorsDefinition {
                     }}
                 }}
 
-                pub fn convert_from_py(neurotransmitter: PyAny) -> Option<Self> {{
+                pub fn convert_from_py(neurotransmitter: &PyAny) -> Option<Self> {{
                     neurotransmitter.extract::<Py{}>().ok()
                         .map(|i| i.convert_type())
                 }}
