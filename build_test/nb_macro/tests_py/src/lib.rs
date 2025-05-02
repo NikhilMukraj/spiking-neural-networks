@@ -59,3 +59,4 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
 
 // add tests to determine if iterate and spike works as intended
 // and that getter setters also work
+// check if neurotransmitters are edited properly
