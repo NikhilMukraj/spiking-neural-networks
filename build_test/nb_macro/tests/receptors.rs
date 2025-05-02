@@ -8,16 +8,10 @@ mod test {
         MultipleReceptorsType, MixedReceptorsType, IonoReceptor, MetaReceptor, 
         MixedReceptorsNeurotransmitterType, MixedReceptors
     };
+    
 
     // need to implement multiple receptor values
     // could default to always assuming one receptor until specified otherwise
-
-    #[cfg(feature = "py")]
-    #[pyclass]
-    #[derive(Clone, Copy)]
-    pub struct PyApproximateReceptor {
-        receptor: ApproximateReceptor
-    }
 
     neuron_builder!(r#"
     [receptors]

@@ -10,13 +10,6 @@ mod test {
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
 
-    #[cfg(feature = "py")]
-    #[pyclass]
-    #[derive(Clone, Copy)]
-    pub struct PyApproximateReceptor {
-        receptor: ApproximateReceptor
-    }
-
     neuron_builder!("
     [receptor_kinetics]
         type: BoundedReceptorKinetics
