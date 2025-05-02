@@ -3,7 +3,7 @@
 //! for receptor dynamics over time.
 
 use std::{
-    collections::{hash_map::{Keys, Values, ValuesMut}, HashMap},
+    collections::{hash_map::{Keys, Values, ValuesMut, Iter, IterMut}, HashMap},
     fmt::Debug,
     hash::Hash,
 };
@@ -2008,6 +2008,16 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
         self.neurotransmitters.values_mut()
     }
 
+    // Iterates over the neurotransmitters associated with each [`NeurotransmitterType`]
+    pub fn iter(&self) -> Iter<'_, N, T>{
+        self.neurotransmitters.iter()
+    }
+
+    // Iterates over mutable neurotransmitters associated with each [`NeurotransmitterType`]
+    pub fn iter_mut(&mut self) -> IterMut<'_, N, T>{
+        self.neurotransmitters.iter_mut()
+    }
+
     /// Gets the neurotransmitter associated with the given [`NeurotransmitterType`]
     pub fn get(&self, neurotransmitter_type: &N) -> Option<&T> {
         self.neurotransmitters.get(neurotransmitter_type)
@@ -2025,6 +2035,11 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
         neurotransmitter: T
     ) {
         self.neurotransmitters.insert(neurotransmitter_type, neurotransmitter);
+    }
+
+    /// Removes the given neurotransmitter with the associated [`NeurotransmitterType`]
+    pub fn remove(&mut self, neurotransmitter_type: &N) -> Option<T> {
+        self.neurotransmitters.remove(&neurotransmitter_type)
     }
 
     /// Returns the neurotransmitter concentration (mM) with their associated types
