@@ -2252,14 +2252,51 @@ impl NeuronDefinition {
         // generate new method from default var assignments
 
         // synaptic neurotransmitters as pydict of neurotransmitter enum to kinetics structs
+        // need neurotransmitter to py type conversion in associated types
+        // or maybe just use the conversion function, maybe conversion function needs to be
+        // a 2-way conversion function
 
-        // "#[getter(synaptic_neurotransmitters)]
-        // fn get_synaptic_neurotransmitters(&self) -> PyDict {{
-        // }}
+        // let neurotransmitters_getter_and_setter = format!(
+        //     "#[getter(synaptic_neurotransmitters)]
+        //     fn get_synaptic_neurotransmitters(&self) -> PyDict {{
+        //         let mut map = HashMap::new();
+        //         for (key, value) in py_dict.iter() {{
+        //             let key_py = key.convert_to_py()?;
+        //             let val_py: i32 = Py{} {{ neurotransmitter: value }};
+        //             map.insert(key_py, val_py);
+        //         }}
 
-        // #[setter(synaptic_neurotransmitters)]
-        // fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: PyDict) -> PyResult<()> {{
-        // }}"
+        //         map.into()
+        //     }}
+
+        //     #[setter(synaptic_neurotransmitters)]
+        //     fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: PyDict) -> PyResult<()> {{
+        //         let current_copy = self.model.synaptic_neurotransmitters.clone();
+        //         for key in self.model.synaptic_neurotransmitters.keys() {{
+        //             self.model.synaptic_neurotransmitters.remove(key).unwrap();
+        //         }}
+
+        //         for (key, value) in neurotransmitters.iter() {{
+        //             let current_type = <{} as Receptors>::N::convert_from_py();
+        //             if current_type.is_err() {{
+        //                 return Err(PyTypeError::new_err((\"Incorrect neurotransmitter type\"));
+        //             }}
+        //             let current_neurotransmitter = value.extract::<Py{}>();
+        //             if current_neurotransmitter.is_err() {{
+        //                 return Err(PyTypeError::new_err((\"Incorrect neurotransmitter kinetics type\"));
+        //             }}
+        //             self.model.synaptic_neurotransmitters.insert(
+        //                 current_type.unwrap(), 
+        //                 current_neurotransmitter.unwrap().neurotransmitter,
+        //             );
+        //         }}
+
+        //         Ok(())
+        //     }}",
+        //     neurotransmitter_kinetics,
+        //     self.receptors.unwrap_or(TypeDefinition::("DefaultReceptors")).generate(),
+        //     neurotransmitter_kinetics,
+        // );
 
         let impl_pymethods = format!(
             "
@@ -4773,6 +4810,16 @@ impl ReceptorsDefinition {
             ))
             .collect::<Vec<_>>();
 
+        let neurotransmitter_conversions_reverse = neurotransmitter_types.iter()
+            .map(|i| format!(
+                "{}::{} => Py{}::{}", 
+                neurotransmitters_name,
+                i,
+                neurotransmitters_name,
+                i,
+            ))
+            .collect::<Vec<_>>();
+
         let neurotransmitter_conversion_impl = format!(
             "impl Py{} {{
                 pub fn convert_type(&self) -> {} {{
@@ -4784,6 +4831,25 @@ impl ReceptorsDefinition {
             neurotransmitters_name,
             neurotransmitters_name,
             neurotransmitter_conversions.join(",\n"),
+        );
+
+        let neurotransmitter_conversion_reverse_impl = format!(
+            "impl {} {{
+                pub fn convert_type_to_py(&self) -> Py{} {{
+                    match self {{
+                        {}
+                    }}
+                }}
+
+                pub fn convert_from_py(neurotransmitter: PyAny) -> Option<Self> {{
+                    neurotransmitter.extract::<Py{}>().ok()
+                        .map(|i| i.convert_type())
+                }}
+            }}",
+            neurotransmitters_name,
+            neurotransmitters_name,
+            neurotransmitter_conversions_reverse.join(",\n"),
+            neurotransmitters_name,
         );
 
         let neurotransmitter_py_impl = format!(
@@ -4871,9 +4937,11 @@ impl ReceptorsDefinition {
                 "{}
                 {}
                 {}
+                {}
                 {}",
                 neurotransmitters_struct_def,
                 neurotransmitter_conversion_impl,
+                neurotransmitter_conversion_reverse_impl,
                 neurotransmitter_py_impl,
                 receptor_impls.join("\n"),
             )
