@@ -2304,6 +2304,8 @@ impl NeuronDefinition {
             neurotransmitter_kinetics,
         );
 
+        // let receptors_getter_and_setter = "";
+
         let impl_pymethods = format!(
             "
             #[pymethods]
@@ -4879,9 +4881,15 @@ impl ReceptorsDefinition {
             .generate();
 
         let mut receptor_impls = vec![];
+        let mut receptor_conversions = vec![];
+        let mut receptor_reverse_conversions = vec![];
+        let mut has_current = false;
 
         for (type_name, vars_def, _, receptor_vars) in &self.blocks {
-            // vars.contains(&String::from("pub current: f32"))
+            let vars = generate_fields(vars_def);
+            if vars.contains(&String::from("pub current: f32")) {
+                has_current = true;
+            }
 
             let struct_def = format!(
                 "#[pyclass]
@@ -4932,10 +4940,130 @@ impl ReceptorsDefinition {
 
             receptor_impls.push(struct_def);
             receptor_impls.push(py_impl);
+
+            receptor_conversions.push(
+                format!(
+                    "Some({}Type::{}(current_receptor)) => 
+                    Py::new(py, Py{}Receptor {{ receptor: current_receptor.clone() }}).unwrap().into_py(py)", 
+                    self.type_name.generate(),
+                    type_name.generate(),
+                    type_name.generate(),
+                )
+            );
+            receptor_reverse_conversions.push(
+                format!(
+                    "match receptor.extract::<Py{}Receptor>() {{
+                        Ok(val) => {{
+                            match self.receptors.insert(current_type, {}Type::{}(val.receptor.clone())) {{
+                                Ok(_) => return Ok(()),
+                                Err(_) => return Err(PyTypeError::new_err(\"Incorrect neurotransmitter type\")),
+                            }}
+                        }},
+                        Err(e) => {{}},
+                    }};",
+                    type_name.generate(),
+                    self.type_name.generate(),
+                    type_name.generate(),
+                )
+            );
         }
+
+        let receptor_struct_def = format!(
+            "#[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Debug, Clone)]
+            pub struct Py{} {{
+                receptors: {}<{}>
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+            default_kinetics,
+        );
+
+        let top_level_getter_setters = match &self.top_level_vars {
+            Some(vars) => generate_vars_as_getter_setters("receptors", vars).join("\n"),
+            None => String::from(""),
+        };
+
+        let update_receptor_kinetics = format!(
+            "fn update_receptor_kinetics(&mut self, t: &PyDict, dt: f32) -> PyResult<()> {{
+                let mut conc = HashMap::new();
+                for (key, value) in t.iter() {{
+                    let current_type = {}::convert_from_py(key);
+                    if current_type.is_none() {{
+                        return Err(PyTypeError::new_err(\"Incorrect neurotransmitter type\"));
+                    }}
+                    let current_t = value.extract::<f32>()?;
+                    conc.insert(
+                        current_type.unwrap(), 
+                        current_t
+                    );
+                }}
+        
+                self.receptors.update_receptor_kinetics(&conc, dt);
+        
+                Ok(())
+            }}",
+            neurotransmitters_name,
+        );
+
+        let get_receptor_currents = if has_current {
+            "fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
+                self.receptors.get_receptor_currents(dt, c_m)
+            }"
+        } else {
+            ""
+        };
+
+        let receptor_py_impl = format!(
+            "#[pymethods]
+            impl Py{} {{
+                #[new]
+                fn new() -> Self {{ Py{} {{ receptors: {}::default_impl() }} }}
+                {}
+                fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.receptors)) }}
+                fn __len__(&self) -> usize {{ self.receptors.len() }}
+                {}
+                fn set_receptor_currents(&mut self, current_voltage: f32, dt: f32) {{
+                    self.receptors.set_receptor_currents(current_voltage, dt);
+                }}
+                {}
+                fn remove(&mut self, neurotransmitter_type: Py{}) {{
+                    self.receptors.remove(&neurotransmitter_type.convert_type()).unwrap();
+                }}
+                fn get<'py>(&self, py: Python<'py>, neurotransmitter_type: Py{}) -> Py<PyAny> {{
+                    let receptor = self.receptors.get(&neurotransmitter_type.convert_type());
+                    match receptor {{
+                        {},
+                        None => py.None(),
+                    }}
+                }}
+                fn insert(&mut self, neurotransmitter_type: Py{}, receptor: &PyAny) -> PyResult<()> {{
+                    let current_type = neurotransmitter_type.convert_type();
+
+                    {}
+
+                    Err(PyTypeError::new_err(\"Receptor type is unknown\"))
+                }}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+            top_level_getter_setters,
+            update_receptor_kinetics,
+            get_receptor_currents,
+            neurotransmitters_name,
+            neurotransmitters_name,
+            receptor_conversions.join(",\n"),
+            neurotransmitters_name,
+            receptor_reverse_conversions.join(",\n"),
+        );
     
         let imports = vec![
             String::from("use pyo3::prelude::*;"),
+            String::from("use pyo3::types::PyDict;"),
+            String::from("use pyo3::exceptions::PyTypeError;"),
             String::from("use std::collections::hash_map::DefaultHasher;"),
             String::from("use std::hash::Hash;"),
             String::from("use std::hash::Hasher;"),
@@ -4948,12 +5076,16 @@ impl ReceptorsDefinition {
                 {}
                 {}
                 {}
+                {}
+                {}
                 {}",
                 neurotransmitters_struct_def,
                 neurotransmitter_conversion_impl,
                 neurotransmitter_conversion_reverse_impl,
                 neurotransmitter_py_impl,
                 receptor_impls.join("\n"),
+                receptor_struct_def,
+                receptor_py_impl,
             )
         )
     }
