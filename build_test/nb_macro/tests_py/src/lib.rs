@@ -53,6 +53,7 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBoundedReceptorKinetics>()?;
     m.add_class::<PyTestReceptorsNeurotransmitterType>()?;
     m.add_class::<PyXReceptor>()?;
+    m.add_class::<PyTestReceptors>()?;
 
     Ok(())
 }
@@ -60,3 +61,4 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
 // add tests to determine if iterate and spike works as intended
 // and that getter setters also work
 // check if neurotransmitters are edited properly
+// check receptors methods work as intended (iterate + current related methods)
