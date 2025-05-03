@@ -2,6 +2,13 @@ use nb_macro::neuron_builder;
 
 
 neuron_builder!(r#"
+[ion_channel]
+    type: TestLeak
+    vars: e = 0, g = 1,
+    on_iteration:
+        current = g * (v - e)
+[end]
+
 [neurotransmitter_kinetics]
     type: BoundedNeurotransmitterKinetics
     vars: t_max = 1, c = 0.001, conc = 0
@@ -54,6 +61,7 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyTestReceptorsNeurotransmitterType>()?;
     m.add_class::<PyXReceptor>()?;
     m.add_class::<PyTestReceptors>()?;
+    m.add_class::<PyTestLeak>()?;
 
     Ok(())
 }
