@@ -2824,6 +2824,13 @@ impl IonChannelDefinition {
             )
         )
     }
+
+    // #[cfg(feature = "py")]
+    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        // determine fields (including default fields)
+        // determine methods to impl
+        // add getter setters to neuron that can modify ion channels
+    // }
 }
 
 fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
