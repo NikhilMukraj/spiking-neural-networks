@@ -2304,7 +2304,44 @@ impl NeuronDefinition {
             neurotransmitter_kinetics,
         );
 
-        // let receptors_getter_and_setter = "";
+        let receptors_name = self.receptors.as_ref()
+            .unwrap_or(&Ast::TypeDefinition(String::from("DefaultReceptors")))
+            .generate();
+
+        let receptors_getter_and_setter = format!(
+            "fn get_receptors(&self) -> Py{} {{
+                Py{} {{ receptors: self.model.receptors.clone() }}
+            }}
+            
+            fn set_receptors(&mut self, receptors: Py{}) {{
+                self.model.receptors = receptors.receptors.clone();
+            }}",
+            receptors_name,
+            receptors_name,
+            receptors_name,
+        );
+
+        let electrochemical_iterate_and_spike_function = format!(
+            "fn iterate_with_neurotransmitter_and_spike(&mut self, input_current: f32, t: &PyDict) -> PyResult<()> {{
+                let mut conc = HashMap::new();
+                for (key, value) in t.iter() {{
+                    let current_type = {}NeurotransmitterType::convert_from_py(key);
+                    if current_type.is_none() {{
+                        return Err(PyTypeError::new_err(\"Incorrect neurotransmitter type\"));
+                    }}
+                    let current_t = value.extract::<f32>()?;
+                    conc.insert(
+                        current_type.unwrap(), 
+                        current_t
+                    );
+                }}
+                
+                self.model.iterate_with_neurotransmitter_and_spike(input_current, &conc);
+
+                Ok(())
+            }}",
+            receptors_name,
+        );
 
         let impl_pymethods = format!(
             "
@@ -2316,6 +2353,8 @@ impl NeuronDefinition {
                 {}
                 {}
                 {}
+                {}
+            {}
             }}
             ",
             self.type_name.generate(),
@@ -2324,7 +2363,9 @@ impl NeuronDefinition {
             basic_getter_setters.join("\n"),
             get_and_set_last_firing_time,
             neurotransmitters_getter_and_setter,
+            receptors_getter_and_setter,
             iterate_and_spike_function,
+            electrochemical_iterate_and_spike_function,
         );
 
         let imports = vec![
