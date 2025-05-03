@@ -2724,15 +2724,6 @@ impl IonChannelDefinition {
         let update_current = if use_timestep {
             let update_current_header = "fn update_current(&mut self, voltage: f32, dt: f32) {";
 
-            // let mut lines: Vec<&str> = on_iteration.split('\n').collect();
-            // let current_line_index = lines.iter().position(|&line| line.starts_with("self.current"));
-
-            // let current_assignment = match current_line_index {
-            //     Some(index) => lines.remove(index),
-            //     None => "",
-            // };
-
-            // let update_current_body = add_indents(&lines.join("\n"), "\t");
             let update_current_body = generate_on_iteration(&self.on_iteration);
 
             let update_current_body = replace_self_var(update_current_body, "current_voltage", "voltage");
@@ -2825,12 +2816,105 @@ impl IonChannelDefinition {
         )
     }
 
-    // #[cfg(feature = "py")]
-    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
         // determine fields (including default fields)
         // determine methods to impl
         // add getter setters to neuron that can modify ion channels
-    // }
+
+        let struct_def = format!(
+            "#[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Debug, Clone, Copy)]
+            pub struct Py{} {{
+                ion_channel: {}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let update_current = if self.get_use_timestep() {
+            "fn update_current(&mut self, voltage: f32, dt: f32) { self.ion_channel.update_current(voltage, dt) }"
+        } else {
+            "fn update_current(&mut self, voltage: f32) { self.ion_channel.update_current(voltage) }"
+        };
+
+        let py_impl = format!(
+            "#[pymethods]
+            impl Py{} {{
+                #[new]
+                fn new() -> Self {{ Py{} {{ ion_channel: {}::default() }} }}
+                fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.ion_channel)) }}
+                {}
+                {}
+                {}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+            generate_vars_as_getter_setters("ion_channel", &self.vars).join("\n"),
+            generate_py_getter_and_setters("ion_channel", "current", "f32"),
+            update_current,
+        );
+
+        // if basic gating variable used
+        // add definition of basic gating variable to imports
+        // and import basic gating variable from snns package too
+
+        // let basic_gating_variable_def = "#[pyclass]
+        //     #[pyo3(name = \"BasicGatingVariable\"]
+        //     #[derive(Debug, Clone, Copy)]
+        //     pub struct PyBasicGatingVariable {
+        //         gating_variable: BasicGatingVariable
+        //     }
+
+        //     #[pymethods]
+        //     impl PyBasicGatingVariable {
+        //         #[new]
+        //         fn new() -> Self { PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() } }
+        //         fn __repr__ -> PyResult<String> { Ok(format!(\"{:#?}\", self.gating_variable)) }
+        //         fn init_state(&mut self) { self.gating_variable.init_state(); }
+        //         fn update(&mut self, dt: f32) { self.gating_variable.update(dt); }
+        //         #[getter]
+        //         fn get_alpha(&self) -> f32 {
+        //             self.gating_variable.alpha
+        //         }
+        //         #[setter]
+        //         fn set_alpha(&mut self, new_param: f32) {
+        //             self.gating_variable.alpha = new_param;
+        //         }
+        //         #[getter]
+        //         fn get_beta(&self) -> f32 {
+        //             self.gating_variable.beta
+        //         }
+        //         #[setter]
+        //         fn set_beta(&mut self, new_param: beta) {
+        //             self.gating_variable.beta = new_param;
+        //         }
+        //         #[getter]
+        //         fn get_state(&self) -> f32 {
+        //             self.gating_variable.state
+        //         }
+        //         #[setter]
+        //         fn set_state(&mut self, new_param: f32) {
+        //             self.gating_variable.state = new_param;
+        //         }
+        //     }
+        // ";
+
+        let imports = vec![String::from("use pyo3::prelude::*;")];
+
+        (
+            imports,
+            format!(
+                "{}
+                {}",
+                struct_def,
+                py_impl
+            )
+        )
+    }
 }
 
 fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
@@ -5502,6 +5586,21 @@ fn build_function(model_description: String) -> TokenStream {
                             .or_default();
     
                         ion_channel_code_map.insert(ion_channel_type_name, ion_channel_code);
+
+                        #[cfg(feature = "py")]
+                        {
+                            let (ion_channel_imports, ion_channel_code) = ion_channel.to_pyo3_code();
+
+                            for i in ion_channel_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            ion_channel_code_map.insert(
+                                format!("{}PY", ion_channel.type_name.generate()), ion_channel_code
+                            );
+                        }
                     },
                     Rule::neurotransmitter_kinetics_definition => {
                         let neurotransmitter_kinetics = generate_neurotransmitter_kinetics(pair.into_inner())
