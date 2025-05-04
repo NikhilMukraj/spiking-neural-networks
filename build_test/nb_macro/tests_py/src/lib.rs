@@ -1,4 +1,16 @@
+use spiking_neural_networks::{
+    neuron::{
+        Lattice, RunLattice, InternalGraph, LatticeHistory, GridVoltageHistory,
+        plasticity::STDP,
+    }, 
+    graph::{Graph, AdjacencyMatrix},
+    error::LatticeNetworkError,
+};
 use nb_macro::neuron_builder;
+use pyo3::{types::PyTuple, exceptions::{PyKeyError, PyValueError}};
+use std::collections::HashSet;
+mod lattices;
+use lattices::{PySTDP, impl_lattice};
 
 
 neuron_builder!(r#"
@@ -88,6 +100,24 @@ neuron_builder!(r#"
 [end]
 "#);
 
+
+type LatticeAdjacencyMatrix = AdjacencyMatrix<(usize, usize), f32>;
+
+#[pyclass]
+#[pyo3(name = "BasicIntegrateAndFireLattice")]
+#[derive(Clone)]
+pub struct PyBasicIntegrateAndFireLattice {
+    lattice: Lattice<
+        BasicIntegrateAndFire<BoundedNeurotransmitterKinetics, BoundedReceptorKinetics>,
+        LatticeAdjacencyMatrix,
+        GridVoltageHistory,
+        STDP,
+        TestReceptorsNeurotransmitterType,
+    >
+}
+
+impl_lattice!(PyBasicIntegrateAndFireLattice, PyBasicIntegrateAndFire, "BasicIntegrateAndFireLattice", PySTDP);
+
 #[pymodule]
 fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBasicIntegrateAndFire>()?;
@@ -101,6 +131,8 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyTestChannel>()?;
     m.add_class::<PyCalciumIonChannel>()?;
     m.add_class::<PyIonChannelNeuron>()?;
+    m.add_class::<PySTDP>()?;
+    m.add_class::<PyBasicIntegrateAndFireLattice>()?;
 
     Ok(())
 }
