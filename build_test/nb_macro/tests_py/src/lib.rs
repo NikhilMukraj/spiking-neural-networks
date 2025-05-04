@@ -9,6 +9,27 @@ neuron_builder!(r#"
         current = g * (v - e)
 [end]
 
+[ion_channel]
+    type: TestChannel
+    vars: e = 0, g = 1
+    gating_vars: n
+    on_iteration:
+        current = g * n.alpha * n.beta * n.state * (v - e)
+[end]
+
+[ion_channel]
+    type: CalciumIonChannel 
+    vars: e = 80, g = 0.025,
+    gating_vars: s
+    on_iteration:
+        s.alpha = 1.6 / (1 + exp(-0.072 * (v - 5)))
+        s.beta = (0.02 * (v + 8.9)) / ((exp(v + 8.9) / 5) - 1)
+
+        s.update(dt)
+
+        current = g * -(s.state ^ 2) * (v - e)
+[end]
+
 [neurotransmitter_kinetics]
     type: BoundedNeurotransmitterKinetics
     vars: t_max = 1, c = 0.001, conc = 0
@@ -51,6 +72,20 @@ neuron_builder!(r#"
     on_iteration:
         dv/dt = -(v - e) + i
 [end]
+
+[neuron]
+    type: IonChannelNeuron
+    kinetics: BoundedNeurotransmitterKinetics, BoundedReceptorKinetics
+    receptors: TestReceptors
+    ion_channels: l = TestLeak
+    vars: v_reset = -75, v_th = -55
+    on_spike: 
+        v = v_reset
+    spike_detection: v >= v_th
+    on_iteration:
+        l.update_current(v)
+        dv/dt = l.current + i
+[end]
 "#);
 
 #[pymodule]
@@ -62,6 +97,10 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyXReceptor>()?;
     m.add_class::<PyTestReceptors>()?;
     m.add_class::<PyTestLeak>()?;
+    m.add_class::<PyBasicGatingVariable>()?;
+    m.add_class::<PyTestChannel>()?;
+    m.add_class::<PyCalciumIonChannel>()?;
+    m.add_class::<PyIonChannelNeuron>()?;
 
     Ok(())
 }
