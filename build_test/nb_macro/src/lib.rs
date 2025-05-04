@@ -2343,6 +2343,38 @@ impl NeuronDefinition {
             receptors_name,
         );
 
+        let ion_channels_getters_setters = match &self.ion_channels {
+            Some(Ast::StructAssignments(variables)) => {
+                variables.iter()
+                    .map(|i| {
+                        let (var_name, type_name) = match i {
+                            Ast::StructAssignment { name, type_name } => (name, type_name),
+                            _ => unreachable!(),
+                        };
+
+                        format!(
+                            "fn get_{}(&self) -> Py{} {{
+                                Py{} {{ ion_channel: self.model.{}.clone() }}
+                            }}
+
+                            fn set_{}(&mut self, new_param: Py{}) {{
+                                self.model.{} = new_param.ion_channel.clone();
+                            }}",
+                            var_name,
+                            type_name,
+                            type_name,
+                            var_name,
+                            var_name,
+                            type_name,
+                            var_name,
+                        )
+                    })
+                    .collect::<Vec<String>>()
+            },
+            None => vec![],
+            _ => unreachable!()
+        };
+
         let impl_pymethods = format!(
             "
             #[pymethods]
@@ -2354,7 +2386,8 @@ impl NeuronDefinition {
                 {}
                 {}
                 {}
-            {}
+                {}
+                {}
             }}
             ",
             self.type_name.generate(),
@@ -2364,6 +2397,7 @@ impl NeuronDefinition {
             get_and_set_last_firing_time,
             neurotransmitters_getter_and_setter,
             receptors_getter_and_setter,
+            ion_channels_getters_setters.join("\n"),
             iterate_and_spike_function,
             electrochemical_iterate_and_spike_function,
         );
@@ -2840,6 +2874,71 @@ impl IonChannelDefinition {
             "fn update_current(&mut self, voltage: f32) { self.ion_channel.update_current(voltage) }"
         };
 
+        // if basic gating variable used
+        // add definition of basic gating variable to imports
+        // and import basic gating variable from snns package too
+
+        let basic_gating_variable_def = "#[pyclass]
+            #[pyo3(name = \"BasicGatingVariable\")]
+            #[derive(Debug, Clone, Copy)]
+            pub struct PyBasicGatingVariable {
+                gating_variable: BasicGatingVariable
+            }
+
+            #[pymethods]
+            impl PyBasicGatingVariable {
+                #[new]
+                fn new() -> Self { PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() } }
+                fn __repr__(&self) -> PyResult<String> { Ok(format!(\"{:#?}\", self.gating_variable)) }
+                fn init_state(&mut self) { self.gating_variable.init_state(); }
+                fn update(&mut self, dt: f32) { self.gating_variable.update(dt); }
+                #[getter]
+                fn get_alpha(&self) -> f32 {
+                    self.gating_variable.alpha
+                }
+                #[setter]
+                fn set_alpha(&mut self, new_param: f32) {
+                    self.gating_variable.alpha = new_param;
+                }
+                #[getter]
+                fn get_beta(&self) -> f32 {
+                    self.gating_variable.beta
+                }
+                #[setter]
+                fn set_beta(&mut self, new_param: f32) {
+                    self.gating_variable.beta = new_param;
+                }
+                #[getter]
+                fn get_state(&self) -> f32 {
+                    self.gating_variable.state
+                }
+                #[setter]
+                fn set_state(&mut self, new_param: f32) {
+                    self.gating_variable.state = new_param;
+                }
+            }
+        ";
+
+        let gating_vars = match &self.gating_vars {
+            Some(Ast::GatingVariables(variables)) => variables.iter()
+                .map(|i| format!(
+                    "fn get_{}(&self) -> PyBasicGatingVariable {{ 
+                        PyBasicGatingVariable {{ gating_variable: self.ion_channel.{} }}
+                    }}
+
+                    fn set_{}(&mut self, new_param: PyBasicGatingVariable) {{ 
+                        self.ion_channel.{} = new_param.gating_variable; 
+                    }}",
+                    i,
+                    i,
+                    i,
+                    i,
+                ))
+                .collect(),
+            None => vec![],
+            _ => unreachable!()
+        };
+
         let py_impl = format!(
             "#[pymethods]
             impl Py{} {{
@@ -2849,61 +2948,22 @@ impl IonChannelDefinition {
                 {}
                 {}
                 {}
+                {}
             }}",
             self.type_name.generate(),
             self.type_name.generate(),
             self.type_name.generate(),
             generate_vars_as_getter_setters("ion_channel", &self.vars).join("\n"),
             generate_py_getter_and_setters("ion_channel", "current", "f32"),
+            gating_vars.join("\n"),
             update_current,
         );
 
-        // if basic gating variable used
-        // add definition of basic gating variable to imports
-        // and import basic gating variable from snns package too
+        let mut imports = vec![String::from("use pyo3::prelude::*;")];
 
-        // let basic_gating_variable_def = "#[pyclass]
-        //     #[pyo3(name = \"BasicGatingVariable\"]
-        //     #[derive(Debug, Clone, Copy)]
-        //     pub struct PyBasicGatingVariable {
-        //         gating_variable: BasicGatingVariable
-        //     }
-
-        //     #[pymethods]
-        //     impl PyBasicGatingVariable {
-        //         #[new]
-        //         fn new() -> Self { PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() } }
-        //         fn __repr__ -> PyResult<String> { Ok(format!(\"{:#?}\", self.gating_variable)) }
-        //         fn init_state(&mut self) { self.gating_variable.init_state(); }
-        //         fn update(&mut self, dt: f32) { self.gating_variable.update(dt); }
-        //         #[getter]
-        //         fn get_alpha(&self) -> f32 {
-        //             self.gating_variable.alpha
-        //         }
-        //         #[setter]
-        //         fn set_alpha(&mut self, new_param: f32) {
-        //             self.gating_variable.alpha = new_param;
-        //         }
-        //         #[getter]
-        //         fn get_beta(&self) -> f32 {
-        //             self.gating_variable.beta
-        //         }
-        //         #[setter]
-        //         fn set_beta(&mut self, new_param: beta) {
-        //             self.gating_variable.beta = new_param;
-        //         }
-        //         #[getter]
-        //         fn get_state(&self) -> f32 {
-        //             self.gating_variable.state
-        //         }
-        //         #[setter]
-        //         fn set_state(&mut self, new_param: f32) {
-        //             self.gating_variable.state = new_param;
-        //         }
-        //     }
-        // ";
-
-        let imports = vec![String::from("use pyo3::prelude::*;")];
+        if !gating_vars.is_empty() {
+            imports.push(String::from(basic_gating_variable_def));
+        }
 
         (
             imports,
