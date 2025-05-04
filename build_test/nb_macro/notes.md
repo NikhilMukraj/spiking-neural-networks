@@ -20,8 +20,8 @@
   - optional else if and else in between if and end
   - option within if statement ast
     - could have vec of conditionals and vec of vec of declarations and iterate through each one
-- [ ] basic function calling tests
-- [ ] **bool vars (should be listed in same `vars:` block)**
+- [x] basic function calling tests
+- [x] **bool vars (should be listed in same `vars:` block)**
 - [ ] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
@@ -39,7 +39,7 @@
     - declare vars
     - assignment blocks
     - `receptor_kinetics = {"[receptor_kinetics]" ~ NEWLINE ~ (vars_with_default_def | on_iteration_def){2,} ~ "[end]" }`
-  - [ ] default impl method for default kinetics
+  - [x] default impl method for default kinetics
   - [ ] default impl trait maybe
 - [ ] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
 - [x] ion channel update current in neuron refactor
@@ -59,10 +59,11 @@
 - [ ] function definition blocks
   - [ ] prefix every function with string to differentiate from structure calls in gpu code
 - [ ] spike train block
+  - [ ] **default impl for spike train that can be used in pyo3**
 - [x] eventually remove vars declaration without vars
 - [ ] ion channel use timestep also checks each expr for a dt too
 - [ ] comments/docs in/around blocks
-- [ ] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
+- [x] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
 - [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
@@ -70,7 +71,7 @@
 - [ ] more descriptive error handling
 - [ ] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
-- [ ] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
+- [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [ ] **redo ligand gated channels using nb macro**
   - [ ] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
 - [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
