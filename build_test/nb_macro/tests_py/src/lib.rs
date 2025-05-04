@@ -141,3 +141,181 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
 // and that getter setters also work
 // check if neurotransmitters are edited properly
 // check receptors methods work as intended (iterate + current related methods)
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    const ITERATIONS: usize = 1000;
+    
+    #[test]
+    fn test_iterate_and_spike() {
+        let is = vec![10., 20., 30., 40., 50.];
+
+        pyo3::prepare_freethreaded_python();
+
+        for i in is {
+            let mut neuron = BasicIntegrateAndFire::default_impl();
+            let mut reference_voltages: Vec<f32> = vec![];
+
+            for _ in 0..ITERATIONS {
+                let _ = neuron.iterate_and_spike(i);
+                reference_voltages.push(neuron.current_voltage);
+            }
+
+            Python::with_gil(|py| {
+                let instance = Py::new(py, PyBasicIntegrateAndFire::new()).unwrap();
+                let mut voltages: Vec<f32> = vec![];
+                for _ in 0..ITERATIONS {
+                    let _: bool = instance.call_method1(py, "iterate_and_spike", (i,))
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
+                    voltages.push(
+                        instance.getattr(py, "current_voltage")
+                            .unwrap()
+                            .extract(py)
+                            .unwrap()
+                    );
+                }
+
+                assert_eq!(reference_voltages, voltages);
+            });
+        }
+    }
+
+    #[test]
+    fn test_current() {
+        let voltages: Vec<f32> = (-10..10).map(|i| i as f32).collect();
+
+        pyo3::prepare_freethreaded_python();
+
+        for voltage in voltages {
+            let mut leak = TestLeak::default();
+            let mut reference_currents = vec![];
+
+            for _ in 0..ITERATIONS {
+                leak.update_current(voltage);
+                reference_currents.push(leak.current);
+            }
+
+            Python::with_gil(|py| {
+                let instance = Py::new(py, PyTestLeak::new()).unwrap();
+                let mut currents: Vec<f32> = vec![];
+                for _ in 0..ITERATIONS {
+                    let _ = instance.call_method1(py, "update_current", (voltage,))
+                        .unwrap();
+                    currents.push(
+                        instance.getattr(py, "current")
+                            .unwrap()
+                            .extract(py)
+                            .unwrap()
+                    );
+                }
+
+                assert_eq!(reference_currents, currents);
+            });
+        }
+    }
+
+    #[test]
+    fn test_calcium_ion_channel() {
+        let voltages: Vec<f32> = (-10..10).map(|i| i as f32).collect();
+        let dts: Vec<f32> = vec![0.1, 0.5, 1.];
+
+        pyo3::prepare_freethreaded_python();
+
+        for voltage in voltages {
+            for dt in &dts {
+                let mut ca = CalciumIonChannel::default();
+                let mut reference_currents = vec![];
+
+                for _ in 0..ITERATIONS {
+                    ca.update_current(voltage, *dt);
+                    reference_currents.push(ca.current);
+                }
+
+                Python::with_gil(|py| {
+                    let instance = Py::new(py, PyCalciumIonChannel::new()).unwrap();
+                    let mut currents: Vec<f32> = vec![];
+                    for _ in 0..ITERATIONS {
+                        let _ = instance.call_method1(py, "update_current", (voltage, *dt,))
+                            .unwrap();
+                        currents.push(
+                            instance.getattr(py, "current")
+                                .unwrap()
+                                .extract(py)
+                                .unwrap()
+                        );
+                    }
+
+                    assert_eq!(reference_currents, currents);
+                });
+            }
+        }
+    }
+
+    #[test]
+    fn test_channel_with_gating_vars() {
+        let voltages: Vec<f32> = (-10..10).map(|i| i as f32).collect();
+
+        pyo3::prepare_freethreaded_python();
+
+        for voltage in voltages {
+            let mut channel = TestChannel::default();
+            let mut reference_currents = vec![];
+            let mut reference_as = vec![];
+            let mut reference_bs = vec![];
+            let mut reference_states = vec![];
+
+            for _ in 0..ITERATIONS {
+                channel.update_current(voltage);
+                reference_currents.push(channel.current);
+                reference_as.push(channel.n.alpha);
+                reference_bs.push(channel.n.beta);
+                reference_states.push(channel.n.state);
+            }
+
+            Python::with_gil(|py| {
+                let instance = Py::new(py, PyTestChannel::new()).unwrap();
+                let mut currents: Vec<f32> = vec![];
+                let mut alphas: Vec<f32> = vec![];
+                let mut betas: Vec<f32> = vec![];
+                let mut states: Vec<f32> = vec![];
+                for _ in 0..ITERATIONS {
+                    let _ = instance.call_method1(py, "update_current", (voltage,))
+                        .unwrap();
+                    currents.push(
+                        instance.getattr(py, "current")
+                            .unwrap()
+                            .extract(py)
+                            .unwrap()
+                    );
+                    let gating_var: PyBasicGatingVariable = instance.call_method0(py, "get_n")
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
+                    alphas.push(
+                        gating_var.gating_variable.alpha
+                    );
+                    betas.push(
+                        gating_var.gating_variable.beta
+                    );
+                    states.push(
+                        gating_var.gating_variable.state
+                    );
+                }
+
+                assert_eq!(reference_currents, currents);
+                assert_eq!(reference_as, alphas);
+                assert_eq!(reference_bs, betas);
+                assert_eq!(reference_states, states);
+            });
+        }
+    }
+
+    // test editing receptors and neurotransmitters and both kinetics types
+    // test updating methods (iterate, apply changes, etc)
+    // test lattice and lattice network methods
+}
