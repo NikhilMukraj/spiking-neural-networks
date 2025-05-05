@@ -367,13 +367,14 @@ macro_rules! impl_lattice {
 
                 Ok(
                     format!(
-                        "{} {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {} }}", 
+                        "{} {{ ({}x{}), id: {}, do_plasticity: {}, update_grid_history: {}, update_graph_history: {} }}", 
                         $name,
                         rows,
                         cols,
                         self.lattice.get_id(),
                         self.lattice.do_plasticity,
                         self.lattice.update_grid_history,
+                        self.lattice.update_graph_history
                     )
                 )
             }
