@@ -74,6 +74,7 @@
 /build_test/other_ast/target
 /build_test/nb_macro/target
 /build_test/nb_macro/.venv
+/build_test/nb_macro/.wvenv
 /gpu_impl/opencl/colwise_test/target
 /gpu_impl/opencl/graph_test/target
 /gpu_impl/opencl/lif_test/target
