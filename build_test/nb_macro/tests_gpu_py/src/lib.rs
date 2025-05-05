@@ -1,4 +1,15 @@
+use spiking_neural_networks::{
+    neuron::{
+        GridVoltageHistory, LatticeHistory, RunLattice, InternalGraph,
+        gpu_lattices::LatticeGPU,
+    },
+    error::LatticeNetworkError,
+    graph::{AdjacencyMatrix, Graph},
+};
 use nb_macro::neuron_builder;
+use pyo3::{types::PyTuple, exceptions::{PyKeyError, PyValueError}};
+mod lattices;
+use lattices::impl_lattice;
 
 
 neuron_builder!("
@@ -46,14 +57,30 @@ neuron_builder!("
 [end]"
 );
 
+type LatticeAdjacencyMatrix = AdjacencyMatrix<(usize, usize), f32>;
+
+#[pyclass]
+#[pyo3(name = "BasicIntegrateAndFireLatticeGPU")]
+pub struct PyBasicIntegrateAndFireLatticeGPU {
+    lattice: LatticeGPU<
+        BasicIntegrateAndFire<BoundedNeurotransmitterKinetics, BoundedReceptorKinetics>,
+        LatticeAdjacencyMatrix,
+        GridVoltageHistory,
+        TestReceptorsNeurotransmitterType,
+    >
+}
+
+impl_lattice!(PyBasicIntegrateAndFireLatticeGPU, PyBasicIntegrateAndFire, "BasicIntegrateAndFireLatticeGPU");
+
 #[pymodule]
-fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
+fn tests_gpu_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBasicIntegrateAndFire>()?;
     m.add_class::<PyBoundedNeurotransmitterKinetics>()?;
     m.add_class::<PyBoundedReceptorKinetics>()?;
     m.add_class::<PyTestReceptorsNeurotransmitterType>()?;
     m.add_class::<PyXReceptor>()?;
     m.add_class::<PyTestReceptors>()?;
+    m.add_class::<PyBasicIntegrateAndFireLatticeGPU>()?;
 
     Ok(())
 }
