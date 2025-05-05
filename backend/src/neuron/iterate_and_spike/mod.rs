@@ -582,7 +582,7 @@ impl ReceptorKinetics for ApproximateReceptor {
 impl ReceptorKineticsGPU for ApproximateReceptor {
     fn get_attribute(&self, value: &str) -> Option<BufferType> {
         match value {
-            "receptor$kinetics$r" => Some(BufferType::Float(self.r)),
+            "receptors$kinetics$r" => Some(BufferType::Float(self.r)),
             _ => None,
         }
     }
@@ -1686,7 +1686,7 @@ fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
 fn get_receptor_args<T: ReceptorKineticsGPU>(indexer: &str) -> String {
     T::get_update_function().0
         .iter()
-        .map(|i| format!("{}{}", i.split("$").collect::<Vec<&str>>()[1], indexer))
+        .map(|i| format!("{}{}", i.split("$").collect::<Vec<&str>>().last().unwrap(), indexer))
         .collect::<Vec<String>>()
         .join(", ")
 }
