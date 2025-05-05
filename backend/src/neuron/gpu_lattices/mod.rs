@@ -6,7 +6,7 @@ use opencl3::{
     program::Program, types::{cl_float, CL_NON_BLOCKING},
 };
 use crate::{
-    error::{GPUError, LatticeNetworkError, SpikingNeuralNetworksError}, 
+    error::{GPUError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError}, 
     graph::{
         ConnectingGraphGPU, ConnectingGraphToGPU, Graph, GraphGPU, 
         GraphPosition, GraphToGPU, InterleavingGraphGPU
@@ -14,7 +14,7 @@ use crate::{
 };
 use super::{
     check_position, 
-    impl_apply, 
+    impl_apply, impl_reset_timing,
     iterate_and_spike::{
         generate_unique_prefix, AvailableBufferType, BufferGPU, 
         IterateAndSpike, IterateAndSpikeGPU, KernelFunction, NeurotransmitterTypeGPU
@@ -23,7 +23,7 @@ use super::{
     spike_train::{NeuralRefractorinessGPU, SpikeTrainGPU}, 
     GridVoltageHistory, Lattice, LatticeHistory, LatticeNetwork, CellGrid,
     Position, RunLattice, RunNetwork, SpikeTrainGrid, SpikeTrainGridHistory, 
-    SpikeTrainLattice, SpikeTrainLatticeHistory
+    SpikeTrainLattice, SpikeTrainLatticeHistory, InternalGraph,
 };
 use std::ptr;
 
@@ -334,10 +334,98 @@ where
     N: NeurotransmitterTypeGPU,
 {
     impl_apply!();
+    impl_reset_timing!();
 
     /// Retrieves an immutable reference to the grid of cells
     pub fn cell_grid(&self) -> &[Vec<T>] {
         &self.cell_grid
+    }
+
+    /// Sets a cell grid (cell grid must be the same dimensions as exsting grid)
+    pub fn set_cell_grid(&mut self, cell_grid: Vec<Vec<T>>) -> Result<(), GraphError> {
+        for (row, expected_row) in cell_grid.iter().zip(self.cell_grid.iter()) {
+            if row.len() != expected_row.len() {
+                return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+            }
+        }
+
+        if cell_grid.len() != self.cell_grid.len() {
+            return Err(GraphError::PositionNotFound(String::from("Unmatched positions in new grid")));
+        }
+
+        self.cell_grid = cell_grid;
+
+        Ok(())
+    }
+
+    fn generate_cell_grid(base_neuron: &T, num_rows: usize, num_cols: usize) -> Vec<Vec<T>> {
+        (0..num_rows)
+            .map(|_| {
+                (0..num_cols)
+                    .map(|_| {
+                        base_neuron.clone()
+                    })
+                    .collect::<Vec<T>>()
+            })
+            .collect()
+    }
+
+    /// Populates the cell grid with a given base neuron
+    pub fn populate(&mut self, base_neuron: &T, num_rows: usize, num_cols: usize) {
+        let id = self.get_id();
+
+        self.graph = U::default();
+        self.graph.set_id(id);
+        self.cell_grid = Self::generate_cell_grid(base_neuron, num_rows, num_cols);
+
+        for i in 0..num_rows {
+            for j in 0..num_cols {
+                self.graph.add_node((i, j))
+            }
+        }
+    }
+
+    /// Gets id of lattice [`Graph`]
+    pub fn get_id(&self) -> usize {
+        self.graph.get_id()
+    }
+
+    /// Sets id of lattice [`Graph`] given an id
+    pub fn set_id(&mut self, id: usize) {
+        self.graph.set_id(id);
+    }
+
+    fn generate_electrical_kernel(context: &Context) -> Result<Kernel, GPUError> {
+        let electrical_incoming_connections_program = match Program::create_and_build_from_source(context, INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        match Kernel::create(&electrical_incoming_connections_program, INPUTS_KERNEL_NAME) {
+            Ok(value) => Ok(value),
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        }
+    }
+
+    fn generate_chemical_kernel(context: &Context) -> Result<Kernel, GPUError> {
+        let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        match Kernel::create(&chemical_incoming_connections_program, NEUROTRANSMITTER_INPUTS_KERNEL_NAME) {
+            Ok(value) => Ok(value),
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        }
+    }
+
+    fn generate_last_firing_time_kernel(context: &Context) -> Result<Kernel, GPUError> {
+        let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::ProgramCompileFailure),
+        };
+        match Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME) {
+            Ok(value) => Ok(value),
+            Err(_) => return Err(GPUError::KernelCompileFailure),
+        }
     }
 
     // Generates a GPU lattice given a lattice and a device
@@ -358,32 +446,9 @@ where
                 Err(_) => return Err(GPUError::GetDeviceFailure),
             };
 
-        let electrical_incoming_connections_program = match Program::create_and_build_from_source(&context, INPUTS_KERNEL, ""){
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::ProgramCompileFailure),
-        };
-        let electrical_incoming_connections_kernel = match Kernel::create(&electrical_incoming_connections_program, INPUTS_KERNEL_NAME) {
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::KernelCompileFailure),
-        };
-
-        let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::ProgramCompileFailure),
-        };
-        let chemical_incoming_connections_kernel = match Kernel::create(&chemical_incoming_connections_program, NEUROTRANSMITTER_INPUTS_KERNEL_NAME) {
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::KernelCompileFailure),
-        };
-
-        let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::ProgramCompileFailure),
-        };
-        let last_firing_time_kernel = match Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME) {
-            Ok(value) => value,
-            Err(_) => return Err(GPUError::KernelCompileFailure),
-        };
+        let electrical_incoming_connections_kernel = Self::generate_electrical_kernel(&context)?;
+        let chemical_incoming_connections_kernel = Self::generate_chemical_kernel(&context)?;
+        let last_firing_time_kernel = Self::generate_last_firing_time_kernel(&context)?;
 
         Ok(
             LatticeGPU { 
@@ -404,7 +469,7 @@ where
         )
     }
 
-    // Generates a GPU lattice from a given lattice
+    /// Generates a GPU lattice from a given lattice
     pub fn from_lattice<
         W: Plasticity<T, T, f32>,
     >(lattice: Lattice<T, U, V, W, N>) -> Result<Self, GPUError> {
@@ -417,10 +482,150 @@ where
         LatticeGPU::from_lattice_given_device(lattice, &device)
     }
 
+    /// Attempts to generate a default configuration
+    pub fn try_default() -> Result<Self, GPUError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = match Context::from_device(&device) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::GetDeviceFailure),
+        };
+
+        let queue =  match CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                CL_QUEUE_SIZE,
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::GetDeviceFailure),
+            };
+
+        let electrical_incoming_connections_kernel = Self::generate_electrical_kernel(&context)?;
+        let chemical_incoming_connections_kernel = Self::generate_chemical_kernel(&context)?;
+        let last_firing_time_kernel = Self::generate_last_firing_time_kernel(&context)?;
+
+        Ok(
+            LatticeGPU { 
+                cell_grid: vec![], 
+                graph: U::default(), 
+                electrical_incoming_connections_kernel,
+                chemical_incoming_connections_kernel,
+                last_firing_time_kernel,
+                internal_clock: 0,
+                grid_history_kernel: V::get_kernel(&context)?,
+                grid_history: V::default(),
+                update_grid_history: false,
+                electrical_synapse: true,
+                chemical_synapse: true,
+                context,
+                queue,
+            }
+        )
+    }
+
     /// Sets timestep variable for the lattice
     pub fn set_dt(&mut self, dt: f32) {
         self.apply(|neuron| neuron.set_dt(dt));
         // self.plasticity.set_dt(dt);
+    }
+
+    // Gets reference to graph
+    pub fn graph(&self) -> &U {
+        &self.graph
+    }
+
+    /// Sets the graph of the lattice given a new lattice, (id remains the same before and after),
+    /// also verifies if graph is valid
+    pub fn set_graph(&mut self, new_graph: U) -> Result<(), GraphError> {
+        let id = self.get_id();
+        for pos in new_graph.get_every_node_as_ref() {
+            match self.cell_grid.get(pos.0) {
+                Some(row) => match row.get(pos.1) {
+                    Some(_) => { continue },
+                    None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+                },
+                None => { return Err(GraphError::PositionNotFound(format!("{:#?}", pos))) },
+            }
+        }
+    
+        self.graph = new_graph;
+        self.set_id(id);
+    
+        Ok(())
+    }
+
+    /// Connects the neurons in a lattice together given a function to determine
+    /// if the neurons should be connected given their position (usize, usize), and
+    /// a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
+    pub fn connect(
+        &mut self, 
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
+    ) {
+        self.graph.get_every_node()
+            .iter()
+            .for_each(|i| {
+                for j in self.graph.get_every_node().iter() {
+                    if (connecting_conditional)(*i, *j) {
+                        match weight_logic {
+                            Some(logic) => {
+                                self.graph.edit_weight(i, j, Some((logic)(*i, *j))).unwrap();
+                            },
+                            None => {
+                                self.graph.edit_weight(i, j, Some(1.)).unwrap();
+                            }
+                        };
+                    } else {
+                        self.graph.edit_weight(i, j, None).unwrap();
+                    }
+                }
+            });
+    }
+
+    /// Connects the neurons in a lattice together given a function (that can fail) to determine
+    /// if the neurons should be connected given their position (usize, usize), and
+    /// a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
+    pub fn falliable_connect(
+        &mut self, 
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
+    ) -> Result<(), LatticeNetworkError> {
+        let output: Result<Vec<_>, LatticeNetworkError> = self.graph.get_every_node()
+            .iter()
+            .map(|i| {
+                for j in self.graph.get_every_node().iter() {
+                    if (connecting_conditional)(*i, *j)? {
+                        match weight_logic {
+                            Some(logic) => {
+                                self.graph.edit_weight(i, j, Some((logic)(*i, *j)?)).unwrap();
+                            },
+                            None => {
+                                self.graph.edit_weight(i, j, Some(1.)).unwrap();
+                            }
+                        };
+                    } else {
+                        self.graph.edit_weight(i, j, None).unwrap();
+                    }
+                }
+
+                Ok(())
+            })
+            .collect();
+
+        match output {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e)
+        }
     }
 
     unsafe fn execute_last_firing_time(
@@ -817,6 +1022,24 @@ where
             (true, true) => self.run_lattice_chemical_synapses(iterations).map_err(Into::into),
             (false, false) => Ok(()),
         }
+    }
+}
+
+impl<T, U, V, N> InternalGraph for LatticeGPU<T, U, V, N>
+where
+    T: IterateAndSpike<N = N> + IterateAndSpikeGPU,
+    U: Graph<K = (usize, usize), V = f32> + GraphToGPU<GraphGPU>,
+    V: LatticeHistory + LatticeHistoryGPU,
+    N: NeurotransmitterTypeGPU,
+{
+    type T = U;
+    
+    fn internal_graph(&self) -> &U {
+        self.graph()
+    }
+
+    fn set_internal_graph(&mut self, new_graph: Self::T) -> Result<(), GraphError> {
+        self.set_graph(new_graph)
     }
 }
 
