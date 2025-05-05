@@ -462,18 +462,17 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     Ok(())
 }
 
-// add tests to determine if iterate and spike works as intended
-// and that getter setters also work
-// check if neurotransmitters are edited properly
-// check receptors methods work as intended (iterate + current related methods)
+// test editing receptors and neurotransmitters and both kinetics types
+// test updating methods (iterate, apply changes, etc)
+// test lattice and lattice network methods
 
 #[cfg(test)]
-mod tests {
+mod neuron_tests {
     use super::*;
 
 
     const ITERATIONS: usize = 1000;
-    
+
     #[test]
     fn test_iterate_and_spike() {
         let is = vec![10., 20., 30., 40., 50.];
@@ -509,6 +508,14 @@ mod tests {
             });
         }
     }
+}
+
+#[cfg(test)]
+mod ion_channel_tests {
+    use super::*;
+
+
+    const ITERATIONS: usize = 1000;
 
     #[test]
     fn test_current() {
@@ -639,8 +646,98 @@ mod tests {
             });
         }
     }
-
-    // test editing receptors and neurotransmitters and both kinetics types
-    // test updating methods (iterate, apply changes, etc)
-    // test lattice and lattice network methods
 }
+
+#[cfg(test)]
+mod receptor_tests {
+    use super::*;
+
+    
+    const ITERATIONS: usize = 1000;
+
+    #[test]
+    fn test_x_receptor() {
+        let voltages: Vec<f32> = (-10..10).map(|i| i as f32).collect();
+        let dts: Vec<f32> = vec![0.1, 0.5, 1.];
+
+        pyo3::prepare_freethreaded_python();
+
+        for voltage in voltages {
+            for dt in &dts {
+                let mut receptor: XReceptor<BoundedReceptorKinetics> = XReceptor::default();
+                let mut reference_currents = vec![];
+
+                for _ in 0..ITERATIONS {
+                    receptor.iterate(voltage, *dt);
+                    reference_currents.push(receptor.current);
+                }
+
+                Python::with_gil(|py| {
+                    let instance = Py::new(py, PyXReceptor::new()).unwrap();
+                    let mut currents: Vec<f32> = vec![];
+                    for _ in 0..ITERATIONS {
+                        let _ = instance.call_method1(py, "iterate", (voltage, *dt,))
+                            .unwrap();
+                        currents.push(
+                            instance.getattr(py, "current")
+                                .unwrap()
+                                .extract(py)
+                                .unwrap()
+                        );
+                    }
+
+                    assert_eq!(reference_currents, currents);
+                });
+            }
+        }
+    }
+
+    #[test]
+    fn test_receptors_empty() {
+        Python::with_gil(|py| {
+            for i in -100..100 {
+                for j in -100..100 {
+                    if i == 0 || j == 0 {
+                        continue;
+                    }
+
+                    let instance = Py::new(py, PyTestReceptors::new()).unwrap();
+                    
+                    let current: f32 = instance.call_method1(py, "get_receptor_currents", (i as f32, j as f32,))
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
+                    
+                    assert_eq!(0., current);
+
+                    let len: usize = instance.call_method0(py, "__len__")
+                        .unwrap()
+                        .extract(py)
+                        .unwrap();
+
+                    assert_eq!(0, len);
+                }
+            }
+        });
+    }
+
+    // #[test]
+    // fn test_adding_removing_receptors() {
+
+    // }
+
+    // #[test]
+    // fn update_receptor_kinetics() {
+
+    // }
+
+    // #[test]
+    // fn test_setting_and_getting_receptor_currents() {
+
+    // }
+}
+
+// add tests to determine if iterate and spike works as intended
+// and that getter setters also work
+// check if neurotransmitters are edited properly
+// check receptors methods work as intended (iterate + current related methods)
