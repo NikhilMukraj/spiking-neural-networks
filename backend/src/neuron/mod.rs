@@ -419,6 +419,8 @@ macro_rules! impl_reset_timing  {
     };
 }
 
+pub (crate) use impl_reset_timing;
+
 macro_rules! impl_apply {
     () => {
         /// Applies a function across the entire cell grid to each neuron
