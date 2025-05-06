@@ -1565,6 +1565,18 @@ where
         Self::from_network_given_device(lattice_network, &device)
     }
 
+    /// Attempts to generate a default configuration of [`LatticeNetworkGPU`]
+    pub fn try_default() -> Result<Self, GPUError> {
+        LatticeNetworkGPU::from_network(LatticeNetwork::default())
+    }
+
+    /// Sets the timestep variable for each neuron, spike train, and plasticity modulator to `dt`
+    pub fn set_dt(&mut self, dt: f32) {
+        self.lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+        self.spike_train_lattices.values_mut()
+            .for_each(|i| i.set_dt(dt));
+    }
     
     /// Resets the clock and last firing times for the entire network
     pub fn reset_timing(&mut self) {
@@ -1669,6 +1681,44 @@ where
         ids
     }
 
+    /// Adds a [`Lattice`] to the network if the lattice has an id that is not already in the network
+    pub fn add_lattice(
+        &mut self, 
+        lattice: Lattice<T, U, V, Y, N>
+    ) -> Result<(), LatticeNetworkError> {
+        let current_id = lattice.get_id();
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
+        }
+        self.lattices.insert(current_id, lattice);
+
+        let lattice_ref = self.lattices.get_mut(&current_id).unwrap();
+        lattice_ref.in_network = true;
+
+        Ok(())
+    }
+
+    /// Adds a [`SpikeTrainLattice`] to the network if the lattice has an id that is 
+    /// not already in the network
+    pub fn add_spike_train_lattice(
+        &mut self, 
+        spike_train_lattice: SpikeTrainLattice<N, W, X>, 
+    ) -> Result<(), LatticeNetworkError> {
+        let current_id = spike_train_lattice.id;
+
+        if self.get_all_ids().contains(&current_id) {
+            return Err(LatticeNetworkError::GraphIDAlreadyPresent(current_id));
+        }
+
+        self.spike_train_lattices.insert(current_id, spike_train_lattice);
+
+        let spike_train_lattice_ref = self.spike_train_lattices.get_mut(&current_id).unwrap();
+        spike_train_lattice_ref.in_network = true;
+
+        Ok(())
+    }
+
     /// Sets the connecting graph to a new graph, (id remains the same before and after),
     /// also verifies if graph is valid
     pub fn set_connecting_graph(&mut self, new_graph: C) -> Result<(), SpikingNeuralNetworksError> {
@@ -1689,6 +1739,257 @@ where
         self.connecting_graph = new_graph;
         self.connecting_graph.set_id(id);
     
+        Ok(())
+    }
+
+    /// Connects the neurons in lattices together given a function to determine
+    /// if the neurons should be connected given their position (usize, usize), and
+    /// a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// `presynaptic_id` refers to the lattice that should contain the presynaptic neurons
+    /// (which can be a [`Lattice`] or a [`SpikeTrainLattice`]) and `postsynaptic_id` refers
+    /// to the lattice that should contain the postsynaptic connections ([`Lattice`] only),
+    /// any pre-existing connections in the given direction (presynaptic -> postsynaptic)
+    /// will be overwritten based on the rule given in `connecting_conditional`
+    pub fn connect(
+        &mut self, 
+        presynaptic_id: usize, 
+        postsynaptic_id: usize, 
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
+    ) -> Result<(), LatticeNetworkError> {
+        if self.spike_train_lattices.contains_key(&postsynaptic_id) {
+            return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
+        }
+
+        if !self.get_all_ids().contains(&presynaptic_id) {
+            return Err(LatticeNetworkError::PresynapticIDNotFound(presynaptic_id));
+        }
+
+        if !self.lattices.contains_key(&postsynaptic_id) {
+            return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
+        }
+
+        if presynaptic_id == postsynaptic_id {
+            self.connect_interally(presynaptic_id, connecting_conditional, weight_logic)?;
+            return Ok(());
+        }
+
+        if self.lattices.contains_key(&presynaptic_id) {
+            let postsynaptic_graph = &self.lattices.get(&postsynaptic_id)
+                .unwrap()
+                .graph;
+            self.lattices.get(&presynaptic_id).unwrap()
+                .graph
+                .get_every_node()
+                .iter()
+                .for_each(|i| {
+                    for j in postsynaptic_graph.get_every_node().iter() {
+                        let i_graph_pos = GraphPosition { id: presynaptic_id, pos: *i};
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(i_graph_pos);
+                        self.connecting_graph.add_node(j_graph_pos);
+
+                        if (connecting_conditional)(*i, *j) {
+                            let weight = weight_logic.map_or(1., |logic| (logic)(*i, *j));
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, None).unwrap();
+                        }
+                    }
+                });
+        } else {
+            let presynaptic_positions = self.spike_train_lattices.get(&presynaptic_id)
+                .unwrap()
+                .cell_grid
+                .iter()
+                .enumerate()
+                .flat_map(|(n1, i)| {
+                    i.iter()
+                        .enumerate()
+                        .map(move |(n2, _)| 
+                            GraphPosition {
+                                id: presynaptic_id, 
+                                pos: (n1, n2),
+                            }
+                        )
+                })
+                .collect::<Vec<GraphPosition>>();
+
+            let postsynaptic_graph = &self.lattices.get(&postsynaptic_id).unwrap().graph;
+
+            presynaptic_positions.iter()
+                .for_each(|i| {
+                    for j in postsynaptic_graph.get_every_node().iter() {
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(*i);
+                        self.connecting_graph.add_node(j_graph_pos);
+                        
+                        if (connecting_conditional)(i.pos, *j) {
+                            let weight = weight_logic.map_or(1., |logic| (logic)(i.pos, *j));
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, None).unwrap();
+                        }
+                    }
+                });
+        }
+
+        Ok(())
+    }
+
+    /// Connects the neurons in lattices together given a function (that can fail) to determine
+    /// if the neurons should be connected given their position (usize, usize), and
+    /// a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// `presynaptic_id` refers to the lattice that should contain the presynaptic neurons
+    /// (which can be a [`Lattice`] or a [`SpikeTrainLattice`]) and `postsynaptic_id` refers
+    /// to the lattice that should contain the postsynaptic connections ([`Lattice`] only),
+    /// any pre-existing connections in the given direction (presynaptic -> postsynaptic)
+    /// will be overwritten based on the rule given in `connecting_conditional`
+    pub fn falliable_connect(
+        &mut self, 
+        presynaptic_id: usize, 
+        postsynaptic_id: usize, 
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
+    ) -> Result<(), LatticeNetworkError> {
+        if self.spike_train_lattices.contains_key(&postsynaptic_id) {
+            return Err(LatticeNetworkError::PostsynapticLatticeCannotBeSpikeTrain);
+        }
+
+        if !self.get_all_ids().contains(&presynaptic_id) {
+            return Err(LatticeNetworkError::PresynapticIDNotFound(presynaptic_id));
+        }
+
+        if !self.lattices.contains_key(&postsynaptic_id) {
+            return Err(LatticeNetworkError::PostsynapticIDNotFound(postsynaptic_id));
+        }
+
+        if presynaptic_id == postsynaptic_id {
+            self.falliable_connect_interally(presynaptic_id, connecting_conditional, weight_logic)?;
+            return Ok(());
+        }
+
+        let output: Result<Vec<_>, LatticeNetworkError> = if self.lattices.contains_key(&presynaptic_id) {
+            let postsynaptic_graph = &self.lattices.get(&postsynaptic_id)
+                .unwrap()
+                .graph;
+            self.lattices.get(&presynaptic_id).unwrap()
+                .graph
+                .get_every_node()
+                .iter()
+                .map(|i| {
+                    for j in postsynaptic_graph.get_every_node().iter() {
+                        let i_graph_pos = GraphPosition { id: presynaptic_id, pos: *i};
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(i_graph_pos);
+                        self.connecting_graph.add_node(j_graph_pos);
+
+                        if (connecting_conditional)(*i, *j)? {
+                            let weight = match weight_logic {
+                                Some(logic) => logic(*i, *j)?,
+                                None => 1.0,
+                            };
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(&i_graph_pos, &j_graph_pos, None).unwrap();
+                        }
+                    }
+
+                    Ok(())
+                })
+                .collect()
+        } else {
+            let presynaptic_positions = self.spike_train_lattices.get(&presynaptic_id)
+                .unwrap()
+                .cell_grid
+                .iter()
+                .enumerate()
+                .flat_map(|(n1, i)| {
+                    i.iter()
+                        .enumerate()
+                        .map(move |(n2, _)| 
+                            GraphPosition {
+                                id: presynaptic_id, 
+                                pos: (n1, n2),
+                            }
+                        )
+                })
+                .collect::<Vec<GraphPosition>>();
+
+            let postsynaptic_graph = &self.lattices.get(&postsynaptic_id).unwrap().graph;
+
+            presynaptic_positions.iter()
+                .map(|i| {
+                    for j in postsynaptic_graph.get_every_node().iter() {
+                        let j_graph_pos = GraphPosition { id: postsynaptic_id, pos: *j};
+                        self.connecting_graph.add_node(*i);
+                        self.connecting_graph.add_node(j_graph_pos);
+                        
+                        if (connecting_conditional)(i.pos, *j)? {
+                            let weight = match weight_logic {
+                                Some(logic) => logic(i.pos, *j)?,
+                                None => 1.0,
+                            };
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, Some(weight)).unwrap();
+                        } else {
+                            self.connecting_graph.edit_weight(i, &j_graph_pos, None).unwrap();
+                        }
+                    }
+
+                    Ok(())
+                })
+                .collect()
+        };
+
+        match output {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Connects the neurons in a [`Lattice`] within the [`LatticeNetworkGPU`] together given a 
+    /// function to determine if the neurons should be connected given their position (usize, usize), 
+    /// and a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
+    pub fn connect_interally(
+        &mut self, 
+        id: usize, 
+        connecting_conditional: &dyn Fn(Position, Position) -> bool,
+        weight_logic: Option<&dyn Fn(Position, Position) -> f32>,
+    ) -> Result<(), LatticeNetworkError> {
+        if !self.lattices.contains_key(&id) {
+            return Err(LatticeNetworkError::IDNotFoundInLattices(id));
+        }
+
+        self.lattices.get_mut(&id).unwrap().connect(connecting_conditional, weight_logic);
+
+        Ok(())
+    }
+
+    /// Connects the neurons in a [`Lattice`] within the [`LatticeNetworkGPU`] together given a 
+    /// function (that can fail) to determine if the neurons should be connected given their position (usize, usize), 
+    /// and a function to determine what the weight between the neurons should be,
+    /// if the `weight_logic` function is `None`, the weights are set as `1.`
+    /// if a connect should occur according to `connecting_conditional`,
+    /// assumes lattice is already populated using the `populate` method
+    pub fn falliable_connect_interally(
+        &mut self, 
+        id: usize, 
+        connecting_conditional: &dyn Fn(Position, Position) -> Result<bool, LatticeNetworkError>,
+        weight_logic: Option<&dyn Fn(Position, Position) -> Result<f32, LatticeNetworkError>>,
+    ) -> Result<(), LatticeNetworkError> {
+        if !self.lattices.contains_key(&id) {
+            return Err(LatticeNetworkError::IDNotFoundInLattices(id));
+        }
+
+        self.lattices.get_mut(&id).unwrap().falliable_connect(connecting_conditional, weight_logic)?;
+
         Ok(())
     }
 
@@ -2802,8 +3103,3 @@ where
         }
     }
 }
-
-// track history over time 
-// last firing time kernel
-// int buffer
-// should probably make method or macro to extract a buffer
