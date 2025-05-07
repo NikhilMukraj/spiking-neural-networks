@@ -9,8 +9,8 @@ use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, 
     GaussianParameters, IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, 
-    LastFiringTime, LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
-    Neurotransmitters, ReceptorKinetics, Timestep
+    LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
+    Neurotransmitters, ReceptorKinetics, Timestep, Ionotropic, IonotropicReception, Receptors,
 };
 use super::ion_channels::{
     NaIonChannel, KIonChannel, KLeakChannel, IonChannel, TimestepIndependentIonChannel
@@ -74,7 +74,7 @@ pub struct HodgkinHuxleyNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics>
     /// Postsynaptic neurotransmitters in cleft
     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
-    pub ligand_gates: LigandGatedChannels<R>,
+    pub receptors: Ionotropic<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxleyNeuron<T, R> {
@@ -92,7 +92,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for HodgkinHuxley
             is_spiking: false,
             was_increasing: false,
             synaptic_neurotransmitters: Neurotransmitters::default(), 
-            ligand_gates: LigandGatedChannels::default(),
+            receptors: Ionotropic::default(),
             gaussian_params: GaussianParameters::default(),
         }
     }
@@ -158,7 +158,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         let i_k = self.k_channel.current;
         let i_k_leak = self.k_leak_channel.current;
 
-        let i_ligand_gates = self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let i_ligand_gates = self.receptors.get_receptor_currents(self.dt, self.c_m);
 
         let i_sum = input_current - (i_na + i_k + i_k_leak);
         self.current_voltage += self.dt * i_sum / self.c_m - i_ligand_gates;
@@ -174,8 +174,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> HodgkinHuxleyNeuron<T, R>
         &mut self, 
         t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>
     ) {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors.set_receptor_currents(self.current_voltage, self.dt);
     }
 
     /// Updates additional ion channels
