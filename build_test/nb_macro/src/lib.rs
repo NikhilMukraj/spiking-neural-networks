@@ -1307,7 +1307,7 @@ impl NeuronDefinition {
         );
 
         let impl_default_impl = format!(
-            "\nimpl {}<{}, {}> {{ fn default_impl() -> Self {{ Self::default() }} }}",
+            "\nimpl {}<{}, {}> {{ pub fn default_impl() -> Self {{ Self::default() }} }}",
             self.type_name.generate(),
             neurotransmitter_kinetics,
             receptor_kinetics,
@@ -4258,7 +4258,7 @@ impl ReceptorsDefinition {
         }
 
         let default_impl = format!(
-            "impl {}<{}> {{ fn default_impl() -> Self {{ {}::default() }} }}",
+            "impl {}<{}> {{ pub fn default_impl() -> Self {{ {}::default() }} }}",
             self.type_name.generate(),
             self.default_kinetics.as_ref().unwrap_or(
                 &Ast::SingleKineticsDefinition(String::from("ApproximateReceptor"))
