@@ -6,14 +6,14 @@ mod tests {
     };
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-        Neurotransmitters, IonotropicNeurotransmitterType,
+        Neurotransmitters, IonotropicReceptorNeurotransmitterType,
         ApproximateNeurotransmitter,
         AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
     
-    type GridType = Vec<Vec<Neurotransmitters<IonotropicNeurotransmitterType, ApproximateNeurotransmitter>>>;
+    type GridType = Vec<Vec<Neurotransmitters<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter>>>;
 
     #[test]
     pub fn test_empty_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
@@ -65,27 +65,27 @@ mod tests {
     pub fn test_neurotransmitter_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters1 = Neurotransmitters::default();
         neurotransmitters1.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter {
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter {
                 t_max: 0.5,
                 ..ApproximateNeurotransmitter::ampa_default()
             }
         );
         neurotransmitters1.insert(
-            IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
+            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
         let mut neurotransmitters2 = Neurotransmitters::default();
         neurotransmitters2.insert(
-            IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter {
+            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter {
                 clearance_constant: 0.02,
                 ..ApproximateNeurotransmitter::nmda_default()
             }
         );
         let mut neurotransmitters3 = Neurotransmitters::default();
         neurotransmitters3.insert(
-            IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default()
+            IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default()
         );
         neurotransmitters3.insert(
-            IonotropicNeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default()
+            IonotropicReceptorNeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default()
         );
         let neurotransmitters4 = Neurotransmitters::default();
 

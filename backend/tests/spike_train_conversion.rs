@@ -9,12 +9,12 @@ mod tests {
         error::SpikingNeuralNetworksError, 
         neuron::{
             iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, IonotropicNeurotransmitterType, NMDADefault, Neurotransmitters
+                AMPADefault, ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, NMDADefault, Neurotransmitters
             }, spike_train::{DeltaDiracRefractoriness, PoissonNeuron, SpikeTrainGPU}
         }
     };
 
-    type GridType = Vec<Vec<PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>>>;
+    type GridType = Vec<Vec<PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>>>;
 
     #[test]
     pub fn test_empty_grid_conversion() -> Result<(), SpikingNeuralNetworksError> {
@@ -159,13 +159,13 @@ mod tests {
 
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
 
         cell_grid[1][1].synaptic_neurotransmitters = neurotransmitters.clone();
 
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
+            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
         );
 
         cell_grid[0][0].synaptic_neurotransmitters = neurotransmitters.clone();

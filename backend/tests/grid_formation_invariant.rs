@@ -6,7 +6,7 @@ mod tests {
         neuron::{
             integrate_and_fire::IzhikevichNeuron, 
             iterate_and_spike::{
-                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType
+                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicReceptorNeurotransmitterType
             }, 
             plasticity::STDP, 
             spike_train::PoissonNeuron, 
@@ -130,7 +130,7 @@ mod tests {
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicNeurotransmitterType,
+            IonotropicReceptorNeurotransmitterType,
         > = LatticeNetwork::default_impl();
         network.add_spike_train_lattice(lattice)?;
 

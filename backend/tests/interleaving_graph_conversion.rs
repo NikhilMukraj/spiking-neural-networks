@@ -9,7 +9,7 @@ mod tests {
         neuron::{
             integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
             iterate_and_spike::{
-                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType
+                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicReceptorNeurotransmitterType
             }, 
             spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
             plasticity::STDP,
@@ -115,9 +115,9 @@ mod tests {
         let mut editable_spike_train_lattices: HashMap<
             usize, 
             SpikeTrainLattice<
-                IonotropicNeurotransmitterType, 
+                IonotropicReceptorNeurotransmitterType, 
                 PoissonNeuron<
-                    IonotropicNeurotransmitterType,
+                    IonotropicReceptorNeurotransmitterType,
                     ApproximateNeurotransmitter,
                     DeltaDiracRefractoriness,
                 >,
@@ -253,9 +253,9 @@ mod tests {
         let mut editable_spike_train_lattices: HashMap<
             usize, 
             SpikeTrainLattice<
-                IonotropicNeurotransmitterType, 
+                IonotropicReceptorNeurotransmitterType, 
                 PoissonNeuron<
-                    IonotropicNeurotransmitterType,
+                    IonotropicReceptorNeurotransmitterType,
                     ApproximateNeurotransmitter,
                     DeltaDiracRefractoriness,
                 >,
@@ -315,7 +315,7 @@ mod tests {
     #[test]
     pub fn test_graph_conversion_spike_train_lattices() -> Result<(), SpikingNeuralNetworksError> {
         let base_spike_train: PoissonNeuron<
-            IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
+            IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
         > = PoissonNeuron::default();
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();
@@ -332,7 +332,7 @@ mod tests {
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicNeurotransmitterType
+            IonotropicReceptorNeurotransmitterType
         > = LatticeNetwork::default();
         network.parallel = true;
         network.add_spike_train_lattice(spike_train_lattice)?;
@@ -372,7 +372,7 @@ mod tests {
                 AdjacencyMatrix<(usize, usize), f32>,
                 GridVoltageHistory,
                 STDP,
-                IonotropicNeurotransmitterType
+                IonotropicReceptorNeurotransmitterType
             >
         > = HashMap::new();
         let mut editable_spike_train_lattices: HashMap<usize, _> = network.get_all_spike_train_lattice_ids()
@@ -430,7 +430,7 @@ mod tests {
         lattice1.update_grid_history = true;
 
         let base_spike_train: PoissonNeuron<
-            IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
+            IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
         > = PoissonNeuron::default();
 
         let mut spike_train_lattice = SpikeTrainLattice::default_impl();

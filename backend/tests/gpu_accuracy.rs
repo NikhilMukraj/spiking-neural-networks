@@ -12,7 +12,7 @@ mod tests {
                 SimpleLeakyIntegrateAndFire,
             }, iterate_and_spike::{
                 AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor,
-                IonotropicNeurotransmitterType, LigandGatedChannel
+                IonotropicReceptorNeurotransmitterType, LigandGatedChannel
             }, 
             plasticity::STDP, 
             spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
@@ -133,10 +133,10 @@ mod tests {
             let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
 
             base_neuron.ligand_gates
-                .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+                .insert(IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
                 .expect("Valid neurotransmitter pairing");
             base_neuron.synaptic_neurotransmitters
-                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+                .insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
         
             let iterations = 1000;
             let (num_rows, num_cols) = (2, 2);
@@ -192,10 +192,10 @@ mod tests {
             let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
 
             base_neuron.ligand_gates
-                .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+                .insert(IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
                 .expect("Valid neurotransmitter pairing");
             base_neuron.synaptic_neurotransmitters
-                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+                .insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
         
             let iterations = 1000;
             let (num_rows, num_cols) = (2, 2);
@@ -258,11 +258,11 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             ApproximateNeurotransmitter::ampa_default()
         );
         base_neuron.ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             LigandGatedChannel::ampa_default(),
         )?;
 
@@ -352,11 +352,11 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             ApproximateNeurotransmitter::ampa_default()
         );
         base_neuron.ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             LigandGatedChannel::ampa_default(),
         )?;
 
@@ -451,11 +451,11 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             ApproximateNeurotransmitter::ampa_default()
         );
         base_neuron.ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             LigandGatedChannel::ampa_default(),
         )?;
     
@@ -574,7 +574,7 @@ mod tests {
     fn test_spike_train_firing(electrical_synapse: bool, chemical_synapse: bool) -> Result<(), SpikingNeuralNetworksError> {
         let mut base_spike_train = PoissonNeuron::default_impl();
         base_spike_train.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             ApproximateNeurotransmitter::ampa_default()
         );
         base_spike_train.chance_of_firing = 0.1;
@@ -588,11 +588,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicNeurotransmitterType,
+            IonotropicReceptorNeurotransmitterType,
         > = LatticeNetwork::default_impl();
         
         network.add_spike_train_lattice(spike_train_lattice)?;
@@ -656,11 +656,11 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             neurotransmitter
         );
         base_neuron.ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             LigandGatedChannel::ampa_default(),
         )?;
     
@@ -687,7 +687,7 @@ mod tests {
 
         let mut base_spike_train = PoissonNeuron::default_impl();
         base_spike_train.synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicReceptorNeurotransmitterType::AMPA, 
             neurotransmitter
         );
 

@@ -12,7 +12,7 @@ mod tests {
             integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
             iterate_and_spike::{
                 AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
-                IonotropicNeurotransmitterType, IterateAndSpikeGPU, LigandGatedChannel, 
+                IonotropicReceptorNeurotransmitterType, IterateAndSpikeGPU, LigandGatedChannel, 
                 LigandGatedChannels, Neurotransmitters
             }
         }
@@ -197,11 +197,11 @@ mod tests {
 
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
         let mut ligand_gates = LigandGatedChannels::default();
         ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
         )?;
 
         cell_grid[1][1].synaptic_neurotransmitters = neurotransmitters;

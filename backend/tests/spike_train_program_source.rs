@@ -6,7 +6,7 @@ mod tests {
     use spiking_neural_networks::{
         neuron::{
             iterate_and_spike::{
-                ApproximateNeurotransmitter, IonotropicNeurotransmitterType, BufferGPU, Timestep,
+                ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, BufferGPU, Timestep,
                 NMDADefault, AMPADefault, GABAaDefault, NeurotransmitterTypeGPU,
             }, 
             spike_train::{DeltaDiracRefractoriness, NeuralRefractorinessGPU, PoissonNeuron, SpikeTrainGPU},
@@ -24,7 +24,7 @@ mod tests {
     use std::{ptr, collections::HashMap};
 
     type SpikeTrainType = PoissonNeuron::<
-        IonotropicNeurotransmitterType, 
+        IonotropicReceptorNeurotransmitterType, 
         ApproximateNeurotransmitter, 
         DeltaDiracRefractoriness
     >;
@@ -83,9 +83,9 @@ mod tests {
         let iterations = 1000;
         
         let mut neuron = PoissonNeuron::default_impl();
-        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
 
         neuron.set_dt(1.);
 
@@ -135,7 +135,7 @@ mod tests {
 
                 for i in iterate_kernel.argument_names.iter() {
                     if i == "number_of_types" {
-                        kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
+                        kernel_execution.set_arg(&IonotropicReceptorNeurotransmitterType::number_of_types());
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
                     } else if i == "skip_index" { 

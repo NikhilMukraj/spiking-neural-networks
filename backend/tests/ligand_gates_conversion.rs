@@ -6,7 +6,7 @@ mod tests {
     };
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-        LigandGatedChannel, LigandGatedChannels, IonotropicNeurotransmitterType,
+        LigandGatedChannel, LigandGatedChannels, IonotropicReceptorNeurotransmitterType,
         ApproximateReceptor,
         AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
     };
@@ -63,24 +63,24 @@ mod tests {
     pub fn test_ligand_gates_conversion() -> Result<(), SpikingNeuralNetworksError> {
         let mut ligand_gates1 = LigandGatedChannels::<ApproximateReceptor>::default();
         ligand_gates1.insert(
-            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
         )?;
         ligand_gates1.insert(
-            IonotropicNeurotransmitterType::NMDA, LigandGatedChannel {
+            IonotropicReceptorNeurotransmitterType::NMDA, LigandGatedChannel {
                 receptor: ApproximateReceptor { r: 1. },
                 ..LigandGatedChannel::nmda_default()
             }
         )?;
         let mut ligand_gates2 = LigandGatedChannels::default();
         ligand_gates2.insert(
-            IonotropicNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default()
+            IonotropicReceptorNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default()
         )?;
         let mut ligand_gates3 = LigandGatedChannels::default();
         ligand_gates3.insert(
-            IonotropicNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default()
+            IonotropicReceptorNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default()
         )?;
         ligand_gates3.insert(
-            IonotropicNeurotransmitterType::GABAb, LigandGatedChannel {
+            IonotropicReceptorNeurotransmitterType::GABAb, LigandGatedChannel {
                 current: 5.,
                 ..LigandGatedChannel::gabab_default()
             }
