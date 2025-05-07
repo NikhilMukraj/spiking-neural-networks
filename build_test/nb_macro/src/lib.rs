@@ -677,7 +677,7 @@ fn generate_on_iteration(on_iteration: &Ast) -> String {
                     let change_string = if name == "v" {
                         "self.current_voltage += dv;".to_string()
                     } else {
-                        format!("self.{} += d{}", name, name)
+                        format!("self.{} += d{};", name, name)
                     };
 
                     assignments_strings.push(change_string);
@@ -3132,7 +3132,7 @@ fn generate_non_kernel_gpu_on_iteration(on_iteration: &Ast) -> String {
                     let change_string = if name == "v" {
                         "current_voltage += dv;".to_string()
                     } else {
-                        format!("{} += d{}", name, name)
+                        format!("{} += d{};", name, name)
                     };
 
                     assignments_strings.push(change_string);
@@ -5102,7 +5102,7 @@ impl ReceptorsDefinition {
                 Some(top_level_vars) => format!(
                     "fn iterate(&mut self, current_voltage: f32, dt: f32, {}) {{ {}\nself.receptor.iterate(current_voltage, dt, {}); }}",
                     generate_fields_as_immutable_args(top_level_vars).join(", "),
-                    generate_fields_as_mutable_statements("processed", top_level_vars).join(", "),
+                    generate_fields_as_mutable_statements("processed", top_level_vars).join("\n"),
                     generate_fields_as_mutable_refs("processed", top_level_vars).join(", "),
                 ),
                 None => String::from(
@@ -5249,7 +5249,7 @@ impl ReceptorsDefinition {
             neurotransmitters_name,
             receptor_conversions.join(",\n"),
             neurotransmitters_name,
-            receptor_reverse_conversions.join(",\n"),
+            receptor_reverse_conversions.join("\n"),
         );
     
         let imports = vec![
@@ -5889,6 +5889,8 @@ fn build_function(model_description: String) -> TokenStream {
             } else {
                 all_code
             };
+
+            // eprintln!("{}\n\n\n{}", imports.join("\n"), all_code);
         
             format!("{}\n\n\n{}", imports.join("\n"), all_code)
                 .parse::<TokenStream>().unwrap()
