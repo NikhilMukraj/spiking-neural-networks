@@ -70,6 +70,7 @@
 /interface/experiments/*/*.sav
 /interface/experiments/*/*.html
 /interface/generate_methods.py
+/interface_gpu/.venv/*
 /build_test/pratt/target
 /build_test/other_ast/target
 /build_test/nb_macro/target
