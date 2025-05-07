@@ -6,12 +6,13 @@ mod tests {
     use spiking_neural_networks::graph::AdjacencyMatrix;
     use spiking_neural_networks::neuron::hodgkin_huxley::HodgkinHuxleyNeuron;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
-        IonotropicNeurotransmitterType, IterateAndSpike, LigandGatedChannel, 
-        LigandGatedChannels, NeurotransmitterKinetics, Neurotransmitters
+        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, NeurotransmitterType,
+        IonotropicReceptorNeurotransmitterType, IterateAndSpike, LigandGatedChannel, 
+        LigandGatedChannels, NeurotransmitterKinetics, Neurotransmitters, Receptors,
+        Ionotropic, IonotropicNeurotransmitterType, IonotropicType, AMPAReceptor,
     };
     use spiking_neural_networks::neuron::plasticity::STDP;
-    use spiking_neural_networks::neuron::spike_train::NeuralRefractoriness;
+    use spiking_neural_networks::neuron::spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness};
     use spiking_neural_networks::neuron::{
         integrate_and_fire::IzhikevichNeuron,
         spike_train::PoissonNeuron,
@@ -24,11 +25,9 @@ mod tests {
         x == y
     }
 
-    type SpikeTrainType<K, U> = PoissonNeuron<IonotropicNeurotransmitterType, K, U>;
-
-    fn get_history_from_example<T, K, U>(
+    fn get_history_from_example<N, T, K, U>(
         neuron: &mut T,
-        spike_train: &mut SpikeTrainType<K, U>,
+        spike_train: &mut PoissonNeuron<N, K, U>,
         size: (usize, usize),
         iterations: usize,
         dt: f32,
@@ -36,22 +35,23 @@ mod tests {
         synapses: (bool, bool)
     ) -> Result<SpikeHistory, SpikingNeuralNetworksError>
     where
-        T: IterateAndSpike<N = IonotropicNeurotransmitterType>,
+        N: NeurotransmitterType, 
+        T: IterateAndSpike<N = N>,
         K: NeurotransmitterKinetics,
         U: NeuralRefractoriness,
     {
-        let mut spike_train_lattice = SpikeTrainLattice::<IonotropicNeurotransmitterType, SpikeTrainType<K, U>, _>::default_impl();
+        let mut spike_train_lattice = SpikeTrainLattice::<N, PoissonNeuron<N, K, U>, _>::default_impl();
         spike_train_lattice.set_id(0);
         spike_train_lattice.populate(spike_train, size.0, size.1)?;
         spike_train_lattice.update_grid_history = true;
     
-        let mut lattice = Lattice::<T, _, _, _, IonotropicNeurotransmitterType>::default();
+        let mut lattice = Lattice::<T, _, _, _, N>::default();
         lattice.set_id(1);
         lattice.populate(neuron, size.0, size.1)?;
         lattice.update_grid_history = true;
     
         let lattices: Vec<
-            Lattice<_, AdjacencyMatrix<_, _>, SpikeHistory, STDP, IonotropicNeurotransmitterType>
+            Lattice<_, AdjacencyMatrix<_, _>, SpikeHistory, STDP, N>
         > = vec![lattice];
         let spike_train_lattices = vec![spike_train_lattice];
         let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
@@ -92,11 +92,11 @@ mod tests {
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
         let mut ligand_gates = LigandGatedChannels::default();
         ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
         )?;
 
         let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
@@ -126,11 +126,11 @@ mod tests {
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
         let mut ligand_gates = LigandGatedChannels::default();
         ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
         )?;
         
         let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
@@ -158,29 +158,36 @@ mod tests {
 
     #[test]
     pub fn test_hodgkin_huxley_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
-        let mut neurotransmitters = Neurotransmitters::default();
-        neurotransmitters.insert(
+        let mut synaptic_neurotransmitters = Neurotransmitters::default();
+        synaptic_neurotransmitters.insert(
             IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
         let mut spike_train_neurotransmitters = Neurotransmitters::default();
         spike_train_neurotransmitters.insert(
             IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
-        let mut ligand_gates = LigandGatedChannels::<ApproximateReceptor>::default();
-        ligand_gates.insert(
-            IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+        let mut receptors = Ionotropic::<ApproximateReceptor>::default();
+        receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
         
         let mut hodgkin_huxley_neuron = HodgkinHuxleyNeuron {
-            synaptic_neurotransmitters: neurotransmitters,
-            ligand_gates,
+            synaptic_neurotransmitters,
+            receptors,
             ..HodgkinHuxleyNeuron::default()
         };
-        let mut poisson_neuron = PoissonNeuron::default_impl();
-        poisson_neuron.synaptic_neurotransmitters = spike_train_neurotransmitters;
+        let mut poisson_neuron: PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, _> = PoissonNeuron {
+            synaptic_neurotransmitters: spike_train_neurotransmitters,
+            ..PoissonNeuron::default()
+        };
 
         let iterations = 100000;
-        let history = get_history_from_example(
+        let history = get_history_from_example::<
+            IonotropicNeurotransmitterType, 
+            HodgkinHuxleyNeuron<_, _>, 
+            ApproximateNeurotransmitter, 
+            DeltaDiracRefractoriness,
+        >(
             &mut hodgkin_huxley_neuron, &mut poisson_neuron, (1, 1), iterations, 0.01, 1.0, (false, true)
         )?;
 
