@@ -4,7 +4,7 @@ use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::intermediate_delegate::NeurotransmittersIntermediate;
 use super::iterate_and_spike::{
     CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, 
-    IonotropicNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
+    IonotropicReceptorNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
     LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, 
     ReceptorKinetics, Timestep
 };
@@ -41,7 +41,7 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicReceptorNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
     pub ligand_gates: LigandGatedChannels<R>,
 }
@@ -61,7 +61,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             is_spiking: false,
             was_increasing: false,
             last_firing_time: None,
-            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::default(),
             ligand_gates: LigandGatedChannels::<R>::default(),
         }
     }
@@ -101,7 +101,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
-    type N = IonotropicNeurotransmitterType;
+    type N = IonotropicReceptorNeurotransmitterType;
 
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
