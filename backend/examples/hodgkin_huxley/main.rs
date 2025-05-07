@@ -3,10 +3,15 @@ use std::{
     io::{BufWriter, Write},
 };
 extern crate spiking_neural_networks;
-use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{
-    hodgkin_huxley::HodgkinHuxleyNeuron, iterate_and_spike::{
-        AMPADefault, DestexheNeurotransmitter, IonotropicNeurotransmitterType, IterateAndSpike, LigandGatedChannel, ReceptorKinetics
-    }, iterate_coupled_spiking_neurons
+use spiking_neural_networks::{
+    error::SpikingNeuralNetworksError, 
+    neuron::{
+    hodgkin_huxley::HodgkinHuxleyNeuron, 
+    iterate_and_spike::{
+        DestexheNeurotransmitter, IonotropicNeurotransmitterType, IonotropicType,
+        AMPAReceptor, IterateAndSpike, ReceptorKinetics, Receptors,
+    }, 
+    iterate_coupled_spiking_neurons
 }};
 
 
@@ -15,10 +20,10 @@ use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{
 // which are written to a .csv file at the working directory
 fn main() -> Result<(), SpikingNeuralNetworksError> {
     let mut presynaptic_neuron = HodgkinHuxleyNeuron::default_impl();
-    presynaptic_neuron.ligand_gates
-        .insert(IonotropicNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())?;
+    presynaptic_neuron.receptors
+        .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))?;
     presynaptic_neuron.synaptic_neurotransmitters
-        .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::ampa_default());
+        .insert(IonotropicNeurotransmitterType::AMPA, DestexheNeurotransmitter::default());
 
     let mut postsynaptic_neuron = presynaptic_neuron.clone();
 
@@ -48,12 +53,11 @@ fn main() -> Result<(), SpikingNeuralNetworksError> {
             *presynaptic_neuron.get_neurotransmitter_concentrations().get(&IonotropicNeurotransmitterType::AMPA)
                 .expect("Could not find concentration")
         );
-        receptor_values.push(
-            postsynaptic_neuron.ligand_gates.get(&IonotropicNeurotransmitterType::AMPA)
-                .expect("Could not find ligand gate")
-                .receptor
-                .get_r()
-        );
+        let ampa_receptor = postsynaptic_neuron.receptors.get(&IonotropicNeurotransmitterType::AMPA)
+            .expect("Could not find ligand gate");
+        if let IonotropicType::AMPA(receptor) = ampa_receptor {
+            receptor_values.push(receptor.r.get_r());
+        }
     }
 
     let mut file = BufWriter::new(File::create("coupled_hodgkin_huxley.csv")
