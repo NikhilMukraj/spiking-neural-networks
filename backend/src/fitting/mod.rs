@@ -337,10 +337,7 @@ fn fitting_objective<
 ) -> result::Result<f32, GeneticAlgorithmError> {
     let settings = settings.get("settings").unwrap();
 
-    let decoded = match decode(bitstring, bounds, n_bits) {
-        Ok(decoded_value) => decoded_value,
-        Err(e) => return Err(e),
-    };
+    let decoded = decode(bitstring, bounds, n_bits)?;
 
     let test_cell = (settings.converter)(&decoded);
 
@@ -387,26 +384,26 @@ fn fitting_objective<
 /// - `reference_neuron` : neuron to reference as a target to meet
 /// 
 /// - `converter` : function to use to take decoded values and translate them to a neuron, number of values
-///     passed the converter within the vector is equal to the length of `bounds` in `genetic_algo_parameters`
+///   passed the converter within the vector is equal to the length of `bounds` in `genetic_algo_parameters`
 /// 
 /// - `scaling_defaults` : a set of default values to use when scaling action potential summaries,
-///     use `None` to not scale summaries during fitting
+///   use `None` to not scale summaries during fitting
 /// 
 /// - `iterations` : number of iterations to run each simulation for
 /// 
 /// - `input_spike_trains` : a set of preset spike trains to use when simulating each neuron, essentially
-///     a set of conditions to observe the neurons over in order to ensure the models are fit
+///   a set of conditions to observe the neurons over in order to ensure the models are fit
 /// 
 /// - `genetic_algo_parameters` : a set of hyperparameters for the genetic algorithm that fits
-///     the neurons to use
+///   the neurons to use
 /// 
 /// - `reference_neuron_synapses` : use `true` for the first element to update neurons based on electrical 
-///     gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
-///     based on neurotransmitter input during the simulation for the neuron to fit
+///   gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
+///   based on neurotransmitter input during the simulation for the neuron to fit
 /// 
 /// - `neuron_to_fit_synapses` : use `true` for the first element to update neurons based on electrical 
-///     gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
-///     based on neurotransmitter input during the simulation for the neuron to fit
+///   gap junctions for the neuron to fit, use `true` to update receptor gating values of the neurons 
+///   based on neurotransmitter input during the simulation for the neuron to fit
 /// 
 /// - `verbose` : use `true` to print extra information
 #[allow(clippy::too_many_arguments)]
@@ -510,10 +507,7 @@ pub fn fit_neuron_to_neuron<
         println!("Finished genetic algorithm...");
     }
 
-    let decoded = match decode(&best_bitstring, &genetic_algo_params.bounds, genetic_algo_params.n_bits) {
-        Ok(decoded_value) => decoded_value,
-        Err(e) => return Err(e),
-    };
+    let decoded = decode(&best_bitstring, &genetic_algo_params.bounds, genetic_algo_params.n_bits)?;
 
     let test_cell = converter(&decoded);
 

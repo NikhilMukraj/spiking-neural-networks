@@ -192,7 +192,7 @@ impl Default for GeneticAlgorithmParameters {
 /// [`BitString`], and a vector of vectors containing the scores for each [`BitString`] over time
 /// 
 /// - `f` : the objective function to minimize the output of, should take in the [`BitString`], bounds,
-///     number of bits per bit substring, and a hashmap of any necessary parameters as arguments
+///   number of bits per bit substring, and a hashmap of any necessary parameters as arguments
 /// 
 /// - `params` : a set of genetic algorithm parameters
 ///
@@ -215,10 +215,7 @@ pub fn genetic_algo<T: Sync>(
         .collect();
 
     let mut best = pop[0].clone();
-    let mut best_eval = match f(&pop[0], &params.bounds, params.n_bits, settings) {
-        Ok(best_eval_result) => best_eval_result,
-        Err(e) => return Err(e),
-    };
+    let mut best_eval = f(&pop[0], &params.bounds, params.n_bits, settings)?;
 
     let mut all_scores = vec![vec![]];
 

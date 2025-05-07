@@ -71,10 +71,10 @@ pub fn gap_junction<T: CurrentVoltage, U: CurrentVoltage + GapConductance>(
 /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
 /// 
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
-///     the neurons based on neurotransmitter input during the simulation
+///   the neurons based on neurotransmitter input during the simulation
 /// 
 /// - `gaussian` : use `Some(GaussianParameters)` to add randomly distributed normal noise to the input
-///     of the presynaptic neuron
+///   of the presynaptic neuron
 pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
     presynaptic_neuron: &mut T, 
     postsynaptic_neuron: &mut T,
@@ -153,7 +153,7 @@ pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
 /// - `electrical_synapse` : use `true` to update neurons based on electrical gap junctions
 /// 
 /// - `chemical_synapse` : use `true` to update receptor gating values of 
-///     the neurons based on neurotransmitter input during the simulation
+///   the neurons based on neurotransmitter input during the simulation
 pub fn iterate_coupled_spiking_neurons_and_spike_train<N, T, U>(
     spike_train: &mut T,
     presynaptic_neuron: &mut U, 

@@ -754,24 +754,16 @@ impl InterleavingGraphGPU {
                 );
 
                 if *id == *id_post {
-                    match lattices.get(id).unwrap().internal_graph().lookup_weight(&(*row, *col), &(*row_post, *col_post)) {
-                        Ok(Some(val)) => { 
-                            connections[index][index_post] = 1;
-                            weights[index][index_post] = val; 
-                        },
-                        Ok(None) | Err(_) => {},
+                    if let Ok(Some(val)) = lattices.get(id).unwrap().internal_graph().lookup_weight(&(*row, *col), &(*row_post, *col_post)) { 
+                        connections[index][index_post] = 1;
+                        weights[index][index_post] = val; 
                     }
-                } else {
-                    match connecting_graph.lookup_weight(
-                        &GraphPosition { id: *id, pos: (*row, *col) },
-                        &GraphPosition { id: *id_post, pos: (*row_post, *col_post) }
-                    ) {
-                        Ok(Some(val)) => {
-                            connections[index][index_post] = 1;
-                            weights[index][index_post] = val; 
-                        }
-                        Ok(None) | Err(_) => {},
-                    }
+                } else if let Ok(Some(val)) = connecting_graph.lookup_weight(
+                    &GraphPosition { id: *id, pos: (*row, *col) },
+                    &GraphPosition { id: *id_post, pos: (*row_post, *col_post) }
+                ) {
+                    connections[index][index_post] = 1;
+                    weights[index][index_post] = val; 
                 }
             }
         }
