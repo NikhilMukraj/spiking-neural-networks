@@ -119,7 +119,7 @@ pub trait NeurotransmitterTypeGPU: NeurotransmitterType + PartialOrd + Ord {
 
 /// Available neurotransmitter types for ionotropic receptor ligand gated channels
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-pub enum IonotropicNeurotransmitterType {
+pub enum IonotropicReceptorNeurotransmitterType {
     /// Neurotransmitter type that effects only AMPA receptors
     AMPA,
     /// Neurotransmitter type that effects only NMDA receptors
@@ -130,16 +130,16 @@ pub enum IonotropicNeurotransmitterType {
     GABAb,
 }
 
-impl NeurotransmitterType for IonotropicNeurotransmitterType {}
+impl NeurotransmitterType for IonotropicReceptorNeurotransmitterType {}
 
 #[cfg(feature = "gpu")]
-impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
+impl NeurotransmitterTypeGPU for IonotropicReceptorNeurotransmitterType {
     fn type_to_numeric(&self) -> usize {
         match &self {
-            IonotropicNeurotransmitterType::AMPA => 0,
-            IonotropicNeurotransmitterType::NMDA => 1,
-            IonotropicNeurotransmitterType::GABAa => 2,
-            IonotropicNeurotransmitterType::GABAb => 3,
+            IonotropicReceptorNeurotransmitterType::AMPA => 0,
+            IonotropicReceptorNeurotransmitterType::NMDA => 1,
+            IonotropicReceptorNeurotransmitterType::GABAa => 2,
+            IonotropicReceptorNeurotransmitterType::GABAb => 3,
         }
     }
 
@@ -149,10 +149,10 @@ impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
 
     fn get_all_types() -> BTreeSet<Self> {
         BTreeSet::from([
-            IonotropicNeurotransmitterType::AMPA,
-            IonotropicNeurotransmitterType::NMDA,
-            IonotropicNeurotransmitterType::GABAa,
-            IonotropicNeurotransmitterType::GABAb,
+            IonotropicReceptorNeurotransmitterType::AMPA,
+            IonotropicReceptorNeurotransmitterType::NMDA,
+            IonotropicReceptorNeurotransmitterType::GABAa,
+            IonotropicReceptorNeurotransmitterType::GABAb,
         ])
     }
 
@@ -161,14 +161,14 @@ impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
     }
 }
 
-impl IonotropicNeurotransmitterType {
+impl IonotropicReceptorNeurotransmitterType {
     /// Converts type to string
     pub fn to_str(&self) -> &str {
         match self {
-            IonotropicNeurotransmitterType::AMPA => "AMPA",
-            IonotropicNeurotransmitterType::GABAa => "GABAa",
-            IonotropicNeurotransmitterType::GABAb => "GABAb",
-            IonotropicNeurotransmitterType::NMDA => "NMDA",
+            IonotropicReceptorNeurotransmitterType::AMPA => "AMPA",
+            IonotropicReceptorNeurotransmitterType::GABAa => "GABAa",
+            IonotropicReceptorNeurotransmitterType::GABAb => "GABAb",
+            IonotropicReceptorNeurotransmitterType::NMDA => "NMDA",
         }
     }
 }
@@ -937,6 +937,7 @@ impl<T: ReceptorKineticsGPU> ReceptorsGPU for DefaultReceptors<T> {
         }
     }
 
+    #[allow(clippy::needless_range_loop)]
     fn convert_to_cpu(
         grid: &mut [Vec<Self>],
         buffers: &HashMap<String, BufferGPU>,
@@ -1170,7 +1171,7 @@ impl<T: ReceptorKinetics> Receptors for DefaultReceptors<T> {
     }
 
     fn remove(&mut self, neurotransmitter_type: &DefaultReceptorsNeurotransmitterType) -> Option<DefaultReceptorsType<T>> {
-        self.receptors.remove(&neurotransmitter_type)
+        self.receptors.remove(neurotransmitter_type)
     }
 }
 
@@ -1516,7 +1517,7 @@ impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
 /// Multiple ligand gated channels with their associated neurotransmitter type
 #[derive(Clone, Debug, PartialEq)]
 pub struct LigandGatedChannels<T: ReceptorKinetics> { 
-    ligand_gates: HashMap<IonotropicNeurotransmitterType, LigandGatedChannel<T>> 
+    ligand_gates: HashMap<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> 
 }
 
 impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
@@ -1528,26 +1529,26 @@ impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
 }
 
 fn matching_neurotransmitter_and_receptor_type(
-    neurotransmitter_type: &IonotropicNeurotransmitterType,
+    neurotransmitter_type: &IonotropicReceptorNeurotransmitterType,
     receptor_type: &IonotropicLigandGatedReceptorType,
 ) -> bool {
     if let IonotropicLigandGatedReceptorType::AMPA = receptor_type {
-        if *neurotransmitter_type == IonotropicNeurotransmitterType::AMPA {
+        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::AMPA {
             return true;
         }
     }
     if let IonotropicLigandGatedReceptorType::NMDA(_) = receptor_type {
-        if *neurotransmitter_type == IonotropicNeurotransmitterType::NMDA {
+        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::NMDA {
             return true;
         }
     }
     if let IonotropicLigandGatedReceptorType::GABAa = receptor_type {
-        if *neurotransmitter_type == IonotropicNeurotransmitterType::GABAa {
+        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::GABAa {
             return true;
         }
     }
     if let IonotropicLigandGatedReceptorType::GABAb(_) = receptor_type {
-        if *neurotransmitter_type == IonotropicNeurotransmitterType::GABAb {
+        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::GABAb {
             return true;
         }
     }
@@ -1567,29 +1568,29 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Returns the neurotransmitter types as set of keys
-    pub fn keys(&self) -> Keys<IonotropicNeurotransmitterType, LigandGatedChannel<T>> {
+    pub fn keys(&self) -> Keys<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.keys()
     }
 
     /// Returns the ligand gates as a set of values
-    pub fn values(&self) -> Values<IonotropicNeurotransmitterType, LigandGatedChannel<T>> {
+    pub fn values(&self) -> Values<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> {
         self.ligand_gates.values()
     }
 
     /// Gets the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get(&self, neurotransmitter_type: &IonotropicNeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
+    pub fn get(&self, neurotransmitter_type: &IonotropicReceptorNeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
         self.ligand_gates.get(neurotransmitter_type)
     }
 
     /// Gets a mutable reference to the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get_mut(&mut self, neurotransmitter_type: &IonotropicNeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
+    pub fn get_mut(&mut self, neurotransmitter_type: &IonotropicReceptorNeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
         self.ligand_gates.get_mut(neurotransmitter_type)
     }
 
     /// Inserts the given [`LigandGatedChannel`] with the associated [`NeurotransmitterType`]
     pub fn insert(
         &mut self, 
-        neurotransmitter_type: IonotropicNeurotransmitterType, 
+        neurotransmitter_type: IonotropicReceptorNeurotransmitterType, 
         ligand_gate: LigandGatedChannel<T>
     ) -> Result<(), ReceptorNeurotransmitterError> {
         if !matching_neurotransmitter_and_receptor_type(&neurotransmitter_type, &ligand_gate.receptor_type) {
@@ -1620,7 +1621,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
     }
 
     /// Updates the receptor gating values based on the neurotransitter concentrations (mM)
-    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>, dt: f32) {
+    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<IonotropicReceptorNeurotransmitterType>, dt: f32) {
         t_total.iter()
             .for_each(|(key, value)| {
                 if let Some(gate) = self.ligand_gates.get_mut(key) {
@@ -1633,7 +1634,7 @@ impl<T: ReceptorKinetics> LigandGatedChannels<T> {
 #[cfg(feature = "gpu")]
 fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
     value: &LigandGatedChannels<T>, 
-    i: IonotropicNeurotransmitterType, 
+    i: IonotropicReceptorNeurotransmitterType, 
     buffers_contents: &mut HashMap<String, Vec<BufferType>>,
     flags: &mut HashMap<String, Vec<u32>>,
 ) {
@@ -1715,13 +1716,13 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         }
 
         let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
-        for i in IonotropicNeurotransmitterType::get_all_types() {
+        for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
             flags.insert(format!("ligand_gates${}", i.to_string()), vec![]);
         }
 
         for row in grid.iter() {
             for value in row.iter() {
-                for i in IonotropicNeurotransmitterType::get_all_types() {
+                for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
                     extract_or_pad_ligand_gates(value, i, &mut buffers_contents, &mut flags);
                 }
             }
@@ -1729,7 +1730,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
 
         let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
 
-        let size = length * IonotropicNeurotransmitterType::number_of_types();
+        let size = length * IonotropicReceptorNeurotransmitterType::number_of_types();
 
         for (key, value) in buffers_contents.iter() {
             match value[0] {
@@ -1775,7 +1776,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         let mut flags_vec: Vec<u32> = vec![];
 
         for n in 0..length {
-            for i in IonotropicNeurotransmitterType::get_all_types() {
+            for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
                 flags_vec.push(
                     flags.get(
                         &format!("ligand_gates${}", i.to_string())
@@ -1819,7 +1820,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             if !string_types.contains(key) {
                 match key.1 {
                     AvailableBufferType::Float => {
-                        let mut current_contents = vec![0.; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        let mut current_contents = vec![0.; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
                         read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);
 
                         let current_contents = current_contents.iter()
@@ -1829,7 +1830,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                         cpu_conversion.insert(key.0.clone(), current_contents);
                     },
                     AvailableBufferType::UInt => {
-                        let mut current_contents = vec![0; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        let mut current_contents = vec![0; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
                         read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
                         let current_contents = current_contents.iter()
@@ -1839,7 +1840,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                         cpu_conversion.insert(key.0.clone(), current_contents);
                     },
                     AvailableBufferType::OptionalUInt => {
-                        let mut current_contents = vec![-1; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                        let mut current_contents = vec![-1; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
                         read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, OptionalUInt);
 
                         let current_contents = current_contents.iter()
@@ -1850,7 +1851,7 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
                     }
                 }
             } else {
-                let mut current_contents = vec![0; rows * cols * IonotropicNeurotransmitterType::number_of_types()];
+                let mut current_contents = vec![0; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
                 read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
 
                 current_flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
@@ -1858,8 +1859,8 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
         }
 
         for n in 0..(rows * cols) {
-            for (n_type, i) in IonotropicNeurotransmitterType::get_all_types().iter().enumerate() {
-                let current_index = n * IonotropicNeurotransmitterType::number_of_types() + n_type;
+            for (n_type, i) in IonotropicReceptorNeurotransmitterType::get_all_types().iter().enumerate() {
+                let current_index = n * IonotropicReceptorNeurotransmitterType::number_of_types() + n_type;
                 match flags.entry(format!("ligand_gates${}", i.to_string())) {
                     Entry::Vacant(entry) => { entry.insert(vec![current_flags[current_index]]); },
                     Entry::Occupied(mut entry) => { entry.get_mut().push(current_flags[current_index]); }
@@ -1871,25 +1872,25 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             for col in 0..cols {
                 let grid_value = &mut ligand_gates_grid[row][col];
                 let flag_index = row * cols + col;
-                for i in IonotropicNeurotransmitterType::get_all_types() {
+                for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
                     let i_str = format!("ligand_gates${}", i.to_string());
-                    let index = row * cols * IonotropicNeurotransmitterType::number_of_types() 
-                        + col * IonotropicNeurotransmitterType::number_of_types() + i.type_to_numeric();
+                    let index = row * cols * IonotropicReceptorNeurotransmitterType::number_of_types() 
+                        + col * IonotropicReceptorNeurotransmitterType::number_of_types() + i.type_to_numeric();
     
                     if let Some(flag) = flags.get(&i_str) {
                         if flag[flag_index] {
                             if !grid_value.ligand_gates.contains_key(&i) {
                                 match i {
-                                    IonotropicNeurotransmitterType::AMPA => grid_value.insert(
+                                    IonotropicReceptorNeurotransmitterType::AMPA => grid_value.insert(
                                         i, LigandGatedChannel::ampa_default()
                                     ).expect("Should insert correct channel type"),
-                                    IonotropicNeurotransmitterType::NMDA => grid_value.insert(
+                                    IonotropicReceptorNeurotransmitterType::NMDA => grid_value.insert(
                                         i, LigandGatedChannel::nmda_default()
                                     ).expect("Should insert correct channel type"),
-                                    IonotropicNeurotransmitterType::GABAa => grid_value.insert(
+                                    IonotropicReceptorNeurotransmitterType::GABAa => grid_value.insert(
                                         i, LigandGatedChannel::gabaa_default()
                                     ).expect("Should insert correct channel type"),
-                                    IonotropicNeurotransmitterType::GABAb => grid_value.insert(
+                                    IonotropicReceptorNeurotransmitterType::GABAb => grid_value.insert(
                                         i, LigandGatedChannel::gabab_default()
                                     ).expect("Should insert correct channel type"),
                                 };
@@ -1962,6 +1963,1098 @@ impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbD
             get_receptor_args::<T>("[index * number_of_types + 2]"),
             get_receptor_args::<T>("[index * number_of_types + 3]"),
         )
+    }
+}
+
+#[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
+pub enum IonotropicNeurotransmitterType {
+    AMPA,
+    NMDA,
+    GABA,
+}
+
+impl NeurotransmitterType for IonotropicNeurotransmitterType {}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AMPAReceptor<T: ReceptorKinetics> {
+    pub current: f32,
+    pub g: f32,
+    pub e: f32,
+    pub r: T,
+}
+
+impl<T: ReceptorKinetics> Default for AMPAReceptor<T> {
+    fn default() -> Self {
+        AMPAReceptor {
+            current: 0.,
+            g: 1.,
+            e: 0.,
+            r: T::default(),
+        }
+    }
+}
+
+impl<T: ReceptorKinetics> AMPAReceptor<T> {
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r.apply_r_change(t, dt);
+    }
+
+    fn iterate(&mut self, current_voltage: f32) {
+        self.current = (self.g * self.r.get_r()) * (current_voltage - self.e);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NMDAReceptor<T: ReceptorKinetics> {
+    pub current: f32,
+    pub g: f32,
+    pub mg: f32,
+    pub e: f32,
+    pub r: T,
+}
+
+impl<T: ReceptorKinetics> Default for NMDAReceptor<T> {
+    fn default() -> Self {
+        NMDAReceptor {
+            current: 0.,
+            g: 0.6,
+            mg: 0.3,
+            e: 0.,
+            r: T::default(),
+        }
+    }
+}
+
+impl<T: ReceptorKinetics> NMDAReceptor<T> {
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r.apply_r_change(t, dt);
+    }
+
+    fn iterate(&mut self, current_voltage: f32) {
+        self.current = ((1.0 / (1.0 + (((-0.062 * current_voltage).exp() * self.mg) / 3.75))
+            * self.g)
+            * self.r.get_r())
+            * (current_voltage - self.e);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct GABAReceptor<T: ReceptorKinetics> {
+    pub current: f32,
+    pub g: f32,
+    pub e: f32,
+    pub r: T,
+}
+
+impl<T: ReceptorKinetics> Default for GABAReceptor<T> {
+    fn default() -> Self {
+        GABAReceptor {
+            current: 0.,
+            g: 1.2,
+            e: -80.,
+            r: T::default(),
+        }
+    }
+}
+
+impl<T: ReceptorKinetics> GABAReceptor<T> {
+    fn apply_r_change(&mut self, t: f32, dt: f32) {
+        self.r.apply_r_change(t, dt);
+    }
+
+    fn iterate(&mut self, current_voltage: f32) {
+        self.current = (self.g * self.r.get_r()) * (current_voltage - self.e);
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum IonotropicType<T: ReceptorKinetics> {
+    AMPA(AMPAReceptor<T>),
+    NMDA(NMDAReceptor<T>),
+    GABA(GABAReceptor<T>),
+}
+
+#[derive(Debug, Clone)]
+pub struct Ionotropic<T: ReceptorKinetics> {
+    receptors: HashMap<IonotropicNeurotransmitterType, IonotropicType<T>>,
+}
+
+impl<T: ReceptorKinetics> Receptors for Ionotropic<T> {
+    type T = T;
+    type N = IonotropicNeurotransmitterType;
+    type R = IonotropicType<T>;
+
+    fn update_receptor_kinetics(
+        &mut self,
+        t: &NeurotransmitterConcentrations<IonotropicNeurotransmitterType>,
+        dt: f32,
+    ) {
+        t.iter().for_each(|(key, value)| {
+            if let Some(receptor_type) = self.receptors.get_mut(key) {
+                match receptor_type {
+                    IonotropicType::AMPA(receptor) => {
+                        receptor.apply_r_change(*value, dt);
+                    }
+                    IonotropicType::NMDA(receptor) => {
+                        receptor.apply_r_change(*value, dt);
+                    }
+                    IonotropicType::GABA(receptor) => {
+                        receptor.apply_r_change(*value, dt);
+                    }
+                }
+            }
+        });
+    }
+
+    fn get(&self, neurotransmitter_type: &Self::N) -> Option<&Self::R> {
+        self.receptors.get(neurotransmitter_type)
+    }
+
+    fn get_mut(&mut self, neurotransmitter_type: &Self::N) -> Option<&mut Self::R> {
+        self.receptors.get_mut(neurotransmitter_type)
+    }
+
+    fn len(&self) -> usize {
+        self.receptors.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.receptors.is_empty()
+    }
+
+    fn remove(&mut self, neurotransmitter_type: &Self::N) -> Option<Self::R> {
+        self.receptors.remove(neurotransmitter_type)
+    }
+
+    fn insert(
+        &mut self,
+        neurotransmitter_type: Self::N,
+        receptor_type: Self::R,
+    ) -> Result<(), ReceptorNeurotransmitterError> {
+        let mut is_valid = false;
+        if let IonotropicType::AMPA(_) = receptor_type {
+            if neurotransmitter_type == IonotropicNeurotransmitterType::AMPA {
+                is_valid = true;
+            }
+        }
+        if let IonotropicType::NMDA(_) = receptor_type {
+            if neurotransmitter_type == IonotropicNeurotransmitterType::NMDA {
+                is_valid = true;
+            }
+        }
+        if let IonotropicType::GABA(_) = receptor_type {
+            if neurotransmitter_type == IonotropicNeurotransmitterType::GABA {
+                is_valid = true;
+            }
+        }
+        if !is_valid {
+            return Err(ReceptorNeurotransmitterError::MismatchedTypes);
+        }
+        self.receptors.insert(neurotransmitter_type, receptor_type);
+        Ok(())
+    }
+}
+
+#[allow(clippy::collapsible_match)]
+impl<T: ReceptorKinetics> IonotropicReception for Ionotropic<T> {
+    fn set_receptor_currents(&mut self, current_voltage: f32, _dt: f32) {
+        if let Some(receptor_type) = self
+            .receptors
+            .get_mut(&IonotropicNeurotransmitterType::AMPA)
+        {
+            if let IonotropicType::AMPA(receptor) = receptor_type {
+                receptor.iterate(current_voltage);
+            }
+        }
+        if let Some(receptor_type) = self
+            .receptors
+            .get_mut(&IonotropicNeurotransmitterType::NMDA)
+        {
+            if let IonotropicType::NMDA(receptor) = receptor_type {
+                receptor.iterate(current_voltage);
+            }
+        }
+        if let Some(receptor_type) = self
+            .receptors
+            .get_mut(&IonotropicNeurotransmitterType::GABA)
+        {
+            if let IonotropicType::GABA(receptor) = receptor_type {
+                receptor.iterate(current_voltage);
+            }
+        }
+    }
+
+    fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
+        let mut total = 0.;
+        if let Some(receptor_type) = self.receptors.get(&IonotropicNeurotransmitterType::AMPA) {
+            if let IonotropicType::AMPA(receptor) = receptor_type {
+                total += receptor.current;
+            }
+        }
+        if let Some(receptor_type) = self.receptors.get(&IonotropicNeurotransmitterType::NMDA) {
+            if let IonotropicType::NMDA(receptor) = receptor_type {
+                total += receptor.current;
+            }
+        }
+        if let Some(receptor_type) = self.receptors.get(&IonotropicNeurotransmitterType::GABA) {
+            if let IonotropicType::GABA(receptor) = receptor_type {
+                total += receptor.current;
+            }
+        };
+        total * (dt / c_m)
+    }
+}
+
+impl<T: ReceptorKinetics> Default for Ionotropic<T> {
+    fn default() -> Self {
+        Ionotropic {
+            receptors: HashMap::new(),
+        }
+    }
+}
+
+impl Ionotropic<ApproximateReceptor> {
+    pub fn default_impl() -> Self {
+        Ionotropic::default()
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl NeurotransmitterTypeGPU for IonotropicNeurotransmitterType {
+    fn type_to_numeric(&self) -> usize {
+        match &self {
+            IonotropicNeurotransmitterType::AMPA => 0,
+            IonotropicNeurotransmitterType::NMDA => 1,
+            IonotropicNeurotransmitterType::GABA => 2,
+        }
+    }
+
+    fn number_of_types() -> usize {
+        3
+    }
+
+    fn get_all_types() -> BTreeSet<Self> {
+        BTreeSet::from([
+            IonotropicNeurotransmitterType::AMPA,
+            IonotropicNeurotransmitterType::NMDA,
+            IonotropicNeurotransmitterType::GABA,
+        ])
+    }
+
+    fn to_string(&self) -> String {
+        format!("{:#?}", self)
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl IonotropicNeurotransmitterType {
+    fn get_associated_receptor<T: ReceptorKinetics>(&self) -> IonotropicType<T> {
+        match &self {
+            IonotropicNeurotransmitterType::AMPA => {
+                IonotropicType::AMPA(AMPAReceptor::<T>::default())
+            }
+            IonotropicNeurotransmitterType::NMDA => {
+                IonotropicType::NMDA(NMDAReceptor::<T>::default())
+            }
+            IonotropicNeurotransmitterType::GABA => {
+                IonotropicType::GABA(GABAReceptor::<T>::default())
+            }
+        }
+    }
+}
+
+#[cfg(feature = "gpu")]
+impl<T: ReceptorKineticsGPU> ReceptorsGPU for Ionotropic<T> {
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType> {
+        match attribute {
+            "receptors$AMPA_current" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::AMPA) {
+                    Some(IonotropicType::AMPA(val)) => Some(BufferType::Float(val.current)),
+                    _ => None,
+                }
+            }
+            "receptors$AMPA_g" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::AMPA) {
+                    Some(IonotropicType::AMPA(val)) => Some(BufferType::Float(val.g)),
+                    _ => None,
+                }
+            }
+            "receptors$AMPA_e" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::AMPA) {
+                    Some(IonotropicType::AMPA(val)) => Some(BufferType::Float(val.e)),
+                    _ => None,
+                }
+            }
+            "receptors$NMDA_current" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::NMDA) {
+                    Some(IonotropicType::NMDA(val)) => Some(BufferType::Float(val.current)),
+                    _ => None,
+                }
+            }
+            "receptors$NMDA_g" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::NMDA) {
+                    Some(IonotropicType::NMDA(val)) => Some(BufferType::Float(val.g)),
+                    _ => None,
+                }
+            }
+            "receptors$NMDA_mg" => match &self.receptors.get(&IonotropicNeurotransmitterType::NMDA)
+            {
+                Some(IonotropicType::NMDA(val)) => Some(BufferType::Float(val.mg)),
+                _ => None,
+            },
+            "receptors$NMDA_e" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::NMDA) {
+                    Some(IonotropicType::NMDA(val)) => Some(BufferType::Float(val.e)),
+                    _ => None,
+                }
+            }
+            "receptors$GABA_current" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::GABA) {
+                    Some(IonotropicType::GABA(val)) => Some(BufferType::Float(val.current)),
+                    _ => None,
+                }
+            }
+            "receptors$GABA_g" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::GABA) {
+                    Some(IonotropicType::GABA(val)) => Some(BufferType::Float(val.g)),
+                    _ => None,
+                }
+            }
+            "receptors$GABA_e" => {
+                match &self.receptors.get(&IonotropicNeurotransmitterType::GABA) {
+                    Some(IonotropicType::GABA(val)) => Some(BufferType::Float(val.e)),
+                    _ => None,
+                }
+            }
+            _ => {
+                let split = attribute.split("$").collect::<Vec<&str>>();
+
+                if split.len() != 5 {
+                    return None;
+                }
+
+                let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
+                if *receptor != *"receptors".to_string() || *kinetics != *"kinetics".to_string() {
+                    return None;
+                }
+
+                let stripped = format!("receptors$kinetics${}", attr);
+                let to_match = format!("{}${}", neuro, name);
+
+                match to_match.as_str() {
+                    "GABA$r" => match self.receptors.get(&IonotropicNeurotransmitterType::GABA) {
+                        Some(IonotropicType::GABA(inner)) => inner.r.get_attribute(&stripped),
+                        _ => None,
+                    },
+                    "NMDA$r" => match self.receptors.get(&IonotropicNeurotransmitterType::NMDA) {
+                        Some(IonotropicType::NMDA(inner)) => inner.r.get_attribute(&stripped),
+                        _ => None,
+                    },
+                    "AMPA$r" => match self.receptors.get(&IonotropicNeurotransmitterType::AMPA) {
+                        Some(IonotropicType::AMPA(inner)) => inner.r.get_attribute(&stripped),
+                        _ => None,
+                    },
+                    _ => None,
+                }
+            }
+        }
+    }
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error> {
+        match attribute {
+            "receptors$AMPA_current" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::AMPA),
+                value,
+            ) {
+                (Some(IonotropicType::AMPA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.current = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$AMPA_g" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::AMPA),
+                value,
+            ) {
+                (Some(IonotropicType::AMPA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.g = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$AMPA_e" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::AMPA),
+                value,
+            ) {
+                (Some(IonotropicType::AMPA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.e = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$NMDA_current" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::NMDA),
+                value,
+            ) {
+                (Some(IonotropicType::NMDA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.current = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$NMDA_g" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::NMDA),
+                value,
+            ) {
+                (Some(IonotropicType::NMDA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.g = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$NMDA_mg" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::NMDA),
+                value,
+            ) {
+                (Some(IonotropicType::NMDA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.mg = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$NMDA_e" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::NMDA),
+                value,
+            ) {
+                (Some(IonotropicType::NMDA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.e = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$GABA_current" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::GABA),
+                value,
+            ) {
+                (Some(IonotropicType::GABA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.current = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$GABA_g" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::GABA),
+                value,
+            ) {
+                (Some(IonotropicType::GABA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.g = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            "receptors$GABA_e" => match (
+                self.receptors
+                    .get_mut(&IonotropicNeurotransmitterType::GABA),
+                value,
+            ) {
+                (Some(IonotropicType::GABA(receptors)), BufferType::Float(nested_val)) => {
+                    receptors.e = nested_val
+                }
+                _ => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid type",
+                    ))
+                }
+            },
+            _ => {
+                let split = attribute.split("$").collect::<Vec<&str>>();
+
+                if split.len() != 5 {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid attribute",
+                    ));
+                }
+
+                let (receptor, neuro, name, kinetics, attr) = (split[0], split[1], split[2], split[3], split[4]);
+                if *receptor != *"receptors".to_string() || *kinetics != *"kinetics".to_string() {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidInput,
+                        "Invalid attribute",
+                    ));
+                }
+
+                let stripped = format!("receptors$kinetics${}", attr);
+                let to_match = format!("{}${}", neuro, name);
+
+                match to_match.as_str() {
+                    "GABA$r" => match self
+                        .receptors
+                        .get_mut(&IonotropicNeurotransmitterType::GABA)
+                    {
+                        Some(IonotropicType::GABA(inner)) => {
+                            inner.r.set_attribute(&stripped, value)?
+                        }
+                        _ => {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "Invalid attribute",
+                            ))
+                        }
+                    },
+                    "NMDA$r" => match self
+                        .receptors
+                        .get_mut(&IonotropicNeurotransmitterType::NMDA)
+                    {
+                        Some(IonotropicType::NMDA(inner)) => {
+                            inner.r.set_attribute(&stripped, value)?
+                        }
+                        _ => {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "Invalid attribute",
+                            ))
+                        }
+                    },
+                    "AMPA$r" => match self
+                        .receptors
+                        .get_mut(&IonotropicNeurotransmitterType::AMPA)
+                    {
+                        Some(IonotropicType::AMPA(inner)) => {
+                            inner.r.set_attribute(&stripped, value)?
+                        }
+                        _ => {
+                            return Err(std::io::Error::new(
+                                std::io::ErrorKind::InvalidInput,
+                                "Invalid attribute",
+                            ))
+                        }
+                    },
+                    _ => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidInput,
+                            "Invalid attribute",
+                        ))
+                    }
+                }
+            }
+        };
+        Ok(())
+    }
+
+    fn get_all_attributes() -> HashSet<(String, AvailableBufferType)> {
+        let mut attrs = HashSet::from([
+            (
+                String::from("receptors$AMPA_current"),
+                AvailableBufferType::Float,
+            ),
+            (String::from("receptors$AMPA_g"), AvailableBufferType::Float),
+            (String::from("receptors$AMPA_e"), AvailableBufferType::Float),
+            (
+                String::from("receptors$NMDA_current"),
+                AvailableBufferType::Float,
+            ),
+            (String::from("receptors$NMDA_g"), AvailableBufferType::Float),
+            (
+                String::from("receptors$NMDA_mg"),
+                AvailableBufferType::Float,
+            ),
+            (String::from("receptors$NMDA_e"), AvailableBufferType::Float),
+            (
+                String::from("receptors$GABA_current"),
+                AvailableBufferType::Float,
+            ),
+            (String::from("receptors$GABA_g"), AvailableBufferType::Float),
+            (String::from("receptors$GABA_e"), AvailableBufferType::Float),
+        ]);
+        attrs.extend(
+            T::get_attribute_names()
+                .iter()
+                .map(|(i, j)| {
+                    (
+                        format!(
+                            "receptors$AMPA$r$kinetics${}",
+                            i.split("$")
+                                .collect::<Vec<_>>()
+                                .last()
+                                .expect("Invalid attribute")
+                        ),
+                        *j,
+                    )
+                })
+                .collect::<Vec<(_, _)>>(),
+        );
+        attrs.extend(
+            T::get_attribute_names()
+                .iter()
+                .map(|(i, j)| {
+                    (
+                        format!(
+                            "receptors$NMDA$r$kinetics${}",
+                            i.split("$")
+                                .collect::<Vec<_>>()
+                                .last()
+                                .expect("Invalid attribute")
+                        ),
+                        *j,
+                    )
+                })
+                .collect::<Vec<(_, _)>>(),
+        );
+        attrs.extend(
+            T::get_attribute_names()
+                .iter()
+                .map(|(i, j)| {
+                    (
+                        format!(
+                            "receptors$GABA$r$kinetics${}",
+                            i.split("$")
+                                .collect::<Vec<_>>()
+                                .last()
+                                .expect("Invalid attribute")
+                        ),
+                        *j,
+                    )
+                })
+                .collect::<Vec<(_, _)>>(),
+        );
+        attrs
+    }
+
+    fn convert_to_gpu(
+        grid: &[Vec<Self>],
+        context: &Context,
+        queue: &CommandQueue,
+    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+        if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
+            return Ok(HashMap::new());
+        }
+
+        let mut buffers = HashMap::new();
+        let size: usize = grid.iter().map(|row| row.len()).sum();
+
+        for (attr, current_type) in Self::get_all_attributes() {
+            match current_type {
+                AvailableBufferType::Float => {
+                    let mut current_attrs: Vec<f32> = vec![];
+                    for row in grid.iter() {
+                        for i in row.iter() {
+                            match i.get_attribute(&attr) {
+                                Some(BufferType::Float(val)) => current_attrs.push(val),
+                                Some(_) => unreachable!(),
+                                None => current_attrs.push(0.),
+                            };
+                        }
+                    }
+                    let mut current_buffer = unsafe {
+                        match Buffer::<cl_float>::create(
+                            context,
+                            CL_MEM_READ_WRITE,
+                            size,
+                            ptr::null_mut(),
+                        ) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::BufferCreateError),
+                        }
+                    };
+                    let last_event = unsafe {
+                        match queue.enqueue_write_buffer(
+                            &mut current_buffer,
+                            CL_BLOCKING,
+                            0,
+                            &current_attrs,
+                            &[],
+                        ) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::BufferWriteError),
+                        }
+                    };
+                    match last_event.wait() {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::WaitError),
+                    };
+                    buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
+                }
+                AvailableBufferType::UInt => {
+                    let mut current_attrs: Vec<u32> = vec![];
+                    for row in grid.iter() {
+                        for i in row.iter() {
+                            match i.get_attribute(&attr) {
+                                Some(BufferType::UInt(val)) => current_attrs.push(val),
+                                Some(_) => unreachable!(),
+                                None => current_attrs.push(0),
+                            };
+                        }
+                    }
+                    let mut current_buffer = unsafe {
+                        match Buffer::<cl_uint>::create(
+                            context,
+                            CL_MEM_READ_WRITE,
+                            size,
+                            ptr::null_mut(),
+                        ) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::BufferCreateError),
+                        }
+                    };
+                    let last_event = unsafe {
+                        match queue.enqueue_write_buffer(
+                            &mut current_buffer,
+                            CL_BLOCKING,
+                            0,
+                            &current_attrs,
+                            &[],
+                        ) {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::BufferWriteError),
+                        }
+                    };
+                    match last_event.wait() {
+                        Ok(value) => value,
+                        Err(_) => return Err(GPUError::WaitError),
+                    };
+                    buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
+                }
+                _ => unreachable!(),
+            }
+        }
+        let mut receptor_flags: Vec<u32> = vec![];
+        for row in grid.iter() {
+            for i in row.iter() {
+                for n in <Self as Receptors>::N::get_all_types() {
+                    match i.receptors.get(&n) {
+                        Some(_) => receptor_flags.push(1),
+                        None => receptor_flags.push(0),
+                    };
+                }
+            }
+        }
+        let flags_size = size * <Self as Receptors>::N::number_of_types();
+        let mut flag_buffer = unsafe {
+            match Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, flags_size, ptr::null_mut())
+            {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferCreateError),
+            }
+        };
+        let last_event = unsafe {
+            match queue.enqueue_write_buffer(
+                &mut flag_buffer,
+                CL_BLOCKING,
+                0,
+                &receptor_flags,
+                &[],
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::BufferWriteError),
+            }
+        };
+        match last_event.wait() {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::WaitError),
+        };
+        buffers.insert(
+            String::from("receptors$flags"),
+            BufferGPU::UInt(flag_buffer),
+        );
+        Ok(buffers)
+    }
+
+    fn get_all_top_level_attributes() -> HashSet<(String, AvailableBufferType)> {
+        HashSet::from([])
+    }
+
+    fn get_attributes_associated_with(
+        neurotransmitter: &IonotropicNeurotransmitterType,
+    ) -> HashSet<(String, AvailableBufferType)> {
+        match neurotransmitter {
+            IonotropicNeurotransmitterType::NMDA => {
+                let mut attrs = HashSet::from([
+                    (
+                        String::from("receptors$NMDA_current"),
+                        AvailableBufferType::Float,
+                    ),
+                    (String::from("receptors$NMDA_g"), AvailableBufferType::Float),
+                    (
+                        String::from("receptors$NMDA_mg"),
+                        AvailableBufferType::Float,
+                    ),
+                    (String::from("receptors$NMDA_e"), AvailableBufferType::Float),
+                ]);
+                attrs.extend(
+                    T::get_attribute_names()
+                        .iter()
+                        .map(|(i, j)| {
+                            (
+                                format!(
+                                    "receptors$NMDA$r$kinetics${}",
+                                    i.split("$")
+                                        .collect::<Vec<_>>()
+                                        .last()
+                                        .expect("Invalid attribute")
+                                ),
+                                *j,
+                            )
+                        })
+                        .collect::<Vec<(_, _)>>(),
+                );
+                attrs
+            }
+            IonotropicNeurotransmitterType::GABA => {
+                let mut attrs = HashSet::from([
+                    (
+                        String::from("receptors$GABA_current"),
+                        AvailableBufferType::Float,
+                    ),
+                    (String::from("receptors$GABA_g"), AvailableBufferType::Float),
+                    (String::from("receptors$GABA_e"), AvailableBufferType::Float),
+                ]);
+                attrs.extend(
+                    T::get_attribute_names()
+                        .iter()
+                        .map(|(i, j)| {
+                            (
+                                format!(
+                                    "receptors$GABA$r$kinetics${}",
+                                    i.split("$")
+                                        .collect::<Vec<_>>()
+                                        .last()
+                                        .expect("Invalid attribute")
+                                ),
+                                *j,
+                            )
+                        })
+                        .collect::<Vec<(_, _)>>(),
+                );
+                attrs
+            }
+            IonotropicNeurotransmitterType::AMPA => {
+                let mut attrs = HashSet::from([
+                    (
+                        String::from("receptors$AMPA_current"),
+                        AvailableBufferType::Float,
+                    ),
+                    (String::from("receptors$AMPA_g"), AvailableBufferType::Float),
+                    (String::from("receptors$AMPA_e"), AvailableBufferType::Float),
+                ]);
+                attrs.extend(
+                    T::get_attribute_names()
+                        .iter()
+                        .map(|(i, j)| {
+                            (
+                                format!(
+                                    "receptors$AMPA$r$kinetics${}",
+                                    i.split("$")
+                                        .collect::<Vec<_>>()
+                                        .last()
+                                        .expect("Invalid attribute")
+                                ),
+                                *j,
+                            )
+                        })
+                        .collect::<Vec<(_, _)>>(),
+                );
+                attrs
+            }
+        }
+    }
+
+    #[allow(clippy::needless_range_loop)]
+    fn convert_to_cpu(
+        grid: &mut [Vec<Self>],
+        buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), GPUError> {
+        if rows == 0 || cols == 0 {
+            for inner in grid {
+                inner.clear();
+            }
+            return Ok(());
+        }
+        let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
+        for key in Self::get_all_attributes() {
+            match key.1 {
+                AvailableBufferType::Float => {
+                    let mut current_contents = vec![0.; rows * cols];
+                    if let Some(BufferGPU::Float(buffer)) = buffers.get(&key.0) {
+                        let read_event = unsafe {
+                            match queue.enqueue_read_buffer(
+                                buffer,
+                                CL_NON_BLOCKING,
+                                0,
+                                &mut current_contents,
+                                &[],
+                            ) {
+                                Ok(value) => value,
+                                Err(_) => return Err(GPUError::BufferReadError),
+                            }
+                        };
+                        match read_event.wait() {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::WaitError),
+                        };
+                    };
+                    let current_contents = current_contents
+                        .iter()
+                        .map(|i| BufferType::Float(*i))
+                        .collect::<Vec<BufferType>>();
+                    cpu_conversion.insert(key.0.clone(), current_contents);
+                }
+                AvailableBufferType::UInt => {
+                    let mut current_contents = vec![0; rows * cols];
+                    if let Some(BufferGPU::UInt(buffer)) = buffers.get(&key.0) {
+                        let read_event = unsafe {
+                            match queue.enqueue_read_buffer(
+                                buffer,
+                                CL_NON_BLOCKING,
+                                0,
+                                &mut current_contents,
+                                &[],
+                            ) {
+                                Ok(value) => value,
+                                Err(_) => return Err(GPUError::BufferReadError),
+                            }
+                        };
+                        match read_event.wait() {
+                            Ok(value) => value,
+                            Err(_) => return Err(GPUError::WaitError),
+                        };
+                    };
+                    let current_contents = current_contents
+                        .iter()
+                        .map(|i| BufferType::UInt(*i))
+                        .collect::<Vec<BufferType>>();
+                    cpu_conversion.insert(key.0.clone(), current_contents);
+                }
+                _ => unreachable!(),
+            }
+        }
+        let mut current_contents = vec![0; rows * cols * <Self as Receptors>::N::number_of_types()];
+        if let Some(BufferGPU::UInt(buffer)) = buffers.get("receptors$flags") {
+            let read_event = unsafe {
+                match queue.enqueue_read_buffer(
+                    buffer,
+                    CL_NON_BLOCKING,
+                    0,
+                    &mut current_contents,
+                    &[],
+                ) {
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::BufferReadError),
+                }
+            };
+            match read_event.wait() {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::WaitError),
+            };
+        };
+        let flags = current_contents
+            .iter()
+            .map(|i| *i == 1)
+            .collect::<Vec<bool>>();
+        for row in 0..rows {
+            for col in 0..cols {
+                let current_index = row * cols + col;
+                for i in Self::get_all_top_level_attributes() {
+                    grid[row][col]
+                        .set_attribute(&i.0, cpu_conversion.get(&i.0).unwrap()[current_index])
+                        .unwrap();
+                }
+                for i in <Self as Receptors>::N::get_all_types() {
+                    if flags[current_index * <Self as Receptors>::N::number_of_types()
+                        + i.type_to_numeric()]
+                    {
+                        for attr in Self::get_attributes_associated_with(&i) {
+                            match grid[row][col].receptors.get_mut(&i) {
+                                Some(_) => grid[row][col]
+                                    .set_attribute(
+                                        &attr.0,
+                                        cpu_conversion.get(&attr.0).unwrap()[current_index],
+                                    )
+                                    .unwrap(),
+                                None => {
+                                    grid[row][col]
+                                        .receptors
+                                        .insert(i, i.get_associated_receptor());
+                                    grid[row][col]
+                                        .set_attribute(
+                                            &attr.0,
+                                            cpu_conversion.get(&attr.0).unwrap()[current_index],
+                                        )
+                                        .unwrap();
+                                }
+                            };
+                        }
+                    } else {
+                        let _ = grid[row][col].receptors.remove(&i);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+    fn get_updates() -> Vec<(String, Vec<(String, AvailableBufferType)>)> {
+        vec![
+            (String::from("__kernel void update_AMPA(uint index, __global float *current_voltage, __global float *dt, __global float *r, __global float *current, __global float *g, __global float *e) {
+                current[index] = ((g[index] * r[index]) * (current_voltage[index] - e[index]));
+            }"), 
+            vec![(String::from("index"),AvailableBufferType::UInt),(String::from("current_voltage"),AvailableBufferType::Float),(String::from("dt"),AvailableBufferType::Float),(String::from("receptors$AMPA$r$kinetics$r"),AvailableBufferType::Float),(String::from("receptors$AMPA_current"),AvailableBufferType::Float),(String::from("receptors$AMPA_g"),AvailableBufferType::Float),(String::from("receptors$AMPA_e"),AvailableBufferType::Float)]),
+            (String::from("__kernel void update_NMDA(uint index, __global float *current_voltage, __global float *dt, __global float *r, __global float *current, __global float *g, __global float *mg, __global float *e) {
+                current[index] = ((((1.0f / (1.0f + ((exp((-0.062 * current_voltage[index])) * mg[index]) / 3.75))) * g[index]) * r[index]) * (current_voltage[index] - e[index]));
+            }"),
+            vec![(String::from("index"),AvailableBufferType::UInt),(String::from("current_voltage"),AvailableBufferType::Float),(String::from("dt"),AvailableBufferType::Float),(String::from("receptors$NMDA$r$kinetics$r"),AvailableBufferType::Float),(String::from("receptors$NMDA_current"),AvailableBufferType::Float),(String::from("receptors$NMDA_g"),AvailableBufferType::Float),(String::from("receptors$NMDA_mg"),AvailableBufferType::Float),(String::from("receptors$NMDA_e"),AvailableBufferType::Float)]),
+            (String::from("__kernel void update_GABA(uint index, __global float *current_voltage, __global float *dt, __global float *r, __global float *current, __global float *g, __global float *e) {
+                current[index] = ((g[index] * r[index]) * (current_voltage[index] - e[index]));
+            }"),
+            vec![(String::from("index"),AvailableBufferType::UInt),(String::from("current_voltage"),AvailableBufferType::Float),(String::from("dt"),AvailableBufferType::Float),(String::from("receptors$GABA$r$kinetics$r"),AvailableBufferType::Float),(String::from("receptors$GABA_current"),AvailableBufferType::Float),(String::from("receptors$GABA_g"),AvailableBufferType::Float),(String::from("receptors$GABA_e"),AvailableBufferType::Float)])
+        ]
     }
 }
 
@@ -2039,7 +3132,7 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
 
     /// Removes the given neurotransmitter with the associated [`NeurotransmitterType`]
     pub fn remove(&mut self, neurotransmitter_type: &N) -> Option<T> {
-        self.neurotransmitters.remove(&neurotransmitter_type)
+        self.neurotransmitters.remove(neurotransmitter_type)
     }
 
     /// Returns the neurotransmitter concentration (mM) with their associated types
@@ -2056,11 +3149,11 @@ impl <N: NeurotransmitterType, T: NeurotransmitterKinetics> Neurotransmitters<N,
     }
 }
 
-
 #[cfg(feature = "gpu")]
 #[macro_export]
 macro_rules! read_and_set_buffer {
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, Float) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         if let Some(BufferGPU::Float(buffer)) = $buffers.get($buffer_name) {
             let read_event = unsafe {
                 match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
@@ -2078,6 +3171,7 @@ macro_rules! read_and_set_buffer {
     
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, UInt) => {
         if let Some(BufferGPU::UInt(buffer)) = $buffers.get($buffer_name) {
+            #[allow(clippy::macro_metavars_in_unsafe)]
             let read_event = unsafe {
                 match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
                     Ok(value) => value,
@@ -2094,6 +3188,7 @@ macro_rules! read_and_set_buffer {
 
     ($buffers:expr, $queue:expr, $buffer_name:expr, $vec:expr, OptionalUInt) => {
         if let Some(BufferGPU::OptionalUInt(buffer)) = $buffers.get($buffer_name) {
+            #[allow(clippy::macro_metavars_in_unsafe)]
             let read_event = unsafe {
                 match $queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, $vec, &[]) {
                     Ok(value) => value,
@@ -2112,10 +3207,12 @@ macro_rules! read_and_set_buffer {
 #[cfg(feature = "gpu")]
 pub use read_and_set_buffer;
 
+#[allow(clippy::macro_metavars_in_unsafe)]
 #[cfg(feature = "gpu")]
 #[macro_export]
 macro_rules! write_buffer {
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let mut $name = unsafe {
             match Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
                 Ok(value) => value,
@@ -2123,6 +3220,7 @@ macro_rules! write_buffer {
             }
         };
 
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let _ = unsafe { 
             match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
                 Ok(value) => value,
@@ -2148,6 +3246,7 @@ macro_rules! write_buffer {
     };
 
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, OptionalUInt) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let mut $name = unsafe {
             match Buffer::<cl_int>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
                 Ok(value) => value,
@@ -2155,6 +3254,7 @@ macro_rules! write_buffer {
             }
         };
 
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let _ = unsafe { 
             match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
                 Ok(value) => value,
@@ -2164,6 +3264,7 @@ macro_rules! write_buffer {
     };
 
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, Float, last) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let mut $name = unsafe {
             match Buffer::<cl_float>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
                 Ok(value) => value,
@@ -2171,6 +3272,7 @@ macro_rules! write_buffer {
             }
         };
 
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let last_event = unsafe { 
             match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
                 Ok(value) => value,
@@ -2185,6 +3287,7 @@ macro_rules! write_buffer {
     };
     
     ($name:ident, $context:expr, $queue:expr, $num:ident, $array:expr, UInt, last) => {
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let mut $name = unsafe {
             match Buffer::<cl_uint>::create($context, CL_MEM_READ_WRITE, $num, ptr::null_mut()) {
                 Ok(value) => value,
@@ -2192,6 +3295,7 @@ macro_rules! write_buffer {
             }
         };
 
+        #[allow(clippy::macro_metavars_in_unsafe)]
         let last_event = unsafe { 
             match $queue.enqueue_write_buffer(&mut $name, CL_BLOCKING, 0, $array, &[]) {
                 Ok(value) => value,
