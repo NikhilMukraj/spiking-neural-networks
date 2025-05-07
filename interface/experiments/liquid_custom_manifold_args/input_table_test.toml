@@ -6,6 +6,7 @@ exc_only = false
 
 off_phase = 5000
 
+connectivity = 0.5
 internal_scalar = 0.1
 
 skew = 1
