@@ -1,5 +1,5 @@
-/// An intermediate used by neuron models to pass information from the outer neuron
-/// to the synaptic neurotransmitters
+//! An intermediate used by neuron models to pass information from the outer neuron
+//! to the synaptic neurotransmitters
 
 use iterate_and_spike_traits::{CurrentVoltage, IsSpiking, Timestep};
 use crate::neuron::iterate_and_spike::{CurrentVoltage, IsSpiking, Timestep};
