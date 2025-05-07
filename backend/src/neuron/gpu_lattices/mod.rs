@@ -402,29 +402,29 @@ where
         };
         match Kernel::create(&electrical_incoming_connections_program, INPUTS_KERNEL_NAME) {
             Ok(value) => Ok(value),
-            Err(_) => return Err(GPUError::KernelCompileFailure),
+            Err(_) => Err(GPUError::KernelCompileFailure),
         }
     }
 
     fn generate_chemical_kernel(context: &Context) -> Result<Kernel, GPUError> {
-        let chemical_incoming_connections_program = match Program::create_and_build_from_source(&context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
+        let chemical_incoming_connections_program = match Program::create_and_build_from_source(context, NEUROTRANSMITTER_INPUTS_KERNEL, ""){
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
         };
         match Kernel::create(&chemical_incoming_connections_program, NEUROTRANSMITTER_INPUTS_KERNEL_NAME) {
             Ok(value) => Ok(value),
-            Err(_) => return Err(GPUError::KernelCompileFailure),
+            Err(_) => Err(GPUError::KernelCompileFailure),
         }
     }
 
     fn generate_last_firing_time_kernel(context: &Context) -> Result<Kernel, GPUError> {
-        let last_firing_time_program = match Program::create_and_build_from_source(&context, LAST_FIRING_TIME_KERNEL, "") {
+        let last_firing_time_program = match Program::create_and_build_from_source(context, LAST_FIRING_TIME_KERNEL, "") {
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
         };
         match Kernel::create(&last_firing_time_program, LAST_FIRING_TIME_KERNEL_NAME) {
             Ok(value) => Ok(value),
-            Err(_) => return Err(GPUError::KernelCompileFailure),
+            Err(_) => Err(GPUError::KernelCompileFailure),
         }
     }
 
