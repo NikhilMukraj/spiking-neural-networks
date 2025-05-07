@@ -5,7 +5,7 @@ use spiking_neural_networks::{
     neuron::{
         create_agent_type_for_lattice, 
         integrate_and_fire::IzhikevichNeuron, 
-        iterate_and_spike::{IonotropicNeurotransmitterType, ApproximateNeurotransmitter, ApproximateReceptor}, 
+        iterate_and_spike::{IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, ApproximateReceptor}, 
         plasticity::{RewardModulatedSTDP, TraceRSTDP}, 
         RewardModulatedLattice
     }, 
@@ -38,7 +38,7 @@ create_agent_type_for_lattice!(
     TraceRSTDP, 
     RewardModulatedSTDP,
     IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
-    IonotropicNeurotransmitterType,
+    IonotropicReceptorNeurotransmitterType,
 );
 
 impl State for TestState {
