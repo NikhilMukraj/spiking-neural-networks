@@ -9,7 +9,9 @@ use spiking_neural_networks::{
     error::SpikingNeuralNetworksError, 
     neuron::{
         integrate_and_fire::IzhikevichNeuron, 
-        iterate_and_spike::{IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, ApproximateReceptor}, 
+        iterate_and_spike::{
+            IonotropicNeurotransmitterType, ApproximateNeurotransmitter, ApproximateReceptor
+        }, 
         plasticity::{RewardModulatedSTDP, TraceRSTDP, STDP}, 
         spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
         Lattice, RewardModulatedConnection, RewardModulatedLattice, 
@@ -36,8 +38,8 @@ create_agent_type_for_network!(
     RewardModulatedSTDP, 
     TraceRSTDP,
     IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>,
-    PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
-    IonotropicReceptorNeurotransmitterType,
+    PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>,
+    IonotropicNeurotransmitterType,
 );
 
 struct TestState {
