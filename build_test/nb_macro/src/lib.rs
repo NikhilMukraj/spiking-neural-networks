@@ -55,6 +55,7 @@ enum Ast {
     StructAssignments(Vec<Ast>),
     EqAssignment {
         name: String,
+        eq_operator: String,
         expr: Box<Ast>,
     },
     DiffEqAssignment {
@@ -179,14 +180,14 @@ impl Ast {
                         .join(", ")
                 )
             },
-            Ast::EqAssignment { name, expr } => {
+            Ast::EqAssignment { name, eq_operator, expr } => {
                 let name = if name == "v" {
                     String::from("self.current_voltage")
                 } else {
                     format!("self.{}", name)
                 };
 
-                format!("{} = {};", name, expr.generate())
+                format!("{} {} {};", name, eq_operator, expr.generate())
             },
             Ast::DiffEqAssignment { name, expr } => {
                 format!("let d{} = ({}) * self.dt;", name, expr.generate())
@@ -375,14 +376,14 @@ impl Ast {
                     }
                 }
             }
-            Ast::EqAssignment { name, expr } => {
+            Ast::EqAssignment { name, eq_operator, expr } => {
                 let name = if name == "v" {
                     String::from("current_voltage")
                 } else {
                     name.to_string()
                 };
 
-                format!("{} = {};", name, expr.generate_non_kernel_gpu())
+                format!("{} {} {};", name, eq_operator, expr.generate_non_kernel_gpu())
             },
             Ast::DiffEqAssignment { name, expr } => {
                 format!("d{} = ({}) * dt;", name, expr.generate_non_kernel_gpu())
@@ -532,14 +533,14 @@ impl Ast {
                         .join(", ")
                 )
             },
-            Ast::EqAssignment { name, expr } => {
+            Ast::EqAssignment { name, eq_operator, expr } => {
                 let name = if name == "v" {
                     String::from("current_voltage[index]")
                 } else {
                     format!("{}[index]", name)
                 };
 
-                format!("{} = {};", name, expr.generate_kernel_gpu())
+                format!("{} {} {};", name, eq_operator, expr.generate_kernel_gpu())
             },
             Ast::DiffEqAssignment { name, expr } => {
                 format!("float d{} = ({}) * dt[index];", name, expr.generate_kernel_gpu())
@@ -5466,9 +5467,12 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
         },
         Rule::eq_declaration => {
             let mut inner_rules = pair.into_inner();
-
             let name: String = String::from(inner_rules.next()
-                .expect("Could not get function name").as_str()
+                .expect("Could not get what to assign to").as_str()
+            );
+
+            let eq_operator: String = String::from(inner_rules.next()
+                .expect("Could not get equation operator name").as_str()
             );
 
             let expr: Box<Ast> = Box::new(
@@ -5479,7 +5483,7 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
                 )
             );
 
-            Ast::EqAssignment { name, expr }
+            Ast::EqAssignment { name, eq_operator, expr }
         },
         Rule::func_declaration => {
             let mut inner_rules = pair.into_inner();
