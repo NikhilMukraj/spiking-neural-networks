@@ -1,0 +1,37 @@
+[simulation_parameters]
+peaks_on = true
+bayesian_is_not_main = true
+use_correlation_as_accuracy = true
+measure_snr = true
+
+# distortion_on_only = false
+
+memory_biases_memory = true
+
+d_acts_on_inh = true
+
+main_1_on = true
+main_2_on = false
+
+iterations1 = 2500
+iterations2 = 2500
+a = -1
+b = 0
+
+weights_scalar = 1.5
+inh_weights_scalar = 3
+skew = 0.05
+c_m = 100
+
+trials = 10
+
+filename = "d2_inh_vary_glu_gaba_cc.json"
+
+[variables]
+spike_train_to_exc = [5]
+bayesian_to_exc = [0, 1]
+prob_of_exc_to_inh = [1]
+bayesian_distortion = [0]
+s_d2 = [0.0, 0.5]
+glutamate_clearance = [0.001, 0.005, 0.01]
+gabaa_clearance = [0.001, 0.005, 0.01]
