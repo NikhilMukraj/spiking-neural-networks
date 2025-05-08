@@ -225,6 +225,9 @@ i2 = 4
 e2 = 5
 d = 6
 
+# compile kernels beforehand
+network = ln.IzhikevichNeuronLatticeNetworkGPU()
+
 for current_state in tqdm(all_states):
     glu_neuro = ln.BoundedNeurotransmitterKinetics()
     gaba_neuro = ln.BoundedNeurotransmitterKinetics()
@@ -268,6 +271,11 @@ for current_state in tqdm(all_states):
     inh_neuron = ln.IzhikevichNeuron()
     inh_neuron.set_synaptic_neurotransmitters(inh_neurotransmitters)
     inh_neuron.set_receptors(receptors)
+
+    # determine how many trials to run in parallel
+    # add them to network
+    # connect accordingly
+    # record data
 
     # for trial in range(parsed_toml['simulation_parameters']['trials']):
     #     if parsed_toml['simulation_parameters']['reset_patterns']:
@@ -858,6 +866,9 @@ for current_state in tqdm(all_states):
     #         current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
 
     #     simulation_output[key] = current_value
+
+    for current_id in network.get_all_ids():
+        network.remove(current_id)
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
