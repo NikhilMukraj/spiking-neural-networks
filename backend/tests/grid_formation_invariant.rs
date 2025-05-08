@@ -2,16 +2,13 @@
 mod tests {
     use spiking_neural_networks::{
         error::SpikingNeuralNetworksError, 
-        graph::{AdjacencyMatrix, GraphPosition}, 
         neuron::{
             integrate_and_fire::IzhikevichNeuron, 
             iterate_and_spike::{
-                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicReceptorNeurotransmitterType
+                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType
             }, 
-            plasticity::STDP, 
             spike_train::PoissonNeuron, 
-            GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, 
-            SpikeTrainGridHistory, SpikeTrainLattice
+            GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainLattice
         }
     };
 
@@ -124,13 +121,13 @@ mod tests {
         #[allow(clippy::type_complexity)]
         let mut network: LatticeNetwork<
             IzhikevichNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
-            AdjacencyMatrix<(usize, usize), f32>, 
+            _, 
             GridVoltageHistory, 
             _, 
-            SpikeTrainGridHistory, 
-            AdjacencyMatrix<GraphPosition, f32>, 
-            STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            _, 
+            _, 
+            _, 
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
         network.add_spike_train_lattice(lattice)?;
 

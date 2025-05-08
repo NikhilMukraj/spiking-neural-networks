@@ -82,7 +82,9 @@ mod tests {
     ) -> Result<Vec<f32>, SpikingNeuralNetworksError> {
         let iterations = 1000;
         
-        let mut neuron = PoissonNeuron::default_impl();
+        let mut neuron: PoissonNeuron<
+            IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
+        > = PoissonNeuron::default();
         neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
         neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
         neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());

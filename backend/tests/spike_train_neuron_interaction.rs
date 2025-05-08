@@ -7,9 +7,8 @@ mod tests {
     use spiking_neural_networks::neuron::hodgkin_huxley::HodgkinHuxleyNeuron;
     use spiking_neural_networks::neuron::iterate_and_spike::{
         AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, NeurotransmitterType,
-        IonotropicReceptorNeurotransmitterType, IterateAndSpike, LigandGatedChannel, 
-        LigandGatedChannels, NeurotransmitterKinetics, Neurotransmitters, Receptors,
-        Ionotropic, IonotropicNeurotransmitterType, IonotropicType, AMPAReceptor,
+        IterateAndSpike, NeurotransmitterKinetics, Neurotransmitters, Receptors, Ionotropic, 
+        IonotropicNeurotransmitterType, IonotropicType, AMPAReceptor,
     };
     use spiking_neural_networks::neuron::plasticity::STDP;
     use spiking_neural_networks::neuron::spike_train::{DeltaDiracRefractoriness, NeuralRefractoriness};
@@ -92,17 +91,17 @@ mod tests {
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
-        let mut ligand_gates = LigandGatedChannels::default();
-        ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+        let mut receptors = Ionotropic::default();
+        receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
 
         let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
         izhikevich_neuron.gap_conductance = 10.;
         izhikevich_neuron.synaptic_neurotransmitters = neurotransmitters.clone();
-        izhikevich_neuron.ligand_gates = ligand_gates;
+        izhikevich_neuron.receptors = receptors;
         let mut poisson_neuron = PoissonNeuron::default_impl();
         poisson_neuron.synaptic_neurotransmitters = neurotransmitters;
 
@@ -126,17 +125,17 @@ mod tests {
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
         );
-        let mut ligand_gates = LigandGatedChannels::default();
-        ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+        let mut receptors = Ionotropic::default();
+        receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default())
         )?;
         
         let mut izhikevich_neuron = IzhikevichNeuron::default_impl();
         izhikevich_neuron.gap_conductance = 10.;
         izhikevich_neuron.synaptic_neurotransmitters = neurotransmitters.clone();
-        izhikevich_neuron.ligand_gates = ligand_gates;
+        izhikevich_neuron.receptors = receptors;
         let mut poisson_neuron = PoissonNeuron::default_impl();
         poisson_neuron.synaptic_neurotransmitters = neurotransmitters;
 
