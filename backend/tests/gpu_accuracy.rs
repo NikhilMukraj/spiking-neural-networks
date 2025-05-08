@@ -478,17 +478,37 @@ mod tests {
 
         lattice1.set_id(1);
 
-        let mut base_spike_train = PoissonNeuron::default_impl();
-        base_spike_train.chance_of_firing = 0.1;
+        let base_spike_train: PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _> = PoissonNeuron {
+            chance_of_firing: 0.1,
+            ..PoissonNeuron::default()
+        };
 
-        let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+        let mut spike_train_lattice: SpikeTrainLattice<
+            IonotropicReceptorNeurotransmitterType, 
+            PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _>, 
+            SpikeTrainGridHistory
+        > = SpikeTrainLattice::default();
         spike_train_lattice.populate(&base_spike_train, 3, 3)?;
         spike_train_lattice.update_grid_history = true;
 
         let lattices = vec![lattice1];
-        let spike_train_lattices = vec![spike_train_lattice];
+        let spike_train_lattices: Vec<SpikeTrainLattice<
+            IonotropicReceptorNeurotransmitterType, 
+            PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _>, 
+            SpikeTrainGridHistory
+        >> = vec![spike_train_lattice];
 
-        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+        #[allow(clippy::type_complexity)]
+        let mut network: LatticeNetwork<
+            _, 
+            _, 
+            _, 
+            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            _, 
+            _, 
+            _, 
+            _,
+        > = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
 
         network.electrical_synapse = electrical_synapse;
         network.chemical_synapse = chemical_synapse;
@@ -572,7 +592,7 @@ mod tests {
     }
 
     fn test_spike_train_firing(electrical_synapse: bool, chemical_synapse: bool) -> Result<(), SpikingNeuralNetworksError> {
-        let mut base_spike_train = PoissonNeuron::default_impl();
+        let mut base_spike_train: PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _> = PoissonNeuron::default();
         base_spike_train.synaptic_neurotransmitters.insert(
             IonotropicReceptorNeurotransmitterType::AMPA, 
             ApproximateNeurotransmitter::ampa_default()
@@ -685,7 +705,11 @@ mod tests {
 
         lattice1.set_id(1);
 
-        let mut base_spike_train = PoissonNeuron::default_impl();
+        let mut base_spike_train: PoissonNeuron<
+            IonotropicReceptorNeurotransmitterType, 
+            ApproximateNeurotransmitter, 
+            DeltaDiracRefractoriness
+        > = PoissonNeuron::default();
         base_spike_train.synaptic_neurotransmitters.insert(
             IonotropicReceptorNeurotransmitterType::AMPA, 
             neurotransmitter
