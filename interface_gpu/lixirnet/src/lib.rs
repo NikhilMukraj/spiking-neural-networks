@@ -22,7 +22,7 @@ use lattices::{
 neuron_builder!("
 [neurotransmitter_kinetics]
     type: BoundedNeurotransmitterKinetics
-    vars: t_max = 1, c = 0.001, conc = 0
+    vars: t_max = 1, clearance_constant = 0.001, conc = 0
     on_iteration:
         [if] is_spiking [then]
             conc = t_max
@@ -30,7 +30,7 @@ neuron_builder!("
             conc = 0
         [end]
 
-        t = t + dt * -c * t + conc
+        t = t + dt * -clearance_constant * t + conc
 
         t = min(max(t, 0), t_max)
 [end]
@@ -70,7 +70,7 @@ neuron_builder!("
     vars: u = 30, a = 0.02, b = 0.2, c = -55, d = 8, v_th = 30, tau_m = 1
     on_spike: 
         v = c
-        u = u + d
+        u += d
     spike_detection: v >= v_th
     on_iteration:
         du/dt = (a * (b * v - u)) / tau_m
@@ -451,7 +451,7 @@ impl_network_gpu!(
 );
 
 #[pymodule]
-fn tests_gpu_py(_py: Python, m: &PyModule) -> PyResult<()> {
+fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyIzhikevichNeuron>()?;
     m.add_class::<PyBoundedNeurotransmitterKinetics>()?;
     m.add_class::<PyBoundedReceptorKinetics>()?;
