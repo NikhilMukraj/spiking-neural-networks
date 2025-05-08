@@ -765,6 +765,10 @@ macro_rules! impl_network {
                 }
             }
 
+            fn get_all_ids(&self) -> HashSet<usize> {
+                self.network.get_all_ids()     
+            }
+
             #[pyo3(signature = (id, connection_conditional, weight_logic=None))]
             fn connect_internally(
                 &mut self, py: Python, id: usize, connection_conditional: &PyAny, weight_logic: Option<&PyAny>,
@@ -1508,6 +1512,10 @@ macro_rules! impl_network_gpu {
                         )
                     ),
                 }
+            }
+
+            fn get_all_ids(&self) -> HashSet<usize> {
+                self.network.get_all_ids()     
             }
 
             #[pyo3(signature = (id, connection_conditional, weight_logic=None))]
