@@ -3,9 +3,7 @@
 
 use rand::Rng;
 use super::iterate_and_spike::{
-    ApproximateNeurotransmitter, CurrentVoltage, IonotropicReceptorNeurotransmitterType, IsSpiking, 
-    LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, 
-    Neurotransmitters, Timestep
+    ApproximateNeurotransmitter, CurrentVoltage, IonotropicNeurotransmitterType, IsSpiking, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, NeurotransmitterType, Neurotransmitters, Timestep
 };
 use super::iterate_and_spike_traits::{SpikeTrainBase, Timestep};
 use super::plasticity::BCMActivity;
@@ -314,7 +312,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
     }
 }
 
-impl PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+impl PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
     /// Returns the default implementation of the spike train
     pub fn default_impl() -> Self {
         PoissonNeuron::default()
@@ -554,7 +552,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             "#,
             RAND_FUNCTION,
             T::get_update_function().1,
-            Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
+            Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
             parsed_argument_names.join(",\n"),
             neurotransmitter_arg_names.join(",\n"),
         );
@@ -805,7 +803,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
     }
 }
 
-impl PresetSpikeTrain<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+impl PresetSpikeTrain<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
     /// Returns the default implementation of the spike train
     pub fn default_impl() -> Self {
         PresetSpikeTrain::default()
@@ -899,7 +897,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
     }
 }
 
-impl BCMPoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
+impl BCMPoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> {
     /// Returns the default implementation of the spike train
     pub fn default_impl() -> Self {
         BCMPoissonNeuron::default()
