@@ -47,7 +47,8 @@ bin_op = _{
 expr = { atom ~ (bin_op ~ atom)* }
 
 diff_eq_declaration = { "d" ~ (struct_call | name) ~ "/dt" ~ " "* ~ "=" ~ " "* ~ expr }
-eq_declaration = { (struct_call | name) ~ " "* ~ "=" ~ " "* ~ expr }
+eq_operator = { "=" | "+=" | "-=" | "*=" | "/=" }
+eq_declaration = { (struct_call | name) ~ " "* ~ eq_operator ~ " "* ~ expr }
 
 func_declaration_args = { "(" ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? ~ ")" }
 func_declaration = { (struct_call | name) ~ func_declaration_args ~ " "* ~ "=" ~ " "* ~ expr }
