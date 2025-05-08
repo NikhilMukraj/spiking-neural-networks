@@ -4,8 +4,9 @@ use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::intermediate_delegate::NeurotransmittersIntermediate;
 use super::iterate_and_spike::{
     CurrentVoltage, DestexheNeurotransmitter, DestexheReceptor, GapConductance, 
-    IonotropicReceptorNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
-    LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, 
+    IonotropicNeurotransmitterType, Ionotropic, Receptors, 
+    IonotropicReception, IsSpiking, IterateAndSpike, LastFiringTime, 
+    NeurotransmitterConcentrations, NeurotransmitterKinetics, Neurotransmitters, 
     ReceptorKinetics, Timestep
 };
 use super::ion_channels::{
@@ -41,9 +42,9 @@ pub struct MorrisLecarNeuron<T: NeurotransmitterKinetics, R: ReceptorKinetics> {
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicReceptorNeurotransmitterType, T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
-    pub ligand_gates: LigandGatedChannels<R>,
+    pub receptors: Ionotropic<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNeuron<T, R> {
@@ -61,8 +62,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for MorrisLecarNe
             is_spiking: false,
             was_increasing: false,
             last_firing_time: None,
-            synaptic_neurotransmitters: Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::default(),
-            ligand_gates: LigandGatedChannels::<R>::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            receptors: Ionotropic::<R>::default(),
         }
     }
 }
@@ -101,7 +102,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for MorrisLecarNeuron<T, R> {
-    type N = IonotropicReceptorNeurotransmitterType;
+    type N = IonotropicNeurotransmitterType;
 
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
@@ -123,13 +124,13 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Morri
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors.set_receptor_currents(self.current_voltage, self.dt);
         
         self.update_channels();
 
         let last_voltage = self.current_voltage;
-        let receptor_current = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let receptor_current = -self.receptors.get_receptor_currents(self.dt, self.c_m);
         self.current_voltage += self.get_dv_change(input_current) + receptor_current;
 
         self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
