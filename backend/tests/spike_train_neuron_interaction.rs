@@ -6,7 +6,7 @@ mod tests {
     use spiking_neural_networks::graph::AdjacencyMatrix;
     use spiking_neural_networks::neuron::hodgkin_huxley::HodgkinHuxleyNeuron;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-        AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, NeurotransmitterType,
+        ApproximateNeurotransmitter, ApproximateReceptor, NeurotransmitterType,
         IterateAndSpike, NeurotransmitterKinetics, Neurotransmitters, Receptors, Ionotropic, 
         IonotropicNeurotransmitterType, IonotropicType, AMPAReceptor,
     };
@@ -91,7 +91,7 @@ mod tests {
     pub fn test_electrical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
         let mut receptors = Ionotropic::default();
         receptors.insert(
@@ -125,7 +125,7 @@ mod tests {
     pub fn test_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
         let mut receptors = Ionotropic::default();
         receptors.insert(
@@ -159,11 +159,11 @@ mod tests {
     pub fn test_hodgkin_huxley_chemical_synapse_input() -> Result<(), SpikingNeuralNetworksError> {
         let mut synaptic_neurotransmitters = Neurotransmitters::default();
         synaptic_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
         let mut spike_train_neurotransmitters = Neurotransmitters::default();
         spike_train_neurotransmitters.insert(
-            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
         let mut receptors = Ionotropic::<ApproximateReceptor>::default();
         receptors.insert(

@@ -7,12 +7,15 @@ mod tests {
         error::SpikingNeuralNetworksError, graph::{AdjacencyMatrix, GraphPosition}, neuron::{
             gpu_lattices::{
                 LatticeGPU, LatticeNetworkGPU,
-            }, integrate_and_fire::{
+            }, 
+            integrate_and_fire::{
                 QuadraticIntegrateAndFireNeuron, 
                 SimpleLeakyIntegrateAndFire,
-            }, iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor,
-                IonotropicReceptorNeurotransmitterType, LigandGatedChannel
+            },
+            iterate_and_spike::{
+                ApproximateNeurotransmitter, ApproximateReceptor,
+                IonotropicNeurotransmitterType, IonotropicType, 
+                Receptors, AMPAReceptor, 
             }, 
             plasticity::STDP, 
             spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
@@ -21,28 +24,12 @@ mod tests {
         }
     };
 
+
     fn connection_conditional(x: (usize, usize), y: (usize, usize)) -> bool {
         ((x.0 as f64 - y.0 as f64).powf(2.) + (x.1 as f64 - y.1 as f64).powf(2.)).sqrt() <= 2. && 
         rand::thread_rng().gen_range(0.0..=1.0) <= 0.8 &&
         x != y
     }
-
-    // fn check_entire_history(cpu_grid_history: &[Vec<Vec<f32>>], gpu_grid_history: &[Vec<Vec<f32>>]) {
-    //     for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.iter()
-    //         .zip(gpu_grid_history) {
-    //         for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
-    //             for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
-    //                 let error = (voltage1 - voltage2).abs();
-    //                 assert!(
-    //                     error <= 2., "error: {}, voltage1: {}, voltage2: {}", 
-    //                     error,
-    //                     voltage1,
-    //                     voltage2,
-    //                 );
-    //             }
-    //         }
-    //     }
-    // }
 
     // check if history over time is within 2 mV of each other
     // check if last firing time is within 2 timesteps of one another
@@ -132,11 +119,11 @@ mod tests {
         for _ in 0..3 {
             let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
 
-            base_neuron.ligand_gates
-                .insert(IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+            base_neuron.receptors
+                .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))
                 .expect("Valid neurotransmitter pairing");
             base_neuron.synaptic_neurotransmitters
-                .insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
         
             let iterations = 1000;
             let (num_rows, num_cols) = (2, 2);
@@ -191,11 +178,11 @@ mod tests {
         for _ in 0..3 {
             let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
 
-            base_neuron.ligand_gates
-                .insert(IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())
+            base_neuron.receptors
+                .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))
                 .expect("Valid neurotransmitter pairing");
             base_neuron.synaptic_neurotransmitters
-                .insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+                .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
         
             let iterations = 1000;
             let (num_rows, num_cols) = (2, 2);
@@ -258,12 +245,12 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, 
+            ApproximateNeurotransmitter::default()
         );
-        base_neuron.ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            LigandGatedChannel::ampa_default(),
+        base_neuron.receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
 
         let iterations = 1000;
@@ -352,12 +339,12 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, 
+            ApproximateNeurotransmitter::default()
         );
-        base_neuron.ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            LigandGatedChannel::ampa_default(),
+        base_neuron.receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
 
         let iterations = 1000;
@@ -451,12 +438,12 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, 
+            ApproximateNeurotransmitter::default()
         );
-        base_neuron.ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            LigandGatedChannel::ampa_default(),
+        base_neuron.receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
     
         let iterations = 1000;
@@ -478,14 +465,14 @@ mod tests {
 
         lattice1.set_id(1);
 
-        let base_spike_train: PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _> = PoissonNeuron {
+        let base_spike_train: PoissonNeuron<IonotropicNeurotransmitterType, _, _> = PoissonNeuron {
             chance_of_firing: 0.1,
             ..PoissonNeuron::default()
         };
 
         let mut spike_train_lattice: SpikeTrainLattice<
-            IonotropicReceptorNeurotransmitterType, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _>, 
+            IonotropicNeurotransmitterType, 
+            PoissonNeuron<IonotropicNeurotransmitterType, _, _>, 
             SpikeTrainGridHistory
         > = SpikeTrainLattice::default();
         spike_train_lattice.populate(&base_spike_train, 3, 3)?;
@@ -493,8 +480,8 @@ mod tests {
 
         let lattices = vec![lattice1];
         let spike_train_lattices: Vec<SpikeTrainLattice<
-            IonotropicReceptorNeurotransmitterType, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _>, 
+            IonotropicNeurotransmitterType, 
+            PoissonNeuron<IonotropicNeurotransmitterType, _, _>, 
             SpikeTrainGridHistory
         >> = vec![spike_train_lattice];
 
@@ -503,7 +490,7 @@ mod tests {
             _, 
             _, 
             _, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             _, 
             _, 
             _, 
@@ -592,10 +579,10 @@ mod tests {
     }
 
     fn test_spike_train_firing(electrical_synapse: bool, chemical_synapse: bool) -> Result<(), SpikingNeuralNetworksError> {
-        let mut base_spike_train: PoissonNeuron<IonotropicReceptorNeurotransmitterType, _, _> = PoissonNeuron::default();
+        let mut base_spike_train: PoissonNeuron<IonotropicNeurotransmitterType, _, _> = PoissonNeuron::default();
         base_spike_train.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, 
+            ApproximateNeurotransmitter::default()
         );
         base_spike_train.chance_of_firing = 0.1;
 
@@ -608,11 +595,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
         
         network.add_spike_train_lattice(spike_train_lattice)?;
@@ -676,12 +663,12 @@ mod tests {
             ..QuadraticIntegrateAndFireNeuron::default_impl()
         };
         base_neuron.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
+            IonotropicNeurotransmitterType::AMPA, 
             neurotransmitter
         );
-        base_neuron.ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
-            LigandGatedChannel::ampa_default(),
+        base_neuron.receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, 
+            IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
     
         let iterations = 1000;
@@ -706,12 +693,12 @@ mod tests {
         lattice1.set_id(1);
 
         let mut base_spike_train: PoissonNeuron<
-            IonotropicReceptorNeurotransmitterType, 
+            IonotropicNeurotransmitterType, 
             ApproximateNeurotransmitter, 
             DeltaDiracRefractoriness
         > = PoissonNeuron::default();
         base_spike_train.synaptic_neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, 
+            IonotropicNeurotransmitterType::AMPA, 
             neurotransmitter
         );
 

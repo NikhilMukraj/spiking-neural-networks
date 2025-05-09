@@ -9,8 +9,9 @@ mod tests {
         error::SpikingNeuralNetworksError, 
         neuron::{
             iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, NMDADefault, Neurotransmitters
-            }, spike_train::{DeltaDiracRefractoriness, PoissonNeuron, SpikeTrainGPU}
+                ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, Neurotransmitters
+            }, 
+            spike_train::{DeltaDiracRefractoriness, PoissonNeuron, SpikeTrainGPU}
         }
     };
 
@@ -159,13 +160,13 @@ mod tests {
 
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
 
         cell_grid[1][1].synaptic_neurotransmitters = neurotransmitters.clone();
 
         neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
+            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default()
         );
 
         cell_grid[0][0].synaptic_neurotransmitters = neurotransmitters.clone();

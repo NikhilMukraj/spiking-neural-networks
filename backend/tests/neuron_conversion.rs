@@ -11,9 +11,9 @@ mod tests {
         neuron::{
             integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
             iterate_and_spike::{
-                AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, 
-                IonotropicReceptorNeurotransmitterType, IterateAndSpikeGPU, LigandGatedChannel, 
-                LigandGatedChannels, Neurotransmitters
+                AMPAReceptor, ApproximateNeurotransmitter, ApproximateReceptor, Ionotropic, 
+                IonotropicNeurotransmitterType, IonotropicType, IterateAndSpikeGPU, 
+                Neurotransmitters, Receptors
             }
         }
     };
@@ -197,15 +197,15 @@ mod tests {
 
         let mut neurotransmitters = Neurotransmitters::default();
         neurotransmitters.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default()
         );
-        let mut ligand_gates = LigandGatedChannels::default();
-        ligand_gates.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+        let mut receptors = Ionotropic::default();
+        receptors.insert(
+            IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default())
         )?;
 
         cell_grid[1][1].synaptic_neurotransmitters = neurotransmitters;
-        cell_grid[1][1].ligand_gates = ligand_gates;
+        cell_grid[1][1].receptors = receptors;
 
         let mut cpu_conversion = cell_grid.clone();
 
@@ -255,8 +255,8 @@ mod tests {
                     expected.synaptic_neurotransmitters,
                 );
                 assert_eq!(
-                    actual.ligand_gates,
-                    expected.ligand_gates,
+                    actual.receptors,
+                    expected.receptors,
                 );
             }
         }

@@ -8,7 +8,6 @@ mod tests {
     use spiking_neural_networks::neuron::iterate_and_spike::{
         Neurotransmitters, IonotropicReceptorNeurotransmitterType,
         ApproximateNeurotransmitter,
-        AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
@@ -67,25 +66,25 @@ mod tests {
         neurotransmitters1.insert(
             IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter {
                 t_max: 0.5,
-                ..ApproximateNeurotransmitter::ampa_default()
+                ..ApproximateNeurotransmitter::default()
             }
         );
         neurotransmitters1.insert(
-            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default()
+            IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default()
         );
         let mut neurotransmitters2 = Neurotransmitters::default();
         neurotransmitters2.insert(
             IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter {
                 clearance_constant: 0.02,
-                ..ApproximateNeurotransmitter::nmda_default()
+                ..ApproximateNeurotransmitter::default()
             }
         );
         let mut neurotransmitters3 = Neurotransmitters::default();
         neurotransmitters3.insert(
-            IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default()
+            IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::default()
         );
         neurotransmitters3.insert(
-            IonotropicReceptorNeurotransmitterType::GABAb, ApproximateNeurotransmitter::gabab_default()
+            IonotropicReceptorNeurotransmitterType::GABAb, ApproximateNeurotransmitter::default()
         );
         let neurotransmitters4 = Neurotransmitters::default();
 

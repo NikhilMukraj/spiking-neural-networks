@@ -7,7 +7,7 @@ mod tests {
             gpu_lattices::{LatticeGPU, LatticeNetworkGPU}, 
             integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
             iterate_and_spike::{
-                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicReceptorNeurotransmitterType
+                ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType
             }, 
             spike_train::{
                 PoissonNeuron, DeltaDiracRefractoriness,
@@ -25,7 +25,7 @@ mod tests {
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = Lattice::default_impl();
 
         lattice.run_lattice(1000)?;
@@ -41,7 +41,7 @@ mod tests {
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = Lattice::default_impl();
 
         let mut gpu_lattice = LatticeGPU::from_lattice(lattice)?;
@@ -58,11 +58,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
 
         network.run_lattices(1000)?;
@@ -77,11 +77,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
 
         let mut gpu_network = LatticeNetworkGPU::from_network(network)?;
@@ -99,11 +99,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
 
         #[allow(clippy::type_complexity)]
@@ -112,7 +112,7 @@ mod tests {
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = Lattice::default_impl();
 
         network.add_lattice(lattice)?;
@@ -129,11 +129,11 @@ mod tests {
             QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>, 
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
-            PoissonNeuron<IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
+            PoissonNeuron<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>, 
             SpikeTrainGridHistory, 
             AdjacencyMatrix<GraphPosition, f32>, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = LatticeNetwork::default_impl();
 
         #[allow(clippy::type_complexity)]
@@ -142,7 +142,7 @@ mod tests {
             AdjacencyMatrix<(usize, usize), f32>, 
             GridVoltageHistory, 
             STDP, 
-            IonotropicReceptorNeurotransmitterType,
+            IonotropicNeurotransmitterType,
         > = Lattice::default_impl();
 
         network.add_lattice(lattice)?;

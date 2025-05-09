@@ -1,13 +1,20 @@
 mod tests {
     use std::{collections::HashMap, ptr};
     use opencl3::{
-        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
+        context::Context, 
+        device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
+        kernel::ExecuteKernel, 
+        memory::{Buffer, CL_MEM_READ_WRITE}, 
+        types::{cl_float, CL_NON_BLOCKING},
     };
     extern crate spiking_neural_networks;
     use spiking_neural_networks::{error::{GPUError, SpikingNeuralNetworksError}, neuron::{
         integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
         iterate_and_spike::{
-            AMPADefault, ApproximateNeurotransmitter, ApproximateReceptor, BufferGPU, GABAaDefault, IonotropicReceptorNeurotransmitterType, IterateAndSpike, IterateAndSpikeGPU, LigandGatedChannel, NMDADefault, NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Timestep
+            AMPAReceptor, NMDAReceptor, GABAReceptor, ApproximateNeurotransmitter, ApproximateReceptor, 
+            BufferGPU, IonotropicNeurotransmitterType, IonotropicType, IterateAndSpike, IterateAndSpikeGPU,
+            NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Receptors, Timestep,
         }
     }};
 
@@ -75,21 +82,21 @@ mod tests {
         let iterations = 1000;
         
         let mut neuron = QuadraticIntegrateAndFireNeuron::default_impl();
-        neuron.ligand_gates.insert(IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default())?;
-        neuron.ligand_gates.insert(IonotropicReceptorNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default())?;
-        neuron.ligand_gates.insert(IonotropicReceptorNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default())?;
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
+        neuron.receptors.insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))?;
+        neuron.receptors.insert(IonotropicNeurotransmitterType::NMDA, IonotropicType::NMDA(NMDAReceptor::default()))?;
+        neuron.receptors.insert(IonotropicNeurotransmitterType::GABA, IonotropicType::GABA(GABAReceptor::default()))?;
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicNeurotransmitterType::GABA, ApproximateNeurotransmitter::default());
 
         neuron.set_dt(1.);
 
         let mut cpu_neuron = neuron.clone();
 
         let mut neurotransmitter_conc = NeurotransmitterConcentrations::new();
-        neurotransmitter_conc.insert(IonotropicReceptorNeurotransmitterType::AMPA, t_values_tuple.0);
-        neurotransmitter_conc.insert(IonotropicReceptorNeurotransmitterType::NMDA, t_values_tuple.1);
-        neurotransmitter_conc.insert(IonotropicReceptorNeurotransmitterType::GABAa, t_values_tuple.2);
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::AMPA, t_values_tuple.0);
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::NMDA, t_values_tuple.1);
+        neurotransmitter_conc.insert(IonotropicNeurotransmitterType::GABA, t_values_tuple.2);
         
         let mut cpu_tracker = vec![];
 
@@ -139,7 +146,7 @@ mod tests {
             Buffer::<cl_float>::create(
                 &context, 
                 CL_MEM_READ_WRITE, 
-                IonotropicReceptorNeurotransmitterType::number_of_types(), 
+                IonotropicNeurotransmitterType::number_of_types(), 
                 ptr::null_mut()
             )
                 .map_err(|_| GPUError::BufferCreateError)?
@@ -171,14 +178,14 @@ mod tests {
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
                     } else if i == "number_of_types" {
-                        kernel_execution.set_arg(&IonotropicReceptorNeurotransmitterType::number_of_types());
+                        kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
                     } else if i == "neuro_flags" {
                         match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
                             _ => unreachable!("Could not retrieve neurotransmitter flags"),
                         };
                     } else if i == "lg_flags" {
-                        match &gpu_cell_grid.get("ligand_gates$flags").expect("Could not retrieve receptor flags") {
+                        match &gpu_cell_grid.get("receptors$flags").expect("Could not retrieve receptor flags") {
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
                             _ => unreachable!("Could not retrieve receptor flags"),
                         };
@@ -337,7 +344,7 @@ mod tests {
     }
 
     fn get_ampa_neurotransmitter(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
-        let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&IonotropicReceptorNeurotransmitterType::AMPA)
+        let ampa_neurotransmitter = neuron.synaptic_neurotransmitters.get(&IonotropicNeurotransmitterType::AMPA)
             .expect("Could not get neurotransmitter")
             .t;
 

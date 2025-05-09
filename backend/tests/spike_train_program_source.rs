@@ -6,8 +6,8 @@ mod tests {
     use spiking_neural_networks::{
         neuron::{
             iterate_and_spike::{
-                ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, BufferGPU, Timestep,
-                NMDADefault, AMPADefault, GABAaDefault, NeurotransmitterTypeGPU,
+                ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, BufferGPU, 
+                Timestep, NeurotransmitterTypeGPU,
             }, 
             spike_train::{DeltaDiracRefractoriness, NeuralRefractorinessGPU, PoissonNeuron, SpikeTrainGPU},
         },
@@ -85,9 +85,9 @@ mod tests {
         let mut neuron: PoissonNeuron<
             IonotropicReceptorNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness
         > = PoissonNeuron::default();
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::ampa_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::nmda_default());
-        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::gabaa_default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default());
+        neuron.synaptic_neurotransmitters.insert(IonotropicReceptorNeurotransmitterType::GABAa, ApproximateNeurotransmitter::default());
 
         neuron.set_dt(1.);
 
