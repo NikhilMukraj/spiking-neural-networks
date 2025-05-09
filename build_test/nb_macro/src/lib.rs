@@ -295,13 +295,15 @@ impl Ast {
                         ));
                     }
 
-                    result.push_str(&format!(
-                        " else {{\n{}\n}}", 
-                        declarations[declarations.len() - 1].iter()
-                            .map(|i| i.generate())
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                    ));
+                    if conditions.len() != declarations.len() {
+                        result.push_str(&format!(
+                            " else {{\n{}\n}}", 
+                            declarations[declarations.len() - 1].iter()
+                                .map(|i| i.generate())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        ));
+                    }
 
                     result
                 }
@@ -440,13 +442,15 @@ impl Ast {
                         ));
                     }
 
-                    result.push_str(&format!(
-                        " else {{\n{}\n}}", 
-                        declarations[declarations.len() - 1].iter()
-                            .map(|i| i.generate_non_kernel_gpu())
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                    ));
+                    if conditions.len() != declarations.len() {
+                        result.push_str(&format!(
+                            " else {{\n{}\n}}", 
+                            declarations[declarations.len() - 1].iter()
+                                .map(|i| i.generate_non_kernel_gpu())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        ));
+                    }
 
                     result
                 }
@@ -615,13 +619,15 @@ impl Ast {
                         ));
                     }
 
-                    result.push_str(&format!(
-                        " else {{\n{}\n}}", 
-                        declarations[declarations.len() - 1].iter()
-                            .map(|i| i.generate_kernel_gpu())
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                    ));
+                    if conditions.len() != declarations.len() {
+                        result.push_str(&format!(
+                            " else {{\n{}\n}}", 
+                            declarations[declarations.len() - 1].iter()
+                                .map(|i| i.generate_kernel_gpu())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                        ));
+                    }
 
                     result
                 }
@@ -1631,7 +1637,7 @@ impl NeuronDefinition {
                         current_split[4]
                     );
                     receptor_kinetics_args.entry((current_split[1].to_string(), current_split[2].to_string()))
-                        .or_insert(Vec::new())
+                        .or_default()
                         .push(current_arg.clone());
 
                     let current_type = match &j {{
@@ -4163,14 +4169,14 @@ impl ReceptorsDefinition {
 
         let receptors_struct = if !has_top_level_vars {
             format!(
-                "#[derive(Debug, Clone)]\npub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                "#[derive(Debug, Clone, PartialEq)]\npub struct {}<T: ReceptorKinetics> {{\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
                 self.type_name.generate(),
                 neurotransmitters_name,
                 self.type_name.generate(),
             )  
         } else {
             format!(
-                "#[derive(Debug, Clone)]\npub struct {}<T: ReceptorKinetics> {{\n{},\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
+                "#[derive(Debug, Clone, PartialEq)]\npub struct {}<T: ReceptorKinetics> {{\n{},\nreceptors: HashMap<{}, {}Type<T>>\n}}", 
                 self.type_name.generate(),
                 generate_fields(self.top_level_vars.as_ref().unwrap()).join(",\n"),
                 neurotransmitters_name,
@@ -5476,7 +5482,7 @@ fn parse_declaration(pair: Pair<Rule>) -> Ast {
             );
 
             let expr: Box<Ast> = Box::new(
-                parse_expr(
+                parse_bool_expr(
                     inner_rules.next()
                         .expect("No arguments found")
                         .into_inner()
