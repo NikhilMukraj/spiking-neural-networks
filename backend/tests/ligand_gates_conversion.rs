@@ -6,9 +6,8 @@ mod tests {
     };
     extern crate spiking_neural_networks;
     use spiking_neural_networks::neuron::iterate_and_spike::{
-        LigandGatedChannel, LigandGatedChannels, IonotropicReceptorNeurotransmitterType,
-        ApproximateReceptor,
-        AMPADefault, NMDADefault, GABAaDefault, GABAbDefault,
+        AMPAReceptor, ApproximateReceptor, GABAReceptor, Ionotropic, IonotropicNeurotransmitterType, 
+        IonotropicType, NMDAReceptor, Receptors, ReceptorsGPU
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError;
 
@@ -29,17 +28,17 @@ mod tests {
             )
             .expect("CommandQueue::create_default failed");
 
-        type GridType = Vec<Vec<LigandGatedChannels<ApproximateReceptor>>>;
+        type GridType = Vec<Vec<Ionotropic<ApproximateReceptor>>>;
         let ligand_gates_grid: GridType = vec![];
 
-        let gpu_conversion = LigandGatedChannels::convert_to_gpu(
+        let gpu_conversion = Ionotropic::convert_to_gpu(
             &ligand_gates_grid,
             &context,
             &queue,
         )?;
 
         let mut cpu_conversion = ligand_gates_grid.clone();
-        LigandGatedChannels::convert_to_cpu(
+        Ionotropic::convert_to_cpu(
             &mut cpu_conversion,
             &gpu_conversion,
             &queue,
@@ -61,31 +60,33 @@ mod tests {
 
     #[test]
     pub fn test_ligand_gates_conversion() -> Result<(), SpikingNeuralNetworksError> {
-        let mut ligand_gates1 = LigandGatedChannels::<ApproximateReceptor>::default();
+        let mut ligand_gates1 = Ionotropic::<ApproximateReceptor>::default();
         ligand_gates1.insert(
-            IonotropicReceptorNeurotransmitterType::AMPA, LigandGatedChannel::ampa_default()
+            IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default())
         )?;
         ligand_gates1.insert(
-            IonotropicReceptorNeurotransmitterType::NMDA, LigandGatedChannel {
-                receptor: ApproximateReceptor { r: 1. },
-                ..LigandGatedChannel::nmda_default()
-            }
+            IonotropicNeurotransmitterType::NMDA, 
+            IonotropicType::NMDA(NMDAReceptor {
+                r: ApproximateReceptor { r: 1. },
+                ..NMDAReceptor::default()
+            })
         )?;
-        let mut ligand_gates2 = LigandGatedChannels::default();
+        let mut ligand_gates2 = Ionotropic::default();
         ligand_gates2.insert(
-            IonotropicReceptorNeurotransmitterType::NMDA, LigandGatedChannel::nmda_default()
+            IonotropicNeurotransmitterType::NMDA, IonotropicType::NMDA(NMDAReceptor::default())
         )?;
-        let mut ligand_gates3 = LigandGatedChannels::default();
+        let mut ligand_gates3 = Ionotropic::default();
         ligand_gates3.insert(
-            IonotropicReceptorNeurotransmitterType::GABAa, LigandGatedChannel::gabaa_default()
+            IonotropicNeurotransmitterType::GABA, IonotropicType::GABA(GABAReceptor::default())
         )?;
         ligand_gates3.insert(
-            IonotropicReceptorNeurotransmitterType::GABAb, LigandGatedChannel {
+            IonotropicNeurotransmitterType::GABA, 
+            IonotropicType::GABA(GABAReceptor {
                 current: 5.,
-                ..LigandGatedChannel::gabab_default()
-            }
+                ..GABAReceptor::default()
+            })
         )?;
-        let ligand_gates4 = LigandGatedChannels::default();
+        let ligand_gates4 = Ionotropic::default();
 
         let ligand_gates_grid = vec![
             vec![ligand_gates1, ligand_gates2, ligand_gates3, ligand_gates4]
@@ -106,7 +107,7 @@ mod tests {
             )
             .expect("CommandQueue::create_default failed");
 
-        let gpu_conversion = LigandGatedChannels::convert_to_gpu(
+        let gpu_conversion = Ionotropic::convert_to_gpu(
             &ligand_gates_grid,
             &context,
             &queue,
@@ -115,11 +116,11 @@ mod tests {
         // let mut cpu_conversion = ligand_gates_grid.clone();
         let mut cpu_conversion = vec![
             vec![
-                LigandGatedChannels::default(), LigandGatedChannels::default(),
-                LigandGatedChannels::default(), LigandGatedChannels::default(),
+                Ionotropic::default(), Ionotropic::default(),
+                Ionotropic::default(), Ionotropic::default(),
             ]
         ];
-        LigandGatedChannels::convert_to_cpu(
+        Ionotropic::convert_to_cpu(
             &mut cpu_conversion,
             &gpu_conversion,
             &queue,
