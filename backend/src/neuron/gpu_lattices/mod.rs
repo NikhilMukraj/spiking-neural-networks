@@ -1719,6 +1719,15 @@ where
         Ok(())
     }
 
+    /// Clears all lattices and spike train lattices, also resets connecting graph and timing
+    pub fn clear(&mut self) {
+        self.lattices = HashMap::new();
+        self.spike_train_lattices = HashMap::new();
+        self.connecting_graph = C::default();
+        self.reset_timing();
+        self.reset_graph_history();
+    }
+
     /// Sets the connecting graph to a new graph, (id remains the same before and after),
     /// also verifies if graph is valid
     pub fn set_connecting_graph(&mut self, new_graph: C) -> Result<(), SpikingNeuralNetworksError> {
