@@ -22,7 +22,7 @@
     - could have vec of conditionals and vec of vec of declarations and iterate through each one
 - [x] basic function calling tests
 - [x] **bool vars (should be listed in same `vars:` block)**
-- [ ] `+=`, `-=`, `*=`, `/=`
+- [x] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
 - [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [x] remove vars without defaults, all vars should have associated defaults
@@ -68,12 +68,17 @@
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
 - [ ] gpu implementations
+  - [x] neurotransmitter kinetics
+  - [x] receptor kinetics
+  - [x] receptors
+  - [ ] ion channels
+  - [x] neurons
 - [ ] more descriptive error handling
-- [ ] gpu set attribute should not panic but return an error type
+- [x] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
-- [ ] **redo ligand gated channels using nb macro**
-  - [ ] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
+- [x] **redo ligand gated channels using nb macro**
+  - [x] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
 - [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
 - [ ] remove all `add_indents` calls
