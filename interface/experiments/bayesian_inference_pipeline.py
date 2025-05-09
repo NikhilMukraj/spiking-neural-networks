@@ -162,7 +162,6 @@ def fill_defaults(parsed):
 
     # single on/off cue versus entire group
 
-
 fields = [
     'main_firing_rate', 'bayesian_firing_rate', 'distortion', 'bayesian_distortion',
     'prob_of_exc_to_inh', 'exc_to_inh', 'spike_train_to_exc', 'bayesian_to_exc',
