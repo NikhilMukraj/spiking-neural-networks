@@ -61,8 +61,8 @@ signed_number = @{ unary_minus? ~ number }
 variables_block = _{ "vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
 variables_assignment = { name ~ " "* ~ "=" ~ " "* ~ (signed_number | bool) }
 variables_with_assignment = _{ 
-	"vars:" ~ " "* ~ variables_assignment ~ 
-    (" "* ~ "," ~ " "* ~ variables_assignment)* ~ 
+	"vars:" ~ (" " | "\n")* ~ variables_assignment ~ 
+    ((" " | "\n")* ~ "," ~ (" " | "\n")* ~ variables_assignment)* ~ 
     ","? 
 }
 
@@ -90,7 +90,7 @@ assignments = _{ assignment ~ (NEWLINE* ~ assignment)* ~ NEWLINE? }
 type_def = { "type:" ~ " "* ~ name ~ NEWLINE+ }
 vars_with_default_def  = { variables_with_assignment ~ NEWLINE+ }
 kinetics_def = { "kinetics:" ~ " "* ~ name ~ " "* ~ "," ~ " "* ~ name ~ NEWLINE+ }
-on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ eq_assignments }
+on_spike_def = { "on_spike:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
 on_iteration_def = { "on_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
 on_electrochemical_iteration_def = { "on_electrochemical_iteration:" ~ " "* ~ (NEWLINE+ | " "+ | "") ~ assignments }
 spike_detection_def = { "spike_detection:" ~ " "* ~ expr ~ NEWLINE+ }
