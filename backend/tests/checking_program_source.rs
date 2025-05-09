@@ -354,7 +354,7 @@ mod tests {
     fn gpu_get_ampa_neurotransmitter(gpu_cell_grid: &HashMap<String, BufferGPU>, queue: &CommandQueue, gpu_tracker: &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError> {
         match gpu_cell_grid.get("neurotransmitters$t").unwrap() {
             BufferGPU::Float(buffer) => {
-                let mut read_vector = vec![0., 0., 0., 0.];
+                let mut read_vector = vec![0., 0., 0.,];
 
                 let read_event = unsafe {
                     match queue.enqueue_read_buffer(buffer, CL_NON_BLOCKING, 0, &mut read_vector, &[]) {
