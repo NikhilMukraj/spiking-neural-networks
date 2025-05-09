@@ -24,6 +24,7 @@ skew = 0.05
 c_m = 100
 
 trials = 10
+gpu_batch = 10
 
 filename = "d2_inh_vary_glu_gaba_cc.json"
 
