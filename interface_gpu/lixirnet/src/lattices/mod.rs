@@ -765,6 +765,10 @@ macro_rules! impl_network {
                 }
             }
 
+            fn clear(&mut self) {
+                self.network.clear();
+            }
+
             fn get_all_ids(&self) -> HashSet<usize> {
                 self.network.get_all_ids()     
             }
@@ -1512,6 +1516,10 @@ macro_rules! impl_network_gpu {
                         )
                     ),
                 }
+            }
+
+            fn clear(&mut self) {
+                self.network.clear();
             }
 
             fn get_all_ids(&self) -> HashSet<usize> {
