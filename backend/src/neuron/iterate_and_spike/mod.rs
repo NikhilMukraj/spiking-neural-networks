@@ -20,87 +20,6 @@ use std::{ptr, collections::{BTreeSet, HashSet, hash_map::Entry}, io::Error};
 use crate::error::GPUError;
 
 
-/// Modifier for NMDA receptor current based on magnesium concentration and voltage
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BV {
-    /// Concentration of extracellular magnesium (mM)
-    pub mg: f32,
-}
-
-impl Default for BV {
-    fn default() -> Self {
-        BV { 
-            mg: 0.33 // mM
-        }
-    }
-}
-
-impl BV {
-    /// Calculates effect of magnesium and voltage on NMDA receptor,
-    /// voltage should be in mV
-    fn calculate_b(&self, voltage: f32) -> f32 {
-        1. / (1. + ((-0.062 * voltage).exp() * self.mg / 3.57))
-    }
-}
-
-/// Modifier for GABAb receptors
-#[derive(Debug, Clone, PartialEq)]
-pub struct GABAbDissociation {
-    pub g: f32,
-    pub n: f32,
-    pub kd: f32,
-    // k1: ,
-    // k2: ,
-    pub k3: f32,
-    pub k4: f32,
-}
-
-impl Default for GABAbDissociation {
-    fn default() -> Self {
-        GABAbDissociation {
-            g: 0.,
-            n: 4.,
-            kd: 100.,
-            // k1: ,
-            // k2: ,
-            k3: 0.098,
-            k4: 0.033, 
-        }
-    }
-}
-
-impl GABAbDissociation {
-    /// Calculates effect of dissociation on GABAb receptor
-    fn calculate_modifer(&self) -> f32 {
-        self.g.powf(self.n) / (self.g.powf(self.n) * self.kd)
-    }
-}
-
-/// Default for AMPA receptor
-pub trait AMPADefault {
-    fn ampa_default() -> Self;
-}
-
-/// Default for GABAa receptor
-pub trait GABAaDefault {
-    fn gabaa_default() -> Self;
-}
-
-/// Default for GABAb receptor
-pub trait GABAbDefault {
-    fn gabab_default() -> Self;
-}
-
-/// Secondary default for GABAb receptor
-pub trait GABAbDefault2 {
-    fn gabab_default2() -> Self;
-}
-
-/// Default for NMDA receptor
-pub trait NMDADefault {
-    fn nmda_default() -> Self;
-}
-
 /// Marker trait for neurotransmitter type
 pub trait NeurotransmitterType: Hash + PartialEq + Eq + Clone + Copy + Debug + Send + Sync {}
 
@@ -214,26 +133,16 @@ pub struct DestexheNeurotransmitter {
     pub k_p: f32,
 }
 
-macro_rules! impl_destexhe_neurotransmitter_default {
-    ($trait:ident, $method:ident, $t_max:expr) => {
-        impl $trait for DestexheNeurotransmitter {
-            fn $method() -> Self {
-                DestexheNeurotransmitter {
-                    t_max: $t_max,
-                    t: 0.,
-                    v_p: 2., // 2 mV
-                    k_p: 5., // 5 mV
-                }
-            }
+impl Default for DestexheNeurotransmitter {
+    fn default() -> Self {
+        DestexheNeurotransmitter {
+            t_max: 1.0,
+            t: 0.,
+            v_p: 2., // 2 mV
+            k_p: 5., // 5 mV
         }
-    };
+    }
 }
-
-impl_destexhe_neurotransmitter_default!(Default, default, 1.0);
-impl_destexhe_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-impl_destexhe_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-impl_destexhe_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-impl_destexhe_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 impl NeurotransmitterKinetics for DestexheNeurotransmitter {
     fn apply_t_change<T: CurrentVoltage + IsSpiking + Timestep>(&mut self, neuron: &T) {
@@ -262,26 +171,15 @@ pub struct ApproximateNeurotransmitter {
     pub clearance_constant: f32,
 }
 
-macro_rules! impl_approximate_neurotransmitter_default {
-    ($trait:ident, $method:ident, $t_max:expr) => {
-        impl $trait for ApproximateNeurotransmitter {
-            fn $method() -> Self {
-                ApproximateNeurotransmitter {
-                    t_max: $t_max,
-                    t: 0.,
-                    clearance_constant: 0.01,
-                }
-            }
+impl Default for ApproximateNeurotransmitter {
+    fn default() -> Self {
+        ApproximateNeurotransmitter {
+            t_max: 1.,
+            t: 0.,
+            clearance_constant: 0.01,
         }
-    };
+    }
 }
-
-impl_approximate_neurotransmitter_default!(Default, default, 1.0);
-impl_approximate_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-impl_approximate_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-impl_approximate_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-impl_approximate_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
-
 
 fn bool_to_float(flag: bool) -> f32 {
     if flag {
@@ -414,24 +312,14 @@ impl NeurotransmitterKinetics for DiscreteSpikeNeurotransmitter {
     }
 }
 
-macro_rules! impl_discrete_neurotransmitter_default {
-    ($trait:ident, $method:ident, $t_max:expr) => {
-        impl $trait for DiscreteSpikeNeurotransmitter {
-            fn $method() -> Self {
-                DiscreteSpikeNeurotransmitter {
-                    t_max: $t_max,
-                    t: 0.,
-                }
-            }
+impl Default for DiscreteSpikeNeurotransmitter {
+    fn default() -> Self {
+        DiscreteSpikeNeurotransmitter {
+            t_max: 1.,
+            t: 0.,
         }
-    };
+    }
 }
-
-impl_discrete_neurotransmitter_default!(Default, default, 1.0);
-impl_discrete_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-impl_discrete_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-impl_discrete_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-impl_discrete_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 /// maximal value when a spike is detected and
@@ -447,25 +335,15 @@ pub struct ExponentialDecayNeurotransmitter {
     pub decay_constant: f32,
 }
 
-macro_rules! impl_exp_decay_neurotransmitter_default {
-    ($trait:ident, $method:ident, $t_max:expr) => {
-        impl $trait for ExponentialDecayNeurotransmitter {
-            fn $method() -> Self {
-                ExponentialDecayNeurotransmitter {
-                    t_max: $t_max,
-                    t: 0.,
-                    decay_constant: 2.0,
-                }
-            }
+impl Default for ExponentialDecayNeurotransmitter {
+    fn default() -> Self {
+        ExponentialDecayNeurotransmitter {
+            t_max: 1.,
+            t: 0.,
+            decay_constant: 2.0,
         }
-    };
+    }
 }
-
-impl_exp_decay_neurotransmitter_default!(Default, default, 1.0);
-impl_exp_decay_neurotransmitter_default!(AMPADefault, ampa_default, 1.0);
-impl_exp_decay_neurotransmitter_default!(NMDADefault, nmda_default, 1.0);
-impl_exp_decay_neurotransmitter_default!(GABAaDefault, gabaa_default, 1.0);
-impl_exp_decay_neurotransmitter_default!(GABAbDefault, gabab_default, 0.5);
 
 fn exp_decay(x: f32, l: f32, dt: f32) -> f32 {
     -x * (dt / -l).exp()
@@ -536,26 +414,15 @@ impl ReceptorKinetics for DestexheReceptor {
     }
 }
 
-macro_rules! impl_destexhe_receptor_default {
-    ($trait:ident, $method:ident, $alpha:expr, $beta:expr) => {
-        impl $trait for DestexheReceptor {
-            fn $method() -> Self {
-                DestexheReceptor {
-                    r: 0.,
-                    alpha: $alpha, // mM^-1 * ms^-1
-                    beta: $beta, // ms^-1
-                }
-            }
+impl Default for DestexheReceptor {
+    fn default() -> Self {
+        DestexheReceptor {
+            r: 0.,
+            alpha: 1., // mM^-1 * ms^-1
+            beta: 1., // ms^-1
         }
-    };
+    }
 }
-
-impl_destexhe_receptor_default!(Default, default, 1., 1.);
-impl_destexhe_receptor_default!(AMPADefault, ampa_default, 1.1, 0.19);
-impl_destexhe_receptor_default!(GABAaDefault, gabaa_default, 5.0, 0.18);
-impl_destexhe_receptor_default!(GABAbDefault, gabab_default, 0.016, 0.0047);
-impl_destexhe_receptor_default!(GABAbDefault2, gabab_default2, 0.52, 0.0013);
-impl_destexhe_receptor_default!(NMDADefault, nmda_default, 0.072, 0.0066);
 
 /// Receptor dynamics approximation that just sets the receptor
 /// gating value to the inputted neurotransmitter concentration
@@ -621,21 +488,11 @@ impl ReceptorKineticsGPU for ApproximateReceptor {
     }
 }
 
-macro_rules! impl_approximate_receptor_default {
-    ($trait:ident, $method:ident) => {
-        impl $trait for ApproximateReceptor {
-            fn $method() -> Self {
-                ApproximateReceptor { r: 0. }
-            }
-        }
-    };
+impl Default for ApproximateReceptor {
+    fn default() -> Self {
+        ApproximateReceptor { r: 0. }
+    }
 }
-
-impl_approximate_receptor_default!(Default, default);
-impl_approximate_receptor_default!(AMPADefault, ampa_default);
-impl_approximate_receptor_default!(GABAaDefault, gabaa_default);
-impl_approximate_receptor_default!(GABAbDefault, gabab_default);
-impl_approximate_receptor_default!(NMDADefault, nmda_default);
 
 /// Receptor dynamics approximation that sets the receptor
 /// gating value to the inputted neurotransmitter concentration and
@@ -665,25 +522,15 @@ impl ReceptorKinetics for ExponentialDecayReceptor {
     }
 }
 
-macro_rules! impl_exp_decay_receptor_default {
-    ($trait:ident, $method:ident) => {
-        impl $trait for ExponentialDecayReceptor {
-            fn $method() -> Self {
-                ExponentialDecayReceptor { 
-                    r_max: 1.0,
-                    r: 0.,
-                    decay_constant: 2.,
-                }
-            }
+impl Default for ExponentialDecayReceptor {
+    fn default() -> Self {
+        ExponentialDecayReceptor { 
+            r_max: 1.,
+            r: 0.,
+            decay_constant: 2.,
         }
-    };
+    }
 }
-
-impl_exp_decay_receptor_default!(Default, default);
-impl_exp_decay_receptor_default!(AMPADefault, ampa_default);
-impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
-impl_exp_decay_receptor_default!(GABAbDefault, gabab_default);
-impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 
 #[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
 pub enum DefaultReceptorsNeurotransmitterType {
@@ -1199,147 +1046,6 @@ impl<T: ReceptorKinetics> Default for DefaultReceptors<T> {
     }
 }
 
-/// Enum containing the type of ionotropic ligand gated receptor
-/// containing a modifier to use when calculating current
-#[derive(Debug, Clone, PartialEq)]
-pub enum IonotropicLigandGatedReceptorType {
-    /// AMPA receptor
-    AMPA,
-    /// GABAa receptor
-    GABAa,
-    /// GABAb receptor with dissociation modifier
-    GABAb(GABAbDissociation),
-    /// NMDA receptor with magnesium and voltage modifier
-    NMDA(BV),
-}
-
-/// Singular ligand gated channel 
-#[derive(Debug, Clone, PartialEq)]
-pub struct LigandGatedChannel<T: ReceptorKinetics> {
-    /// Maximal synaptic conductance (nS)
-    pub g: f32,
-    /// Reveral potential (mV)
-    pub reversal: f32,
-    // Receptor dynamics
-    pub receptor: T,
-    /// Type of receptor
-    pub receptor_type: IonotropicLigandGatedReceptorType,
-    /// Current generated by receptor
-    pub current: f32,
-}
-
-impl<T: ReceptorKinetics + AMPADefault> AMPADefault for LigandGatedChannel<T> {
-    fn ampa_default() -> Self {
-        LigandGatedChannel {
-            g: 1.0, // 1.0 nS
-            reversal: 0., // 0.0 mV
-            receptor: T::ampa_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::AMPA,
-            current: 0.,
-        }
-    }
-}
-
-impl<T: ReceptorKinetics + GABAaDefault> GABAaDefault for LigandGatedChannel<T> {
-    fn gabaa_default() -> Self {
-        LigandGatedChannel {
-            g: 1.2, // 1.2 nS
-            reversal: -80., // -80 mV
-            receptor: T::gabaa_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::GABAa,
-            current: 0.,
-        }
-    }
-}
-
-impl<T: ReceptorKinetics + GABAbDefault> GABAbDefault for LigandGatedChannel<T> {
-    fn gabab_default() -> Self {
-        LigandGatedChannel {
-            g: 0.06, // 0.06 nS
-            reversal: -95., // -95 mV
-            receptor: T::gabab_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::GABAb(GABAbDissociation::default()),
-            current: 0.,
-        }
-    }
-}
-
-impl<DestexheReceptor: ReceptorKinetics + GABAbDefault2> GABAbDefault2 for LigandGatedChannel<DestexheReceptor> {
-    fn gabab_default2() -> Self {
-        LigandGatedChannel {
-            g: 0.06, // 0.06 nS
-            reversal: -95., // -95 mV
-            receptor: DestexheReceptor::gabab_default2(),
-            receptor_type: IonotropicLigandGatedReceptorType::GABAb(GABAbDissociation::default()),
-            current: 0.,
-        }
-    }
-}
-
-impl<T: ReceptorKinetics + NMDADefault> NMDADefault for LigandGatedChannel<T> {
-    fn nmda_default() -> Self {
-        LigandGatedChannel {
-            g: 0.6, // 0.6 nS
-            reversal: 0., // 0.0 mV
-            receptor: T::nmda_default(),
-            receptor_type: IonotropicLigandGatedReceptorType::NMDA(BV::default()),
-            current: 0.,
-        }
-    }
-}
-
-// /// Default implementation with a given `BV` as input
-// pub trait NMDAWithBV {
-//     fn nmda_with_bv(bv: BV) -> Self;
-// }
-
-// impl<T: ReceptorKinetics> NMDAWithBV for LigandGatedChannel<T> {
-//     fn nmda_with_bv(bv: BV) -> Self {
-//         LigandGatedChannel {
-//             g: 0.6, // 0.6 nS
-//             reversal: 0., // 0.0 mV
-//             receptor: T::nmda_default(),
-//             receptor_type: IonotropicLigandGatedReceptorType::NMDA(bv),
-//             current: 0.,
-//         }
-//     }
-// }
-
-impl<T: ReceptorKinetics> LigandGatedChannel<T> {
-    /// Calculates modifier for current calculation
-    fn get_modifier(&mut self, voltage: f32, dt: f32) -> f32 {
-        match &mut self.receptor_type {
-            IonotropicLigandGatedReceptorType::AMPA => 1.0,
-            IonotropicLigandGatedReceptorType::GABAa => 1.0,
-            IonotropicLigandGatedReceptorType::GABAb(value) => {
-                value.g += (value.k3 * self.receptor.get_r() - value.k4 * value.g) * dt;
-                value.calculate_modifer() // G^N / (G^N + Kd)
-            }, 
-            IonotropicLigandGatedReceptorType::NMDA(value) => value.calculate_b(voltage),
-        }
-    }
-
-    /// Calculates current generated from receptor based on input `voltage` in mV and `dt` in ms
-    pub fn calculate_current(&mut self, voltage: f32, dt: f32) -> f32 {
-        let modifier = self.get_modifier(voltage, dt);
-
-        self.current = modifier * self.receptor.get_r() * self.g * (voltage - self.reversal);
-
-        self.current
-    }
-
-    // /// Converts the receptor type of the channel to a string
-    // pub fn to_str(&self) -> &str {
-    //     match self.receptor_type {
-    //         IonotropicLigandGatedReceptorType::Basic(_) => "Basic",
-    //         IonotropicLigandGatedReceptorType::AMPA(_) => "AMPA",
-    //         IonotropicLigandGatedReceptorType::GABAa(_) => "GABAa",
-    //         IonotropicLigandGatedReceptorType::GABAb(_) => "GABAb",
-    //         IonotropicLigandGatedReceptorType::NMDA(_) => "NMDA",
-    //     }
-    // }
-}
-
 #[cfg(feature = "gpu")]
 pub fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> String {
     let mut num = 0;
@@ -1357,613 +1063,6 @@ pub fn generate_unique_prefix(other_attributes: &[String], prefix: &str) -> Stri
     }
 
     format!("{}{}_", prefix, num)
-}
-
-#[cfg(feature = "gpu")]
-impl<T: ReceptorKineticsGPU> LigandGatedChannel<T> {
-    /// Retrieves a given attribute from the ligand gated channel
-    fn get_attribute(&self, attribute: &str) -> Option<BufferType> {
-        match attribute {
-            "ligand_gates$current" => Some(BufferType::Float(self.current)),
-            "ligand_gates$reversal" => Some(BufferType::Float(self.reversal)),
-            "ligand_gates$g" => Some(BufferType::Float(self.g)),
-            "ligand_gates$nmda_mg" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::NMDA(value) => Some(BufferType::Float(value.mg)),
-                _ => None
-            },
-            "ligand_gates$gabab_g" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.g)),
-                _ => None
-            },
-            "ligand_gates$gabab_k3" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.k3)),
-                _ => None
-            },
-            "ligand_gates$gabab_k4" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.k4)),
-                _ => None
-            },
-            "ligand_gates$gabab_kd" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.kd)),
-                _ => None
-            },
-            "ligand_gates$gabab_n" => match &self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(value) => Some(BufferType::Float(value.n)),
-                _ => None
-            },
-            _ => {
-                self.receptor.get_attribute(attribute)
-            },
-        }
-    }
-
-    /// Sets a given attribute to a given value
-    fn set_attribute(&mut self, attribute: &str, value: BufferType) {
-        match attribute {
-            "ligand_gates$current" => self.current = match value {
-                BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
-            },
-            "ligand_gates$reversal" => self.reversal = match value {
-                BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
-            },
-            "ligand_gates$g" => self.g = match value {
-                BufferType::Float(nested_val) => nested_val,
-                _ => unreachable!("Incorrect type passed"),
-            },
-            "ligand_gates$nmda_mg" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::NMDA(current_value) => current_value.mg = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set NMDA value with non NMDA receptor")
-            },
-            "ligand_gates$gabab_g" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.g = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
-            },
-            "ligand_gates$gabab_k3" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k3 = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
-            },
-            "ligand_gates$gabab_k4" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.k4 = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
-            },
-            "ligand_gates$gabab_kd" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.kd = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
-            }
-            "ligand_gates$gabab_n" => match &mut self.receptor_type {
-                IonotropicLigandGatedReceptorType::GABAb(current_value) => current_value.n = match value {
-                    BufferType::Float(nested_val) => nested_val,
-                    _ => unreachable!("Incorrect type passed"),
-                },
-                _ => unreachable!("Cannot set GABAb value with non GABAb receptor")
-            }
-            _ => {
-                self.receptor.set_attribute(attribute, value).unwrap()
-            },
-        }
-    }
-
-    /// Gets all possible attribute names
-    pub fn get_all_possible_attribute_names() -> HashSet<(String, AvailableBufferType)> {
-        let mut attributes = HashSet::from([
-            (String::from("ligand_gates$current"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$reversal"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$g"), AvailableBufferType::Float),
-            (String::from("ligand_gates$nmda_mg"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$gabab_g"), AvailableBufferType::Float),
-            (String::from("ligand_gates$gabab_k3"), AvailableBufferType::Float),
-            (String::from("ligand_gates$gabab_k4"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$gabab_kd"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$gabab_n"), AvailableBufferType::Float),
-        ]);
-
-        attributes.extend(T::get_attribute_names());
-        
-        attributes
-    }
-
-    pub fn get_all_possible_attribute_names_ordered() -> BTreeSet<(String, AvailableBufferType)> {
-        LigandGatedChannel::<T>::get_all_possible_attribute_names().into_iter().collect()
-    }
-
-    /// Gets all valid attribute names
-    fn get_valid_attribute_names(&self) -> HashSet<(String, AvailableBufferType)> {
-        let mut attributes = HashSet::from([
-            (String::from("ligand_gates$current"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$reversal"), AvailableBufferType::Float), 
-            (String::from("ligand_gates$g"), AvailableBufferType::Float),
-        ]);
-
-        attributes.extend(T::get_attribute_names());
-
-        match &self.receptor_type {
-            IonotropicLigandGatedReceptorType::AMPA => attributes,
-            IonotropicLigandGatedReceptorType::NMDA(_) => {
-                attributes.insert((String::from("ligand_gates$nmda_mg"), AvailableBufferType::Float));
-
-                attributes
-            },
-            IonotropicLigandGatedReceptorType::GABAa => attributes,
-            IonotropicLigandGatedReceptorType::GABAb(_) => {
-                attributes.insert((String::from("ligand_gates_gabab$g"), AvailableBufferType::Float));
-                attributes.insert((String::from("ligand_gates_gabab$k3"), AvailableBufferType::Float));
-                attributes.insert((String::from("ligand_gates_gabab$k4"), AvailableBufferType::Float));
-                attributes.insert((String::from("ligand_gates_gabab$kd"), AvailableBufferType::Float));
-                attributes.insert((String::from("ligand_gates_gabab$n"), AvailableBufferType::Float));
-
-                attributes
-            }
-        }
-    }
-}
-
-/// Multiple ligand gated channels with their associated neurotransmitter type
-#[derive(Clone, Debug, PartialEq)]
-pub struct LigandGatedChannels<T: ReceptorKinetics> { 
-    ligand_gates: HashMap<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> 
-}
-
-impl<T: ReceptorKinetics> Default for LigandGatedChannels<T> {
-    fn default() -> Self {
-        LigandGatedChannels {
-            ligand_gates: HashMap::new(),
-        }
-    }
-}
-
-fn matching_neurotransmitter_and_receptor_type(
-    neurotransmitter_type: &IonotropicReceptorNeurotransmitterType,
-    receptor_type: &IonotropicLigandGatedReceptorType,
-) -> bool {
-    if let IonotropicLigandGatedReceptorType::AMPA = receptor_type {
-        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::AMPA {
-            return true;
-        }
-    }
-    if let IonotropicLigandGatedReceptorType::NMDA(_) = receptor_type {
-        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::NMDA {
-            return true;
-        }
-    }
-    if let IonotropicLigandGatedReceptorType::GABAa = receptor_type {
-        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::GABAa {
-            return true;
-        }
-    }
-    if let IonotropicLigandGatedReceptorType::GABAb(_) = receptor_type {
-        if *neurotransmitter_type == IonotropicReceptorNeurotransmitterType::GABAb {
-            return true;
-        }
-    }
-
-    false
-}
-
-impl<T: ReceptorKinetics> LigandGatedChannels<T> {
-    /// Returns how many ligand gates there are
-    pub fn len(&self) -> usize {
-        self.ligand_gates.len()
-    }
-
-    /// Returns if ligand gates is empty
-    pub fn is_empty(&self) -> bool {
-        self.ligand_gates.is_empty()
-    }
-
-    /// Returns the neurotransmitter types as set of keys
-    pub fn keys(&self) -> Keys<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> {
-        self.ligand_gates.keys()
-    }
-
-    /// Returns the ligand gates as a set of values
-    pub fn values(&self) -> Values<IonotropicReceptorNeurotransmitterType, LigandGatedChannel<T>> {
-        self.ligand_gates.values()
-    }
-
-    /// Gets the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get(&self, neurotransmitter_type: &IonotropicReceptorNeurotransmitterType) -> Option<&LigandGatedChannel<T>> {
-        self.ligand_gates.get(neurotransmitter_type)
-    }
-
-    /// Gets a mutable reference to the ligand gate associated with the given [`NeurotransmitterType`]
-    pub fn get_mut(&mut self, neurotransmitter_type: &IonotropicReceptorNeurotransmitterType) -> Option<&mut LigandGatedChannel<T>> {
-        self.ligand_gates.get_mut(neurotransmitter_type)
-    }
-
-    /// Inserts the given [`LigandGatedChannel`] with the associated [`NeurotransmitterType`]
-    pub fn insert(
-        &mut self, 
-        neurotransmitter_type: IonotropicReceptorNeurotransmitterType, 
-        ligand_gate: LigandGatedChannel<T>
-    ) -> Result<(), ReceptorNeurotransmitterError> {
-        if !matching_neurotransmitter_and_receptor_type(&neurotransmitter_type, &ligand_gate.receptor_type) {
-            return Err(ReceptorNeurotransmitterError::MismatchedTypes);
-        }
-
-        self.ligand_gates.insert(neurotransmitter_type, ligand_gate);
-
-        Ok(())
-    }
-
-    /// Calculates the receptor currents for each channel based on a given voltage (mV)
-    pub fn set_receptor_currents(&mut self, voltage: f32, dt: f32) {
-        self.ligand_gates
-            .values_mut()
-            .for_each(|i| {
-                i.calculate_current(voltage, dt);
-        });
-    }
-
-    /// Returns the total sum of the currents given the timestep (ms) value 
-    /// and capacitance of the model (nF)
-    pub fn get_receptor_currents(&self, dt: f32, c_m: f32) -> f32 {
-        self.ligand_gates
-            .values()
-            .map(|i| i.current)
-            .sum::<f32>() * (dt / c_m)
-    }
-
-    /// Updates the receptor gating values based on the neurotransitter concentrations (mM)
-    pub fn update_receptor_kinetics(&mut self, t_total: &NeurotransmitterConcentrations<IonotropicReceptorNeurotransmitterType>, dt: f32) {
-        t_total.iter()
-            .for_each(|(key, value)| {
-                if let Some(gate) = self.ligand_gates.get_mut(key) {
-                    gate.receptor.apply_r_change(*value, dt);
-                }
-            })
-    }
-}
-
-#[cfg(feature = "gpu")]
-fn extract_or_pad_ligand_gates<T: ReceptorKineticsGPU>(
-    value: &LigandGatedChannels<T>, 
-    i: IonotropicReceptorNeurotransmitterType, 
-    buffers_contents: &mut HashMap<String, Vec<BufferType>>,
-    flags: &mut HashMap<String, Vec<u32>>,
-) {
-    match value.get(&i) {
-        Some(current_value) => {
-            if let Some(current_flag) = flags.get_mut(&format!("ligand_gates${}", i.to_string())) {
-                current_flag.push(1);
-            }
-
-            for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
-                    if current_value.get_valid_attribute_names().contains(&attribute) {
-                        retrieved_attribute.push(
-                            current_value.get_attribute(&attribute.0)
-                                .unwrap_or_else(|| panic!("Attribute ({}) not found", attribute.0))
-                        );
-                    } else {
-                        match attribute.1 {
-                            AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
-                            AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
-                            AvailableBufferType::OptionalUInt => retrieved_attribute.push(BufferType::OptionalUInt(-1))
-                        };
-                    }
-                } else {
-                    unreachable!("Attribute ({}) not found", attribute.0);
-                }
-            }
-        },
-        None => {
-            if let Some(current_flag) = flags.get_mut(&format!("ligand_gates${}", i.to_string())) {
-                current_flag.push(0);
-            }
-
-            for attribute in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-                if let Some(retrieved_attribute) = buffers_contents.get_mut(&attribute.0) {
-                    match attribute.1 {
-                        AvailableBufferType::Float => retrieved_attribute.push(BufferType::Float(0.)),
-                        AvailableBufferType::UInt => retrieved_attribute.push(BufferType::UInt(0)),
-                        AvailableBufferType::OptionalUInt => retrieved_attribute.push(BufferType::OptionalUInt(-1))
-                    };
-                } else {
-                    unreachable!("Attribute ({}) not found", attribute.0)
-                }
-            }
-        }
-    }
-}
-
-#[cfg(feature = "gpu")]
-fn get_receptor_args<T: ReceptorKineticsGPU>(indexer: &str) -> String {
-    T::get_update_function().0
-        .iter()
-        .map(|i| format!("{}{}", i.split("$").collect::<Vec<&str>>().last().unwrap(), indexer))
-        .collect::<Vec<String>>()
-        .join(", ")
-}
-
-#[cfg(feature = "gpu")]
-impl <T: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> LigandGatedChannels<T> {
-    pub fn convert_to_gpu(
-        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
-    ) -> Result<HashMap<String, BufferGPU>, GPUError> {
-        // aggreate a list of all possible attributes (prefix those that are sub attributes)
-        // flags that depend on
-        // add to list 
-
-        let length: usize = grid.iter().map(|row| row.len()).sum();
-
-        if length == 0 {
-            return Ok(HashMap::new());
-        }
-
-        let mut buffers_contents: HashMap<String, Vec<BufferType>> = HashMap::new();
-        for i in T::get_attribute_names() {
-            buffers_contents.insert(i.0.to_string(), vec![]);
-        }
-        for i in LigandGatedChannel::<T>::get_all_possible_attribute_names() {
-            buffers_contents.insert(i.0.to_string(), vec![]);
-        }
-
-        let mut flags: HashMap<String, Vec<u32>> = HashMap::new();
-        for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
-            flags.insert(format!("ligand_gates${}", i.to_string()), vec![]);
-        }
-
-        for row in grid.iter() {
-            for value in row.iter() {
-                for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
-                    extract_or_pad_ligand_gates(value, i, &mut buffers_contents, &mut flags);
-                }
-            }
-        }
-
-        let mut buffers: HashMap<String, BufferGPU> = HashMap::new();
-
-        let size = length * IonotropicReceptorNeurotransmitterType::number_of_types();
-
-        for (key, value) in buffers_contents.iter() {
-            match value[0] {
-                BufferType::Float(_) => {
-                    let values = value.iter()
-                        .map(|i| match i {
-                            BufferType::Float(inner_value) => *inner_value,
-                            _ => unreachable!("Incorrect type passed",)
-                        })
-                        .collect::<Vec<f32>>();
-
-                    write_buffer!(current_buffer, context, queue, size, &values, Float, last);
-
-                    buffers.insert(key.clone(), BufferGPU::Float(current_buffer));
-                },
-                BufferType::UInt(_) => {
-                    let values = value.iter()
-                        .map(|i| match i {
-                            BufferType::UInt(inner_value) => *inner_value,
-                            _ => unreachable!("Incorrect type passed",)
-                        })
-                        .collect::<Vec<u32>>();
-
-                    write_buffer!(current_buffer, context, queue, size, &values, UInt, last);
-
-                    buffers.insert(key.clone(), BufferGPU::UInt(current_buffer));
-                },
-                BufferType::OptionalUInt(_) => {
-                    let values = value.iter()
-                        .map(|i| match i {
-                            BufferType::OptionalUInt(inner_value) => *inner_value,
-                            _ => unreachable!("Incorrect type passed",)
-                        })
-                        .collect::<Vec<i32>>();
-
-                    write_buffer!(current_buffer, context, queue, size, &values, OptionalUInt, last);
-
-                    buffers.insert(key.clone(), BufferGPU::OptionalUInt(current_buffer));
-                }
-            };  
-        }
-
-        let mut flags_vec: Vec<u32> = vec![];
-
-        for n in 0..length {
-            for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
-                flags_vec.push(
-                    flags.get(
-                        &format!("ligand_gates${}", i.to_string())
-                    ).unwrap()[n]
-                );
-            }
-        }
-
-        write_buffer!(flags_buffer, context, queue, size, &flags_vec, UInt, last);
-
-        buffers.insert(String::from("ligand_gates$flags"), BufferGPU::UInt(flags_buffer));
-
-        Ok(buffers)
-    }
-
-    #[allow(clippy::needless_range_loop)]
-    pub fn convert_to_cpu(
-        ligand_gates_grid: &mut [Vec<Self>],
-        buffers: &HashMap<String, BufferGPU>,
-        queue: &CommandQueue,
-        rows: usize,
-        cols: usize,
-    ) -> Result<(), GPUError> {
-        if rows == 0 || cols == 0 {
-            for inner in ligand_gates_grid {
-                inner.clear();
-            }
-
-            return Ok(());
-        }
-
-        let mut cpu_conversion: HashMap<String, Vec<BufferType>> = HashMap::new();
-        let mut flags: HashMap<String, Vec<bool>> = HashMap::new();
-        let mut current_flags: Vec<bool> = vec![];
-
-        let string_types: HashSet<(String, AvailableBufferType)> = HashSet::from([
-            (String::from("ligand_gates$flags"), AvailableBufferType::UInt)
-        ]);
-
-        for key in LigandGatedChannel::<T>::get_all_possible_attribute_names().union(&string_types) {
-            if !string_types.contains(key) {
-                match key.1 {
-                    AvailableBufferType::Float => {
-                        let mut current_contents = vec![0.; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
-                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, Float);
-
-                        let current_contents = current_contents.iter()
-                            .map(|i| BufferType::Float(*i))
-                            .collect::<Vec<BufferType>>();
-
-                        cpu_conversion.insert(key.0.clone(), current_contents);
-                    },
-                    AvailableBufferType::UInt => {
-                        let mut current_contents = vec![0; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
-                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
-
-                        let current_contents = current_contents.iter()
-                            .map(|i| BufferType::UInt(*i))
-                            .collect::<Vec<BufferType>>();
-
-                        cpu_conversion.insert(key.0.clone(), current_contents);
-                    },
-                    AvailableBufferType::OptionalUInt => {
-                        let mut current_contents = vec![-1; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
-                        read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, OptionalUInt);
-
-                        let current_contents = current_contents.iter()
-                            .map(|i| BufferType::OptionalUInt(*i))
-                            .collect::<Vec<BufferType>>();
-
-                        cpu_conversion.insert(key.0.clone(), current_contents);
-                    }
-                }
-            } else {
-                let mut current_contents = vec![0; rows * cols * IonotropicReceptorNeurotransmitterType::number_of_types()];
-                read_and_set_buffer!(buffers, queue, &key.0, &mut current_contents, UInt);
-
-                current_flags = current_contents.iter().map(|i| *i == 1).collect::<Vec<bool>>();
-            }
-        }
-
-        for n in 0..(rows * cols) {
-            for (n_type, i) in IonotropicReceptorNeurotransmitterType::get_all_types().iter().enumerate() {
-                let current_index = n * IonotropicReceptorNeurotransmitterType::number_of_types() + n_type;
-                match flags.entry(format!("ligand_gates${}", i.to_string())) {
-                    Entry::Vacant(entry) => { entry.insert(vec![current_flags[current_index]]); },
-                    Entry::Occupied(mut entry) => { entry.get_mut().push(current_flags[current_index]); }
-                }
-            }
-        }
-
-        for row in 0..rows {
-            for col in 0..cols {
-                let grid_value = &mut ligand_gates_grid[row][col];
-                let flag_index = row * cols + col;
-                for i in IonotropicReceptorNeurotransmitterType::get_all_types() {
-                    let i_str = format!("ligand_gates${}", i.to_string());
-                    let index = row * cols * IonotropicReceptorNeurotransmitterType::number_of_types() 
-                        + col * IonotropicReceptorNeurotransmitterType::number_of_types() + i.type_to_numeric();
-    
-                    if let Some(flag) = flags.get(&i_str) {
-                        if flag[flag_index] {
-                            if !grid_value.ligand_gates.contains_key(&i) {
-                                match i {
-                                    IonotropicReceptorNeurotransmitterType::AMPA => grid_value.insert(
-                                        i, LigandGatedChannel::ampa_default()
-                                    ).expect("Should insert correct channel type"),
-                                    IonotropicReceptorNeurotransmitterType::NMDA => grid_value.insert(
-                                        i, LigandGatedChannel::nmda_default()
-                                    ).expect("Should insert correct channel type"),
-                                    IonotropicReceptorNeurotransmitterType::GABAa => grid_value.insert(
-                                        i, LigandGatedChannel::gabaa_default()
-                                    ).expect("Should insert correct channel type"),
-                                    IonotropicReceptorNeurotransmitterType::GABAb => grid_value.insert(
-                                        i, LigandGatedChannel::gabab_default()
-                                    ).expect("Should insert correct channel type"),
-                                };
-                            }
-
-                            let current_ligand_gated_channel = grid_value.get_mut(&i).unwrap();
-    
-                            for attribute in current_ligand_gated_channel.get_valid_attribute_names() {
-                                if let Some(values) = cpu_conversion.get(&attribute.0) {
-                                    current_ligand_gated_channel.set_attribute(&attribute.0, values[index]);
-                                }
-                            }
-                        } else {
-                            grid_value.ligand_gates.remove(&i);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn get_ligand_gated_channels_update_function() -> String {
-        let mut kernel_args = vec![
-            String::from("uint index"), 
-            String::from("uint number_of_types"),
-            String::from("__global float* t"),
-            String::from("__global float* voltage"), 
-            String::from("__global float* dt"), 
-            String::from("__global uint* lg_flags"),
-        ];
-        let ligand_gates_args = LigandGatedChannel::<T>::get_all_possible_attribute_names_ordered()
-            .iter()
-            .map(|i| format!("__global {}* {}", i.1.to_str(), i.0.split("$").collect::<Vec<&str>>()[1]))
-            .collect::<Vec<String>>();
-        kernel_args.extend(ligand_gates_args);
-        let kernel_args = kernel_args.join(",\n");
-        format!(
-            r#"
-            __kernel void ligand_gates_update_function(
-                {}
-            ) {{
-                if (lg_flags[index * number_of_types]) {{ // AMPA
-                    r[index * number_of_types] = get_r({});
-                    current[index * number_of_types] = g[index * number_of_types] * r[index * number_of_types] * (voltage[index] - reversal[index * number_of_types]); 
-                }}
-                if (lg_flags[index * number_of_types + 1]) {{ // NMDA
-                    r[index * number_of_types + 1] = get_r({});
-                    float modifier = 1.0 / (1.0 + (exp(-0.062 * voltage[index]) * nmda_mg[index * number_of_types + 1] / 3.57)); 
-                    current[index * number_of_types + 1] = modifier * g[index * number_of_types + 1] * r[index * number_of_types + 1] * (voltage[index] - reversal[index * number_of_types + 1]);
-                }}
-                if (lg_flags[index * number_of_types + 2]) {{ // GABAa 
-                    r[index * number_of_types + 2] = get_r({});
-                    current[index * number_of_types + 2] = g[index * number_of_types + 2] * r[index * number_of_types + 2] * (voltage[index] - reversal[index * number_of_types + 2]); 
-                }}
-                if (lg_flags[index * number_of_types + 3]) {{ // GABAb
-                    r[index * number_of_types + 3] = get_r({});
-                    gabab_g[index * number_of_types + 3] += (gabab_k3[index * number_of_types + 3] * r[index * number_of_types + 3] - gabab_k4[index * number_of_types + 3] * gabab_g[index * number_of_types + 3]) * dt[index];
-                    float bottom = pow(gabab_g[index * number_of_types + 3], gabab_n[index * number_of_types + 3]) * gabab_kd[index * number_of_types + 3];
-                    float top = pow(gabab_g[index * number_of_types + 3], gabab_n[index * number_of_types + 3]);
-                    float modifier =  top / bottom;
-                    current[index * number_of_types + 3] = modifier * g[index * number_of_types + 3] * r[index * number_of_types + 3] * (voltage[index] - reversal[index * number_of_types * number_of_types + 3]);
-                }}
-            }}
-            "#,
-            kernel_args,
-            get_receptor_args::<T>("[index * number_of_types]"),
-            get_receptor_args::<T>("[index * number_of_types + 1]"),
-            get_receptor_args::<T>("[index * number_of_types + 2]"),
-            get_receptor_args::<T>("[index * number_of_types + 3]"),
-        )
-    }
 }
 
 #[derive(Hash, Debug, Eq, PartialEq, PartialOrd, Ord, Clone, Copy)]
@@ -2074,7 +1173,7 @@ pub enum IonotropicType<T: ReceptorKinetics> {
     GABA(GABAReceptor<T>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ionotropic<T: ReceptorKinetics> {
     receptors: HashMap<IonotropicNeurotransmitterType, IonotropicType<T>>,
 }
