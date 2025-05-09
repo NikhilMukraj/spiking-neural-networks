@@ -1697,6 +1697,15 @@ where
         Ok(())
     }
 
+    /// Clears all lattices and spike train lattices, also resets connecting graph and timing
+    pub fn clear(&mut self) {
+        self.lattices = HashMap::new();
+        self.spike_train_lattices = HashMap::new();
+        self.connecting_graph = Y::default();
+        self.reset_timing();
+        self.reset_graph_history();
+    }
+
     /// Resets the clock and last firing times for the entire network
     pub fn reset_timing(&mut self) {
         self.internal_clock = 0;
@@ -3640,6 +3649,16 @@ where
         spike_train_lattice_ref.in_network = true;
 
         Ok(())
+    }
+
+    /// Clears all lattices and spike train lattices, also resets connecting graph and timing
+    pub fn clear(&mut self) {
+        self.lattices = HashMap::new();
+        self.reward_modulated_lattices = HashMap::new();
+        self.spike_train_lattices = HashMap::new();
+        self.connecting_graph = Y::default();
+        self.reset_timing();
+        self.reset_graph_history();
     }
 
     /// Sets the timestep variable for each neuron, spike train, and plasticity modulator, 
