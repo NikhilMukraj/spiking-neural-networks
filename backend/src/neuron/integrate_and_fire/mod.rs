@@ -6,19 +6,17 @@ use iterate_and_spike_traits::IterateAndSpikeBase;
 use super::iterate_and_spike::{
     ApproximateNeurotransmitter, ApproximateReceptor, CurrentVoltage, GapConductance, 
     GaussianParameters, IonotropicReception, Ionotropic, IonotropicNeurotransmitterType, Receptors, 
-    IonotropicReceptorNeurotransmitterType, IsSpiking, IterateAndSpike, LastFiringTime, 
-    LigandGatedChannels, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
+    IsSpiking, IterateAndSpike, LastFiringTime, NeurotransmitterConcentrations, NeurotransmitterKinetics, 
     Neurotransmitters, ReceptorKinetics, Timestep
 };
 use crate::neuron::intermediate_delegate::NeurotransmittersIntermediate;
 #[cfg(feature = "gpu")]
 use super::iterate_and_spike::{
     NeurotransmitterKineticsGPU, ReceptorKineticsGPU,
-    AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
     IterateAndSpikeGPU, BufferGPU, KernelFunction, 
     create_float_buffer, create_optional_uint_buffer, create_uint_buffer,
     read_and_set_buffer, flatten_and_retrieve_field, write_buffer,
-    LigandGatedChannel, AvailableBufferType, generate_unique_prefix,
+    ReceptorsGPU, NeurotransmitterTypeGPU, AvailableBufferType, generate_unique_prefix,
 };
 #[cfg(feature = "gpu")]
 use crate::error::GPUError;
@@ -290,9 +288,9 @@ pub struct QuadraticIntegrateAndFireNeuron<T: NeurotransmitterKinetics, R: Recep
     /// Last timestep the neuron has spiked
     pub last_firing_time: Option<usize>,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicReceptorNeurotransmitterType, T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
-    pub ligand_gates: LigandGatedChannels<R>,
+    pub receptors: Ionotropic<R>,
 }
 
 impl_default_impl_integrate_and_fire!(QuadraticIntegrateAndFireNeuron);
@@ -315,8 +313,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for QuadraticInte
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            synaptic_neurotransmitters: Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::default(),
-            ligand_gates: LigandGatedChannels::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            receptors: Ionotropic::default(),
         }
     }
 }
@@ -332,7 +330,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> QuadraticIntegrateAndFire
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for QuadraticIntegrateAndFireNeuron<T, R> {
-    type N = IonotropicReceptorNeurotransmitterType;
+    type N = IonotropicNeurotransmitterType;
 
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
@@ -352,11 +350,11 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.quadratic_get_dv_change(input_current);
-        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.receptors.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
 
@@ -367,7 +365,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Quadr
 } 
 
 #[cfg(feature = "gpu")]
-impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
+impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU for QuadraticIntegrateAndFireNeuron<T, R> {
     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
@@ -436,81 +434,237 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         )
     }
 
-    fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
-        let argument_names = vec![
-            String::from("number_of_types"), String::from("inputs"), String::from("t"), String::from("index_to_position"), 
-            String::from("neuro_flags"), String::from("lg_flags"), String::from("current_voltage"), String::from("alpha"), String::from("v_reset"), 
-            String::from("v_c"), String::from("integration_constant"), String::from("dt"), 
-            String::from("tau_m"), String::from("c_m"), String::from("v_th"), String::from("refractory_count"), 
-            String::from("tref"), String::from("is_spiking"),
+        fn iterate_and_spike_electrochemical_kernel(
+        context: &Context,
+    ) -> Result<KernelFunction, GPUError> {
+        let kernel_name = String::from("iterate_and_spike");
+        let mut argument_names = vec![
+            String::from("number_of_types"), String::from("inputs"), String::from("t"),
+            String::from("index_to_position"), String::from("neurotransmitters$flags"),
+            String::from("receptors$flags"), String::from("current_voltage"),
+            String::from("dt"), String::from("is_spiking"), String::from("gap_conductance"),
+            String::from("c_m"), String::from("alpha"), String::from("v_th"), String::from("v_reset"),
+            String::from("v_c"), String::from("tau_m"), String::from("tref"),
+            String::from("refractory_count"), String::from("integration_constant"),
         ];
-
-        let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
+        argument_names.extend(
+            T::get_attribute_names_as_vector()
+                .iter()
+                .map(|(i, _)| i.clone())
+                .collect::<Vec<_>>(),
+        );
+        let neuro_prefix = generate_unique_prefix(&argument_names, "neurotransmitters");
         let neurotransmitter_args = T::get_attribute_names_as_vector()
             .iter()
-            .map(|i| (
-                i.1, 
-                format!(
-                    "{}{}", neuro_prefix,
-                    i.0.split("$").collect::<Vec<&str>>()[1],
+            .map(|i| {
+                (
+                    i.1,
+                    format!(
+                        "{}{}",
+                        neuro_prefix,
+                        i.0.split("$").collect::<Vec<&str>>()[1],
+                    ),
                 )
-            ))
-            .collect::<Vec<(AvailableBufferType, String)>>();
-        let neurotransmitter_arg_names = neurotransmitter_args.iter()
-            .map(|i| i.1.clone())
-            .collect::<Vec<String>>();
-        let combined_args = [argument_names.clone(), neurotransmitter_arg_names.clone()].concat();
-        let ligand_gates_prefix = generate_unique_prefix(&combined_args, "lg");
-        let ligand_gates_args = LigandGatedChannel::<R>::get_all_possible_attribute_names_ordered()
-            .iter()
-            .map(|i| (
-                i.1, 
-                format!(
-                    "{}{}", 
-                    ligand_gates_prefix, 
-                    i.0.split("$").collect::<Vec<&str>>()[1],
-                )
-            ))
-            .collect::<Vec<(AvailableBufferType, String)>>();
-        let ligand_gates_args_names = ligand_gates_args.iter()
-            .map(|i| i.1.clone())
-            .collect::<Vec<String>>();
-        let parsed_neurotransmitter_args = neurotransmitter_args.iter()
-            .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
-            .collect::<Vec<String>>();
-        let parsed_ligand_gates_args = ligand_gates_args.iter()
-            .map(|i| format!("__global {}* {}", i.0.to_str(), i.1))
-            .collect::<Vec<String>>();
-
-        let uint_args = [String::from("lg_flags"), String::from("neuro_flags"), String::from("index_to_position"), String::from("is_spiking")];
-
-        let mut parsed_argument_names: Vec<String> = argument_names
-            .iter()
-            .enumerate()
-            .map(|(i, name)| {
-                let qualifier = if i < 3 { "__global const " } else { "__global " };
-                let type_decl = if uint_args.contains(name) { "uint" } else { "float" };
-                format!("{}{}* {}", qualifier, type_decl, name)
             })
-            .collect::<Vec<_>>();
+            .collect::<Vec<(AvailableBufferType, String)>>();
+        let neurotransmitter_arg_names = neurotransmitter_args
+            .iter()
+            .map(|i| i.1.clone())
+            .collect::<Vec<String>>();
+        let neurotransmitter_arg_and_type = neurotransmitter_args
+            .iter()
+            .map(|(i, j)| {
+                format!(
+                    "__global {} *{}",
+                    match i {
+                        AvailableBufferType::Float => "float",
+                        AvailableBufferType::UInt => "uint",
+                        _ => unreachable!(),
+                    },
+                    j
+                )
+            })
+            .collect::<Vec<String>>();
+        let receptor_prefix = generate_unique_prefix(&argument_names, "receptors");
+        let receptor_kinetics_prefix =
+            generate_unique_prefix(&argument_names, "kinetics_receptors");
+        let mut receptor_arg_and_type = Vec::new();
+        let mut receptor_kinetics_args: HashMap<(String, String), Vec<String>> = HashMap::new();
+        for (i, j) in Ionotropic::<R>::get_all_attributes().iter() {
+            let current_split = i.split("$").collect::<Vec<&str>>();
+            if current_split.len() == 2 {
+                let current_type = match &j {
+                    AvailableBufferType::Float => "float",
+                    AvailableBufferType::UInt => "uint",
+                    _ => unreachable!(),
+                };
+                receptor_arg_and_type.push(
+                    format!(
+                        "__global {} *{}{}",
+                        current_type,
+                        receptor_prefix,
+                        current_split[1]
+                    )
+                );
+            } else {
+                let current_arg = format!(
+                    "{}{}_{}_{}",
+                    receptor_kinetics_prefix,
+                    current_split[1],
+                    current_split[2],
+                    current_split[4]
+                );
+                receptor_kinetics_args
+                    .entry((current_split[1].to_string(), current_split[2].to_string()))
+                    .or_default()
+                    .push(current_arg.clone());
+                let current_type = match &j {
+                    AvailableBufferType::Float => "float",
+                    AvailableBufferType::UInt => "uint",
+                    _ => unreachable!(),
+                };
+                receptor_arg_and_type.push(format!(
+                    "__global {} *{}",
+                    current_type,
+                    current_arg
+                ));
+            }
+            argument_names.push(i.clone());
+        }
+        let mut conversion: HashMap<String, usize> = HashMap::new();
+        for i in <Ionotropic<R> as Receptors>::N::get_all_types().iter() {
+            conversion.insert(i.to_string(), i.type_to_numeric());
+        }
+        let mut update_receptor_kinetics = Vec::new();
+        for ((neuro, name), _) in receptor_kinetics_args.iter() {
+            let update = format!(
+                "if (receptors_flags[index * number_of_types + {}] == 1) {{
+                    {}{}_{}_r[index] = get_r(t[index * number_of_types + {}], dt[index], {});
+                }}",
+                conversion.get(neuro).unwrap(),
+                receptor_kinetics_prefix,
+                neuro,
+                name,
+                conversion.get(neuro).unwrap(),
+                R::get_update_function()
+                    .0
+                    .iter()
+                    .filter(|i| i.starts_with("receptors"))
+                    .map(|i| format!(
+                        "{}{}_{}_{}[index]",
+                        receptor_kinetics_prefix,
+                        neuro,
+                        name,
+                        i.split("$").collect::<Vec<_>>().last().unwrap()
+                    ))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            update_receptor_kinetics.push(update);
+        }
+        let mut receptor_updates = Vec::new();
+        for (update, update_args) in <Ionotropic<R> as ReceptorsGPU>::get_updates().iter() {
+            let current_prefix = "__kernel void update_";
+            let rest = &update[current_prefix.len()..];
+            let end = rest.find('(').unwrap();
+            let neuro = &rest[..end];
+            let mut current_args = Vec::new();
+            for arg in update_args.iter() {
+                let current_split = arg.0.split("$").collect::<Vec<_>>();
 
-        parsed_argument_names[0] = String::from("uint number_of_types");
+                #[allow(clippy::comparison_chain)]
+                if current_split.len() == 2 {
+                    current_args.push(format!(
+                        "{}{}",
+                        receptor_prefix,
+                        current_split.last().unwrap()
+                    ));
+                } else if current_split.len() > 2 {
+                    current_args.push(format!(
+                        "{}{}_{}_{}",
+                        receptor_kinetics_prefix,
+                        current_split[1],
+                        current_split[2],
+                        current_split[4],
+                    ));
+                }
+            }
+            let current_update = format!(
+                "if (receptors_flags[index * number_of_types + {}] == 1) {{
+                    update_{}(index, current_voltage, dt, {});
+                }}",
+                conversion.get(neuro).unwrap(),
+                neuro,
+                current_args.join(", "),
+            );
+            receptor_updates.push(current_update);
+        }
+        let mut current_attrs = Vec::new();
+        let mut current_neuros = Vec::new();
+        for (i, _) in Ionotropic::<R>::get_all_attributes().iter() {
+            let current_split = i.split("$").collect::<Vec<&str>>();
+            if current_split.len() == 2 {
+                for neuro in conversion.keys() {
+                    if format!("{}_current", neuro) == *current_split.last().unwrap() {
+                        current_attrs.push(format!(
+                            "{}{}_current",
+                            receptor_prefix,
+                            neuro
+                        ));
+                        current_neuros.push(neuro.clone());
+                    }
+                }
+            }
+        }
+        let get_currents = current_attrs
+            .iter()
+            .zip(current_neuros.iter())
+            .map(|(i, j)| {
+                format!(
+                    "(((float) receptors_flags[index * number_of_types + {}]) * {}[index])",
+                    conversion.get(j).unwrap(),
+                    i,
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(" + ");
 
-        parsed_argument_names.extend(parsed_neurotransmitter_args);
-        parsed_argument_names.extend(parsed_ligand_gates_args);
-
-        let program_source = format!(r#"
+        #[allow(clippy::format_in_format_args)]
+        let program_source = format!("{}
             {}
             {}
-        
             {}
-            {}
-
-            __kernel void quadratic_integrate_and_fire_iterate_and_spike_electrochemical(
+            __kernel void iterate_and_spike(
+                uint number_of_types,
+                __global const float *inputs,
+                __global const float *t,
+                __global const uint *index_to_position,
+                __global const uint *neuro_flags,
+                __global const uint *receptors_flags,
+                __global float *current_voltage,
+                __global float *dt,
+                __global uint *is_spiking,
+                __global float *gap_conductance,
+                __global float *c_m,
+                                __global float *alpha,
+                __global float *v_th,
+                __global float *v_reset,
+                __global float *v_c,
+                __global float *tau_m,
+                __global float *tref,
+                __global float *refractory_count,
+                __global float *integration_constant,
+                {},
                 {}
             ) {{
                 int gid = get_global_id(0);
                 int index = index_to_position[gid];
+                {}
+                {}
+                float dv = (((((alpha[index] * (current_voltage[index] - v_reset[index])) * (current_voltage[index] - v_c[index])) + integration_constant[index]) + inputs[index])) * dt[index];
+                current_voltage[index] += dv;
+
+                {}
 
                 neurotransmitters_update(
                     index, 
@@ -521,83 +675,53 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
                     dt,
                     {}
                 );
-                ligand_gates_update_function(
-                    index,
-                    number_of_types,
-                    t,
-                    current_voltage,
-                    dt,
-                    lg_flags,
-                    {}
-                );
 
-                float dv = (
-                    alpha[index] * (current_voltage[index] - v_reset[index]) * 
-                    (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
-                    ) 
-                    * (dt[index] / tau_m[index]);
-                float receptor_current = -({}current[index * number_of_types] + {}current[index * number_of_types + 1] 
-                    + {}current[index * number_of_types + 2] + {}current[index * number_of_types + 3]) * (dt[index] / c_m[index]);
-
-                current_voltage[index] += dv + receptor_current;
-
-                if (refractory_count[index] > 0.0f) {{
-                    current_voltage[index] = v_reset[index];
-                    refractory_count[index] -= 1.0f; 
-                    is_spiking[index] = 0;
-                }} else if (current_voltage[index] >= v_th[index]) {{
-                    current_voltage[index] = v_reset[index];
+                if (current_voltage[index] > v_th[index] || refractory_count[index] > 0.0f) {{
                     is_spiking[index] = 1;
-                    refractory_count[index] = tref[index] / dt[index];
+                    is_spiking[index] = false;
+                    if (refractory_count[index] > 0.0f) {{
+                        current_voltage[index] = v_reset[index];
+                        refractory_count[index] -= 1.0f;
+                    }} else if (current_voltage[index] > v_th[index]) {{
+                        current_voltage[index] = v_reset[index];
+                        refractory_count[index] = (tref[index] / dt[index]);
+                        is_spiking[index] = false;
+                    }}
                 }} else {{
                     is_spiking[index] = 0;
                 }}
-            }}"#, 
-            T::get_update_function().1,
+            }}",
             R::get_update_function().1,
-            Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
-            LigandGatedChannels::<R>::get_ligand_gated_channels_update_function(),
-            parsed_argument_names.join(",\n"),
-            neurotransmitter_arg_names.join(",\n"),
-            ligand_gates_args_names.join(",\n"),
-            ligand_gates_prefix,
-            ligand_gates_prefix,
-            ligand_gates_prefix,
-            ligand_gates_prefix,
+            T::get_update_function().1, 
+            <Ionotropic<R>as ReceptorsGPU>::get_updates().iter()
+                .map(|i|i.0.clone()).collect:: <Vec<_>>().join("\n"),
+            Neurotransmitters:: <<Ionotropic<R>as Receptors>::N,T>::get_neurotransmitter_update_kernel_code(),
+            neurotransmitter_arg_and_type.join(",\n"),
+            receptor_arg_and_type.join(",\n"),update_receptor_kinetics.join("\n"),
+            receptor_updates.join("\n"),
+            format!(
+                "current_voltage[index] -= (dt[index] / c_m[index]) * ({});",
+                get_currents
+            ),
+            neurotransmitter_arg_names.join(",\n")
         );
 
-        let mut kernel_function_arguments = argument_names.clone();
-        kernel_function_arguments.extend(
-                T::get_attribute_names_as_vector().iter()
-                    .map(|i| i.0.clone())
-                    .collect::<Vec<String>>()
-            );
-        kernel_function_arguments.extend(
-            LigandGatedChannel::<R>::get_all_possible_attribute_names_ordered().iter()
-                .map(|i| i.0.clone())
-                .collect::<Vec<String>>()
-        );
-
-        let kernel_name = String::from("quadratic_integrate_and_fire_iterate_and_spike_electrochemical");
-
-        let iterate_and_spike_electrochemical_program = match Program::create_and_build_from_source(context, &program_source, "") {
+        let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, "") {
             Ok(value) => value,
             Err(_) => return Err(GPUError::ProgramCompileFailure),
         };
 
-        let kernel = match Kernel::create(&iterate_and_spike_electrochemical_program, &kernel_name) {
+        let kernel = match Kernel::create(&iterate_and_spike_program, &kernel_name) {
             Ok(value) => value,
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
-        Ok(
-            KernelFunction {
-                kernel,
-                program_source,
-                kernel_name,
-                argument_names: kernel_function_arguments
-            }
-        )
+        Ok(KernelFunction {
+            kernel,
+            program_source,
+            kernel_name,
+            argument_names,
+        })
     }
     
     fn convert_to_gpu(
@@ -733,15 +857,15 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
             .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
             .collect();
-        let ligand_gates: Vec<Vec<_>> = cell_grid.iter()
-            .map(|row| row.iter().map(|cell| cell.ligand_gates.clone()).collect())
+        let receptors: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.receptors.clone()).collect())
             .collect();
 
-        let neurotransmitter_buffers = Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::convert_to_gpu(
+        let neurotransmitter_buffers = Neurotransmitters::<IonotropicNeurotransmitterType, T>::convert_to_gpu(
             &neurotransmitters, context, queue
         )?;
-        let ligand_gates_buffers = LigandGatedChannels::<R>::convert_to_gpu(
-            &ligand_gates, context, queue
+        let ligand_gates_buffers = Ionotropic::<R>::convert_to_gpu(
+            &receptors, context, queue
         )?;
 
         buffers.extend(neurotransmitter_buffers);
@@ -766,23 +890,23 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDA
         let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
             .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
             .collect();
-        let mut ligand_gates: Vec<Vec<_>> = cell_grid.iter()
-            .map(|row| row.iter().map(|cell| cell.ligand_gates.clone()).collect())
+        let mut receptors: Vec<Vec<_>> = cell_grid.iter()
+            .map(|row| row.iter().map(|cell| cell.receptors.clone()).collect())
             .collect();
 
         Self::convert_to_cpu(cell_grid, buffers, rows, cols, queue)?;
         
-        Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::convert_to_cpu(
+        Neurotransmitters::<IonotropicNeurotransmitterType, T>::convert_to_cpu(
             &mut neurotransmitters, buffers, queue, rows, cols
         )?;
-        LigandGatedChannels::<R>::convert_to_cpu(
-            &mut ligand_gates, buffers, queue, rows, cols
+        Ionotropic::<R>::convert_to_cpu(
+            &mut receptors, buffers, queue, rows, cols
         )?;
 
         for (i, row) in cell_grid.iter_mut().enumerate() {
             for (j, cell) in row.iter_mut().enumerate() {
                 cell.synaptic_neurotransmitters = neurotransmitters[i][j].clone();
-                cell.ligand_gates = ligand_gates[i][j].clone();
+                cell.receptors = receptors[i][j].clone();
             }
         }
 
@@ -1418,9 +1542,9 @@ pub struct SimpleLeakyIntegrateAndFire<T: NeurotransmitterKinetics, R: ReceptorK
     /// Last timestep the neuron fired
     pub last_firing_time: Option<usize>,
     /// Postsynaptic neurotransmitters in cleft
-    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicReceptorNeurotransmitterType, T>,
+    pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
     /// Ionotropic receptor ligand gated channels
-    pub ligand_gates: LigandGatedChannels<R>,
+    pub receptors: Ionotropic<R>,
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for SimpleLeakyIntegrateAndFire<T, R> {
@@ -1437,8 +1561,8 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for SimpleLeakyIn
             dt: 0.1, // simulation time step (ms)
             is_spiking: false,
             last_firing_time: None,
-            synaptic_neurotransmitters: Neurotransmitters::<IonotropicReceptorNeurotransmitterType, T>::default(),
-            ligand_gates: LigandGatedChannels::default(),
+            synaptic_neurotransmitters: Neurotransmitters::<IonotropicNeurotransmitterType, T>::default(),
+            receptors: Ionotropic::default(),
         }
     }
 }
@@ -1469,7 +1593,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> SimpleLeakyIntegrateAndFi
 }
 
 impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for SimpleLeakyIntegrateAndFire<T, R> {
-    type N = IonotropicReceptorNeurotransmitterType;
+    type N = IonotropicNeurotransmitterType;
 
     fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {
         self.synaptic_neurotransmitters.get_concentrations()
@@ -1489,11 +1613,11 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
         input_current: f32, 
         t_total: &NeurotransmitterConcentrations<Self::N>,
     ) -> bool {
-        self.ligand_gates.update_receptor_kinetics(t_total, self.dt);
-        self.ligand_gates.set_receptor_currents(self.current_voltage, self.dt);
+        self.receptors.update_receptor_kinetics(t_total, self.dt);
+        self.receptors.set_receptor_currents(self.current_voltage, self.dt);
 
         let dv = self.get_dv_change(input_current);
-        let neurotransmitter_dv = -self.ligand_gates.get_receptor_currents(self.dt, self.c_m);
+        let neurotransmitter_dv = -self.receptors.get_receptor_currents(self.dt, self.c_m);
 
         self.current_voltage += dv + neurotransmitter_dv;
 
@@ -1504,7 +1628,7 @@ impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> IterateAndSpike for Simpl
 }
 
 #[cfg(feature = "gpu")]
-impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU + AMPADefault + NMDADefault + GABAaDefault + GABAbDefault> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
+impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU for SimpleLeakyIntegrateAndFire<T, R> {
     fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("simple_leaky_integrate_and_fire_iterate_and_spike");
         let argument_names = vec![
