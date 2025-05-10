@@ -2966,7 +2966,7 @@ pub trait Timestep {
 /// use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 /// use spiking_neural_networks::neuron::iterate_and_spike::{
 ///     IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
-///     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+///     LastFiringTime, NeurotransmitterConcentrations, Ionotropic, Receptors, IonotropicReception, 
 ///     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 ///     ApproximateNeurotransmitter, ApproximateReceptor,
 ///     IonotropicNeurotransmitterType,
@@ -3009,7 +3009,7 @@ pub trait Timestep {
 ///     /// Postsynaptic neurotransmitters in cleft
 ///     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
 ///     /// Ionotropic receptor ligand gated channels
-///     pub ligand_gates: LigandGatedChannels<R>,
+///     pub ligand_gates: Ionotropic<R>,
 /// }
 /// 
 /// impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> QuadraticIntegrateAndFireNeuron<T, R> {
