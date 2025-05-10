@@ -646,7 +646,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU 
                 __global uint *is_spiking,
                 __global float *gap_conductance,
                 __global float *c_m,
-                                __global float *alpha,
+                __global float *alpha,
                 __global float *v_th,
                 __global float *v_reset,
                 __global float *v_c,
@@ -661,8 +661,12 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU 
                 int index = index_to_position[gid];
                 {}
                 {}
-                float dv = (((((alpha[index] * (current_voltage[index] - v_reset[index])) * (current_voltage[index] - v_c[index])) + integration_constant[index]) + inputs[index])) * dt[index];
-                current_voltage[index] += dv;
+                current_voltage[index] += 
+                    (
+                        alpha[index] * (current_voltage[index] - v_reset[index]) * 
+                        (current_voltage[index] - v_c[index]) + integration_constant[index] * inputs[index]
+                    ) 
+                    * (dt[index] / tau_m[index]);
 
                 {}
 
@@ -676,17 +680,14 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU 
                     {}
                 );
 
-                if (current_voltage[index] > v_th[index] || refractory_count[index] > 0.0f) {{
+                if (refractory_count[index] > 0.0f) {{
+                    current_voltage[index] = v_reset[index];
+                    refractory_count[index] -= 1.0f; 
+                    is_spiking[index] = 0;
+                }} else if (current_voltage[index] >= v_th[index]) {{
+                    current_voltage[index] = v_reset[index];
                     is_spiking[index] = 1;
-                    is_spiking[index] = false;
-                    if (refractory_count[index] > 0.0f) {{
-                        current_voltage[index] = v_reset[index];
-                        refractory_count[index] -= 1.0f;
-                    }} else if (current_voltage[index] > v_th[index]) {{
-                        current_voltage[index] = v_reset[index];
-                        refractory_count[index] = (tref[index] / dt[index]);
-                        is_spiking[index] = false;
-                    }}
+                    refractory_count[index] = tref[index] / dt[index];
                 }} else {{
                     is_spiking[index] = 0;
                 }}
@@ -695,7 +696,7 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU 
             T::get_update_function().1, 
             <Ionotropic<R>as ReceptorsGPU>::get_updates().iter()
                 .map(|i|i.0.clone()).collect:: <Vec<_>>().join("\n"),
-            Neurotransmitters:: <<Ionotropic<R>as Receptors>::N,T>::get_neurotransmitter_update_kernel_code(),
+            Neurotransmitters::<<Ionotropic<R>as Receptors>::N,T>::get_neurotransmitter_update_kernel_code(),
             neurotransmitter_arg_and_type.join(",\n"),
             receptor_arg_and_type.join(",\n"),update_receptor_kinetics.join("\n"),
             receptor_updates.join("\n"),
