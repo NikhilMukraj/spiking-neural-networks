@@ -8,6 +8,7 @@ measure_snr = true
 
 memory_biases_memory = true
 
+d2 = true
 d_acts_on_inh = true
 
 main_1_on = true
