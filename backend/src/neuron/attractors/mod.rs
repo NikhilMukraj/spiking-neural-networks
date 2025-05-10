@@ -8,7 +8,7 @@
 //! #         integrate_and_fire::IzhikevichNeuron,
 //! #         plasticity::STDP,
 //! #         attractors::{generate_random_patterns, generate_hopfield_network, distort_pattern},
-//! #         Lattice, SpikeHistory,
+//! #         Lattice, SpikeHistory, RunLattice,
 //! #     },
 //! #     graph::AdjacencyMatrix,
 //! #     error::SpikingNeuralNetworksError,
@@ -83,7 +83,7 @@
 //! #         attractors::{
 //! #            generate_random_patterns, generate_binary_hopfield_network, distort_pattern
 //! #         },
-//! #         Lattice, LatticeNetwork, SpikeHistory,
+//! #         Lattice, LatticeNetwork, SpikeHistory, RunNetwork,
 //! #     },
 //! #     graph::AdjacencyMatrix,
 //! #     error::SpikingNeuralNetworksError,
@@ -178,7 +178,7 @@
 //! #         integrate_and_fire::IzhikevichNeuron,
 //! #         spike_train::PoissonNeuron,
 //! #         plasticity::STDP,
-//! #         Lattice, SpikeTrainLattice, LatticeNetwork, SpikeHistory,
+//! #         Lattice, SpikeTrainLattice, LatticeNetwork, SpikeHistory, RunNetwork,
 //! #     },
 //! #     graph::AdjacencyMatrix,
 //! #     error::SpikingNeuralNetworksError,
