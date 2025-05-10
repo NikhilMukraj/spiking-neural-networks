@@ -202,7 +202,7 @@
 //! use spiking_neural_networks::neuron::iterate_and_spike_traits::IterateAndSpikeBase;
 //! use spiking_neural_networks::neuron::iterate_and_spike::{
 //!     IsSpiking, Timestep, CurrentVoltage, GapConductance, IterateAndSpike, 
-//!     LastFiringTime, NeurotransmitterConcentrations, LigandGatedChannels, 
+//!     LastFiringTime, NeurotransmitterConcentrations, Ionotropic, Receptors, IonotropicReception, 
 //!     ReceptorKinetics, NeurotransmitterKinetics, Neurotransmitters,
 //!     ApproximateNeurotransmitter, ApproximateReceptor,
 //!     IonotropicNeurotransmitterType,
@@ -338,7 +338,7 @@
 //!     /// Postsynaptic neurotransmitters in cleft
 //!     pub synaptic_neurotransmitters: Neurotransmitters<IonotropicNeurotransmitterType, T>,
 //!     /// Ionotropic receptor ligand gated channels
-//!     pub ligand_gates: LigandGatedChannels<R>,
+//!     pub ligand_gates: Ionotropic<R>,
 //! }
 //! 
 //! impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> MorrisLecarNeuron<T, R> {
@@ -420,7 +420,9 @@
 //! ### Custom `NeurotransmitterKinetics` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;
+//! use spiking_neural_networks::neuron::iterate_and_spike::{
+//!     NeurotransmitterKinetics, CurrentVoltage, IsSpiking, Timestep,
+//! };
 //! 
 //! /// An approximation of neurotransmitter kinetics that sets the concentration to the 
 //! /// maximal value when a spike is detected (input `voltage` is greater than `v_th`) and
@@ -471,9 +473,8 @@
 //! ### Custom `ReceptorKinetics` implementation
 //! 
 //! ```rust
-//! use spiking_neural_networks::neuron::iterate_and_spike::{
-//!     ReceptorKinetics, AMPADefault, GABAaDefault, GABAbDefault, NMDADefault,
-//! };
+//! use spiking_neural_networks::neuron::iterate_and_spike::ReceptorKinetics;
+//! 
 //! 
 //! /// Receptor dynamics approximation that sets the receptor
 //! /// gating value to the inputted neurotransmitter concentration and
@@ -508,28 +509,16 @@
 //!         self.r = r;
 //!     }
 //! }
-//!
-//! // automatically generate defaults so `LigandGatedChannels`
-//! // can use default receptor settings in construction
-//! macro_rules! impl_exp_decay_receptor_default {
-//!     ($trait:ident, $method:ident) => {
-//!         impl $trait for ExponentialDecayReceptor {
-//!             fn $method() -> Self {
-//!                 ExponentialDecayReceptor { 
-//!                     r_max: 1.0,
-//!                     r: 0.,
-//!                     decay_constant: 2.,
-//!                 }
-//!             }
+//! 
+//! impl Default for ExponentialDecayReceptor {
+//!     fn default() -> Self {
+//!         ExponentialDecayReceptor {
+//!             r_max: 1.,
+//!             r: 0.,
+//!             decay_constant: 2.,
 //!         }
-//!     };
+//!     }
 //! }
-//!
-//! impl_exp_decay_receptor_default!(Default, default);
-//! impl_exp_decay_receptor_default!(AMPADefault, ampa_default);
-//! impl_exp_decay_receptor_default!(GABAaDefault, gabaa_default);
-//! impl_exp_decay_receptor_default!(GABAbDefault, gabab_default);
-//! impl_exp_decay_receptor_default!(NMDADefault, nmda_default);
 //! ```
 
 pub mod correlation;
