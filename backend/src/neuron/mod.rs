@@ -1466,7 +1466,7 @@ fn check_position<T>(
 /// #     neuron::{
 /// #         integrate_and_fire::IzhikevichNeuron,
 /// #         spike_train::PoissonNeuron,
-/// #         Lattice, SpikeTrainLattice, LatticeNetwork,
+/// #         Lattice, SpikeTrainLattice, LatticeNetwork, RunNetwork,
 /// #     },
 /// #     error::SpikingNeuralNetworksError,
 /// # };
