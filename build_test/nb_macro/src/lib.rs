@@ -749,6 +749,94 @@ fn generate_fields_as_mutable_refs(prefix: &str, vars: &Ast) -> Vec<String> {
     generate_fields_internal(vars, |i, _| format!("&mut {}_{}", prefix, i))
 }
 
+#[cfg(feature = "py")]
+fn generate_fields_as_fn_new_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let value = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(value) => Ast::Number(*value).generate(),
+                            NumOrBool::Bool(value) => format!("{}", value),
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}={}", var_name, value)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_receptors_as_fn_new_args(kinetics: &str, receptor_vars: &Ast) -> Vec<String> {
+    match receptor_vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::Name(name) => name.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}=Py{} {{ receptor: {}::default() }}", var_name, kinetics, kinetics)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_receptors_as_args(kinetics: &str, receptor_vars: &Ast) -> Vec<String> {
+    match receptor_vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::Name(name) => name.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}: {}", var_name, kinetics)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_receptors_as_args_in_receptor(receptor_vars: &Ast) -> Vec<String> {
+    match receptor_vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::Name(name) => name.clone(),
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}: {}.receptor.clone()", var_name, var_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
 fn generate_fields_as_names(vars: &Ast) -> Vec<String> {
     generate_fields_internal(vars, |i, _| i.to_string())
 }
@@ -3550,11 +3638,20 @@ impl NeurotransmitterKineticsDefinition {
 
         let constructor = format!(
             "#[new]
-            fn new() -> Self {{
-                Py{} {{ neurotransmitter: {}::default() }}
+            #[pyo3(signature = (t=0., {}))]
+            fn new(t: f32, {}) -> Self {{
+                Py{} {{ 
+                    neurotransmitter: {} {{
+                        t,
+                        {}
+                    }}
+                }}
             }}",
+            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            generate_fields_as_immutable_args(&self.vars).join(", "),
             self.type_name.generate(),
             self.type_name.generate(),
+            generate_fields_as_names(&self.vars).join(",\n"),
         );
 
         let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.neurotransmitter)) }"#;
@@ -3777,11 +3874,20 @@ impl ReceptorKineticsDefinition {
 
         let constructor = format!(
             "#[new]
-            fn new() -> Self {{
-                Py{} {{ receptor: {}::default() }}
+            #[pyo3(signature = (r=0., {}))]
+            fn new(r: f32, {}) -> Self {{
+                Py{} {{ 
+                    receptor: {} {{
+                        r,
+                        {}
+                    }}
+                }}
             }}",
+            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            generate_fields_as_immutable_args(&self.vars).join(", "),
             self.type_name.generate(),
             self.type_name.generate(),
+            generate_fields_as_names(&self.vars).join(",\n"),
         );
 
         let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.receptor)) }"#;
@@ -5121,7 +5227,15 @@ impl ReceptorsDefinition {
                 "#[pymethods]
                 impl Py{}Receptor {{
                     #[new]
-                    fn new() -> Self {{ Py{}Receptor {{ receptor: {}Receptor::default() }} }}
+                    #[pyo3(signature = ({}, {}))]
+                    fn new({}, {}) -> Self {{ 
+                        Py{}Receptor {{ 
+                            receptor: {}Receptor {{
+                                {},
+                                {},
+                            }}
+                        }} 
+                    }}
                     fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.receptor)) }}
                     {}
                     {}
@@ -5130,8 +5244,14 @@ impl ReceptorsDefinition {
                 }}
                 ",
                 type_name.generate(),
+                generate_fields_as_fn_new_args(vars_def).join(", "),
+                generate_py_receptors_as_fn_new_args(&default_kinetics, receptor_vars).join(","),
+                generate_fields_as_immutable_args(vars_def).join(", "),
+                generate_py_receptors_as_args(&format!("Py{}", default_kinetics), receptor_vars).join(","),
                 type_name.generate(),
                 type_name.generate(),
+                generate_fields_as_names(vars_def).join(",\n"),
+                generate_py_receptors_as_args_in_receptor(receptor_vars).join(","),
                 getters_and_setters.join("\n"),
                 receptor_getters_and_setters.join("\n"),
                 iterate_function,
