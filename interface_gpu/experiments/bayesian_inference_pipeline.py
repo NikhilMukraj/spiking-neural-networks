@@ -397,7 +397,6 @@ for current_state in tqdm(all_states):
 
                 i2s.append(inh_lattice_2)
                 e2s.append(exc_lattice_2)
-                c2s.append(cue_lattice)
 
                 if parsed['simulation_parameters']['d1'] and parsed['simulation_parameters']['d2']:
                     dopa_neuron = ln.IzhikevichNeuron()
@@ -407,6 +406,18 @@ for current_state in tqdm(all_states):
                     d_intermediate = ln.IzhikevichNeuronLattice(element * network_batch_size + d)
 
                     ds.append(d_intermediate)
+            else:
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                    poisson_dopa = ln.PoissonNeuron()
+                    poisson_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
+
+                    cue_lattice = ln.PoissonLattice(element * network_batch_size + c2)
+                    cue_lattice.populate(poisson_dopa, exc_n, exc_n)
+                else:
+                    cue_lattice = ln.PoissonLattice(element * network_batch_size + c2)
+                    cue_lattice.populate(poisson, exc_n, exc_n)
+
+            c2s.append(cue_lattice)
     
         [network.add_lattice(i) for i in i1s]
         [network.add_lattice(i) for i in e1s]
@@ -415,6 +426,14 @@ for current_state in tqdm(all_states):
         [network.add_lattice(i) for i in e2s]
         [network.add_spike_train_lattice(i) for i in c2s]
         [network.add_lattice(i) for i in ds]
+
+        # print(f'i1: {[i.id for i in i1s]}')
+        # print(f'e1: {[i.id for i in e1s]}')
+        # print(f'c1: {[i.id for i in c1s]}')
+        # print(f'i2: {[i.id for i in i2s]}')
+        # print(f'e2: {[i.id for i in e2s]}')
+        # print(f'c2: {[i.id for i in c2s]}')
+        # print(f'd: {[i.id for i in ds]}')
 
         for element in range(parsed_toml['simulation_parameters']['gpu_batch']):
             network.connect(
@@ -480,7 +499,7 @@ for current_state in tqdm(all_states):
 
                         e2_to_e1_mapping[n1] = current_pointer
 
-                if parsed['simulation_parameters']['d1'] and parsed['simulation_parameters']['d2']:
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                     if not parsed_toml['simulation_parameters']['d_acts_on_inh']:
                         network.connect(
                             element * network_batch_size + e2, 
@@ -558,8 +577,7 @@ for current_state in tqdm(all_states):
                     lambda x, y: current_state['bayesian_to_exc']
                 )
 
-        network.set_dt(parsed['simulation_parameters']['dt'])
-        network.parallel = True
+        network.set_dt(parsed_toml['simulation_parameters']['dt'])
 
         network.electrical_synapse = False
         network.chemical_synapse = True
@@ -615,7 +633,7 @@ for current_state in tqdm(all_states):
                         element * network_batch_size + c2, 
                         get_spike_train_setup_function(
                             all_patterns[element],
-                            all_pattern2[element], 
+                            all_pattern2s[element], 
                             current_state['bayesian_distortion'],
                             bayesian_firing_rate,
                             exc_n,
