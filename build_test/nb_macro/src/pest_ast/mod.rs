@@ -159,7 +159,8 @@ lazy_static::lazy_static! {
                 Op::infix(or_operator, Left)
             )
             .op(Op::infix(add, Left) | Op::infix(subtract, Left))
-            .op(Op::infix(multiply, Left) | Op::infix(divide, Left) | Op::infix(power, Left))
+            .op(Op::infix(multiply, Left) | Op::infix(divide, Left))
+			.op(Op::infix(power, Left))
             .op(Op::prefix(unary_minus) | Op::prefix(not_operator))
     };
 }
