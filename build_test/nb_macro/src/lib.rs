@@ -837,6 +837,111 @@ fn generate_py_receptors_as_args_in_receptor(receptor_vars: &Ast) -> Vec<String>
     }
 }
 
+#[cfg(feature = "py")]
+fn generate_py_basic_gating_vars_as_fn_new_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i|
+                    format!("{}=PyBasicGatingVariable {{ gating_variable: BasicGatingVariable::default() }}", i)
+                )
+                .collect::<Vec<String>>()
+        },
+        ast => unreachable!("Unexpected AST in gating variable generation: {:#?}", ast)
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_basic_gating_vars_as_args_in_ion_channel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i|
+                    format!("{}: {}.gating_variable.clone()", i, i)
+                )
+                .collect::<Vec<String>>()
+        },
+        ast => unreachable!("Unexpected AST in gating variable generation: {:#?}", ast)
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_fields_as_py_basic_gating_vars_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    format!("{}: PyBasicGatingVariable", i)
+                })
+                .collect::<Vec<String>>()
+        },
+        ast => unreachable!("Unexpected AST in gating variable generation: {:#?}", ast)
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_ion_channels_as_fn_new_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}=Py{} {{ ion_channel: {}::default() }}", var_name, type_name, type_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_ion_channels_as_args_in_neuron(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::StructAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}: {}.ion_channel.clone()", var_name, var_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "py")]
+fn generate_py_ion_channels_as_immutable_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!("{}: Py{}", var_name, type_name)
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
 fn generate_fields_as_names(vars: &Ast) -> Vec<String> {
     generate_fields_internal(vars, |i, _| i.to_string())
 }
@@ -2299,20 +2404,6 @@ impl NeuronDefinition {
             receptor_kinetics,
         );
 
-        // defaults.push(String::from("current_voltage: 0."));
-        // defaults.push(String::from("dt: 0.1"));
-        // defaults.push(String::from("c_m: 1."));
-        // defaults.push(String::from("gap_conductance: 10."));
-
-        let constructor = format!(
-            "#[new]
-            fn new() -> Self {{ Py{} {{ model: {}::default() }} }}",
-            self.type_name.generate(),
-            self.type_name.generate(),
-        );
-
-        let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.model)) }"#;
-
         // iterate to generate getter and setters
         let mandatory_vars = [
             ("dt", "f32"), 
@@ -2321,6 +2412,65 @@ impl NeuronDefinition {
             ("gap_conductance", "f32"), 
             ("is_spiking", "bool"),
         ];
+
+        let defaults = vec![
+            String::from("dt=0.1"), String::from("current_voltage=0."), String::from("c_m=1."), 
+            String::from("gap_conductance=10."), String::from("is_spiking=false"),
+        ];
+
+        let receptors_name = self.receptors.as_ref()
+            .unwrap_or(&Ast::TypeDefinition(String::from("DefaultReceptors")))
+            .generate();
+
+        let constructor = format!(
+            "#[new]
+            #[pyo3(signature = ({}, {}, {} synaptic_neurotransmitters=None, receptors=Py{} {{ receptors: {}::default() }}))]
+            fn new({}, {}, {} synaptic_neurotransmitters: Option<&PyDict>, receptors: Py{}) -> PyResult<Self> {{ 
+                let model = {} {{
+                    {},
+                    {},
+                    {}
+                    ..{}::default()
+                }};
+
+                let mut neuron = Py{} {{ model }};
+                if let Some(dict) = synaptic_neurotransmitters {{
+                    neuron.set_synaptic_neurotransmitters(dict)?
+                }};
+                neuron.set_receptors(receptors);
+
+                Ok(neuron)
+            }}",
+            defaults.join(", "),
+            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            if let Some(ion_channels) = &self.ion_channels {
+                format!("{},", generate_py_ion_channels_as_fn_new_args(&ion_channels).join(", "))
+            } else {
+                String::from("")
+            },
+            receptors_name,
+            receptors_name,
+            mandatory_vars.iter().map(|(i, j)| format!("{}: {}", i, j)).collect::<Vec<_>>().join(", "),
+            generate_fields_as_immutable_args(&self.vars).join(", "),
+            if let Some(ion_channels) = &self.ion_channels {
+                format!("{},", generate_py_ion_channels_as_immutable_args(&ion_channels).join(", "))
+            } else {
+                String::from("")
+            },
+            receptors_name,
+            self.type_name.generate(),
+            mandatory_vars.iter().map(|(i, _)| i.to_string()).collect::<Vec<_>>().join(", "),
+            generate_fields_as_names(&self.vars).join(", "),
+            if let Some(ion_channels) = &self.ion_channels {
+                format!("{},", generate_py_ion_channels_as_args_in_neuron(&ion_channels).join(", "))
+            } else {
+                String::from("")
+            },
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
+
+        let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.model)) }"#;
 
         let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
             .map(|(i, j)| generate_py_getter_and_setters("model", i, j))
@@ -2398,10 +2548,6 @@ impl NeuronDefinition {
             receptor_kinetics,
             neurotransmitter_kinetics,
         );
-
-        let receptors_name = self.receptors.as_ref()
-            .unwrap_or(&Ast::TypeDefinition(String::from("DefaultReceptors")))
-            .generate();
 
         let receptors_getter_and_setter = format!(
             "fn get_receptors(&self) -> Py{} {{
@@ -2983,7 +3129,12 @@ impl IonChannelDefinition {
             #[pymethods]
             impl PyBasicGatingVariable {
                 #[new]
-                fn new() -> Self { PyBasicGatingVariable { gating_variable: BasicGatingVariable::default() } }
+                #[pyo3(signature = (alpha=0., beta=0., state=0.))]
+                fn new(alpha: f32, beta: f32, state: f32) -> Self {
+                    PyBasicGatingVariable { 
+                        gating_variable: BasicGatingVariable { alpha, beta, state }
+                    } 
+                }
                 fn __repr__(&self) -> PyResult<String> { Ok(format!(\"{:#?}\", self.gating_variable)) }
                 fn init_state(&mut self) { self.gating_variable.init_state(); }
                 fn update(&mut self, dt: f32) { self.gating_variable.update(dt); }
@@ -3038,7 +3189,16 @@ impl IonChannelDefinition {
             "#[pymethods]
             impl Py{} {{
                 #[new]
-                fn new() -> Self {{ Py{} {{ ion_channel: {}::default() }} }}
+                #[pyo3(signature = (current=0., {}, {}))]
+                fn new(current: f32, {}, {}) -> Self {{ 
+                    Py{} {{ 
+                        ion_channel: {} {{
+                            current,
+                            {},
+                            {}
+                        }}
+                    }} 
+                }}
                 fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.ion_channel)) }}
                 {}
                 {}
@@ -3046,8 +3206,20 @@ impl IonChannelDefinition {
                 {}
             }}",
             self.type_name.generate(),
+            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            generate_py_basic_gating_vars_as_fn_new_args(&self.gating_vars.as_ref()
+                .unwrap_or(&Ast::GatingVariables(vec![]))
+            ).join(", "),
+            generate_fields_as_immutable_args(&self.vars).join(", "),
+            generate_fields_as_py_basic_gating_vars_args(&self.gating_vars.as_ref()
+                .unwrap_or(&Ast::GatingVariables(vec![]))
+            ).join(","),
             self.type_name.generate(),
             self.type_name.generate(),
+            generate_fields_as_names(&self.vars).join(",\n"),
+            generate_py_basic_gating_vars_as_args_in_ion_channel(&self.gating_vars.as_ref()
+                .unwrap_or(&Ast::GatingVariables(vec![]))
+            ).join(",\n"),
             generate_vars_as_getter_setters("ion_channel", &self.vars).join("\n"),
             generate_py_getter_and_setters("ion_channel", "current", "f32"),
             gating_vars.join("\n"),
