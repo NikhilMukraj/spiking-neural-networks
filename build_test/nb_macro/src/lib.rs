@@ -464,7 +464,7 @@ impl Ast {
         match self {
             Ast::Number(n) => {
                 if n % 1. != 0. {
-                    n.to_string()
+                    format!("{}f", n)
                 } else {
                     format!("{}.0f", n)
                 }
@@ -487,7 +487,7 @@ impl Ast {
                     Op::Subtract => format!("({} - {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
                     Op::Multiply => format!("({} * {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
                     Op::Divide => format!("({} / {})", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
-                    Op::Power => format!("({}.powf({}))", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
+                    Op::Power => format!("(pow({}, {}))", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
                     Op::Equal => format!("{} == {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
                     Op::NotEqual => format!("{} != {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
                     Op::GreaterThan => format!("{} > {}", lhs.generate_kernel_gpu(), rhs.generate_kernel_gpu()),
