@@ -1,10 +1,5 @@
 # notes
 
-## general
-
-- default ligand gated channel is just neurotransmitter $X$ with ligand gated channel $I_{syn} = g_X r_X (V - E_X)$
-- gpu receptors refactor where g, r, E, etc are not shared there's just an indivual r ampa, r nmda, g ampa, g nmda, etc
-
 ## todo
 
 - [x] ion channel defaults
@@ -82,3 +77,4 @@
 - [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
 - [ ] remove all `add_indents` calls
+- [ ] change default values of default variables (dt, current_voltage, etc), make sure to update pyo3 accordingly
