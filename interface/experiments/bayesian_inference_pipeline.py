@@ -498,7 +498,7 @@ for current_state in tqdm(all_states):
         else:
             network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
-        network.set_dt(parsed['simulation_parameters']['dt'])
+        network.set_dt(parsed_toml['simulation_parameters']['dt'])
         network.parallel = True
 
         network.electrical_synapse = False
