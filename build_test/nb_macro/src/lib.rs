@@ -6259,6 +6259,29 @@ fn build_function(model_description: String) -> TokenStream {
     }
 }
 
+fn parse_out_comments(string: &str) -> String {
+    if string.len() < 2 {
+        return string.to_string();
+    }
+
+    let mut output = String::new();
+
+    let mut is_comment = false;
+    for i in 0..string.len() {
+        if string.chars().nth(i).unwrap() == '/' && string.chars().nth(i + 1) == Some('/') {
+            is_comment = true;
+        } 
+        if !is_comment {
+            output.push(string.chars().nth(i).unwrap());
+        } else if is_comment && string.chars().nth(i).unwrap() == '\n' {
+            is_comment = false;
+            output.push('\n');
+        }
+    }
+
+    output
+}
+
 #[proc_macro]
 pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
     // block based seperation
@@ -6312,7 +6335,7 @@ pub fn neuron_builder(model_description: TokenStream) -> TokenStream {
     let model_description = parse_macro_input!(model_description as LitStr);
     let model_description = model_description.value();
 
-    build_function(model_description)
+    build_function(parse_out_comments(model_description.as_str()))
 }
 
 #[proc_macro]
@@ -6320,5 +6343,36 @@ pub fn neuron_builder_from_file(filename: TokenStream) -> TokenStream {
     let filename = parse_macro_input!(filename as LitStr);
     let filename = filename.value();
 
-    build_function(read_to_string(filename).expect("Could not read file to string"))
+    build_function(parse_out_comments(
+        read_to_string(filename).expect("Could not read file to string").as_str()
+    ))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::parse_out_comments;
+
+    
+    #[test]
+    fn test_comment_strip() {
+        let string = "hi hello\nhow are you // comment\nend of comment hopefully";
+        let expected = "hi hello\nhow are you \nend of comment hopefully";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_comment_strip_no_comments() {
+        let string = "aoisdf/n 1\n8w23fna948\nasdl$fjaslk/df3hq238f*732fonwauds  aksdjfhaw\nap38 w2";
+        
+        assert_eq!(string, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_comment_strip_many_comments() {
+        let string = "[neuron]\ntype: n // test\nkinetics: default\nvars: another = 1 // // stuff\n[end] // extra";
+        let expected = "[neuron]\ntype: n \nkinetics: default\nvars: another = 1 \n[end] ";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
 }
