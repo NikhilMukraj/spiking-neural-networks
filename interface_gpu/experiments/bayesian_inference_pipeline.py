@@ -800,7 +800,8 @@ for current_state in tqdm(all_states):
                         )
                     )
 
-        network.run_lattices(parsed_toml['simulation_parameters']['iterations2'])
+        if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            network.run_lattices(parsed_toml['simulation_parameters']['iterations2'])
 
         for element in range(parsed_toml['simulation_parameters']['gpu_batch']):
             hist = network.get_lattice(element * network_batch_size + e1).history
@@ -917,7 +918,7 @@ for current_state in tqdm(all_states):
 
             simulation_output[key] = current_value
 
-    network.clear()
+        network.clear()
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
