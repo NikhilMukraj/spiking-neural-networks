@@ -72,6 +72,7 @@
 /interface/generate_methods.py
 /interface_gpu/.venv/*
 /interface_gpu/experiments/__pycache__
+/interface_gpu/experiments/*/*.json
 /build_test/pratt/target
 /build_test/other_ast/target
 /build_test/nb_macro/target
