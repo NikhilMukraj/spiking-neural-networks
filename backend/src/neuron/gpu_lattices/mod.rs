@@ -1012,7 +1012,7 @@ where
     N: NeurotransmitterTypeGPU,
 {
     fn run_lattice(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
-        if self.cell_grid.is_empty() || self.cell_grid.first().unwrap_or(&vec![]).is_empty() {
+        if self.cell_grid.is_empty() || self.cell_grid.first().unwrap_or(&vec![]).is_empty() || iterations == 0 {
             return Ok(());
         }
 
@@ -3095,7 +3095,7 @@ where
     C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
 {
     fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
-        if self.lattices.is_empty() && self.spike_train_lattices.is_empty() {
+        if self.lattices.is_empty() && self.spike_train_lattices.is_empty() || iterations == 0 {
             return Ok(());
         }
 
