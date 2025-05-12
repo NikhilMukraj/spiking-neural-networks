@@ -41,7 +41,7 @@ mod test {
             receptors: ampa_r, nmda_r
             vars: current = 0, g_ampa = 1, g_nmda = 0.6, e_ampa = 0, e_nmda = 0, mg = 0.3
             on_iteration:
-                current = inh_modifier * g_ampa * ampa_r * (v - e_ampa) + (1 / (1 + exp(-0.062 * v) / mg * 3.57)) * inh_modifier * g_nmda * nmda_r ^ nmda_modifier * (v - e_nmda)
+                current = inh_modifier * g_ampa * ampa_r * (v - e_ampa) + (1 / (1 + exp(-0.062 * v) * mg / 3.57)) * inh_modifier * g_nmda * (nmda_r ^ nmda_modifier) * (v - e_nmda)
             neurotransmitter: GABA
             vars: current = 0, g = 1.2, e = -80
             on_iteration:
@@ -68,6 +68,8 @@ mod test {
                 dv/dt = (0.04 * v ^ 2 + 5 * v + 140 - u + i) / c_m
         [end]"
     );
+
+    const ITERATIONS: usize = 1000;
 
     #[test]
     pub fn test_electrical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
@@ -159,7 +161,6 @@ mod test {
     pub fn test_electrical_lattice_accuracy() -> Result<(), SpikingNeuralNetworksError> {
         let base_neuron = IzhikevichNeuron::default_impl();
     
-        let iterations = 1000;
         let (num_rows, num_cols) = (2, 2);
 
         let mut lattice = Lattice::default_impl();
@@ -181,9 +182,9 @@ mod test {
     
         let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
     
-        lattice.run_lattice(iterations)?;
+        lattice.run_lattice(ITERATIONS)?;
     
-        gpu_lattice.run_lattice(iterations)?;
+        gpu_lattice.run_lattice(ITERATIONS)?;
     
         check_last_state(&lattice, &gpu_lattice);
     
@@ -203,7 +204,6 @@ mod test {
             base_neuron.synaptic_neurotransmitters
                 .insert(DopaGluGABANeurotransmitterType::Glutamate, BoundedNeurotransmitterKinetics::default());
         
-            let iterations = 1000;
             let (num_rows, num_cols) = (2, 2);
 
             let mut lattice = Lattice::default_impl();
@@ -228,9 +228,9 @@ mod test {
         
             let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
         
-            lattice.run_lattice(iterations)?;
+            lattice.run_lattice(ITERATIONS)?;
         
-            gpu_lattice.run_lattice(iterations)?;
+            gpu_lattice.run_lattice(ITERATIONS)?;
 
             check_last_state(&lattice, &gpu_lattice);
 
@@ -238,5 +238,120 @@ mod test {
         }
 
         Ok(())
+    }
+
+    #[test]
+    fn test_d1_functionality() {
+        let glu_ts: Vec<f32> = (0..11).map(|i| i as f32 / 10.).collect();
+        let dopamine_ts = glu_ts.clone();
+
+        let mut spike_counts: Vec<Vec<usize>> = (0..11).map(|_| (0..11).map(|_| 0).collect()).collect();
+        
+        for (n, glu) in glu_ts.iter().enumerate() {
+            for (m, dopamine) in dopamine_ts.iter().enumerate() {
+                let mut neuron = IzhikevichNeuron::default_impl();
+
+                neuron.receptors
+                    .insert(DopaGluGABANeurotransmitterType::Glutamate, DopaGluGABAType::Glutamate(GlutamateReceptor::default()))
+                    .expect("Valid neurotransmitter pairing");
+                neuron.receptors
+                    .insert(
+                        DopaGluGABANeurotransmitterType::Dopamine, 
+                        DopaGluGABAType::Dopamine(DopamineReceptor { s_d2: 0., s_d1: 1., ..DopamineReceptor::default() })
+                    )
+                    .expect("Valid neurotransmitter pairing");
+
+                let t_total = HashMap::from([
+                    (DopaGluGABANeurotransmitterType::Glutamate, *glu),
+                    (DopaGluGABANeurotransmitterType::Dopamine, *dopamine)
+                ]);
+
+                let mut spikes = 0;
+                for _ in 0..ITERATIONS {
+                    let is_spiking = neuron.iterate_with_neurotransmitter_and_spike(0., &t_total);
+                    if is_spiking {
+                        spikes += 1;
+                    }
+                    match neuron.receptors.get(&DopaGluGABANeurotransmitterType::Dopamine).unwrap() {
+                        DopaGluGABAType::Dopamine(receptor) => assert_eq!(receptor.r_d1.get_r(), *dopamine),
+                        _ => unreachable!()
+                    }
+                    assert_eq!(neuron.receptors.nmda_modifier, 1. - *dopamine);
+                    assert_eq!(neuron.receptors.inh_modifier, 1.);
+                }
+
+                spike_counts[n][m] = spikes;
+            }
+        }
+
+        for i in 1..11 {
+            for j in 1..11 {
+                assert!(spike_counts[i][j] >= spike_counts[i][j - 1]);
+                assert!(spike_counts[j][i] >= spike_counts[j - 1][i]);
+            }
+        }
+
+        #[allow(clippy::needless_range_loop)]
+        for i in 3..8 {
+            assert!(
+                spike_counts[i][0] < spike_counts[i][10], 
+                "{}: {} < {}", 
+                i, 
+                spike_counts[i][0], 
+                spike_counts[i][10]
+            );
+        }
+    }
+
+    #[test]
+    fn test_d2_functionality() {
+        let glu_ts: Vec<f32> = (0..11).map(|i| i as f32 / 10.).collect();
+        let dopamine_ts = glu_ts.clone();
+
+        let mut spike_counts: Vec<Vec<usize>> = (0..11).map(|_| (0..11).map(|_| 0).collect()).collect();
+
+        for (n, glu) in glu_ts.iter().enumerate() {
+            for (m, dopamine) in dopamine_ts.iter().enumerate() {
+                let mut neuron = IzhikevichNeuron::default_impl();
+
+                neuron.receptors
+                    .insert(DopaGluGABANeurotransmitterType::Glutamate, DopaGluGABAType::Glutamate(GlutamateReceptor::default()))
+                    .expect("Valid neurotransmitter pairing");
+                neuron.receptors
+                    .insert(
+                        DopaGluGABANeurotransmitterType::Dopamine, 
+                        DopaGluGABAType::Dopamine(DopamineReceptor { s_d2: 0.5, s_d1: 0., ..DopamineReceptor::default() })
+                    )
+                    .expect("Valid neurotransmitter pairing");
+
+                let t_total = HashMap::from([
+                    (DopaGluGABANeurotransmitterType::Glutamate, *glu),
+                    (DopaGluGABANeurotransmitterType::Dopamine, *dopamine)
+                ]);
+
+                let mut spikes = 0;
+                for _ in 0..ITERATIONS {
+                    let is_spiking = neuron.iterate_with_neurotransmitter_and_spike(0., &t_total);
+                    if is_spiking {
+                        spikes += 1;
+                    }
+                    match neuron.receptors.get(&DopaGluGABANeurotransmitterType::Dopamine).unwrap() {
+                        DopaGluGABAType::Dopamine(receptor) => assert_eq!(receptor.r_d2.get_r(), *dopamine),
+                        _ => unreachable!()
+                    }
+                    assert_eq!(neuron.receptors.nmda_modifier, 1.);
+                    assert_eq!(neuron.receptors.inh_modifier, 1. - (0.5 * *dopamine));
+                }
+
+                spike_counts[n][m] = spikes;
+            }
+        }
+
+        #[allow(clippy::needless_range_loop)]
+        for i in 1..11 {
+            for j in 1..11 {
+                assert!(spike_counts[i][j] <= spike_counts[i][j - 1]);
+            }
+        }
     }
 }
