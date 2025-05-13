@@ -3095,7 +3095,7 @@ where
     C: Graph<K=GraphPosition, V=f32> + ConnectingGraphToGPU<ConnectingGraphGPU>, 
 {
     fn run_lattices(&mut self, iterations: usize) -> Result<(), SpikingNeuralNetworksError> {
-        if self.lattices.is_empty() && self.spike_train_lattices.is_empty() || iterations == 0 {
+        if (self.lattices.is_empty() && self.spike_train_lattices.is_empty()) || iterations == 0 {
             return Ok(());
         }
 
