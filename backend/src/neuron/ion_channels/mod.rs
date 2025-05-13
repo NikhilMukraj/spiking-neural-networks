@@ -1,5 +1,14 @@
 //! A series of ion channels and ion channel traits to implement for usage in neuron models
 
+#[cfg(feature = "gpu")]
+use std::collections::{HashMap, HashSet};
+#[cfg(feature = "gpu")]
+use super::iterate_and_spike::{BufferGPU, BufferType, AvailableBufferType};
+#[cfg(feature = "gpu")]
+use crate::error::GPUError;
+#[cfg(feature = "gpu")]
+use opencl3::{command_queue::CommandQueue, context::Context};
+
 /// A gating variable for necessary ion channels
 #[derive(Debug, Clone, Copy)]
 pub struct BasicGatingVariable {
@@ -73,7 +82,7 @@ impl BasicGatingVariable {
 ///     }
 /// }
 /// ```
-pub trait TimestepIndependentIonChannel: TimestepIndependentIonChannelBoxClone + Sync + Send {
+pub trait TimestepIndependentIonChannel: Clone + Sync + Send {
     /// Updates current based on the current voltage (mV)
     fn update_current(&mut self, voltage: f32);
     /// Returns the current
@@ -121,51 +130,11 @@ pub trait TimestepIndependentIonChannel: TimestepIndependentIonChannelBoxClone +
 ///     }
 /// }
 /// ```
-pub trait IonChannel: IonChannelBoxClone + Sync + Send {
+pub trait IonChannel: Clone + Sync + Send {
     /// Updates current based on the current voltage (mV) and a timestep (ms)
     fn update_current(&mut self, voltage: f32, dt: f32);
     /// Returns the current
     fn get_current(&self) -> f32;
-}
-
-/// Handles cloning of boxed dynamic gated ion channels
-pub trait IonChannelBoxClone {
-    fn clone_box(&self) -> Box<dyn IonChannel>;
-}
-
-impl<T> IonChannelBoxClone for T
-where
-    T: 'static + IonChannel + Clone,
-{
-    fn clone_box(&self) -> Box<dyn IonChannel> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn IonChannel> {
-    fn clone(&self) -> Box<dyn IonChannel> {
-        self.clone_box()
-    }
-}
-
-/// Handles cloning of boxed dynamic ungated ion channels
-pub trait TimestepIndependentIonChannelBoxClone {
-    fn clone_box(&self) -> Box<dyn TimestepIndependentIonChannel>;
-}
-
-impl<T> TimestepIndependentIonChannelBoxClone for T
-where
-    T: 'static + TimestepIndependentIonChannel + Clone,
-{
-    fn clone_box(&self) -> Box<dyn TimestepIndependentIonChannel> {
-        Box::new(self.clone())
-    }
-}
-
-impl Clone for Box<dyn TimestepIndependentIonChannel> {
-    fn clone(&self) -> Box<dyn TimestepIndependentIonChannel> {
-        self.clone_box()
-    }
 }
 
 /// An implementation of a calcium channel
@@ -480,4 +449,56 @@ impl TimestepIndependentIonChannel for LeakChannel {
     fn get_current(&self) -> f32 {
         self.current
     }
+}
+
+#[cfg(feature = "gpu")]
+pub trait IonChannelGPU: IonChannel {
+    /// Gets a given attribute from the ion channel
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
+    /// Gets a sets attribute in the ion channel
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error>;
+    /// Gets all possible attributes
+    fn get_all_attributes() -> HashSet<(String, AvailableBufferType)>;
+    /// Retrieves all attribute names as a vector
+    fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)>;
+    /// Gets update function with the associated argument names
+    fn get_update_function() -> ((Vec<String>, Vec<String>), String);
+    /// Converts the representation to one that can be used on the GPU
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts the GPU representation to a CPU representation
+    fn convert_to_cpu(
+        grid: &mut [Vec<Self>],
+        buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), GPUError>;
+}
+
+#[cfg(feature = "gpu")]
+pub trait TimestepIndependentIonChannelGPU: TimestepIndependentIonChannel {
+    /// Gets a given attribute from the ion channel
+    fn get_attribute(&self, attribute: &str) -> Option<BufferType>;
+    /// Gets a sets attribute in the ion channel
+    fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error>;
+    /// Gets all possible attributes
+    fn get_all_attributes() -> HashSet<(String, AvailableBufferType)>;
+    /// Retrieves all attribute names as a vector
+    fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)>;
+    /// Gets update function with the associated argument names
+    fn get_update_function() -> ((Vec<String>, Vec<String>), String);
+    /// Converts the representation to one that can be used on the GPU
+    fn convert_to_gpu(
+        grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    ) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Converts the GPU representation to a CPU representation
+    fn convert_to_cpu(
+        grid: &mut [Vec<Self>],
+        buffers: &HashMap<String, BufferGPU>,
+        queue: &CommandQueue,
+        rows: usize,
+        cols: usize,
+    ) -> Result<(), GPUError>;
 }
