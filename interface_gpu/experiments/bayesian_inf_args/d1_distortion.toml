@@ -13,8 +13,8 @@ iterations2 = 0
 a = -1
 b = 0
 
-weights_scalar = 1
-inh_weights_scalar = 1
+weights_scalar = 1.5
+inh_weights_scalar = 0.75
 skew = 0.1
 c_m = 25
 
