@@ -14,9 +14,9 @@ a = -1
 b = 0
 
 weights_scalar = 1.5
-inh_weights_scalar = 0.75
+inh_weights_scalar = 1
 skew = 0.1
-c_m = 25
+c_m = 100
 
 trials = 20
 gpu_batch = 10
