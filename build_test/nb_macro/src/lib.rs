@@ -6267,15 +6267,21 @@ fn parse_out_comments(string: &str) -> String {
     let mut output = String::new();
 
     let mut is_comment = false;
+    let mut is_comment_inline = false;
     for i in 0..string.len() {
         if string.chars().nth(i).unwrap() == '/' && string.chars().nth(i + 1) == Some('/') {
             is_comment = true;
-        } 
-        if !is_comment {
+        } else if string.chars().nth(i).unwrap() == '/' && string.chars().nth(i + 1) == Some('*') {
+            is_comment_inline = true;
+        }
+        if !is_comment && !is_comment_inline {
             output.push(string.chars().nth(i).unwrap());
         } else if is_comment && string.chars().nth(i).unwrap() == '\n' {
             is_comment = false;
             output.push('\n');
+        } else if is_comment_inline && string.chars().nth(i).unwrap() == '/' && 
+            string.chars().nth(i - 1).unwrap() == '*' {
+            is_comment_inline = false;
         }
     }
 
@@ -6372,6 +6378,38 @@ mod test {
     fn test_comment_strip_many_comments() {
         let string = "[neuron]\ntype: n // test\nkinetics: default\nvars: another = 1 // // stuff\n[end] // extra";
         let expected = "[neuron]\ntype: n \nkinetics: default\nvars: another = 1 \n[end] ";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_strip_comment_end_of_string() {
+        let string = "asdfjasldjf stuff // comment";
+        let expected = "asdfjasldjf stuff ";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_strip_inline_comment() {
+        let string = "aslkdfjap892rioavnalsjdf;l/* stuff */adfasjl283yref9q83phneavasfhsjakdfk";
+        let expected = "aslkdfjap892rioavnalsjdf;ladfasjl283yref9q83phneavasfhsjakdfk";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_comment_strip_many_inline() {
+        let string = "[neuron]\ntype: /* neuron */ n\nvars: g = 1 /* g_max */, e = 1\non_spike: is_spiking /* stuff */\n[end] /* other */";
+        let expected = "[neuron]\ntype:  n\nvars: g = 1 , e = 1\non_spike: is_spiking \n[end] ";
+
+        assert_eq!(expected, parse_out_comments(string));
+    }
+
+    #[test]
+    fn test_comment_strip_mixed() {
+        let string = "hello // comment\nyadadada /* inline */ followed by // comment\nnextline // /* nested */ yea\n";
+        let expected = "hello \nyadadada  followed by \nnextline \n";
 
         assert_eq!(expected, parse_out_comments(string));
     }
