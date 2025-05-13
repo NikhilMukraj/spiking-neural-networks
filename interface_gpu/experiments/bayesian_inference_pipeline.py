@@ -668,8 +668,8 @@ for current_state in tqdm(all_states):
             firing_max = current_pred_pattern.max()
 
             first_acc = determine_accuracy(
-                patterns,
-                pattern1,
+                all_patterns[element],
+                all_pattern1s[element],
                 num_patterns,
                 first_window,
                 peaks,
@@ -682,8 +682,8 @@ for current_state in tqdm(all_states):
 
             if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
                 bayesian_first_acc = determine_accuracy(
-                    patterns,
-                    pattern2,
+                    all_patterns[element],
+                    all_pattern2s[element],
                     num_patterns,
                     first_window,
                     peaks,
@@ -703,8 +703,8 @@ for current_state in tqdm(all_states):
                 firing_max = current_pred_pattern.max()
 
                 bayesian_memory_first_acc = determine_accuracy(
-                    bayesian_memory_patterns,
-                    bayesian_memory_pattern,
+                    all_bayesian_memory_patterns[element],
+                    all_bayesian_memory_pattern_indexes[element],
                     num_patterns,
                     first_window,
                     peaks,
