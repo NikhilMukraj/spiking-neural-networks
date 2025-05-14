@@ -3091,6 +3091,140 @@ impl IonChannelDefinition {
         )
     }
 
+    // #[cfg(feature = "gpu")]
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+    //     // when used in neuron, ion channels should be prefixed with their name
+    //     // in order to avoid naming conflicts
+    //     // after prefixing, they can be added to the whole buffer hashmap
+
+    //     let get_all_attrs_as_vec = format!(
+    //         "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {{
+    //             vec![{}]
+    //         }}",
+    //         generate_gpu_ion_channel_attributes_vec(&self.vars).join(", "),
+    //     );
+
+    //     let get_all_attrs = "fn get_attribute_names_as_vector() -> HashSet<(String, AvailableBufferType)> {
+    //         HashSet::from(Self::get_attribute_names_as_vector())
+    //     }";
+
+    //     let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
+    //     let get_attribute_body = format!(
+    //         "match value {{ \"ion_channel$current\" => Some(BufferType::Float(self.current)),\n{},\n_ => None }}", 
+    //         generate_gpu_ion_channel_attribute_matching(&self.vars).join(",\n")
+    //     );
+
+    //     let get_attribute = format!("{}\n{}\n}}", get_attribute_header, get_attribute_body);
+
+    //     let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error> {";
+    //     let set_current_attribute = "\"ion_channel$current\" => self.current = match value {
+    //             BufferType::Float(nested_val) => nested_val,
+    //             _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid type\")),
+    //         }";
+    //     let set_attribute_body = format!(
+    //         "match attribute {{ {},\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
+    //         set_current_attribute,
+    //         generate_gpu_ion_channel_attribute_setting(&self.vars).join(",\n")
+    //     );
+
+    //     let set_attribute = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
+
+    //     let convert_to_cpu = format!("fn convert_to_cpu(
+    //             grid: &mut Vec<Vec<Self>>,
+    //             buffers: &HashMap<String, BufferGPU>,
+    //             rows: usize,
+    //             cols: usize,
+    //             queue: &CommandQueue,
+    //         ) -> Result<(), GPUError> {{ 
+    //             if rows == 0 || cols == 0 {{
+    //                 grid.clear();
+
+    //                 return Ok(());
+    //             }}
+
+    //             let mut current: Vec<f32> = vec![0.0; rows * cols];
+
+    //             {}
+
+    //             read_and_set_buffer!(buffers, queue, \"current\", &mut current, Float);
+
+    //             {}
+
+    //             for i in 0..rows {{
+    //                 for j in 0..cols {{
+    //                     let idx = i * cols + j;
+    //                     let ion_channel = &mut grid[i][j];
+                        
+    //                     ion_channel.current = current[idx];
+
+    //                     {}
+    //                 }}
+    //             }}
+
+    //             Ok(())
+    //         }}",
+    //         generate_vars_as_field_vecs(&self.vars),
+    //         generate_vars_as_read_and_set(&self.vars),
+    //         generate_vars_as_field_setters(&self.vars),
+    //     );
+
+    //     let convert_to_gpu = "fn convert_to_gpu(
+    //         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
+    //     ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+    //         if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {
+    //             return Ok(HashMap::new());
+    //         }
+
+    //         let mut buffers = HashMap::new();
+
+    //         let size: usize = grid.iter().map(|row| row.len()).sum();
+            
+    //         for (attr, current_type) in Self::get_all_attributes() {
+    //             match current_type {
+    //                 AvailableBufferType::Float => {
+    //                     let mut current_attrs: Vec<f32> = vec![];
+    //                     for row in grid.iter() {
+    //                         for i in row.iter() {
+    //                             match i.get_attribute(&attr) {
+    //                                 Some(BufferType::Float(val)) => current_attrs.push(val),
+    //                                 Some(_) => unreachable!(),
+    //                                 None => current_attrs.push(0.),
+    //                             };
+    //                         }
+    //                     }
+
+    //                     write_buffer!(current_buffer, context, queue, size, &current_attrs, Float, last);
+
+    //                     buffers.insert(attr.clone(), BufferGPU::Float(current_buffer));
+    //                 },
+    //                 AvailableBufferType::UInt => {
+    //                     let mut current_attrs: Vec<u32> = vec![];
+    //                     for row in grid.iter() {
+    //                         for i in row.iter() {
+    //                             match i.get_attribute(&attr) {
+    //                                 Some(BufferType::UInt(val)) => current_attrs.push(val),
+    //                                 Some(_) => unreachable!(),
+    //                                 None => current_attrs.push(0),
+    //                             };
+    //                         }
+    //                     }
+
+    //                     write_buffer!(current_buffer, context, queue, size, &current_attrs, UInt, last);
+
+    //                     buffers.insert(attr.clone(), BufferGPU::UInt(current_buffer));
+    //                 },
+    //                 _ => unreachable!(),
+    //             }
+    //         }
+            
+    //         Ok(buffers)
+    //     }";
+
+    //     // let imports = vec![
+    //     //     String::from("")
+    //     // ];
+    // }
+
     #[cfg(feature = "py")]
     fn to_pyo3_code(&self) -> (Vec<String>, String) {
         // determine fields (including default fields)
@@ -3460,6 +3594,21 @@ fn generate_gpu_neurotransmitters_attribute_matching(vars: &Ast) -> Vec<String> 
     )
 }
 
+// #[cfg(feature="gpu")] 
+// fn generate_gpu_ion_channel_attribute_matching(vars: &Ast) -> Vec<String> {
+//     generate_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""ion_channel${}" => Some(BufferType::{}(self.{}))"#,
+//                 var_name,
+//                 type_name,
+//                 var_name,
+//             )
+//         }
+//     )
+// }
+
 #[cfg(feature="gpu")] 
 fn generate_gpu_neurotransmitters_attribute_setting(vars: &Ast) -> Vec<String> {
     generate_gpu_matching(
@@ -3478,6 +3627,25 @@ fn generate_gpu_neurotransmitters_attribute_setting(vars: &Ast) -> Vec<String> {
         }
     )
 }
+
+// #[cfg(feature="gpu")] 
+// fn generate_gpu_neurotransmitters_attribute_setting(vars: &Ast) -> Vec<String> {
+//     generate_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#""ion_channel${}" => self.{} = match value {{ 
+//                     BufferType::{}(nested_val) => nested_val,
+//                     _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
+//                 }}   
+//                 "#,
+//                 var_name,
+//                 var_name,
+//                 type_name,
+//             )
+//         }
+//     )
+// }
 
 #[cfg(feature="gpu")] 
 fn generate_gpu_neurotransmitters_attributes_vec(vars: &Ast) -> Vec<String> {
@@ -3614,6 +3782,20 @@ fn generate_gpu_receptors_attributes_vec_no_types(vars: &Ast, prefix: &str) -> V
         }
     )
 }
+
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_ion_channel_attributes_vec(vars: &Ast) -> Vec<String> {
+//     generate_gpu_matching(
+//         vars, 
+//         |var_name, type_name| { 
+//             format!(
+//                 r#"(String::from("ion_channel${}"), AvailableBufferType::{})"#,
+//                 var_name,
+//                 type_name,
+//             )
+//         }
+//     )
+// }
 
 impl NeurotransmitterKineticsDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
