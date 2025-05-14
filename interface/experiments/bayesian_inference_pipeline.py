@@ -201,7 +201,7 @@ inh_n = parsed_toml['simulation_parameters']['inh_n']
 
 setup_neuron = generate_setup_neuron(
     parsed_toml['simulation_parameters']['c_m'], 
-    0.1,
+    parsed_toml['simulation_parameters']['skew'],
 )
 
 p_on = 0.5
@@ -323,7 +323,7 @@ for current_state in tqdm(all_states):
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             inh_lattice_2 = ln.DopaIzhikevichLattice(i2)
             inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
-            inh_lattice.apply(setup_neuron)
+            inh_lattice_2.apply(setup_neuron)
 
             exc_lattice_2 = ln.DopaIzhikevichLattice(e2)
             exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
