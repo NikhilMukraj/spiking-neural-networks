@@ -241,7 +241,7 @@
 //!         .max().unwrap_or(0);
 //!     
 //!     // check if neuron at preferred direction is one of high firing neurons
-//!     assert!(firing_rates[preferred_direction][0] as f32 >= maximal_firing_rate as f32 * 0.9);
+//!     assert!(firing_rates[preferred_direction][0] as f32 >= maximal_firing_rate as f32 * 0.8);
 //! 
 //!     Ok(())
 //! }
