@@ -145,7 +145,7 @@
 //!     network.run_lattices(1000)?;
 //! 
 //!     // associates each firing rate to a low and high state
-//!     let mut firing_rates = network.get_lattice(&1).expect("Could not retrieve lattice")
+//!     let firing_rates = network.get_lattice(&1).expect("Could not retrieve lattice")
 //!         .grid_history.aggregate();
 //!     let firing_threshold: isize = 10;
 //!     let predicted_pattern: Vec<Vec<bool>> = firing_rates.iter()
