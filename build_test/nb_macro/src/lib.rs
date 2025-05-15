@@ -3220,6 +3220,35 @@ impl IonChannelDefinition {
     //         Ok(buffers)
     //     }";
 
+    //     let update_function = format!(
+    //         "fn get_update_function() -> ((Vec<String>, Vec<String>), String) {{
+    //             (
+    //                 vec![{}, {}],
+    //                 \"__kernel__ void update_{}_ion_channel(
+    //                     uint index,
+    //                     {},
+    //                     {}
+    //                 ) {{
+    //                     {}
+    //                 }}
+    //                 \"
+    //             )
+    //         }}",
+    //         if self.get_use_timestep() {
+    //             "String::from(\"ion_channel$current\"), String::from(\"ion_channel$dt\")"
+    //         } else {
+    //             "String::from(\"ion_channel$current\")"
+    //         },
+    //         generate_gpu_neurotransmitters_attributes_vec_no_types(&self.vars).join(", ")
+    //         if self.get_use_timestep() {
+    //             "__global float *current,\n__global float *dt"
+    //         } else {
+    //             "__global float *current"
+    //         },
+    //         generate_non_kernel_gpu_args(&self.vars).join(", "),
+    //         generate_non_kernel_gpu_on_iteration(&self.on_iteration),
+    //     );
+
     //     // let imports = vec![
     //     //     String::from("")
     //     // ];
@@ -3668,6 +3697,19 @@ fn generate_gpu_neurotransmitters_attributes_vec_no_types(vars: &Ast) -> Vec<Str
         |var_name, _| { 
             format!(
                 r#"(String::from("neurotransmitters${}"))"#,
+                var_name,
+            )
+        }
+    )
+}
+
+#[cfg(feature="gpu")] 
+fn generate_gpu_ion_channel_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+    generate_gpu_matching(
+        vars, 
+        |var_name, _| { 
+            format!(
+                r#"(String::from("ion_channel${}"))"#,
                 var_name,
             )
         }
