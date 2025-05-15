@@ -462,7 +462,7 @@ pub trait IonChannelGPU: IonChannel {
     /// Retrieves all attribute names as a vector
     fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
-    fn get_update_function() -> ((Vec<String>, Vec<String>), String);
+    fn get_update_function() -> (Vec<String>, String);
     /// Converts the representation to one that can be used on the GPU
     fn convert_to_gpu(
         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
