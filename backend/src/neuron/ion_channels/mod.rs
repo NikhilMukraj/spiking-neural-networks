@@ -469,11 +469,11 @@ pub trait IonChannelGPU: IonChannel {
     ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts the GPU representation to a CPU representation
     fn convert_to_cpu(
-        grid: &mut [Vec<Self>],
+        grid: &mut Vec<Vec<Self>>,
         buffers: &HashMap<String, BufferGPU>,
-        queue: &CommandQueue,
         rows: usize,
         cols: usize,
+        queue: &CommandQueue,
     ) -> Result<(), GPUError>;
 }
 
@@ -488,17 +488,17 @@ pub trait TimestepIndependentIonChannelGPU: TimestepIndependentIonChannel {
     /// Retrieves all attribute names as a vector
     fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)>;
     /// Gets update function with the associated argument names
-    fn get_update_function() -> ((Vec<String>, Vec<String>), String);
+    fn get_update_function() -> (Vec<String>, String);
     /// Converts the representation to one that can be used on the GPU
     fn convert_to_gpu(
         grid: &[Vec<Self>], context: &Context, queue: &CommandQueue
     ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts the GPU representation to a CPU representation
     fn convert_to_cpu(
-        grid: &mut [Vec<Self>],
+        grid: &mut Vec<Vec<Self>>,
         buffers: &HashMap<String, BufferGPU>,
-        queue: &CommandQueue,
         rows: usize,
         cols: usize,
+        queue: &CommandQueue,
     ) -> Result<(), GPUError>;
 }
