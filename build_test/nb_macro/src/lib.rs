@@ -3703,18 +3703,18 @@ fn generate_gpu_neurotransmitters_attributes_vec_no_types(vars: &Ast) -> Vec<Str
     )
 }
 
-#[cfg(feature="gpu")] 
-fn generate_gpu_ion_channel_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
-    generate_gpu_matching(
-        vars, 
-        |var_name, _| { 
-            format!(
-                r#"(String::from("ion_channel${}"))"#,
-                var_name,
-            )
-        }
-    )
-}
+// #[cfg(feature="gpu")] 
+// fn generate_gpu_ion_channel_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+//     generate_gpu_matching(
+//         vars, 
+//         |var_name, _| { 
+//             format!(
+//                 r#"(String::from("ion_channel${}"))"#,
+//                 var_name,
+//             )
+//         }
+//     )
+// }
 
 #[cfg(feature = "gpu")]
 fn generate_gpu_receptors_attribute_matching(vars: &Ast, prefix: &str) -> Vec<String> {
