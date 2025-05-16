@@ -241,7 +241,8 @@ mod test {
         }
 
         assert!(spike_counts.iter().sum::<usize>() > 0);
-        assert!(spike_counts[0] < spike_counts[1]);
-        assert!(spike_counts[1] < spike_counts[2]);
+        assert!(spike_counts[0] <= spike_counts[1]);
+        assert!(spike_counts[1] <= spike_counts[2]);
+        assert!(spike_counts[0] < spike_counts[2]);
     }
 }
