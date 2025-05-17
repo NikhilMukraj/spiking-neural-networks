@@ -1238,6 +1238,39 @@ fn generate_vars_as_read_and_set(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature = "gpu")]
+fn generate_vars_as_read_and_set_ion_channel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    let type_name = match i {
+                        Ast::VariableAssignment { value, .. } => match value {
+                            NumOrBool::Number(_) => "Float",
+                            NumOrBool::Bool(_) => "UInt",
+                        },
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "read_and_set_buffer!(buffers, queue, \"ion_channel${}\", &mut {}, {});", 
+                        var_name,
+                        var_name,
+                        type_name,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
 fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
@@ -2986,7 +3019,7 @@ impl IonChannelDefinition {
         let mut imports = vec![];
 
         let header = format!(
-            "#[derive(Debug, Clone, Copy)]\npub struct {} {{", 
+            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{", 
             self.type_name.generate(),
         );
         
@@ -3125,7 +3158,7 @@ impl IonChannelDefinition {
 
         let get_all_attrs_as_vec = format!(
             "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {{
-                vec![{}]
+                vec![(String::from(\"ion_channel$current\"), AvailableBufferType::Float), {}]
             }}",
             generate_gpu_ion_channel_attributes_vec(&self.vars).join(", "),
         );
@@ -3172,7 +3205,7 @@ impl IonChannelDefinition {
 
                 {}
 
-                read_and_set_buffer!(buffers, queue, \"current\", &mut current, Float);
+                read_and_set_buffer!(buffers, queue, \"ion_channel$current\", &mut current, Float);
 
                 {}
 
@@ -3190,7 +3223,7 @@ impl IonChannelDefinition {
                 Ok(())
             }}",
             generate_vars_as_field_vecs(&self.vars).join("\n"),
-            generate_vars_as_read_and_set(&self.vars).join("\n"),
+            generate_vars_as_read_and_set_ion_channel(&self.vars).join("\n"),
             generate_vars_as_ion_channel_field_setters(&self.vars).join("\n"),
         );
 
@@ -3250,7 +3283,7 @@ impl IonChannelDefinition {
             "fn get_update_function() -> (Vec<String>, String) {{
                 (
                     vec![{}, {}],
-                    String::from(\"__kernel__ void update_{}_ion_channel(
+                    String::from(\"__kernel void update_{}_ion_channel(
                         uint index,
                         {},
                         {}
@@ -3260,18 +3293,18 @@ impl IonChannelDefinition {
                 )
             }}",
             if self.get_use_timestep() {
-                "String::from(\"ion_channel$current\"), String::from(\"ion_channel$dt\")"
+                "String::from(\"current_voltage\"), String::from(\"ion_channel$dt\"), String::from(\"ion_channel$current\")"
             } else {
-                "String::from(\"ion_channel$current\")"
+                "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
             },
             generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
             self.type_name.generate(),
             if self.get_use_timestep() {
-                "__global float *current,\n__global float *dt"
+                "__global float *current_voltage,\n__global float *dt,\n__global float *current"
             } else {
-                "__global float *current"
+                "__global float *current_voltage,\n__global float *current"
             },
-            generate_kernel_args(&self.vars).join(", "),
+            generate_kernel_args(&self.vars).join(",\n"),
             generate_gpu_kernel_on_iteration(&self.on_iteration),
         );
 
