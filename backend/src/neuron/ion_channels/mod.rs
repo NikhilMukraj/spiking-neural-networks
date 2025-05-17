@@ -10,7 +10,7 @@ use crate::error::GPUError;
 use opencl3::{command_queue::CommandQueue, context::Context};
 
 /// A gating variable for necessary ion channels
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BasicGatingVariable {
     /// Gating variable
     pub alpha: f32,
