@@ -3107,6 +3107,7 @@ pub struct KernelFunction {
 }
 
 #[cfg(feature = "gpu")]
+#[derive(Debug)]
 /// An encapsulation of a float or unsigned integer or optional unsigned integer buffer for the GPU
 pub enum BufferGPU {
     Float(Buffer<cl_float>),
