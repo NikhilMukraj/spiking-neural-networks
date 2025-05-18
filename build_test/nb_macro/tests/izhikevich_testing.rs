@@ -199,7 +199,7 @@ mod test {
 
     #[test]
     fn test_coupling() {
-        let rates = [0.0001, 0.001, 0.01];
+        let rates = [0., 0.001, 0.01];
 
         let mut spike_counts = [0, 0, 0];
 
