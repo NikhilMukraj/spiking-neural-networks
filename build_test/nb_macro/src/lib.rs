@@ -1205,6 +1205,28 @@ fn generate_vars_as_field_vecs(vars: &Ast) -> Vec<String> {
 }
 
 #[cfg(feature = "gpu")]
+fn generate_gating_vars_as_field_vecs(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i| {
+                    format!(
+                        "let mut {}_alpha: Vec<f32> = vec![0.; rows * cols];
+                        let mut {}_beta: Vec<f32> = vec![0.; rows * cols];
+                        let mut {}_state: Vec<f32> = vec![0.; rows * cols];", 
+                        i,
+                        i,
+                        i,
+                    )
+                })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
 fn generate_vars_as_read_and_set(vars: &Ast) -> Vec<String> {
     match vars {
         Ast::VariablesAssignments(variables) => {
@@ -1270,6 +1292,32 @@ fn generate_vars_as_read_and_set_ion_channel(vars: &Ast) -> Vec<String> {
     }
 }
 
+
+#[cfg(feature = "gpu")]
+fn generate_gating_vars_as_read_and_set_ion_channel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i|   
+                    format!(
+                        "read_and_set_buffer!(buffers, queue, \"ion_channel${}$alpha\", &mut {}_alpha, Float);
+                        read_and_set_buffer!(buffers, queue, \"ion_channel${}$beta\", &mut {}_beta, Float);
+                        read_and_set_buffer!(buffers, queue, \"ion_channel${}$state\", &mut {}_state, Float);", 
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
 #[cfg(feature = "gpu")]
 fn generate_vars_as_field_setters(vars: &Ast) -> Vec<String> {
     match vars {
@@ -1316,6 +1364,31 @@ fn generate_vars_as_ion_channel_field_setters(vars: &Ast) -> Vec<String> {
                         _ => unreachable!(),
                     }
                 })
+                .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_gating_vars_as_ion_channel_field_setters(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables
+                .iter()
+                .map(|i|
+                   format!(
+                        "ion_channel.{}.alpha = {}_alpha[idx];
+                        ion_channel.{}.beta = {}_beta[idx];
+                        ion_channel.{}.state = {}_state[idx];", 
+                        i, 
+                        i,
+                        i, 
+                        i,
+                        i, 
+                        i,
+                    )
+                )
                 .collect::<Vec<String>>()
         },
         _ => unreachable!()
@@ -3156,24 +3229,46 @@ impl IonChannelDefinition {
         // in order to avoid naming conflicts
         // after prefixing, they can be added to the whole buffer hashmap
 
+        let gating_vars_attrs = generate_gpu_gating_vars_attributes_vec(
+            self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
+        );
+
         let get_all_attrs_as_vec = format!(
             "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {{
-                vec![(String::from(\"ion_channel$current\"), AvailableBufferType::Float), {}]
+                vec![(String::from(\"ion_channel$current\"), AvailableBufferType::Float), {} {}]
             }}",
             generate_gpu_ion_channel_attributes_vec(&self.vars).join(", "),
+            if !gating_vars_attrs.is_empty() {
+                format!(",{}", gating_vars_attrs.join(", "))
+            } else {
+                String::from("")
+            },
         );
 
         let get_all_attrs = "fn get_all_attributes() -> HashSet<(String, AvailableBufferType)> {
             Self::get_attribute_names_as_vector().into_iter().collect()
         }";
 
+        let get_gating_vars = generate_gpu_gating_vars_attribute_matching(
+            self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
+        );
+
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
-            "match value {{ \"ion_channel$current\" => Some(BufferType::Float(self.current)),\n{},\n_ => None }}", 
-            generate_gpu_ion_channel_attribute_matching(&self.vars).join(",\n")
+            "match value {{ \"ion_channel$current\" => Some(BufferType::Float(self.current)),\n{},{}\n_ => None }}", 
+            generate_gpu_ion_channel_attribute_matching(&self.vars).join(",\n"),
+            if !get_gating_vars.is_empty() {
+                format!("{},\n", get_gating_vars.join(",\n"))
+            } else {
+                String::from("")
+            },
         );
 
         let get_attribute = format!("{}\n{}\n}}", get_attribute_header, get_attribute_body);
+
+        let set_gating_vars = generate_gpu_gating_vars_attribute_setting(
+            self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
+        );
 
         let set_attribute_header = "fn set_attribute(&mut self, attribute: &str, value: BufferType) -> Result<(), std::io::Error> {";
         let set_current_attribute = "\"ion_channel$current\" => self.current = match value {
@@ -3181,12 +3276,38 @@ impl IonChannelDefinition {
                 _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid type\")),
             }";
         let set_attribute_body = format!(
-            "match attribute {{ {},\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
+            "match attribute {{ {},\n{},{}\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
             set_current_attribute,
-            generate_gpu_ion_channel_attribute_setting(&self.vars).join(",\n")
+            generate_gpu_ion_channel_attribute_setting(&self.vars).join(",\n"),
+            if !set_gating_vars.is_empty() {
+                format!("{},\n", set_gating_vars.join(",\n"))
+            } else {
+                String::from("")
+            },
         );
 
         let set_attribute = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
+
+        let gating_vars_conversion_to_cpu = if !gating_vars_attrs.is_empty() {
+            format!(
+                "{}
+
+                {}
+
+                for i in 0..rows {{
+                    for j in 0..cols {{
+                        let idx = i * cols + j;
+                        let ion_channel = &mut grid[i][j];
+                        {}
+                    }}
+                }}",
+                generate_gating_vars_as_field_vecs(self.gating_vars.as_ref().unwrap()).join("\n"),
+                generate_gating_vars_as_read_and_set_ion_channel(self.gating_vars.as_ref().unwrap()).join("\n"),
+                generate_gating_vars_as_ion_channel_field_setters(self.gating_vars.as_ref().unwrap()).join("\n"),
+            )
+        } else {
+            String::from("")
+        };
 
         let convert_to_cpu = format!("fn convert_to_cpu(
                 grid: &mut Vec<Vec<Self>>,
@@ -3220,11 +3341,14 @@ impl IonChannelDefinition {
                     }}
                 }}
 
+                {}
+
                 Ok(())
             }}",
             generate_vars_as_field_vecs(&self.vars).join("\n"),
             generate_vars_as_read_and_set_ion_channel(&self.vars).join("\n"),
             generate_vars_as_ion_channel_field_setters(&self.vars).join("\n"),
+            gating_vars_conversion_to_cpu,
         );
 
         let convert_to_gpu = "fn convert_to_gpu(
@@ -3279,10 +3403,14 @@ impl IonChannelDefinition {
             Ok(buffers)
         }";
 
+        let gating_vars_attrs_no_types = generate_gpu_gating_vars_attributes_vec_no_types(
+            self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
+        );
+
         let update_function = format!(
             "fn get_update_function() -> (Vec<String>, String) {{
                 (
-                    vec![{}, {}],
+                    vec![{}, {} {}],
                     String::from(\"__kernel void update_{}_ion_channel(
                         uint index,
                         {},
@@ -3298,6 +3426,11 @@ impl IonChannelDefinition {
                 "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
             },
             generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
+            if !gating_vars_attrs_no_types.is_empty() {
+                format!(", {}", gating_vars_attrs_no_types.join(", "))
+            } else {
+                String::from("")
+            },
             self.type_name.generate(),
             if self.get_use_timestep() {
                 "__global float *current_voltage,\n__global float *dt,\n__global float *current"
@@ -3746,6 +3879,30 @@ fn generate_gpu_ion_channel_attribute_matching(vars: &Ast) -> Vec<String> {
     )
 }
 
+#[cfg(feature="gpu")]
+fn generate_gpu_gating_vars_attribute_matching(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!(
+                        "\"ion_channel${}$alpha\" => Some(BufferType::Float(self.{}.alpha)),
+                        \"ion_channel${}$beta\" => Some(BufferType::Float(self.{}.beta)),
+                        \"ion_channel${}$state\" => Some(BufferType::Float(self.{}.state))",
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                    ) 
+                )
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
 #[cfg(feature="gpu")] 
 fn generate_gpu_neurotransmitters_attribute_setting(vars: &Ast) -> Vec<String> {
     generate_gpu_matching(
@@ -3782,6 +3939,40 @@ fn generate_gpu_ion_channel_attribute_setting(vars: &Ast) -> Vec<String> {
             )
         }
     )
+}
+
+#[cfg(feature="gpu")] 
+fn generate_gpu_gating_vars_attribute_setting(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!(
+                        r#""ion_channel${}$alpha" => self.{}.alpha = match value {{ 
+                            BufferType::Float(nested_val) => nested_val,
+                            _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
+                        }},
+                        "ion_channel${}$beta" => self.{}.beta = match value {{ 
+                            BufferType::Float(nested_val) => nested_val,
+                            _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
+                        }},
+                        "ion_channel${}$state" => self.{}.state = match value {{ 
+                            BufferType::Float(nested_val) => nested_val,
+                            _ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "Invalid type")),
+                        }}  
+                        "#,
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect()
+        },
+        _ => unreachable!(),
+    }
 }
 
 #[cfg(feature="gpu")] 
@@ -3822,6 +4013,27 @@ fn generate_gpu_ion_channel_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
             )
         }
     )
+}
+
+#[cfg(feature="gpu")] 
+fn generate_gpu_gating_vars_attributes_vec_no_types(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!(
+                        r#"(String::from("ion_channel${}$alpha")), 
+                        (String::from("ion_channel${}$beta")),
+                        (String::from("ion_channel${}$state"))"#,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect()
+        },
+        _ => unreachable!()
+    }
 }
 
 #[cfg(feature = "gpu")]
@@ -3945,6 +4157,28 @@ fn generate_gpu_ion_channel_attributes_vec(vars: &Ast) -> Vec<String> {
             )
         }
     )
+}
+
+#[cfg(feature = "gpu")]
+fn generate_gpu_gating_vars_attributes_vec(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!(
+                        r#"(String::from("ion_channel${}$alpha"), AvailableBufferType::Float), 
+                        (String::from("ion_channel${}$beta"), AvailableBufferType::Float), 
+                        (String::from("ion_channel${}$state"), AvailableBufferType::Float)
+                        "#,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect()
+        },
+        _ => unreachable!()
+    }
 }
 
 impl NeurotransmitterKineticsDefinition {
