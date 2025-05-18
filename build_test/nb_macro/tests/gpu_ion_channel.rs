@@ -1,3 +1,4 @@
+#[cfg(feature = "gpu")]
 #[cfg(test)]
 mod test {
     use nb_macro::neuron_builder;
