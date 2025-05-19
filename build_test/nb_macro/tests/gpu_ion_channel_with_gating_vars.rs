@@ -4,7 +4,8 @@ mod test {
     use nb_macro::neuron_builder;
     use opencl3::{
         command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
-        device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}
+        device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
+        program::Program,
     };
     use spiking_neural_networks::error::SpikingNeuralNetworksError; 
 
@@ -20,8 +21,23 @@ mod test {
         [end]
     "#);
 
-    // #[test]
-    // fn test_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {}
+    #[test]
+    fn test_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
+        let program_source = TestChannel::get_update_function().1;
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        match Program::create_and_build_from_source(&context, &program_source, "") {
+            Ok(_) => Ok(()),
+            Err(_) => Err(SpikingNeuralNetworksError::from(GPUError::ProgramCompileFailure)),
+        }
+    }
 
     #[test]
     fn test_get_all_attrs() {
