@@ -364,7 +364,7 @@ impl Ast {
                 match args {
                     Some(args) => {
                         format!(
-                            "{}_{}({})", 
+                            "{}${}({})", 
                             name, 
                             attribute,
                             args.iter()
@@ -374,7 +374,7 @@ impl Ast {
                         )
                     },
                     None => {
-                        format!("{}_{}", name, attribute)
+                        format!("{}${}", name, attribute)
                     }
                 }
             }
@@ -522,7 +522,7 @@ impl Ast {
                         )
                     },
                     None => {
-                        format!("{}_{}", name, attribute)
+                        format!("{}${}", name, attribute)
                     }
                 }
             }
@@ -1080,6 +1080,146 @@ fn generate_kernel_args(vars: &Ast) -> Vec<String> {
                     format!("__global {} *{}", type_name, var_name)
                 })
                 .collect::<Vec<String>>()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature="gpu")]
+fn generate_gating_vars_kernel_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!(
+                        "String::from(\"{}_alpha\"), 
+                        String::from(\"{}_beta\"), 
+                        String::from(\"{}_state\")",
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
+
+#[cfg(feature="gpu")]
+fn generate_gating_vars_replacements(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            variables.iter()
+                .map(|i|
+                    format!("
+                        update_function = update_function.replace(
+                            \"{}$alpha\",
+                            &format!(\"{{}}{}_alpha[index]\", prefix)
+                        );
+                        update_function = update_function.replace(
+                            \"{}$beta\",
+                            &format!(\"{{}}{}_beta[index]\", prefix)
+                        );
+                        update_function = update_function.replace(
+                            \"{}$state\",
+                            &format!(\"{{}}{}_state[index]\", prefix)
+                        );",
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature="gpu")]
+fn generate_gating_vars_update_replacements(vars: &Ast) -> String {
+    match vars {
+        Ast::GatingVariables(variables) => {
+            let replacement_functions: Vec<_> = variables.iter()
+                .enumerate()
+                .map(|(n, i)|
+                    format!(
+                        "let replacement_function{} = |args_str: &str| -> String {{
+                            format!(
+                                \"gating_vars_update(index, $, {{}}{}_alpha, {{}}{}_beta, {{}}{}_state)\", 
+                                prefix,
+                                prefix,
+                                prefix,
+                            ).replace(\"$\", args_str)
+                        }};",
+                        n,
+                        i,
+                        i,
+                        i,
+                    )
+                )
+                .collect();
+
+            let to_replace: Vec<_> = variables.iter()
+                .enumerate()
+                .map(|(n, i)| 
+                    format!("(\"{}$update(\", Box::new(replacement_function{}))", i, n)
+                )
+                .collect();
+
+            format!("
+                {}
+
+                let to_replace: Vec<(_, Box<dyn Fn(&str) -> String>)> = vec![
+                    {}
+                ];
+
+                for (name_to_replace, replacement_function) in to_replace.iter() {{
+                        let mut result = String::new();
+                        let mut last_end = 0;
+
+                    while let Some(func_start) = update_function[last_end..].find(name_to_replace) {{
+                        let args_start = last_end + func_start + name_to_replace.len() - 1;
+                        result.push_str(&update_function[last_end..last_end + func_start]);
+
+                        let remaining_text = &update_function[args_start..];
+                        
+                        let mut cursor = 1;
+                        let mut depth = 1;
+                        let mut args_end = 1;
+                        
+                        while cursor < remaining_text.len() {{
+                            match remaining_text.chars().nth(cursor).unwrap() {{
+                                '(' => depth += 1,
+                                ')' => {{
+                                    depth -= 1;
+                                    if depth == 0 {{
+                                        args_end = cursor;
+                                        break;
+                                    }}
+                                }},
+                                _ => {{}}
+                            }}
+                            cursor += 1;
+                        }}
+
+                        let args_str = &remaining_text[1..args_end];
+                       
+                        result.push_str(&replacement_function(&args_str));
+                        
+                        last_end = args_start + args_end + 1;
+                    }}
+
+                    result.push_str(&update_function[last_end..]);
+
+                    update_function = result;
+                }}",
+                replacement_functions.join("\n"),
+                to_replace.join(",\n"),
+            )
         },
         _ => unreachable!()
     }
@@ -2297,6 +2437,7 @@ impl NeuronDefinition {
                 .join("\n"),
             generate_vars_as_insert_buffers(&self.vars).join("\n"),
         );
+
         let convert_to_cpu = format!("
             fn convert_to_cpu(
                 cell_grid: &mut Vec<Vec<Self>>,
@@ -3407,41 +3548,112 @@ impl IonChannelDefinition {
             self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
         );
 
-        let update_function = format!(
-            "fn get_update_function() -> (Vec<String>, String) {{
-                (
-                    vec![{}, {} {}],
-                    String::from(\"__kernel void update_{}_ion_channel(
-                        uint index,
-                        {},
-                        {}
-                    ) {{
-                        {}
-                    }}\")
-                )
-            }}",
-            if self.get_use_timestep() {
-                "String::from(\"current_voltage\"), String::from(\"ion_channel$dt\"), String::from(\"ion_channel$current\")"
-            } else {
-                "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
-            },
-            generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
-            if !gating_vars_attrs_no_types.is_empty() {
-                format!(", {}", gating_vars_attrs_no_types.join(", "))
-            } else {
-                String::from("")
-            },
-            self.type_name.generate(),
-            if self.get_use_timestep() {
-                "__global float *current_voltage,\n__global float *dt,\n__global float *current"
-            } else {
-                "__global float *current_voltage,\n__global float *current"
-            },
-            generate_kernel_args(&self.vars).join(",\n"),
-            generate_gpu_kernel_on_iteration(&self.on_iteration),
-        );
+        let update_function = if gating_vars_attrs.is_empty() {
+            format!(
+                "fn get_update_function() -> (Vec<String>, String) {{
+                    (
+                        vec![{}, {}],
+                        String::from(\"__kernel void update_{}_ion_channel(
+                            uint index,
+                            {},
+                            {}
+                        ) {{
+                            {}
+                        }}\")
+                    )
+                }}",
+                if self.get_use_timestep() {
+                    "String::from(\"current_voltage\"), String::from(\"ion_channel$dt\"), String::from(\"ion_channel$current\")"
+                } else {
+                    "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
+                },
+                generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
+                self.type_name.generate(),
+                if self.get_use_timestep() {
+                    "__global float *current_voltage,\n__global float *dt,\n__global float *current"
+                } else {
+                    "__global float *current_voltage,\n__global float *current"
+                },
+                generate_kernel_args(&self.vars).join(",\n"),
+                generate_gpu_kernel_on_iteration(&self.on_iteration),
+            )
+        } else {
+            let kernel_on_iteration = generate_gpu_kernel_on_iteration(&self.on_iteration);
 
-        let imports = vec![
+            let update_gating_vars_func = "__kernel void gating_vars_update(
+                uint index,
+                float dt,
+                __global float *alpha,
+                __global float *beta,
+                __global float *state
+            ) {{
+                state[index] = dt * (alpha[index] * (1.0f - state[index]) - (beta[index] * state[index]));
+            }}";
+
+            format!(
+                "fn get_update_function() -> (Vec<String>, String) {{
+                    let kernel_args = vec![{}];
+                    let gating_vars_args = vec![{}];
+                    let prefix = generate_unique_prefix(&kernel_args, \"gating_vars\");
+                    let gating_vars_args: Vec<_> = gating_vars_args.iter()
+                        .map(|i| format!(\"__global float *{{}}{{}}\", prefix, i))
+                        .collect();
+                    
+                    let mut update_function = format!(\"{}
+                    
+                        __kernel void update_{}_ion_channel(
+                            uint index,
+                            {},
+                            {{}},
+                            {{}}
+                        ) {{{{
+                            {}
+                        }}}}\",
+                        kernel_args.join(\",\n\"),
+                        gating_vars_args.join(\",\n\"),
+                    );
+
+                    {}
+
+                    {}
+
+                    (
+                        vec![{}, {}, {}],
+                        update_function,
+                    )
+                }}",
+                generate_kernel_args(&self.vars).iter()
+                    .map(|i| format!("String::from(\"{}\")", i)).collect::<Vec<_>>().join(",\n"),
+                generate_gating_vars_kernel_args(self.gating_vars.as_ref().unwrap()).join(",\n"),
+                if kernel_on_iteration.contains("$update") {
+                    update_gating_vars_func
+                } else {
+                    ""
+                },
+                self.type_name.generate(),
+                if self.get_use_timestep() {
+                    "__global float *current_voltage,\n__global float *dt,\n__global float *current"
+                } else {
+                    "__global float *current_voltage,\n__global float *current"
+                },
+                kernel_on_iteration,
+                generate_gating_vars_replacements(self.gating_vars.as_ref().unwrap()).join("\n"),
+                if kernel_on_iteration.contains("$update") {
+                    generate_gating_vars_update_replacements(self.gating_vars.as_ref().unwrap())
+                } else {
+                    String::from("")
+                },
+                if self.get_use_timestep() {
+                    "String::from(\"current_voltage\"), String::from(\"ion_channel$dt\"), String::from(\"ion_channel$current\")"
+                } else {
+                    "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
+                },
+                generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
+                gating_vars_attrs_no_types.join(", "),
+            )
+        };
+
+        let mut imports = vec![
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::read_and_set_buffer;"),
             String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
@@ -3465,6 +3677,12 @@ impl IonChannelDefinition {
             String::from("use std::collections::HashMap;"),
             String::from("use std::ptr;"),
         ];
+
+        if !gating_vars_attrs.is_empty() {
+            imports.push(
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::generate_unique_prefix;")
+            );
+        }
 
         (
             imports,
