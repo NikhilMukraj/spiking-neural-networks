@@ -8,7 +8,6 @@
   - [ ] in assignments add a `struct_call_execution` to or where it execution is `_{ struct_call }`
     - eventually change to seperate struct_function_call
   - [ ] calling structs functions
-  - [ ] struct var call versus struct func call in declaration
   - [ ] rename assignments to calls (call assignments for current assignments)
 - [x] if statements (handled by statement blocks)
   - `if_statement = { "[if]" ~ WHITESPACE* ~ expr ~ WHITESPACE* ~ "[then]\n" ~ WHITESPACE* ~ assignments ~ NEWLINE? ~ "[end]" }`
@@ -78,3 +77,4 @@
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
 - [ ] remove all `add_indents` calls
 - [ ] change default values of default variables (dt, current_voltage, etc), make sure to update pyo3 accordingly
+- [ ] **struct var call versus struct func call in declaration**
