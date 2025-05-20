@@ -260,54 +260,54 @@ for current_state in tqdm(all_states):
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             bayesian_memory_pattern = np.random.choice(range(num_patterns))
 
-        glu_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['glutamate_clearance'])
-        gaba_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['gabaa_clearance'])
-        dopa_neuro = ln.ApproximateNeurotransmitter(clearance_constant=current_state['dopamine_clearance'])
+        glu_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['glutamate_clearance'])
+        gaba_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['gabaa_clearance'])
+        dopa_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['dopamine_clearance'])
 
-        exc_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
-        exc_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Glutamate, glu_neuro)
+        exc_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Glutamate : glu_neuro}
 
-        inh_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
-        inh_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.GABA, gaba_neuro)
+        inh_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.GABA : gaba_neuro}
 
-        dopa_neurotransmitters = ln.DopaGluGABAApproximateNeurotransmitters()
-        dopa_neurotransmitters.set_neurotransmitter(ln.DopaGluGABANeurotransmitterType.Dopamine, dopa_neuro)
+        dopa_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Dopamine : dopa_neuro}
 
         glu = ln.GlutamateReceptor()
         gabaa = ln.GABAReceptor()
         dopamine_rs = ln.DopamineReceptor()
 
-        dopamine_rs.d1_enabled = parsed_toml['simulation_parameters']['d1']
-        dopamine_rs.d2_enabled = parsed_toml['simulation_parameters']['d2']
+        if parsed_toml['simulation_parameters']['d1']:
+            dopamine_rs.s_d1 = current_state['s_d1']
+        else:
+            dopamine_rs.s_d1 = 0
+        if parsed_toml['simulation_parameters']['d2']:
+            dopamine_rs.s_d2 = current_state['s_d2']
+        else:
+            dopamine_rs.s_d2 = 0
 
-        dopamine_rs.s_d1 = current_state['s_d1']
-        dopamine_rs.s_d2 = current_state['s_d2']
-
-        glu.ampa_g = current_state['nmda_g']
-        glu.nmda_g = current_state['ampa_g']
+        glu.g_ampa = current_state['nmda_g']
+        glu.g_nmda = current_state['ampa_g']
         gabaa.g = current_state['gabaa_g']
 
-        poisson = ln.DopaPoissonNeuron()
-        poisson.set_neurotransmitters(exc_neurotransmitters)
+        poisson = ln.PoissonNeuron()
+        poisson.set_synaptic_neurotransmitters(exc_neurotransmitters)
 
-        receptors = ln.DopaGluGABAReceptors()
-        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
-        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
-        receptors.set_receptor(ln.DopaGluGABANeurotransmitterType.Dopamine, dopamine_rs)
+        receptors = ln.DopaGluGABA()
+        receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
+        receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
+        receptors.insert(ln.DopaGluGABANeurotransmitterType.Dopamine, dopamine_rs)
 
-        exc_neuron = ln.DopaIzhikevichNeuron()
-        exc_neuron.set_neurotransmitters(exc_neurotransmitters)
+        exc_neuron = ln.IzhikevichNeuron()
+        exc_neuron.set_synaptic_neurotransmitters(exc_neurotransmitters)
         exc_neuron.set_receptors(receptors)
 
-        inh_neuron = ln.DopaIzhikevichNeuron()
-        inh_neuron.set_neurotransmitters(inh_neurotransmitters)
+        inh_neuron = ln.IzhikevichNeuron()
+        inh_neuron.set_synaptic_neurotransmitters(inh_neurotransmitters)
         inh_neuron.set_receptors(receptors)
 
-        inh_lattice = ln.DopaIzhikevichLattice(i1)
+        inh_lattice = ln.IzhikevichNeuronLattice(i1)
         inh_lattice.populate(inh_neuron, inh_n, inh_n)
         inh_lattice.apply(setup_neuron)
 
-        exc_lattice = ln.DopaIzhikevichLattice(e1)
+        exc_lattice = ln.IzhikevichNeuronLattice(e1)
         exc_lattice.populate(exc_neuron, exc_n, exc_n)
         exc_lattice.apply(setup_neuron)
         position_to_index = exc_lattice.position_to_index
@@ -317,15 +317,15 @@ for current_state in tqdm(all_states):
         )
         exc_lattice.update_grid_history = True
 
-        spike_train_lattice = ln.DopaPoissonLattice(c1)
+        spike_train_lattice = ln.PoissonLattice(c1)
         spike_train_lattice.populate(poisson, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            inh_lattice_2 = ln.DopaIzhikevichLattice(i2)
+            inh_lattice_2 = ln.IzhikevichNeuronLattice(i2)
             inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
             inh_lattice_2.apply(setup_neuron)
 
-            exc_lattice_2 = ln.DopaIzhikevichLattice(e2)
+            exc_lattice_2 = ln.IzhikevichNeuronLattice(e2)
             exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
             exc_lattice_2.apply(setup_neuron)
             position_to_index_2 = exc_lattice_2.position_to_index
@@ -335,15 +335,15 @@ for current_state in tqdm(all_states):
             )
             exc_lattice_2.update_grid_history = True
 
-            cue_lattice = ln.DopaPoissonLattice(c2)
+            cue_lattice = ln.PoissonLattice(c2)
             cue_lattice.populate(poisson, exc_n, exc_n)
 
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                dopa_neuron = ln.DopaIzhikevichNeuron()
-                dopa_neuron.set_neurotransmitters(dopa_neurotransmitters)
+                dopa_neuron = ln.IzhikevichNeuron()
+                dopa_neuron.set_synaptic_neurotransmitters(dopa_neurotransmitters)
                 dopa_neuron.set_receptors(receptors)
 
-                d_intermediate = ln.DopaIzhikevichLattice(d)
+                d_intermediate = ln.IzhikevichNeuronLattice(d)
                 d_intermediate.populate(dopa_neuron, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
@@ -352,22 +352,22 @@ for current_state in tqdm(all_states):
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                 current_lattices.append(d_intermediate)
 
-            network = ln.DopaIzhikevichNetwork.generate_network(
+            network = ln.IzhikevichNeuronNetwork.generate_network(
                 current_lattices, 
                 [spike_train_lattice, cue_lattice],
             )
         else:
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                poisson_dopa = ln.DopaPoissonNeuron()
-                poisson_dopa.set_neurotransmitters(dopa_neurotransmitters)
+                poisson_dopa = ln.PoissonNeuron()
+                poisson_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
 
-                cue_lattice = ln.DopaPoissonLattice(c2)
+                cue_lattice = ln.PoissonLattice(c2)
                 cue_lattice.populate(poisson_dopa, exc_n, exc_n)
             else:
-                cue_lattice = ln.DopaPoissonLattice(c2)
+                cue_lattice = ln.PoissonLattice(c2)
                 cue_lattice.populate(poisson, exc_n, exc_n)
 
-            network = ln.DopaIzhikevichNetwork.generate_network(
+            network = ln.IzhikevichNeuronNetwork.generate_network(
                 [exc_lattice, inh_lattice], 
                 [spike_train_lattice, cue_lattice]
             )
