@@ -1420,7 +1420,7 @@ fn generate_vars_as_read_and_set_ion_channel(vars: &Ast) -> Vec<String> {
                     };
 
                     format!(
-                        "read_and_set_buffer!(buffers, queue, \"ion_channel${}\", &mut {}, {});", 
+                        "read_and_set_buffer!(buffers, queue, &format!(\"{{}}ion_channel${}\", prefix), &mut {}, {});", 
                         var_name,
                         var_name,
                         type_name,
@@ -1441,9 +1441,9 @@ fn generate_gating_vars_as_read_and_set_ion_channel(vars: &Ast) -> Vec<String> {
                 .iter()
                 .map(|i|   
                     format!(
-                        "read_and_set_buffer!(buffers, queue, \"ion_channel${}$alpha\", &mut {}_alpha, Float);
-                        read_and_set_buffer!(buffers, queue, \"ion_channel${}$beta\", &mut {}_beta, Float);
-                        read_and_set_buffer!(buffers, queue, \"ion_channel${}$state\", &mut {}_state, Float);", 
+                        "read_and_set_buffer!(buffers, queue, &format!(\"{{}}ion_channel${}$alpha\", prefix), &mut {}_alpha, Float);
+                        read_and_set_buffer!(buffers, queue, &format!(\"{{}}ion_channel${}$beta\", prefix), &mut {}_beta, Float);
+                        read_and_set_buffer!(buffers, queue, &format!(\"{{}}ion_channel${}$state\", prefix), &mut {}_state, Float);", 
                         i,
                         i,
                         i,
@@ -1532,6 +1532,85 @@ fn generate_gating_vars_as_ion_channel_field_setters(vars: &Ast) -> Vec<String> 
                 .collect::<Vec<String>>()
         },
         _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channels_to_gpu(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "let {}: Vec<Vec<_>> = cell_grid.iter()
+                            .map(|row| row.iter().map(|cell| cell.{}.clone()).collect())
+                            .collect();
+                        let {}_buffers = {}::convert_to_gpu(
+                            &{}, context, queue
+                        )?;
+                        let {}_buffers: HashMap<_, _> = {}_buffers.into_iter()
+                            .map(|(k, v)| (format!(\"{}_{{}}\", k), v))
+                            .collect();
+                        buffers.extend({}_buffers);",
+                        var_name,
+                        var_name,
+                        var_name,
+                        type_name,
+                        var_name,
+                        var_name,
+                        var_name,
+                        var_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!("
+                        let mut {}s: Vec<Vec<_>> = cell_grid.iter()
+                            .map(|row| row.iter().map(|cell| cell.{}.clone()).collect())
+                            .collect();
+
+                        {}::convert_to_cpu(
+                            \"{}\", &mut {}s, buffers, rows, cols, queue
+                        )?;
+
+                        for (i, row) in cell_grid.iter_mut().enumerate() {{
+                            for (j, cell) in row.iter_mut().enumerate() {{
+                                cell.{} = {}s[i][j].clone();
+                            }}
+                        }}",
+                        var_name,
+                        var_name,
+                        type_name,
+                        var_name,
+                        var_name,
+                        var_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!(),
     }
 }
 
@@ -2389,6 +2468,10 @@ impl NeuronDefinition {
             iterate_and_spike_kernel_footer,
         );
 
+        let ion_channels_to_gpu = generate_ion_channels_to_gpu(
+            self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
+        );
+
         // let iterate_and_spike_electrochemical_function = "fn iterate_and_spike_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
         let convert_to_gpu = format!("
             fn convert_to_gpu(
@@ -2414,6 +2497,8 @@ impl NeuronDefinition {
 
                 buffers.insert(String::from(\"last_firing_time\"), BufferGPU::OptionalUInt(last_firing_time_buffer));
 
+                {}
+
                 Ok(buffers)
             }}
             ",
@@ -2436,6 +2521,11 @@ impl NeuronDefinition {
                 .collect::<Vec<String>>()
                 .join("\n"),
             generate_vars_as_insert_buffers(&self.vars).join("\n"),
+            ion_channels_to_gpu.join("\n"),
+        );
+
+        let ion_channels_to_cpu = generate_ion_channels_to_cpu(
+            self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
         );
 
         let convert_to_cpu = format!("
@@ -2481,6 +2571,8 @@ impl NeuronDefinition {
                     }}
                 }}
 
+                {}
+
                 Ok(())
             }}
             ",
@@ -2519,6 +2611,7 @@ impl NeuronDefinition {
                 .collect::<Vec<String>>()
                 .join("\n"),
             generate_vars_as_field_setters(&self.vars).join("\n"),
+            ion_channels_to_cpu.join("\n"),
         );
         
         let convert_electrochemical_to_gpu = format!("
@@ -3451,6 +3544,7 @@ impl IonChannelDefinition {
         };
 
         let convert_to_cpu = format!("fn convert_to_cpu(
+                prefix: &str,
                 grid: &mut Vec<Vec<Self>>,
                 buffers: &HashMap<String, BufferGPU>,
                 rows: usize,
@@ -3467,7 +3561,7 @@ impl IonChannelDefinition {
 
                 {}
 
-                read_and_set_buffer!(buffers, queue, \"ion_channel$current\", &mut current, Float);
+                read_and_set_buffer!(buffers, queue, &format!(\"{{}}ion_channel$current\", prefix), &mut current, Float);
 
                 {}
 
