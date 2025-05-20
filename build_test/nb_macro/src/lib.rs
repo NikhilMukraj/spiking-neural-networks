@@ -1591,7 +1591,7 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
                             .collect();
 
                         {}::convert_to_cpu(
-                            \"{}\", &mut {}s, buffers, rows, cols, queue
+                            \"{}_\", &mut {}s, buffers, rows, cols, queue
                         )?;
 
                         for (i, row) in cell_grid.iter_mut().enumerate() {{
