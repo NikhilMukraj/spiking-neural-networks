@@ -352,7 +352,7 @@ for current_state in tqdm(all_states):
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                 current_lattices.append(d_intermediate)
 
-            network = ln.IzhikevichNeuronNetwork.generate_network(
+            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
                 current_lattices, 
                 [spike_train_lattice, cue_lattice],
             )
@@ -367,7 +367,7 @@ for current_state in tqdm(all_states):
                 cue_lattice = ln.PoissonLattice(c2)
                 cue_lattice.populate(poisson, exc_n, exc_n)
 
-            network = ln.IzhikevichNeuronNetwork.generate_network(
+            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
                 [exc_lattice, inh_lattice], 
                 [spike_train_lattice, cue_lattice]
             )
@@ -499,7 +499,7 @@ for current_state in tqdm(all_states):
             network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
-        network.parallel = True
+        # network.parallel = True
 
         network.electrical_synapse = False
         network.chemical_synapse = True
@@ -575,8 +575,7 @@ for current_state in tqdm(all_states):
                     )
                 )
 
-        for _ in range(parsed_toml['simulation_parameters']['iterations1']):
-            network.run_lattices(1)
+        network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
 
         hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
@@ -712,8 +711,7 @@ for current_state in tqdm(all_states):
                     )
                 )
 
-        for _ in range(parsed_toml['simulation_parameters']['iterations2']):
-            network.run_lattices(1)
+        network.run_lattices(parsed_toml['simulation_parameters']['iterations2'])
 
         hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
