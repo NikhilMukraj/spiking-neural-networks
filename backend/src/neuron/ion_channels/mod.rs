@@ -469,6 +469,7 @@ pub trait IonChannelGPU: IonChannel {
     ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts the GPU representation to a CPU representation
     fn convert_to_cpu(
+        prefix: &str,
         grid: &mut Vec<Vec<Self>>,
         buffers: &HashMap<String, BufferGPU>,
         rows: usize,
@@ -495,6 +496,7 @@ pub trait TimestepIndependentIonChannelGPU: TimestepIndependentIonChannel {
     ) -> Result<HashMap<String, BufferGPU>, GPUError>;
     /// Converts the GPU representation to a CPU representation
     fn convert_to_cpu(
+        prefix: &str,
         grid: &mut Vec<Vec<Self>>,
         buffers: &HashMap<String, BufferGPU>,
         rows: usize,
