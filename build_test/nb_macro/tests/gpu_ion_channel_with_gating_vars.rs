@@ -196,6 +196,7 @@ mod test {
 
         let mut cpu_conversion = ion_channel_grid.clone();
         TestChannel::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             0,
@@ -250,6 +251,7 @@ mod test {
         ];
 
         TestChannel::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             2,
@@ -304,6 +306,7 @@ mod test {
         ];
 
         TestChannel::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             3,

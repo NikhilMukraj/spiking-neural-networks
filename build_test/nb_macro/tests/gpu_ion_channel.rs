@@ -155,6 +155,7 @@ mod test {
 
         let mut cpu_conversion = ion_channel_grid.clone();
         TestLeak::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             0,
@@ -206,6 +207,7 @@ mod test {
         ];
 
         TestLeak::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             2,
@@ -257,6 +259,7 @@ mod test {
         ];
 
         TestLeak::convert_to_cpu(
+            "",
             &mut cpu_conversion,
             &gpu_conversion,
             3,
