@@ -1003,10 +1003,27 @@ pub struct RateSpikeTrain<N: NeurotransmitterType, T: NeurotransmitterKinetics, 
     pub dt: f32,
 }
 
+impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for RateSpikeTrain<N, T, U> {
+    fn default() -> Self {
+        RateSpikeTrain { 
+            current_voltage: 0., 
+            v_th: 30., 
+            v_resting: 0., 
+            rate: 0., 
+            step: 0., 
+            is_spiking: false, 
+            last_firing_time: None, 
+            synaptic_neurotransmitters: Neurotransmitters::default(), 
+            neural_refractoriness: U::default(), 
+            dt: 0.1,
+        }
+    }
+}
+
 impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for RateSpikeTrain<N, T, U> {
     fn iterate(&mut self) -> bool {
         self.step += self.dt;
-        if self.step > self.rate {
+        if self.rate != 0. && self.step > self.rate {
             self.step = 0.;
             self.current_voltage = self.v_th;
             self.is_spiking = true;
@@ -1014,6 +1031,8 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
             self.current_voltage = self.v_resting;
             self.is_spiking = false;
         }
+
+        self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
 
         self.is_spiking
     }
@@ -1053,7 +1072,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 int index = index_to_position[gid + skip_index] - skip_index;
 
                 step[index] += dt[index];
-                if step[index] > rate[index] {{
+                if (rate[index] != 0.0f && step[index] > rate[index]) {{
                     step[index] = 0.0f;
                     current_voltage[index] = v_th[index];
                     is_spiking[index] = true;
@@ -1150,7 +1169,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 int index = index_to_position[gid + skip_index] - skip_index;
 
                 step[index] += dt[index];
-                if step[index] > rate[index] {{
+                if (rate[index] != 0.0f && step[index] > rate[index]) {{
                     step[index] = 0.0f;
                     current_voltage[index] = v_th[index];
                     is_spiking[index] = true;
