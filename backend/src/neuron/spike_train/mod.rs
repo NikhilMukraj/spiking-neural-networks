@@ -379,12 +379,10 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 #[cfg(feature = "gpu")]
 const RAND_FUNCTION: &str = r#"
     uint rand(uint seed) {
-        uint a = 1664525;
-        uint c = 1013904223;
-        uint m = 0xFFFFFFFF; // 2^32
-        
-        uint x = (a * seed + c) & m;
-
+        uint x = seed;
+        x ^= x << 13;
+        x ^= x >> 17;
+        x ^= x << 5;
         return x;
     }
 "#;
