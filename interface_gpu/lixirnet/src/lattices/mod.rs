@@ -663,6 +663,16 @@ macro_rules! impl_spike_train_lattice {
                 self.lattice.grid_history.history.clone()
             }
 
+            #[getter]
+            fn get_update_grid_history(&self) -> bool {
+                self.lattice.update_grid_history
+            }
+
+            #[setter]
+            fn set_update_grid_history(&mut self, flag: bool) {
+                self.lattice.update_grid_history = flag;
+            }
+
             fn __repr__(&self) -> PyResult<String> {
                 let rows = self.lattice.spike_train_grid().len();
                 let cols = self.lattice.spike_train_grid().first().unwrap_or(&vec![]).len();
