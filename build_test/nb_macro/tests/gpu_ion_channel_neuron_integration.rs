@@ -27,6 +27,12 @@ mod test {
         [end]
     "#);
 
+    // #[test]
+    // fn test_electrical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {}
+
+    // #[test]
+    // fn test_chemical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {}
+
     type GridType = Vec<Vec<LIF<ApproximateNeurotransmitter, ApproximateReceptor>>>;
 
     #[test]
