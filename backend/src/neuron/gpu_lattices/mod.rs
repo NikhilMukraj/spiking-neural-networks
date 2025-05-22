@@ -270,7 +270,7 @@ __kernel void set_last_firing_time(
     int gid = get_global_id(0);
     int index = index_to_position[gid + skip_index] - skip_index;
 
-    if (is_spiking[index] == 1) {
+    if (is_spiking[index] != 0) {
         last_firing_time[index] = iteration;
     }
 } 
@@ -1385,8 +1385,8 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
                             sum += weights[i * n + gid] * gap_junction;
                         }} else {{
-                            if (last_firing_time[presynaptic_index] < 0) {{
-                                sum += {}v_th[presynaptic_index - skip_index];
+                            if (last_firing_time[presynaptic_index - skip_index] < 0) {{
+                                sum += {}v_resting[presynaptic_index - skip_index];
                             }} else {{
                                 sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
                             }}
