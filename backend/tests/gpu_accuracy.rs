@@ -706,7 +706,7 @@ mod tests {
         spike_train_lattice.populate(&base_spike_train, lattice_size, lattice_size)?;
         spike_train_lattice.apply_given_position(|pos, i| {
             if (pos.0 * lattice_size + pos.1) % 2 == 0 {
-                i.chance_of_firing = 0.005;
+                i.chance_of_firing = 0.01;
             } else {
                 i.chance_of_firing = 0.;
             }
@@ -718,7 +718,7 @@ mod tests {
 
         let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
 
-        network.connect(0, 1, &|x, y| {(x.0 * lattice_size + x.1) % 2 == 0 && x == y}, None)?;
+        network.connect(0, 1, &|x, y| {(x.0 * lattice_size + x.1) % 2 == 0 && x == y}, Some(&(|_, _| 2.)))?;
         network.set_dt(1.);
 
         network.electrical_synapse = electrical_synapse;
