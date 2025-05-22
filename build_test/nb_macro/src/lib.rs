@@ -2038,6 +2038,10 @@ impl NeuronDefinition {
             generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
         );
 
+        // iterate over ion channel vars
+        // use them to replace vars
+        // replace update func with actual function, only add func if it is found in kernel
+
         let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
         let iterate_and_spike_kernel_footer = "
