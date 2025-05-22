@@ -106,7 +106,7 @@ impl NeuralRefractorinessGPU for DeltaDiracRefractoriness {
                 float dt
             ) {
                 float a = v_th - v_resting;
-                float time_difference = timestep - last_firing_time;
+                float time_difference = (float) (timestep - last_firing_time);
 
                 return a * exp((-1.0f / (k / dt)) * time_difference * time_difference) + v_resting;
             }
@@ -1023,7 +1023,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for RateSpikeTrain<N, T, U> {
     fn iterate(&mut self) -> bool {
         self.step += self.dt;
-        if self.rate != 0. && self.step > self.rate {
+        if self.rate != 0. && self.step >= self.rate {
             self.step = 0.;
             self.current_voltage = self.v_th;
             self.is_spiking = true;
@@ -1044,8 +1044,9 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("rate_spike_train_electrical_kernel");
         let mut argument_names = vec![
-            String::from("index_to_position"), String::from("seed"), String::from("current_voltage"), String::from("dt"), 
-            String::from("v_resting"), String::from("v_th"), String::from("rate"), String::from("step"), String::from("is_spiking")
+            String::from("index_to_position"), String::from("current_voltage"), String::from("dt"), 
+            String::from("v_resting"), String::from("v_th"), String::from("rate"), String::from("step"), 
+            String::from("is_spiking")
         ];
 
         let uint_args = [String::from("is_spiking"), String::from("index_to_position")];
@@ -1072,7 +1073,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 int index = index_to_position[gid + skip_index] - skip_index;
 
                 step[index] += dt[index];
-                if (rate[index] != 0.0f && step[index] > rate[index]) {{
+                if (rate[index] != 0.0f && step[index] >= rate[index]) {{
                     step[index] = 0.0f;
                     current_voltage[index] = v_th[index];
                     is_spiking[index] = true;
@@ -1111,9 +1112,8 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
         let kernel_name = String::from("rate_spike_train_electrochemical_kernel");
         let mut argument_names = vec![
             String::from("number_of_types"), String::from("index_to_position"),  String::from("neuro_flags"),
-            String::from("seed"), String::from("current_voltage"), String::from("dt"), 
-            String::from("v_resting"), String::from("v_th"), String::from("rate"), 
-            String::from("step"), String::from("is_spiking")
+            String::from("current_voltage"), String::from("dt"), String::from("v_resting"),
+            String::from("v_th"), String::from("rate"), String::from("step"), String::from("is_spiking")
         ];
 
         let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
@@ -1169,7 +1169,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 int index = index_to_position[gid + skip_index] - skip_index;
 
                 step[index] += dt[index];
-                if (rate[index] != 0.0f && step[index] > rate[index]) {{
+                if (rate[index] != 0.0f && step[index] >= rate[index]) {{
                     step[index] = 0.0f;
                     current_voltage[index] = v_th[index];
                     is_spiking[index] = true;
