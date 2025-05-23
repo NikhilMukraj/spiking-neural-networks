@@ -3,7 +3,7 @@ use spiking_neural_networks::{
         Lattice, GridVoltageHistory, LatticeHistory, RunLattice, InternalGraph, 
         SpikeTrainLattice, SpikeTrainGrid, SpikeTrainGridHistory, RunSpikeTrainLattice,
         SpikeTrainLatticeHistory, LatticeNetwork, RunNetwork,
-        spike_train::{SpikeTrain, PoissonNeuron, NeuralRefractoriness, DeltaDiracRefractoriness},
+        spike_train::{SpikeTrain, RateSpikeTrain, NeuralRefractoriness, DeltaDiracRefractoriness},
         plasticity::STDP,
         gpu_lattices::{LatticeGPU, LatticeNetworkGPU},
     },
@@ -212,17 +212,17 @@ impl PyDeltaDiracRefractoriness {
 }
 
 #[pyclass]
-#[pyo3(name = "PoissonNeuron")]
+#[pyo3(name = "RateSpikeTrain")]
 #[derive(Clone)]
-pub struct PyPoissonNeuron {
-    model: PoissonNeuron<DopaGluGABANeurotransmitterType, BoundedNeurotransmitterKinetics, DeltaDiracRefractoriness>,
+pub struct PyRateSpikeTrain {
+    model: RateSpikeTrain<DopaGluGABANeurotransmitterType, BoundedNeurotransmitterKinetics, DeltaDiracRefractoriness>,
 }
 
 #[pymethods]
-impl PyPoissonNeuron {
+impl PyRateSpikeTrain {
     #[new]
     fn new() -> Self {
-        PyPoissonNeuron { model: PoissonNeuron::default() }
+        PyRateSpikeTrain { model: RateSpikeTrain::default() }
     }
 
     fn __repr__(&self) -> PyResult<String> {
@@ -260,13 +260,23 @@ impl PyPoissonNeuron {
     }
 
     #[getter]
-    fn get_chance_of_firing(&self) -> f32 {
-        self.model.chance_of_firing
+    fn get_rate(&self) -> f32 {
+        self.model.rate
     }
 
     #[setter]
-    fn set_chance_of_firing(&mut self, new_param: f32) {
-        self.model.chance_of_firing = new_param;
+    fn set_rate(&mut self, new_param: f32) {
+        self.model.rate = new_param;
+    }
+
+    #[getter]
+    fn get_step(&self) -> f32 {
+        self.model.step
+    }
+
+    #[setter]
+    fn set_step(&mut self, new_param: f32) {
+        self.model.step = new_param;
     }
 
     #[getter]
@@ -352,12 +362,12 @@ impl PyPoissonNeuron {
     }
 }
 
-type LatticeSpikeTrain = PoissonNeuron<DopaGluGABANeurotransmitterType, BoundedNeurotransmitterKinetics, DeltaDiracRefractoriness>;
+type LatticeSpikeTrain = RateSpikeTrain<DopaGluGABANeurotransmitterType, BoundedNeurotransmitterKinetics, DeltaDiracRefractoriness>;
 
 #[pyclass]
-#[pyo3(name = "PoissonLattice")]
+#[pyo3(name = "RateSpikeTrainLattice")]
 #[derive(Clone)]
-pub struct PyPoissonLattice {
+pub struct PyRateSpikeTrainLattice {
     lattice: SpikeTrainLattice<
         DopaGluGABANeurotransmitterType,
         LatticeSpikeTrain,
@@ -365,7 +375,7 @@ pub struct PyPoissonLattice {
     >
 }
 
-impl_spike_train_lattice!(PyPoissonLattice, PyPoissonNeuron, LatticeSpikeTrain, "PoissonLattice");
+impl_spike_train_lattice!(PyRateSpikeTrainLattice, PyRateSpikeTrain, LatticeSpikeTrain, "RateSpikeTrainLattice");
 
 #[pyclass]
 #[pyo3(name = "GraphPosition")]
@@ -425,8 +435,8 @@ pub struct PyIzhikevichNeuronNetwork {
 }
 
 impl_network!(
-    PyIzhikevichNeuronNetwork, PyIzhikevichNeuronLattice, PyPoissonLattice, PyIzhikevichNeuron,
-    PyPoissonNeuron, PySTDP, "IzhikevichNeuronLattice", "PoissonLattice", "IzhikevichNeuronNetwork",
+    PyIzhikevichNeuronNetwork, PyIzhikevichNeuronLattice, PyRateSpikeTrainLattice, PyIzhikevichNeuron,
+    PyRateSpikeTrain, PySTDP, "IzhikevichNeuronLattice", "RateSpikeTrainLattice", "IzhikevichNeuronNetwork",
 );
 
 #[pyclass]
@@ -446,8 +456,8 @@ pub struct PyIzhikevichNeuronNetworkGPU {
 }
 
 impl_network_gpu!(
-    PyIzhikevichNeuronNetworkGPU, PyIzhikevichNeuronLattice, PyPoissonLattice, PyIzhikevichNeuron,
-    PyPoissonNeuron, PySTDP, "IzhikevichNeuronLattice", "PoissonLattice", "IzhikevichNeuronNetworkGPU",
+    PyIzhikevichNeuronNetworkGPU, PyIzhikevichNeuronLattice, PyRateSpikeTrainLattice, PyIzhikevichNeuron,
+    PyRateSpikeTrain, PySTDP, "IzhikevichNeuronLattice", "RateSpikeTrainLattice", "IzhikevichNeuronNetworkGPU",
 );
 
 #[pymodule]
@@ -464,8 +474,8 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyIzhikevichNeuronLattice>()?;
     m.add_class::<PyIzhikevichNeuronLatticeGPU>()?;
     m.add_class::<PyDeltaDiracRefractoriness>()?;
-    m.add_class::<PyPoissonNeuron>()?;
-    m.add_class::<PyPoissonLattice>()?;
+    m.add_class::<PyRateSpikeTrain>()?;
+    m.add_class::<PyRateSpikeTrainLattice>()?;
     m.add_class::<PyGraphPosition>()?;
     m.add_class::<PyIzhikevichNeuronNetwork>()?;
     m.add_class::<PyIzhikevichNeuronNetworkGPU>()?;
