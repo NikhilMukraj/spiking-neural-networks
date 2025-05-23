@@ -12,8 +12,8 @@ from tqdm import tqdm
 from pipeline_setup import parse_toml, generate_key_helper
 from pipeline_setup import get_weights, weights_ie, check_uniqueness, generate_patterns
 from pipeline_setup import calculate_correlation, skewed_random, generate_setup_neuron
-from pipeline_setup import reset_spike_train, get_spike_train_setup_function
-from pipeline_setup import get_spike_train_same_firing_rate_setup, get_noisy_spike_train_setup_function
+from pipeline_setup import get_rate_spike_train_setup_function
+from pipeline_setup import get_noisy_rate_spike_train_setup_function
 from pipeline_setup import find_peaks_above_threshold, acc, signal_to_noise, determine_accuracy
 import lixirnet as ln
 
@@ -125,9 +125,9 @@ def fill_defaults(parsed):
         parsed['variables']['bayesian_distortion'] = [0]
 
     if 'main_firing_rate' not in parsed['variables']:
-        parsed['variables']['main_firing_rate'] = [0.01]
+        parsed['variables']['main_firing_rate'] = [100]
     if 'bayesian_firing_rate' not in parsed['simulation_parameters']:
-        parsed['variables']['bayesian_firing_rate'] = [0.01]
+        parsed['variables']['bayesian_firing_rate'] = [100]
 
     if 'prob_of_exc_to_inh' not in parsed['variables']:
         parsed['variables']['prob_of_exc_to_inh'] = [0.5]
@@ -287,8 +287,8 @@ for current_state in tqdm(all_states):
         glu.g_nmda = current_state['ampa_g']
         gabaa.g = current_state['gabaa_g']
 
-        poisson = ln.PoissonNeuron()
-        poisson.set_synaptic_neurotransmitters(exc_neurotransmitters)
+        spike_train = ln.RateSpikeTrain()
+        spike_train.set_synaptic_neurotransmitters(exc_neurotransmitters)
 
         receptors = ln.DopaGluGABA()
         receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
@@ -317,8 +317,8 @@ for current_state in tqdm(all_states):
         )
         exc_lattice.update_grid_history = True
 
-        spike_train_lattice = ln.PoissonLattice(c1)
-        spike_train_lattice.populate(poisson, exc_n, exc_n)
+        spike_train_lattice = ln.RateSpikeTrainLattice(c1)
+        spike_train_lattice.populate(spike_train, exc_n, exc_n)
 
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             inh_lattice_2 = ln.IzhikevichNeuronLattice(i2)
@@ -335,8 +335,8 @@ for current_state in tqdm(all_states):
             )
             exc_lattice_2.update_grid_history = True
 
-            cue_lattice = ln.PoissonLattice(c2)
-            cue_lattice.populate(poisson, exc_n, exc_n)
+            cue_lattice = ln.RateSpikeTrainLattice(c2)
+            cue_lattice.populate(spike_train, exc_n, exc_n)
 
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                 dopa_neuron = ln.IzhikevichNeuron()
@@ -352,22 +352,22 @@ for current_state in tqdm(all_states):
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                 current_lattices.append(d_intermediate)
 
-            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
+            network = ln.IzhikevichNeuronNetwork.generate_network(
                 current_lattices, 
                 [spike_train_lattice, cue_lattice],
             )
         else:
             if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                poisson_dopa = ln.PoissonNeuron()
-                poisson_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
+                spike_train_dopa = ln.RateSpikeTrain()
+                spike_train_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
 
-                cue_lattice = ln.PoissonLattice(c2)
-                cue_lattice.populate(poisson_dopa, exc_n, exc_n)
+                cue_lattice = ln.RateSpikeTrainLattice(c2)
+                cue_lattice.populate(spike_train_dopa, exc_n, exc_n)
             else:
-                cue_lattice = ln.PoissonLattice(c2)
-                cue_lattice.populate(poisson, exc_n, exc_n)
+                cue_lattice = ln.RateSpikeTrainLattice(c2)
+                cue_lattice.populate(spike_train, exc_n, exc_n)
 
-            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
+            network = ln.IzhikevichNeuronNetwork.generate_network(
                 [exc_lattice, inh_lattice], 
                 [spike_train_lattice, cue_lattice]
             )
@@ -499,7 +499,7 @@ for current_state in tqdm(all_states):
             network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
         network.set_dt(parsed_toml['simulation_parameters']['dt'])
-        # network.parallel = True
+        network.parallel = True
 
         network.electrical_synapse = False
         network.chemical_synapse = True
@@ -512,7 +512,7 @@ for current_state in tqdm(all_states):
         if not parsed_toml['simulation_parameters']['main_noisy']:
             network.apply_spike_train_lattice_given_position(
                 c1, 
-                get_spike_train_setup_function(
+                get_rate_spike_train_setup_function(
                     patterns,
                     pattern1, 
                     current_state['distortion'],
@@ -538,7 +538,7 @@ for current_state in tqdm(all_states):
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network.apply_spike_train_lattice_given_position(
                 c2, 
-                get_spike_train_setup_function(
+                get_rate_spike_train_setup_function(
                     bayesian_memory_patterns,
                     bayesian_memory_pattern, 
                     current_state['bayesian_distortion'],
@@ -551,7 +551,7 @@ for current_state in tqdm(all_states):
             if not parsed_toml['simulation_parameters']['d2']:
                 network.apply_spike_train_lattice_given_position(
                     c2, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         patterns,
                         pattern2, 
                         current_state['bayesian_distortion'],
@@ -565,7 +565,7 @@ for current_state in tqdm(all_states):
 
                 network.apply_spike_train_lattice_given_position(
                     c2, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         inv_patterns,
                         pattern2, 
                         current_state['bayesian_distortion'],
@@ -636,7 +636,7 @@ for current_state in tqdm(all_states):
             if not parsed_toml['simulation_parameters']['pattern_switch']:
                 network.apply_spike_train_lattice_given_position(
                     c1, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         patterns,
                         pattern1, 
                         current_state['distortion'],
@@ -648,7 +648,7 @@ for current_state in tqdm(all_states):
             else:
                 network.apply_spike_train_lattice_given_position(
                     c1, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         patterns,
                         pattern_switch1, 
                         current_state['distortion'],
@@ -674,7 +674,7 @@ for current_state in tqdm(all_states):
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             network.apply_spike_train_lattice_given_position(
                 c2, 
-                get_spike_train_setup_function(
+                get_rate_spike_train_setup_function(
                     bayesian_memory_patterns,
                     bayesian_memory_pattern, 
                     current_state['bayesian_distortion'],
@@ -687,7 +687,7 @@ for current_state in tqdm(all_states):
             if not parsed_toml['simulation_parameters']['d2']:
                 network.apply_spike_train_lattice_given_position(
                     c2, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         patterns,
                         pattern2, 
                         current_state['bayesian_distortion'],
@@ -701,7 +701,7 @@ for current_state in tqdm(all_states):
 
                 network.apply_spike_train_lattice_given_position(
                     c2, 
-                    get_spike_train_setup_function(
+                    get_rate_spike_train_setup_function(
                         inv_patterns,
                         pattern2, 
                         current_state['bayesian_distortion'],
