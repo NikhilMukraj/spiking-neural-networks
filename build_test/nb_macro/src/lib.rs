@@ -1614,6 +1614,58 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
     }
 }
 
+// #[cfg(feature = "gpu")]
+// fn generate_ion_channel_prefixes(vars: &Ast) -> Vec<String> {
+//     match vars {
+//         Ast::StructAssignments(variables) => {
+//             variables.iter()
+//                 .map(|i| {
+//                     let var_name = match i {
+//                         Ast::StructAssignment { name, .. } => name,
+//                         _ => unreachable!(),
+//                     };
+
+//                     format!(
+//                         "let {}_prefix = generate_unique_prefix(&argument_names, \"{}_ion_channel\");",
+//                         var_name,
+//                         var_name,
+//                     )
+//                 })
+//         },
+//         _ => unreachable!(),
+//     }
+// }
+
+// #[cfg(feature = "gpu")]
+// fn generate_ion_channel_replacements_in_neuron_kernel(vars: &Ast) -> Vec<String> {
+//     match vars {
+//         Ast::StructAssignments(variables) => {
+//             variables.iter()
+//                 .map(|i| {
+//                     let (var_name, type_name) = match i {
+//                         Ast::StructAssignment { name, type_name } => (name, type_name),
+//                         _ => unreachable!(),
+//                     };
+
+//                     format!(
+//                         "for (attr, _) in {}::get_all_attributes_as_vec() {{
+//                             let current_split: Vec<_> = attr.split(\"$\").collect();
+//                             program_source.replace(
+//                                 &format!(\"{}${{}}\", &current_split[1..].join(\"$\")),
+//                                 &format!(\"{{}}\", {}_prefix, &current_split[1..].join(\"$\")),
+//                             );
+//                         }}",
+//                         type_name,
+//                         var_name,
+//                         var_name,
+//                     )
+//                 })
+//                 .collect()
+//         },
+//         _ => unreachable!(),
+//     }
+// }
+
 #[cfg(feature = "py")]
 fn generate_py_getter_and_setters(field_name: &str, var_name: &str, type_name: &str) -> String {
     format!("
