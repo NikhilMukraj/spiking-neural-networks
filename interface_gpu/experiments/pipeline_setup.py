@@ -124,6 +124,32 @@ def get_spike_train_setup_function(patterns, pattern_index, distortion, firing_r
 
     return setup_spike_train
 
+def get_rate_spike_train_setup_function(patterns, pattern_index, distortion, firing_rate, exc_n, stay_unflipped=False):
+    def setup_spike_train(pos, neuron):
+        x, y = pos
+        index = x * exc_n + y
+        state = patterns[pattern_index][index] == 1
+
+        if np.random.uniform(0, 1) < distortion:
+            if not stay_unflipped:
+                state ^= 1
+            else:
+                if state != 0:
+                    state = 0
+
+        if state:
+            neuron.rate = firing_rate
+            try:
+                neuron.step = np.random.randint(0, firing_rate)
+            except ValueError:
+                pass
+        else:
+            neuron.rate = 0
+
+        return neuron
+
+    return setup_spike_train
+
 def get_spike_train_same_firing_rate_setup(firing_rate):
     def setup_spike_train(neuron):
         neuron.chance_of_firing = firing_rate
@@ -138,6 +164,21 @@ def get_noisy_spike_train_setup_function(noise_level, firing_rate):
             neuron.chance_of_firing = firing_rate
         else:
             neuron.chance_of_firing = 0
+        
+        return neuron
+
+    return setup_spike_train
+
+def get_noisy_rate_spike_train_setup_function(noise_leve, firing_rate):
+    def setup_spike_train(neuron):
+        if np.random.uniform(0, 1) < noise_level:
+            neuron.rate = firing_rate
+            try:
+                neuron.step = np.random.randint(0, firing_rate)
+            except ValueError:
+                pass
+        else:
+            neuron.rate = 0
         
         return neuron
 
