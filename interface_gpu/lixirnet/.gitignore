@@ -41,6 +41,8 @@ htmlcov/
 .cache
 nosetests.xml
 coverage.xml
+test/*.ipynb
+test/*.npy
 
 # Translations
 *.mo
