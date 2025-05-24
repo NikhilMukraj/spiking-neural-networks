@@ -135,7 +135,7 @@ pub trait GraphToGPU<G> {
 /// assert!(adjacency_matrix.lookup_weight(&(0, 0), &(0, 1)) == Ok(None));
 /// assert!(adjacency_matrix.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AdjacencyMatrix<T: Send + Sync + Hash + Eq + PartialEq + Clone + Copy, U: Send + Sync + Debug + Clone + Copy> {
     /// Converts position to a index for the matrix
     pub position_to_index: HashMap<T, usize>,
@@ -967,7 +967,7 @@ impl InterleavingGraphGPU {
 /// assert!(adjacency_list.lookup_weight(&(0, 0), &(0, 1)) == Ok(None));
 /// assert!(adjacency_list.get_incoming_connections(&(0, 1)) == Ok(HashSet::from([(1, 2)])));
 /// ```
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AdjacencyList<
     T: Send + Sync + Debug + Hash + Eq + PartialEq + Clone + Copy, 
     U: Send + Sync + Debug + Clone + Copy
