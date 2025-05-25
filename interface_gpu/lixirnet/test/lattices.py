@@ -1,19 +1,12 @@
 import unittest
 import numpy as np
+from setup_functions import get_neuron_setup
 import lixirnet as ln
 
 
 e1 = 0
 exc_n = 3
-
-def get_setup(init_state):
-    def setup_neuron(pos, neuron):
-        x, y = pos
-        neuron.current_voltage = init_state[x][y]
-
-        return neuron
-    
-    return setup_neuron
+iterations = 1000
 
 class TestCPUGPUImpl(unittest.TestCase):
     def test_single_lattice_electrical_using_from(self):
@@ -22,12 +15,12 @@ class TestCPUGPUImpl(unittest.TestCase):
         neuron.c_m = 25
 
         init_state = np.random.uniform(neuron.c, neuron.v_th, (exc_n, exc_n))
-        setup_neuron = get_setup(init_state)
+        setup_neuron = get_neuron_setup(init_state)
 
         lattice = ln.IzhikevichNeuronLattice(e1)
         lattice.populate(neuron, exc_n, exc_n)
         lattice.apply_given_position(setup_neuron)
-        lattice.connect(lambda x, y: True, lambda x, y: 5)
+        lattice.connect(lambda x, y: x != y, lambda x, y: 5)
         lattice.update_grid_history = True
         lattice.electrical_synapse = True
         lattice.chemical_synapse = False
@@ -47,8 +40,8 @@ class TestCPUGPUImpl(unittest.TestCase):
                     f'{lattice.get_neuron(n1, m1).current_voltage} != {gpu_lattice.get_neuron(n2, m2).current_voltage}'
                 )
 
-        lattice.run_lattice(1000)
-        gpu_lattice.run_lattice(1000)
+        lattice.run_lattice(iterations)
+        gpu_lattice.run_lattice(iterations)
 
         np.save(f'cpu_history_{self._testMethodName}.npy', np.array(lattice.history))
         np.save(f'gpu_history_{self._testMethodName}.npy', np.array(gpu_lattice.history))
@@ -76,12 +69,12 @@ class TestCPUGPUImpl(unittest.TestCase):
         neuron.set_receptors(receptors)
 
         init_state = np.random.uniform(neuron.c, neuron.v_th, (exc_n, exc_n))
-        setup_neuron = get_setup(init_state)
+        setup_neuron = get_neuron_setup(init_state)
 
         lattice = ln.IzhikevichNeuronLattice(e1)
         lattice.populate(neuron, exc_n, exc_n)
         lattice.apply_given_position(setup_neuron)
-        lattice.connect(lambda x, y: True, lambda x, y: 1)
+        lattice.connect(lambda x, y: x != y, lambda x, y: 1)
         lattice.update_grid_history = True
         lattice.electrical_synapse = False
         lattice.chemical_synapse = True
@@ -101,8 +94,8 @@ class TestCPUGPUImpl(unittest.TestCase):
                     f'{lattice.get_neuron(n1, m1).current_voltage} != {gpu_lattice.get_neuron(n2, m2).current_voltage}'
                 )
 
-        lattice.run_lattice(1000)
-        gpu_lattice.run_lattice(1000)
+        lattice.run_lattice(iterations)
+        gpu_lattice.run_lattice(iterations)
 
         np.save(f'cpu_history_{self._testMethodName}.npy', np.array(lattice.history))
         np.save(f'gpu_history_{self._testMethodName}.npy', np.array(gpu_lattice.history))
@@ -122,12 +115,12 @@ class TestCPUGPUImpl(unittest.TestCase):
         neuron.c_m = 25
 
         init_state = np.random.uniform(neuron.c, neuron.v_th, (exc_n, exc_n))
-        setup_neuron = get_setup(init_state)
+        setup_neuron = get_neuron_setup(init_state)
 
         lattice = ln.IzhikevichNeuronLattice(e1)
         lattice.populate(neuron, exc_n, exc_n)
         lattice.apply_given_position(setup_neuron)
-        lattice.connect(lambda x, y: True, lambda x, y: 1)
+        lattice.connect(lambda x, y: x != y, lambda x, y: 1)
         lattice.update_grid_history = True
         lattice.electrical_synapse = True
         lattice.chemical_synapse = False
@@ -135,7 +128,7 @@ class TestCPUGPUImpl(unittest.TestCase):
         gpu_lattice = ln.IzhikevichNeuronLatticeGPU(e1)
         gpu_lattice.populate(neuron, exc_n, exc_n)
         gpu_lattice.apply_given_position(setup_neuron)
-        gpu_lattice.connect(lambda x, y: True, lambda x, y: 1)
+        gpu_lattice.connect(lambda x, y: x != y, lambda x, y: 1)
         gpu_lattice.update_grid_history = True
         gpu_lattice.electrical_synapse = True
         gpu_lattice.chemical_synapse = False        
@@ -153,8 +146,8 @@ class TestCPUGPUImpl(unittest.TestCase):
                     f'{lattice.get_neuron(n1, m1).current_voltage} != {gpu_lattice.get_neuron(n2, m2).current_voltage}'
                 )
 
-        lattice.run_lattice(1000)
-        gpu_lattice.run_lattice(1000)
+        lattice.run_lattice(iterations)
+        gpu_lattice.run_lattice(iterations)
 
         np.save(f'cpu_history_{self._testMethodName}.npy', np.array(lattice.history))
         np.save(f'gpu_history_{self._testMethodName}.npy', np.array(gpu_lattice.history))
@@ -182,12 +175,12 @@ class TestCPUGPUImpl(unittest.TestCase):
         neuron.set_receptors(receptors)
 
         init_state = np.random.uniform(neuron.c, neuron.v_th, (exc_n, exc_n))
-        setup_neuron = get_setup(init_state)
+        setup_neuron = get_neuron_setup(init_state)
 
         lattice = ln.IzhikevichNeuronLattice(e1)
         lattice.populate(neuron, exc_n, exc_n)
         lattice.apply_given_position(setup_neuron)
-        lattice.connect(lambda x, y: True, lambda x, y: 5)
+        lattice.connect(lambda x, y: x != y, lambda x, y: 5)
         lattice.update_grid_history = True
         lattice.electrical_synapse = False
         lattice.chemical_synapse = True
@@ -195,7 +188,7 @@ class TestCPUGPUImpl(unittest.TestCase):
         gpu_lattice = ln.IzhikevichNeuronLatticeGPU(e1)
         gpu_lattice.populate(neuron, exc_n, exc_n)
         gpu_lattice.apply_given_position(setup_neuron)
-        gpu_lattice.connect(lambda x, y: True, lambda x, y: 5)
+        gpu_lattice.connect(lambda x, y: x != y, lambda x, y: 5)
         gpu_lattice.update_grid_history = True
         gpu_lattice.electrical_synapse = True
         gpu_lattice.chemical_synapse = False
@@ -213,8 +206,8 @@ class TestCPUGPUImpl(unittest.TestCase):
                     f'{lattice.get_neuron(n1, m1).current_voltage} != {gpu_lattice.get_neuron(n2, m2).current_voltage}'
                 )
 
-        lattice.run_lattice(1000)
-        gpu_lattice.run_lattice(1000)
+        lattice.run_lattice(iterations)
+        gpu_lattice.run_lattice(iterations)
 
         np.save(f'cpu_history_{self._testMethodName}.npy', np.array(lattice.history))
         np.save(f'gpu_history_{self._testMethodName}.npy', np.array(gpu_lattice.history))
