@@ -1449,7 +1449,7 @@ pub(super) use impl_network;
 
 macro_rules! impl_network_gpu {
     (
-        $network_kind:ident, $lattice_kind:ident, $spike_train_lattice_kind:ident,
+        $network_kind:ident, $from_network_kind:ident, $lattice_kind:ident, $spike_train_lattice_kind:ident,
         $lattice_neuron_kind:ident, $spike_train_kind:ident, $plasticity_kind:ident,
         $lattice_neuron_name:literal, $spike_train_name:literal, $network_name:literal,
     ) => {        
@@ -1496,6 +1496,13 @@ macro_rules! impl_network_gpu {
                 }
 
                 Ok($network_kind { network })
+            }
+
+            #[staticmethod]
+            fn from_network(lattice_network: $from_network_kind) -> Self {
+                let network = LatticeNetworkGPU::from_network(lattice_network.network.clone()).unwrap();
+
+                $network_kind { network }
             }
 
             fn set_dt(&mut self, dt: f32) {

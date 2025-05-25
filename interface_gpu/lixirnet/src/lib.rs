@@ -456,7 +456,7 @@ pub struct PyIzhikevichNeuronNetworkGPU {
 }
 
 impl_network_gpu!(
-    PyIzhikevichNeuronNetworkGPU, PyIzhikevichNeuronLattice, PyRateSpikeTrainLattice, PyIzhikevichNeuron,
+    PyIzhikevichNeuronNetworkGPU, PyIzhikevichNeuronNetwork, PyIzhikevichNeuronLattice, PyRateSpikeTrainLattice, PyIzhikevichNeuron,
     PyRateSpikeTrain, PySTDP, "IzhikevichNeuronLattice", "RateSpikeTrainLattice", "IzhikevichNeuronNetworkGPU",
 );
 
