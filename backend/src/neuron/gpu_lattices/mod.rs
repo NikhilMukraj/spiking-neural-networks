@@ -1,9 +1,6 @@
 use std::collections::{hash_map::{Values, ValuesMut}, HashMap, HashSet};
 use opencl3::{
-    command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
-    context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
-    kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, 
-    program::Program, types::{cl_float, CL_NON_BLOCKING},
+    command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, platform::get_platforms, program::Program, types::{cl_float, CL_NON_BLOCKING}
 };
 use crate::{
     error::{GPUError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError}, 
@@ -473,13 +470,18 @@ where
     pub fn from_lattice<
         W: Plasticity<T, T, f32>,
     >(lattice: Lattice<T, U, V, W, N>) -> Result<Self, GPUError> {
-        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-            .expect("Could not get GPU devices")
-            .first()
-            .expect("No GPU found");
-        let device = Device::new(device_id);
+        let platforms = get_platforms().map_err(|_| GPUError::GetDeviceFailure)?;
 
-        LatticeGPU::from_lattice_given_device(lattice, &device)
+        for platform in platforms {
+            if let Ok(devices) = platform.get_devices(CL_DEVICE_TYPE_GPU) {
+                if let Some(&device_id) = devices.first() {
+                    let device = Device::new(device_id);
+                    return LatticeGPU::from_lattice_given_device(lattice, &device);
+                }
+            }
+        }
+
+        Err(GPUError::GetDeviceFailure)
     }
 
     /// Attempts to generate a default configuration
@@ -1556,13 +1558,18 @@ where
     pub fn from_network(
         lattice_network: LatticeNetwork<T, U, V, W, X, C, Y, N>,
     ) -> Result<Self, GPUError> {
-        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-            .expect("Could not get GPU devices")
-            .first()
-            .expect("No GPU found");
-        let device = Device::new(device_id);
+        let platforms = get_platforms().map_err(|_| GPUError::GetDeviceFailure)?;
 
-        Self::from_network_given_device(lattice_network, &device)
+        for platform in platforms {
+            if let Ok(devices) = platform.get_devices(CL_DEVICE_TYPE_GPU) {
+                if let Some(&device_id) = devices.first() {
+                    let device = Device::new(device_id);
+                    return Self::from_network_given_device(lattice_network, &device);
+                }
+            }
+        }
+
+        Err(GPUError::GetDeviceFailure)
     }
 
     /// Attempts to generate a default configuration of [`LatticeNetworkGPU`]
