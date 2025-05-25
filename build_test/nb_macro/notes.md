@@ -54,6 +54,13 @@
   - [ ] prefix every function with string to differentiate from structure calls in gpu code
 - [ ] spike train block
   - [ ] **default impl for spike train that can be used in pyo3**
+  - [ ] vars
+  - [ ] default kinetics, default refractoriness
+  - [ ] on iteration
+  - [ ] on chemical iteration (optional)
+  - [ ] on spike
+  - [ ] spike detecton
+- [ ] refractoriness block
 - [x] eventually remove vars declaration without vars
 - [ ] ion channel use timestep also checks each expr for a dt too
 - [ ] comments/docs in/around blocks
