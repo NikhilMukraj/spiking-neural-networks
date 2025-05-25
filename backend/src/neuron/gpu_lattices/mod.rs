@@ -678,7 +678,7 @@ where
                 if i == "iteration" {
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
-                    kernel_execution.set_arg(&gpu_graph.size);
+                    kernel_execution.set_arg(&(gpu_graph.size as u32));
                 // } else if i == "skip_index" {
                 //     kernel_execution.set_arg(&0);
                 } else if i == "index_to_position" {
@@ -753,7 +753,7 @@ where
                     _ => unreachable!("current_voltage must be float"),
                 };
 
-                match kernel_execution.set_arg(&gpu_graph.size)
+                match kernel_execution.set_arg(&(gpu_graph.size as u32))
                     .set_arg(&sums_buffer)
                     .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
                     .enqueue_nd_range(&self.queue) {
@@ -870,7 +870,7 @@ where
                         _ => unreachable!("current_voltage must be float"),
                     };
 
-                    match kernel_execution.set_arg(&gpu_graph.size)
+                    match kernel_execution.set_arg(&(gpu_graph.size as u32))
                         .set_arg(&sums_buffer)
                         .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
                         .enqueue_nd_range(&self.queue) {
@@ -902,8 +902,8 @@ where
                     _ => unreachable!("neurotransmitters$t must be float"),
                 };
 
-                kernel_execution.set_arg(&gpu_graph.size)
-                    .set_arg(&N::number_of_types());
+                kernel_execution.set_arg(&(gpu_graph.size as u32))
+                    .set_arg(&(N::number_of_types() as u32));
 
                 match kernel_execution
                     .set_arg(&counts_buffer)
@@ -931,7 +931,7 @@ where
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&gpu_graph.index_to_position);
                     } else if i == "number_of_types" {
-                        kernel_execution.set_arg(&N::number_of_types());
+                        kernel_execution.set_arg(&(N::number_of_types() as u32));
                     } else if i == "neuro_flags" {
                         match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
@@ -2062,7 +2062,7 @@ where
 
             for i in kernel.argument_names.iter() {
                 if i == "iteration" {
-                    kernel_execution.set_arg(&self.internal_clock);
+                    kernel_execution.set_arg(&(self.internal_clock as i32));
                 } else if i == "size" {
                     kernel_execution.set_arg(&size);
                 } else if i == "skip_index" {
@@ -2124,7 +2124,7 @@ where
                 _ => unreachable!("current_voltage must be float"),
             };
 
-            match kernel_execution.set_arg(&gpu_graph.size)
+            match kernel_execution.set_arg(&(gpu_graph.size as u32))
                 .set_arg(sums_buffer)
                 .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
                 .enqueue_nd_range(&self.queue) {
@@ -2178,7 +2178,7 @@ where
                 } else if i == "skip_index" {
                     kernel_execution.set_arg(&spike_train_skip_index);
                 } else if i == "n" {
-                    kernel_execution.set_arg(&gpu_graph.size);
+                    kernel_execution.set_arg(&(gpu_graph.size as u32));
                 } else if i == "res" {
                     kernel_execution.set_arg(sums_buffer);
                 } else {
@@ -2373,7 +2373,7 @@ where
 
                     for i in spike_train_iterate_kernel.argument_names.iter() {
                         if i == "number_of_types" {
-                            kernel_execution.set_arg(&N::number_of_types());
+                            kernel_execution.set_arg(&(N::number_of_types() as u32));
                         } else if i == "index_to_position" {
                             kernel_execution.set_arg(&gpu_graph.index_to_position);
                         } else if i == "skip_index" { 
@@ -2613,8 +2613,8 @@ where
                         _ => unreachable!("neurotransmitters$t must be float"),
                     };
 
-                    kernel_execution.set_arg(&gpu_graph.size)
-                        .set_arg(&N::number_of_types());
+                    kernel_execution.set_arg(&(gpu_graph.size as u32))
+                        .set_arg(&(N::number_of_types() as u32));
 
                     match kernel_execution
                         .set_arg(&counts_buffer)
@@ -2672,8 +2672,8 @@ where
                     };
 
                     kernel_execution.set_arg(&spike_train_skip_index)
-                        .set_arg(&gpu_graph.size)
-                        .set_arg(&N::number_of_types());
+                        .set_arg(&(gpu_graph.size as u32))
+                        .set_arg(&(N::number_of_types() as u32));
 
                     match kernel_execution
                         .set_arg(&counts_buffer)
@@ -2703,7 +2703,7 @@ where
                         } else if i == "index_to_position" {
                             kernel_execution.set_arg(&gpu_graph.index_to_position);
                         } else if i == "number_of_types" {
-                            kernel_execution.set_arg(&N::number_of_types());
+                            kernel_execution.set_arg(&(N::number_of_types() as u32));
                         } else if i == "neuro_flags" {
                             match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                                 BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
@@ -2777,7 +2777,7 @@ where
     
                         for i in spike_train_iterate_kernel.argument_names.iter() {
                             if i == "number_of_types" {
-                                kernel_execution.set_arg(&N::number_of_types());
+                                kernel_execution.set_arg(&(N::number_of_types() as u32));
                             } else if i == "index_to_position" {
                                 kernel_execution.set_arg(&gpu_graph.index_to_position);
                             } else if i == "skip_index" { 
