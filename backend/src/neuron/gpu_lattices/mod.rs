@@ -1,6 +1,6 @@
 use std::collections::{hash_map::{Values, ValuesMut}, HashMap, HashSet};
 use opencl3::{
-    command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, platform::get_platforms, program::Program, types::{cl_float, CL_NON_BLOCKING}
+    command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, platform::get_platforms, program::Program, types::{cl_float, CL_NON_BLOCKING}
 };
 use crate::{
     error::{GPUError, GraphError, LatticeNetworkError, SpikingNeuralNetworksError}, 
@@ -437,7 +437,7 @@ where
         let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(GPUError::GetDeviceFailure),
@@ -500,7 +500,7 @@ where
         let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(GPUError::GetDeviceFailure),
@@ -1491,7 +1491,7 @@ where
         let queue = match CommandQueue::create_default_with_properties(
             &context, 
             CL_QUEUE_PROFILING_ENABLE,
-            CL_QUEUE_SIZE,
+            0,
         ) {
             Ok(value) => value,
             Err(_) => return Err(GPUError::GetDeviceFailure),
