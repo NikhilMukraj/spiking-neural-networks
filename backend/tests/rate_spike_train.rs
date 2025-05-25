@@ -3,7 +3,7 @@ mod test {
     use std::{collections::HashMap, ptr};
     use opencl3::{
         command_queue::{
-            CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE
+            CommandQueue, CL_QUEUE_PROFILING_ENABLE
         }, 
         context::Context, 
         device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
@@ -153,7 +153,7 @@ mod test {
         let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),

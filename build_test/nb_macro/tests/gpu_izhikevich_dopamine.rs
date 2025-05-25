@@ -8,7 +8,7 @@ mod test {
         BoundedNeurotransmitterKinetics, BoundedReceptorKinetics, DopaGluGABANeurotransmitterType, DopaGluGABAType, DopamineReceptor, GABAReceptor, GlutamateReceptor, IzhikevichNeuron
     };
     use opencl3::{
-        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
     };
     use rand::Rng;
     use spiking_neural_networks::{
@@ -299,7 +299,7 @@ mod test {
         let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),

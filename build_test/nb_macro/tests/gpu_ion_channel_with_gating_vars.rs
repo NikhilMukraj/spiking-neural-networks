@@ -3,7 +3,7 @@
 mod test {
     use nb_macro::neuron_builder;
     use opencl3::{
-        command_queue::{CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
+        command_queue::{CL_QUEUE_PROFILING_ENABLE}, 
         device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
         program::Program,
     };
@@ -182,7 +182,7 @@ mod test {
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             )
             .expect("CommandQueue::create_default failed");
 
@@ -231,7 +231,7 @@ mod test {
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             )
             .expect("CommandQueue::create_default failed");
 
@@ -284,7 +284,7 @@ mod test {
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             )
             .expect("CommandQueue::create_default failed");
 

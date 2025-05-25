@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use opencl3::{
-        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE},
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE},
         context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU},
     };
     extern crate spiking_neural_networks;
@@ -27,7 +27,7 @@ mod tests {
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             )
             .expect("CommandQueue::create_default failed");
 
@@ -103,7 +103,7 @@ mod tests {
         let queue = CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             )
             .expect("CommandQueue::create_default failed");
 
