@@ -161,6 +161,8 @@ dependencies = [
  "nb_macro",
  "opencl3",
  "pyo3",
+ "rand",
+ "rand_chacha",
  "spiking_neural_networks",
 ]
 
