@@ -546,4 +546,19 @@ mod test {
 
         Ok(())
     }
+
+    // #[test]
+    // pub fn test_isolated_network_electrical_accuracy() {
+
+    // }
+
+    // #[test]
+    // pub fn test_isolated_network_chemical_accuracy() {
+
+    // }
+
+    // #[test]
+    // pub fn test_isolated_network_electrochemical_accuracy() {
+
+    // }
 }
