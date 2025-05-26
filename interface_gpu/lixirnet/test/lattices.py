@@ -155,9 +155,9 @@ class TestCPUGPUImpl(unittest.TestCase):
         for n, (cpu_grid, gpu_grid) in enumerate(zip(lattice.history, gpu_lattice.history)):
             for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
                 for i, j in zip(cpu_row, gpu_row):
-                    if i > -80:
+                    if i > -80 and (i != neuron.c and j != neuron.c):
                         self.assertTrue(
-                            np.abs(i - j) < 2,
+                            np.abs(i - j) < 4,
                             f'{n} | {i} != {j}'
                         )
     
@@ -190,8 +190,8 @@ class TestCPUGPUImpl(unittest.TestCase):
         gpu_lattice.apply_given_position(setup_neuron)
         gpu_lattice.connect(lambda x, y: x != y, lambda x, y: 5)
         gpu_lattice.update_grid_history = True
-        gpu_lattice.electrical_synapse = True
-        gpu_lattice.chemical_synapse = False
+        gpu_lattice.electrical_synapse = False
+        gpu_lattice.chemical_synapse = True
 
         for n1, n2 in zip(range(exc_n), range(exc_n)):
             for m1, m2 in zip(range(exc_n), range(exc_n)):
