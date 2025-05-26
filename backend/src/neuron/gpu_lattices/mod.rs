@@ -484,6 +484,51 @@ where
         Err(GPUError::GetDeviceFailure)
     }
 
+    /// Attempts to clone lattice
+    pub fn try_clone(&self) -> Result<Self, GPUError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = match Context::from_device(&device) {
+            Ok(value) => value,
+            Err(_) => return Err(GPUError::GetDeviceFailure),
+        };
+
+        let queue =  match CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                0,
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(GPUError::GetDeviceFailure),
+            };
+
+        let electrical_incoming_connections_kernel = Self::generate_electrical_kernel(&context)?;
+        let chemical_incoming_connections_kernel = Self::generate_chemical_kernel(&context)?;
+        let last_firing_time_kernel = Self::generate_last_firing_time_kernel(&context)?;
+        
+        Ok(
+            LatticeGPU { 
+                cell_grid: self.cell_grid.clone(), 
+                graph: self.graph.clone(), 
+                electrical_incoming_connections_kernel,
+                chemical_incoming_connections_kernel,
+                last_firing_time_kernel,
+                internal_clock: self.internal_clock,
+                grid_history_kernel: V::get_kernel(&context)?,
+                grid_history: self.grid_history.clone(),
+                update_grid_history: self.update_grid_history,
+                electrical_synapse: self.electrical_synapse,
+                chemical_synapse: self.chemical_synapse,
+                context,
+                queue,
+            }
+        )
+    }
+
     /// Attempts to generate a default configuration
     pub fn try_default() -> Result<Self, GPUError> {
         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
