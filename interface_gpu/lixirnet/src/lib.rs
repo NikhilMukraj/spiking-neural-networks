@@ -482,3 +482,653 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use rand::prelude::*;
+    use rand_chacha::ChaCha8Rng;
+    use spiking_neural_networks::{
+        graph::{AdjacencyMatrix, GraphPosition},
+        neuron::{
+            iterate_and_spike::Receptors, 
+            plasticity::STDP, 
+            gpu_lattices::{LatticeGPU, LatticeNetworkGPU}, 
+            spike_train::{RateSpikeTrain, DeltaDiracRefractoriness},
+            Lattice, RunLattice, LatticeNetwork, RunNetwork, GridVoltageHistory, SpikeTrainGridHistory,
+        }
+    };
+    use super::{
+        IzhikevichNeuron, PyIzhikevichNeuron, PyIzhikevichNeuronNetwork, BoundedNeurotransmitterKinetics, BoundedReceptorKinetics,
+        DopaGluGABANeurotransmitterType, DopaGluGABAType, GlutamateReceptor, PyIzhikevichNeuronLattice,
+        PyIzhikevichNeuronLatticeGPU, PyIzhikevichNeuronNetworkGPU,
+    };
+
+
+    type LatticeSpikeTrain = RateSpikeTrain<DopaGluGABANeurotransmitterType, BoundedNeurotransmitterKinetics, DeltaDiracRefractoriness>;
+    type LatticeType = Lattice<
+        IzhikevichNeuron<BoundedNeurotransmitterKinetics, BoundedReceptorKinetics>,
+        AdjacencyMatrix<(usize, usize), f32>,
+        GridVoltageHistory,
+        STDP,
+        DopaGluGABANeurotransmitterType,
+    >;
+    type NetworkType = LatticeNetwork<
+        IzhikevichNeuron<BoundedNeurotransmitterKinetics,  BoundedReceptorKinetics>, 
+        AdjacencyMatrix<(usize, usize), f32>, 
+        GridVoltageHistory, 
+        LatticeSpikeTrain,
+        SpikeTrainGridHistory,
+        AdjacencyMatrix<GraphPosition, f32>,
+        STDP,
+        DopaGluGABANeurotransmitterType,
+    >;
+    type NetworkGPUType = LatticeNetworkGPU<
+        IzhikevichNeuron<BoundedNeurotransmitterKinetics,  BoundedReceptorKinetics>, 
+        AdjacencyMatrix<(usize, usize), f32>, 
+        GridVoltageHistory, 
+        LatticeSpikeTrain,
+        SpikeTrainGridHistory,
+        STDP,
+        DopaGluGABANeurotransmitterType,
+        DeltaDiracRefractoriness,
+        AdjacencyMatrix<GraphPosition, f32>,
+    >;
+
+    const ITERATIONS: usize = 1000;
+
+    fn check_history(history1: &[Vec<Vec<f32>>], history2: &[Vec<Vec<f32>>], tolerance: f32, msg: &str) {
+        assert!(!history1.is_empty());
+        assert!(!history2.is_empty());
+
+        for (n, (grid1, grid2)) in history1.iter().zip(history2.iter()).enumerate() {
+            for (row1, row2) in grid1.iter().zip(grid2.iter()) {
+                for (i, j) in row1.iter().zip(row2.iter()) {
+                    assert!((i - j).abs() < tolerance, "{} | {} | {} != {}", msg, n, i, j);
+                }
+            }
+        }
+    } 
+
+    fn generate_weights(seed: u64, rows: usize, cols: usize) -> Box<dyn Fn((usize, usize), (usize, usize)) -> f32> {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+        let mut weights = vec![vec![0.; rows]; cols];
+        for x in 0..rows {
+            for y in 0..cols {
+                if x != y {
+                    weights[x][y] = rng.gen_range(0.0..1.0);
+                }
+            }
+        }
+
+        Box::new(move |x: (usize, usize), _| weights[x.0][x.1])
+    }
+
+    fn generate_voltages(seed: u64, rows: usize, cols: usize, min: f32, max: f32) -> Box<dyn Fn((usize, usize), &mut IzhikevichNeuron<BoundedNeurotransmitterKinetics, BoundedReceptorKinetics>)> {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+        let mut voltages = vec![vec![0.; rows]; cols];
+        for x in 0..rows {
+            for y in 0..cols {
+                voltages[x][y] = rng.gen_range(min..max);
+            }
+        }
+
+        Box::new(move |x: (usize, usize), neuron: &mut IzhikevichNeuron<_, _>| {
+            neuron.current_voltage = voltages[x.0][x.1];
+        })
+    }
+
+    #[test]
+    fn test_cpu_iteration_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+
+        let mut lattice = Lattice::default();
+        lattice.populate(&base_neuron, 3, 3).unwrap();
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = true;
+        lattice.chemical_synapse = false;
+        let mut py_lattice = PyIzhikevichNeuronLattice { lattice: lattice.clone() };
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "CPU");
+    }
+
+    #[test]
+    fn test_cpu_iteration_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice = Lattice::default();
+        lattice.populate(&base_neuron, 3, 3).unwrap();
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = false;
+        lattice.chemical_synapse = true;
+        let mut py_lattice = PyIzhikevichNeuronLattice { lattice: lattice.clone() };
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "CPU");
+    }
+
+    #[test]
+    fn test_cpu_iteration_constructed_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+
+        let mut lattice: LatticeType = Lattice::default();
+        lattice.populate(&base_neuron, 3, 3).unwrap();
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = true;
+        lattice.chemical_synapse = false;
+
+        let mut py_lattice = PyIzhikevichNeuronLattice::new(0);
+        py_lattice.populate(PyIzhikevichNeuron { model: base_neuron.clone() }, 3, 3).unwrap();
+        py_lattice.lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        py_lattice.set_update_grid_history(true);
+        py_lattice.set_electrical_synapse(true);
+        py_lattice.set_chemical_synapse(false);
+        py_lattice.set_dt(1.);
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "CPU");
+    }
+
+    #[test]
+    fn test_cpu_iteration_constructed_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice: LatticeType = Lattice::default();
+        lattice.populate(&base_neuron, 3, 3).unwrap();
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = false;
+        lattice.chemical_synapse = true;
+
+        let mut py_lattice = PyIzhikevichNeuronLattice::new(0);
+        py_lattice.populate(PyIzhikevichNeuron { model: base_neuron.clone() }, 3, 3).unwrap();
+        py_lattice.lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        py_lattice.set_update_grid_history(true);
+        py_lattice.set_electrical_synapse(false);
+        py_lattice.set_chemical_synapse(true);
+        py_lattice.set_dt(1.);
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "CPU");
+    }
+
+    #[test]
+    fn test_gpu_iteration_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+
+        let mut lattice = LatticeGPU::try_default().unwrap();
+        lattice.populate(&base_neuron, 3, 3);
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = true;
+        lattice.chemical_synapse = false;
+        let mut py_lattice = PyIzhikevichNeuronLatticeGPU { lattice: lattice.try_clone().unwrap() };
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "GPU electrical");
+    }
+
+    #[test]
+    fn test_gpu_iteration_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice = LatticeGPU::try_default().unwrap();
+        lattice.populate(&base_neuron, 3, 3);
+        lattice.connect(&(|x, y| x != y), Some(&generate_weights(2, 3, 3)));
+        lattice.set_dt(1.);
+        lattice.update_grid_history = true;
+        lattice.electrical_synapse = false;
+        lattice.chemical_synapse = true;
+        let mut py_lattice = PyIzhikevichNeuronLatticeGPU { lattice: lattice.try_clone().unwrap() };
+
+        lattice.run_lattice(ITERATIONS).unwrap();
+        py_lattice.run_lattice(ITERATIONS).unwrap();
+
+        check_history(&lattice.grid_history.history, &py_lattice.lattice.grid_history.history, 0.1, "GPU chemical");
+    }
+
+    #[test]
+    fn test_cpu_iteration_isolated_network_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice1.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.update_grid_history = true;
+
+        let mut network = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1).unwrap();
+        network.add_lattice(lattice2).unwrap();
+
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+
+        let mut py_network = PyIzhikevichNeuronNetwork { network: network.clone() };
+
+        network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            0.1,
+            "e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            0.1,
+            "e2"
+        );
+    }
+
+    #[test]
+    fn test_cpu_iteration_isolated_network_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.update_grid_history = true;
+        lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice2.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.update_grid_history = true;
+
+        let mut network = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1).unwrap();
+        network.add_lattice(lattice2).unwrap();
+
+        network.electrical_synapse = false;
+        network.chemical_synapse = true;
+
+        let mut py_network = PyIzhikevichNeuronNetwork { network: network.clone() };
+
+        network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            0.1,
+            "e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            0.1,
+            "e2"
+        );
+    }
+
+    #[test]
+    fn test_cpu_iteration_constructed_isolated_network_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice1.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.update_grid_history = true;
+
+        let mut network: NetworkType = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1.clone()).unwrap();
+        network.add_lattice(lattice2.clone()).unwrap();
+
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+
+        let mut py_network = PyIzhikevichNeuronNetwork::generate_network(
+            vec![PyIzhikevichNeuronLattice { lattice: lattice1 }, PyIzhikevichNeuronLattice { lattice: lattice2 }], 
+            vec![]
+        ).unwrap();
+        py_network.set_electrical_synapse(true);
+        py_network.set_chemical_synapse(false);
+
+        network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            0.1,
+            "e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            0.1,
+            "e2"
+        );
+    }
+
+    #[test]
+    fn test_cpu_iteration_constructed_isolated_network_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice1.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.update_grid_history = true;
+
+        let mut network: NetworkType = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1.clone()).unwrap();
+        network.add_lattice(lattice2.clone()).unwrap();
+
+        network.electrical_synapse = false;
+        network.chemical_synapse = true;
+
+        let mut py_network = PyIzhikevichNeuronNetwork::generate_network(
+            vec![PyIzhikevichNeuronLattice { lattice: lattice1 }, PyIzhikevichNeuronLattice { lattice: lattice2 }], 
+            vec![]
+        ).unwrap();
+        py_network.set_electrical_synapse(false);
+        py_network.set_chemical_synapse(true);
+
+        network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            0.1,
+            "e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            0.1,
+            "e2"
+        );
+    }
+    
+    #[test]
+    fn test_gpu_iteration_isolated_network_electrical() {
+        let base_neuron = IzhikevichNeuron::default_impl();
+    
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        // lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+        // lattice2.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice2.update_grid_history = true;
+
+        let mut network = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1).unwrap();
+        network.add_lattice(lattice2).unwrap();
+
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+
+        let mut py_network = PyIzhikevichNeuronNetworkGPU::from_network(PyIzhikevichNeuronNetwork { network: network.clone() });
+
+        assert_eq!(
+            network.get_lattice(&0).unwrap().cell_grid().iter()
+                .map(|row| row.iter().map(|i| i.current_voltage).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>(),
+            py_network.network.get_lattice(&0).unwrap().cell_grid().iter()
+                .map(|row| row.iter().map(|i| i.current_voltage).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>(),
+        );
+        assert_eq!(
+            network.get_lattice(&1).unwrap().cell_grid().iter()
+                .map(|row| row.iter().map(|i| i.current_voltage).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>(),
+            py_network.network.get_lattice(&1).unwrap().cell_grid().iter()
+                .map(|row| row.iter().map(|i| i.current_voltage).collect::<Vec<_>>())
+                .collect::<Vec<Vec<_>>>(),
+        );
+
+        let mut secondary_network = LatticeNetworkGPU::from_network(network.clone()).unwrap();
+
+        network.run_lattices(ITERATIONS).unwrap();
+        secondary_network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &secondary_network.get_lattice(&0).unwrap().grid_history.history, 
+            5.,
+            "Clone reference e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &secondary_network.get_lattice(&1).unwrap().grid_history.history, 
+            5.,
+            "Clone reference e2"
+        );
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            5.,
+            "py version e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            5.,
+            "py version e2"
+        );
+    }
+
+    #[test]
+    fn test_gpu_iteration_isolated_network_chemical() {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.c_m = 25.;
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        ).unwrap();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate,
+            BoundedNeurotransmitterKinetics::default(),
+        );
+
+        let mut lattice1 = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2 = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice2.update_grid_history = true;
+
+        let mut network = LatticeNetwork::default();
+
+        network.parallel = true;
+        network.add_lattice(lattice1).unwrap();
+        network.add_lattice(lattice2).unwrap();
+
+        network.electrical_synapse = false;
+        network.chemical_synapse = true;
+
+        let mut py_network = PyIzhikevichNeuronNetworkGPU::from_network(PyIzhikevichNeuronNetwork { network: network.clone() });
+
+        let mut network: NetworkGPUType = LatticeNetworkGPU::from_network(network).unwrap(); 
+
+        network.run_lattices(ITERATIONS).unwrap();
+        py_network.run_lattices(ITERATIONS).unwrap();
+
+        check_history(
+            &network.get_lattice(&0).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&0).unwrap().grid_history.history, 
+            5.,
+            "e1"
+        );
+        check_history(
+            &network.get_lattice(&1).unwrap().grid_history.history, 
+            &py_network.network.get_lattice(&1).unwrap().grid_history.history, 
+            5.,
+            "e2"
+        );
+    }
+}
