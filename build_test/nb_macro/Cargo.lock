@@ -216,6 +216,7 @@ dependencies = [
  "pyo3",
  "quote",
  "rand",
+ "rand_chacha",
  "spiking_neural_networks",
  "syn 1.0.109",
 ]
