@@ -991,7 +991,7 @@ mod test {
             2, 
             2, 
         ).unwrap();
-        // lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.apply_given_position(&generate_voltages(2, 2, 2, -55., 20.));
         lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
         lattice1.update_grid_history = true;
 
@@ -1003,7 +1003,7 @@ mod test {
             3, 
             3, 
         ).unwrap();
-        // lattice2.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.apply_given_position(&generate_voltages(3, 3, 3, -55., 20.));
         lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
         lattice2.update_grid_history = true;
 
