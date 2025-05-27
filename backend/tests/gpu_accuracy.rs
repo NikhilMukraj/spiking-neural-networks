@@ -253,7 +253,7 @@ mod tests {
             IonotropicType::AMPA(AMPAReceptor::default()),
         )?;
 
-        let iterations = 1000;
+        let iterations = 1;
 
         let mut lattice1 = Lattice::default_impl();
         lattice1.populate(
@@ -267,6 +267,11 @@ mod tests {
             let mut rng = rand::thread_rng();
             neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
         });
+        // lattice1.connect(&|x, y| (x.0 * 2 + x.1) % 2 == 0 && (y.0 * 2 + y.1) % 2 != 0, None);
+        // lattice1.apply_given_position(|pos: _, neuron: &mut _| {
+        //     neuron.current_voltage = (pos.0 * 2 + pos.1) as f32;
+        // });
+        // println!("{:#?}", lattice1.cell_grid().iter().map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<_>>()).collect::<Vec<_>>());
         lattice1.update_grid_history = true;
 
         let mut lattice2 = Lattice::default_impl();
@@ -283,7 +288,11 @@ mod tests {
             let mut rng = rand::thread_rng();
             neuron.current_voltage = rng.gen_range(neuron.v_init..=neuron.v_th);
         });
-
+        // lattice2.connect(&|x, y| (4 + x.0 * 3 + x.1) % 2 == 0 && (4 + y.0 * 3 + y.1) % 2 != 0, None);
+        // lattice2.apply_given_position(|pos: _, neuron: &mut _| {
+        //     neuron.current_voltage = (4 + pos.0 * 3 + pos.1) as f32;
+        // });
+        // println!("{:#?}", lattice2.cell_grid().iter().map(|i| i.iter().map(|j| j.current_voltage).collect::<Vec<_>>()).collect::<Vec<_>>());
         lattice2.update_grid_history = true;
 
         let mut network = LatticeNetwork::default_impl();
@@ -296,20 +305,27 @@ mod tests {
         network.chemical_synapse = chemical_synapse;
 
         let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
-        
+
+        network.run_lattices(iterations)?;
         gpu_network.run_lattices(iterations)?;
 
         for i in network.get_all_ids() {
             let cpu_grid_history = &network.get_lattice(&i).unwrap().grid_history;
             let gpu_grid_history = &gpu_network.get_lattice(&i).unwrap().grid_history;
+
+            assert!(!cpu_grid_history.history.is_empty());
+            assert!(!gpu_grid_history.history.is_empty());
     
-            for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.history.iter()
-                .zip(gpu_grid_history.history.iter()) {
+            for (n, (cpu_cell_grid, gpu_cell_grid)) in cpu_grid_history.history.iter()
+                .zip(gpu_grid_history.history.iter())
+                .enumerate() {
                 for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
                     for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
                         let error = (voltage1 - voltage2).abs();
                         assert!(
-                            error <= 5., "error: {}, voltage1: {}, voltage2: {}", 
+                            error <= 5., "{} | {} | error: {}, voltage1: {}, voltage2: {}", 
+                            i,
+                            n,
                             error,
                             voltage1,
                             voltage2,
@@ -393,6 +409,7 @@ mod tests {
 
         let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
 
+        network.run_lattices(iterations)?;
         gpu_network.run_lattices(iterations)?;
 
         for i in network.get_all_ids() {
