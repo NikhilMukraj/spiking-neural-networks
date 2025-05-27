@@ -698,7 +698,8 @@ impl<T: NeurotransmitterKineticsGPU, R: ReceptorKineticsGPU> IterateAndSpikeGPU 
                 .map(|i|i.0.clone()).collect:: <Vec<_>>().join("\n"),
             Neurotransmitters::<<Ionotropic<R>as Receptors>::N,T>::get_neurotransmitter_update_kernel_code(),
             neurotransmitter_arg_and_type.join(",\n"),
-            receptor_arg_and_type.join(",\n"),update_receptor_kinetics.join("\n"),
+            receptor_arg_and_type.join(",\n"),
+            update_receptor_kinetics.join("\n"),
             receptor_updates.join("\n"),
             format!(
                 "current_voltage[index] -= (dt[index] / c_m[index]) * ({});",
