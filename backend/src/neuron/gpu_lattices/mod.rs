@@ -1237,7 +1237,7 @@ __kernel void calculate_network_electrical_inputs(
     if (count != 0.0f) {
         res[gid] = sum / count;
     } else {
-        res[gid] = 0;
+        res[gid] = 0.0f;
     }
 }
 "#;
@@ -1445,7 +1445,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                 if (count != 0.0f) {{
                     res[gid] = sum / count;
                 }} else {{
-                    res[gid] = 0;
+                    res[gid] = 0.0f;
                 }}
             }}
         "#,
