@@ -10,17 +10,17 @@ mod test {
     use opencl3::{
         command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel, memory::{Buffer, CL_MEM_READ_WRITE}, types::{cl_float, CL_NON_BLOCKING}
     };
-    use rand::Rng;
+    use rand::prelude::*;
+    use rand_chacha::ChaCha8Rng;
     use spiking_neural_networks::{
-        error::{GPUError, SpikingNeuralNetworksError}, 
+        error::{GPUError, SpikingNeuralNetworksError},
         neuron::{
-            gpu_lattices::LatticeGPU, 
-            iterate_and_spike::{
+            gpu_lattices::{LatticeGPU, LatticeNetworkGPU}, iterate_and_spike::{
                 BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
                 NeurotransmitterConcentrations, NeurotransmitterTypeGPU, 
                 Receptors, Timestep
             }, 
-            CellGrid, Lattice, RunLattice
+            CellGrid, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork
         }
     };
 
@@ -66,13 +66,15 @@ mod test {
     }
 
     fn check_entire_history(cpu_grid_history: &[Vec<Vec<f32>>], gpu_grid_history: &[Vec<Vec<f32>>]) {
-        for (cpu_cell_grid, gpu_cell_grid) in cpu_grid_history.iter()
-            .zip(gpu_grid_history) {
+        for (n, (cpu_cell_grid, gpu_cell_grid)) in cpu_grid_history.iter()
+            .zip(gpu_grid_history)
+            .enumerate() {
             for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
                 for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
                     let error = (voltage1 - voltage2).abs();
                     assert!(
-                        error <= 3., "error: {}, voltage1: {}, voltage2: {}", 
+                        error <= 3., "{} | error: {}, voltage1: {}, voltage2: {}", 
+                        n,
                         error,
                         voltage1,
                         voltage2,
@@ -547,15 +549,110 @@ mod test {
         Ok(())
     }
 
-    // #[test]
-    // pub fn test_isolated_network_electrical_accuracy() {
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::needless_range_loop)]
+    fn generate_weights(seed: u64, rows: usize, cols: usize) -> Box<dyn Fn((usize, usize), (usize, usize)) -> f32> {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
 
-    // }
+        let mut weights = vec![vec![0.; rows]; cols];
+        for x in 0..rows {
+            for y in 0..cols {
+                if x != y {
+                    weights[x][y] = rng.gen_range(0.0..1.0);
+                }
+            }
+        }
 
-    // #[test]
-    // pub fn test_isolated_network_chemical_accuracy() {
+        Box::new(move |x: (usize, usize), _| weights[x.0][x.1])
+    }
 
-    // }
+    #[allow(clippy::type_complexity)]
+    #[allow(clippy::needless_range_loop)]
+    fn generate_voltages(seed: u64, rows: usize, cols: usize, min: f32, max: f32) -> Box<dyn Fn((usize, usize), &mut IzhikevichNeuron<BoundedNeurotransmitterKinetics, BoundedReceptorKinetics>)> {
+        let mut rng = ChaCha8Rng::seed_from_u64(seed);
+
+        let mut voltages = vec![vec![0.; rows]; cols];
+        for x in 0..rows {
+            for y in 0..cols {
+                voltages[x][y] = rng.gen_range(min..max);
+            }
+        }
+
+        Box::new(move |x: (usize, usize), neuron: &mut IzhikevichNeuron<_, _>| {
+            neuron.current_voltage = voltages[x.0][x.1];
+        })
+    }
+
+    fn test_isolated_lattices_accuracy(electrical_synapse: bool, chemical_synapse: bool) -> Result<(), SpikingNeuralNetworksError> {
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.synaptic_neurotransmitters.insert(
+            DopaGluGABANeurotransmitterType::Glutamate, 
+            BoundedNeurotransmitterKinetics::default()
+        );
+        base_neuron.receptors.insert(
+            DopaGluGABANeurotransmitterType::Glutamate, 
+            DopaGluGABAType::Glutamate(GlutamateReceptor::default()),
+        )?;
+    
+        let mut lattice1: Lattice<IzhikevichNeuron<_, _>, _, _, _, DopaGluGABANeurotransmitterType> = Lattice::default();
+        lattice1.populate(
+            &base_neuron, 
+            2, 
+            2, 
+        ).unwrap();
+        lattice1.apply_given_position(generate_voltages(2, 2, 2, -55., 20.));
+        lattice1.connect(&(|x, y| x != y), Some(&generate_weights(2, 2, 2)));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2: Lattice<IzhikevichNeuron<_, _>, _, _, _, DopaGluGABANeurotransmitterType> = Lattice::default();
+
+        lattice2.set_id(1);
+        lattice2.populate(
+            &base_neuron, 
+            3, 
+            3, 
+        ).unwrap();
+        lattice2.apply_given_position(generate_voltages(3, 3, 3, -55., 20.));
+        lattice2.connect(&(|x, y| x != y), Some(&generate_weights(3, 3, 3)));
+        lattice2.update_grid_history = true;
+
+        let mut network: LatticeNetwork<IzhikevichNeuron<_, _>, _, GridVoltageHistory, _, _, _, _, DopaGluGABANeurotransmitterType> = LatticeNetwork::default_impl();
+
+        network.parallel = true;
+        network.add_lattice(lattice1).unwrap();
+        network.add_lattice(lattice2).unwrap();
+
+        network.electrical_synapse = electrical_synapse;
+        network.chemical_synapse = chemical_synapse;
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
+        
+        network.run_lattices(1000)?;
+        gpu_network.run_lattices(1000)?;
+
+        for i in network.get_all_ids() {
+            let cpu_grid_history = &network.get_lattice(&i).unwrap().grid_history.history;
+            let gpu_grid_history = &gpu_network.get_lattice(&i).unwrap().grid_history.history;
+    
+            check_entire_history(cpu_grid_history, gpu_grid_history);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_isolated_network_electrical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        test_isolated_lattices_accuracy(true, false)?;
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_isolated_network_chemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        test_isolated_lattices_accuracy(false, true)?;
+
+        Ok(())
+    }
 
     // #[test]
     // pub fn test_isolated_network_electrochemical_accuracy() {
