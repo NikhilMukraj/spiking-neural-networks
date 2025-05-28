@@ -654,8 +654,10 @@ mod test {
         Ok(())
     }
 
-    // #[test]
-    // pub fn test_isolated_network_electrochemical_accuracy() {
+    #[test]
+    pub fn test_isolated_network_electrochemical_accuracy() -> Result<(), SpikingNeuralNetworksError> {
+        test_isolated_lattices_accuracy(true, true)?;
 
-    // }
+        Ok(())
+    }
 }
