@@ -129,7 +129,7 @@ class TestCPUGPUImpl(unittest.TestCase):
         lattice2.populate(neuron, exc_n2, exc_n2)
         lattice2.apply_given_position(setup_neuron2)
         lattice2.connect(lambda x, y: x != y, lambda x, y: 0.5)
-        latticae2.update_grid_history = True
+        lattice2.update_grid_history = True
 
         network = ln.IzhikevichNeuronNetwork.generate_network([lattice1, lattice2], [])
         network.connect(e1, e2, lambda x, y: x == y, lambda x, y: 1)
