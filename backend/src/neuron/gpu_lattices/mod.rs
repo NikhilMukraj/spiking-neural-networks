@@ -144,12 +144,13 @@ __kernel void add_grid_voltage_history(
     __global const float *current_voltage,
     __global float *history,
     int iteration,
-    int size
+    int size,
+    int skip_index
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[gid];
+    int index = index_to_position[gid + skip_index];
 
-    history[iteration * size + index] = current_voltage[index]; 
+    history[iteration * size + index_to_position[gid]] = current_voltage[index]; 
 }
 "#;
 
@@ -176,7 +177,7 @@ impl LatticeHistoryGPU for GridVoltageHistory {
 
         let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("history"),
-            String::from("iteration"), String::from("size"),
+            String::from("iteration"), String::from("size"), String::from("skip_index")
         ];
 
         Ok(
@@ -724,8 +725,8 @@ where
                     kernel_execution.set_arg(&self.internal_clock);
                 } else if i == "size" {
                     kernel_execution.set_arg(&(gpu_graph.size as u32));
-                // } else if i == "skip_index" {
-                //     kernel_execution.set_arg(&0);
+                } else if i == "skip_index" {
+                    kernel_execution.set_arg(&0);
                 } else if i == "index_to_position" {
                     kernel_execution.set_arg(&gpu_graph.index_to_position);
                 } else if gpu_cell_grid.contains_key(i) {
@@ -1108,9 +1109,9 @@ __kernel void add_spike_train_grid_voltage_history(
     int skip_index
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[gid + skip_index] - skip_index;
+    int index = index_to_position[gid + skip_index];
 
-    history[iteration * size + index] = current_voltage[index]; 
+    history[iteration * size + index_to_position[gid]] = current_voltage[index]; 
 }
 "#;
 
@@ -2460,7 +2461,7 @@ where
 
                 for (key, value) in self.spike_train_lattices.iter() {
                     if value.update_grid_history {
-                        let mut skip_index = spike_train_skip_index as usize;
+                        let mut skip_index = 0;
                         for i in gpu_graph.spike_train_ordered_keys.iter() {
                             if *i >= *key {
                                 break;
@@ -2864,7 +2865,7 @@ where
     
                     for (key, value) in self.spike_train_lattices.iter() {
                         if value.update_grid_history {
-                            let mut skip_index = spike_train_skip_index as usize;
+                            let mut skip_index = 0;
                             for i in gpu_graph.spike_train_ordered_keys.iter() {
                                 if *i >= *key {
                                     break;
