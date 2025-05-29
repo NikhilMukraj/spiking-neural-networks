@@ -14,6 +14,6 @@ opencl3 = "0.9.5"
 nb_macro = { path = "../../build_test/nb_macro", default-features = false, features = ["py", "gpu"] }
 spiking_neural_networks = { path = "../../backend", features = ["gpu"] }
 
-# [dev-dependencies]
-# rand = "0.8.3"
+[dev-dependencies]
+rand = "0.8.3"
 # rand_chacha = "0.3.1"
