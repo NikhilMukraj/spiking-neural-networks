@@ -391,14 +391,14 @@ const RAND_FUNCTION: &str = r#"
 impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for PoissonNeuron<N, T, U> {
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("poisson_neuron_electrical_kernel");
-        let mut argument_names = vec![
+        let argument_names = vec![
             String::from("index_to_position"), String::from("seed"), String::from("current_voltage"), String::from("dt"), 
             String::from("v_resting"), String::from("v_th"), String::from("chance_of_firing"), String::from("is_spiking")
         ];
 
         let uint_args = [String::from("is_spiking"), String::from("seed"), String::from("index_to_position")];
 
-        let mut processed_argument_names: Vec<String> = argument_names.iter()
+        let processed_argument_names: Vec<String> = argument_names.iter()
             .map(|i| {
                 if uint_args.contains(i) {
                     format!("__global uint *{}", i)
@@ -408,8 +408,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             })
             .collect();
 
-        processed_argument_names.insert(0, String::from("uint skip_index"));
-
         let program_source = format!(r#"
             {}
 
@@ -417,7 +415,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 {}
             ) {{
                 int gid = get_global_id(0);
-                int index = index_to_position[gid + skip_index] - skip_index;
+                int index = index_to_position[gid];
 
                 uint new_seed = rand(seed[index]);
                 seed[index] = new_seed;
@@ -448,8 +446,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
-        argument_names.insert(0, String::from("skip_index"));
-
         Ok(
             KernelFunction { 
                 kernel, 
@@ -462,7 +458,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
     fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("poisson_neuron_electrochemical_kernel");
-        let mut argument_names = vec![
+        let argument_names = vec![
             String::from("number_of_types"), String::from("index_to_position"),  String::from("neuro_flags"),
             String::from("seed"), String::from("current_voltage"), String::from("dt"), 
             String::from("v_resting"), String::from("v_th"), String::from("chance_of_firing"), 
@@ -507,10 +503,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
         parsed_argument_names.extend(parsed_neurotransmitter_args);
 
-        parsed_argument_names.insert(0, String::from("uint skip_index"));
-
-        argument_names.insert(0, String::from("skip_index"));
-
         let program_source = format!(r#"
             {}
             {}
@@ -520,7 +512,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 {}
             ) {{
                 int gid = get_global_id(0);
-                int index = index_to_position[gid + skip_index] - skip_index;
+                int index = index_to_position[gid];
 
                 float new_seed = rand(seed[index]);
                 seed[index] = new_seed;
@@ -1043,7 +1035,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
 impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for RateSpikeTrain<N, T, U> {
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("rate_spike_train_electrical_kernel");
-        let mut argument_names = vec![
+        let argument_names = vec![
             String::from("index_to_position"), String::from("current_voltage"), String::from("dt"), 
             String::from("v_resting"), String::from("v_th"), String::from("rate"), String::from("step"), 
             String::from("is_spiking")
@@ -1051,7 +1043,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
         let uint_args = [String::from("is_spiking"), String::from("index_to_position")];
 
-        let mut processed_argument_names: Vec<String> = argument_names.iter()
+        let processed_argument_names: Vec<String> = argument_names.iter()
             .map(|i| {
                 if uint_args.contains(i) {
                     format!("__global uint *{}", i)
@@ -1061,8 +1053,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             })
             .collect();
 
-        processed_argument_names.insert(0, String::from("uint skip_index"));
-
         let program_source = format!(r#"
             {}
 
@@ -1070,7 +1060,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 {}
             ) {{
                 int gid = get_global_id(0);
-                int index = index_to_position[gid + skip_index] - skip_index;
+                int index = index_to_position[gid];
 
                 step[index] += dt[index];
                 if (rate[index] != 0.0f && step[index] >= rate[index]) {{
@@ -1096,8 +1086,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
             Err(_) => return Err(GPUError::KernelCompileFailure),
         };
 
-        argument_names.insert(0, String::from("skip_index"));
-
         Ok(
             KernelFunction { 
                 kernel, 
@@ -1110,7 +1098,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
     fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("rate_spike_train_electrochemical_kernel");
-        let mut argument_names = vec![
+        let argument_names = vec![
             String::from("number_of_types"), String::from("index_to_position"),  String::from("neuro_flags"),
             String::from("current_voltage"), String::from("dt"), String::from("v_resting"),
             String::from("v_th"), String::from("rate"), String::from("step"), String::from("is_spiking")
@@ -1153,10 +1141,6 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
 
         parsed_argument_names.extend(parsed_neurotransmitter_args);
 
-        parsed_argument_names.insert(0, String::from("uint skip_index"));
-
-        argument_names.insert(0, String::from("skip_index"));
-
         let program_source = format!(r#"
             {}
             {}
@@ -1166,7 +1150,7 @@ impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefrac
                 {}
             ) {{
                 int gid = get_global_id(0);
-                int index = index_to_position[gid + skip_index] - skip_index;
+                int index = index_to_position[gid];
 
                 step[index] += dt[index];
                 if (rate[index] != 0.0f && step[index] >= rate[index]) {{
