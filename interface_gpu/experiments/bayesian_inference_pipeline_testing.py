@@ -575,7 +575,13 @@ for current_state in tqdm(all_states):
                     )
                 )
 
+        gpu_network = ln.IzhikevichNeuronNetworkGPU.from_network(network)
+
+        gpu_network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
         network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
+
+        assert np.sum(np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)) < 0.1, \
+            f'error: {np.sum(np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history))}'
 
         hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
