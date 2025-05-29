@@ -6,9 +6,22 @@ import lixirnet as ln
 
 e1 = 0
 e2 = 1
+i1 = 2
+i2 = 3
+c1 = 4
+c2 = 5
 exc_n1 = 3
 exc_n2 = 2
 iterations = 1000
+
+def get_spike_train_setup(init_state):
+    def setup_spike_train(pos, neuron):
+        x, y = pos
+        neuron.step = init_state[x][y]
+
+        return neuron
+    
+    return setup_spike_train
 
 class TestCPUGPUImpl(unittest.TestCase):
     def test_network_electrical_using_from(self):
@@ -78,29 +91,29 @@ class TestCPUGPUImpl(unittest.TestCase):
         np.save(f'cpu_history_{self._testMethodName}_e2.npy', np.array(network.get_lattice(e2).history))
         np.save(f'gpu_history_{self._testMethodName}_e2.npy', np.array(gpu_network.get_lattice(e2).history))
 
-        # self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
         
-        # self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
 
-        for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e1).history, gpu_network.get_lattice(e1).history)):
-            for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
-                for i, j in zip(cpu_row, gpu_row):
-                    if i > -80 and (i != neuron.c and j != neuron.c):
-                        self.assertTrue(
-                            np.abs(i - j) < 4,
-                            f'{n} | {i} != {j}'
-                        )
+        # for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e1).history, gpu_network.get_lattice(e1).history)):
+        #     for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
+        #         for i, j in zip(cpu_row, gpu_row):
+        #             if i > -80 and (i != neuron.c and j != neuron.c):
+        #                 self.assertTrue(
+        #                     np.abs(i - j) < 4,
+        #                     f'{n} | {i} != {j}'
+        #                 )
 
-        for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e2).history, gpu_network.get_lattice(e2).history)):
-            for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
-                for i, j in zip(cpu_row, gpu_row):
-                    if i > -80 and (i != neuron.c and j != neuron.c):
-                        self.assertTrue(
-                            np.abs(i - j) < 4,
-                            f'{n} | {i} != {j}'
-                        )
+        # for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e2).history, gpu_network.get_lattice(e2).history)):
+        #     for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
+        #         for i, j in zip(cpu_row, gpu_row):
+        #             if i > -80 and (i != neuron.c and j != neuron.c):
+        #                 self.assertTrue(
+        #                     np.abs(i - j) < 4,
+        #                     f'{n} | {i} != {j}'
+        #                 )
     
-    def test_isolated_network_chemical_using_from(self):
+    def test_network_chemical_using_from(self):
         neuron = ln.IzhikevichNeuron()
         neuron.c_m = 25
 
@@ -175,27 +188,87 @@ class TestCPUGPUImpl(unittest.TestCase):
         np.save(f'cpu_history_{self._testMethodName}_e2.npy', np.array(network.get_lattice(e2).history))
         np.save(f'gpu_history_{self._testMethodName}_e2.npy', np.array(gpu_network.get_lattice(e2).history))
 
-        # self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
         
-        # self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
 
-        for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e1).history, gpu_network.get_lattice(e1).history)):
-            for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
-                for i, j in zip(cpu_row, gpu_row):
-                    if i > -80 and (i != neuron.c and j != neuron.c):
-                        self.assertTrue(
-                            np.abs(i - j) < 5,
-                            f'{n} | {i} != {j}'
-                        )
+        # for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e1).history, gpu_network.get_lattice(e1).history)):
+        #     for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
+        #         for i, j in zip(cpu_row, gpu_row):
+        #             if i > -80 and (i != neuron.c and j != neuron.c):
+        #                 self.assertTrue(
+        #                     np.abs(i - j) < 5,
+        #                     f'{n} | {i} != {j}'
+        #                 )
 
-        for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e2).history, gpu_network.get_lattice(e2).history)):
-            for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
-                for i, j in zip(cpu_row, gpu_row):
-                    if i > -80 and (i != neuron.c and j != neuron.c):
-                        self.assertTrue(
-                            np.abs(i - j) < 5,
-                            f'{n} | {i} != {j}'
-                        )
+        # for n, (cpu_grid, gpu_grid) in enumerate(zip(network.get_lattice(e2).history, gpu_network.get_lattice(e2).history)):
+        #     for cpu_row, gpu_row in zip(cpu_grid, gpu_grid):
+        #         for i, j in zip(cpu_row, gpu_row):
+        #             if i > -80 and (i != neuron.c and j != neuron.c):
+        #                 self.assertTrue(
+        #                     np.abs(i - j) < 5,
+        #                     f'{n} | {i} != {j}'
+        #                 )
 
+    def test_network_electrical_with_spike_trains(self):
+        neuron = ln.IzhikevichNeuron()
+        neuron.gap_conductance = 10
+        neuron.c_m = 25
+
+        init_state1 = np.random.uniform(neuron.c, neuron.v_th, (exc_n1, exc_n1))
+        init_state2 = np.random.uniform(neuron.c, neuron.v_th, (exc_n2, exc_n2))
+
+        setup_neuron1 = get_neuron_setup(init_state1)
+        setup_neuron2 = get_neuron_setup(init_state2)
+
+        spike_train = ln.RateSpikeTrain()
+        spike_train.rate = 100
+
+        init_spike_train = np.random.uniform(0, 100, (exc_n1, exc_n1))
+
+        setup_spike_train = get_spike_train_setup(init_spike_train)
+
+        spike_train_lattice = ln.RateSpikeTrainLattice(c1)
+        spike_train_lattice.populate(spike_train, exc_n1, exc_n1)
+        spike_train_lattice.apply_given_position(setup_spike_train)
+        spike_train_lattice.update_grid_history = True
+
+        lattice1 = ln.IzhikevichNeuronLattice(e1)
+        lattice1.populate(neuron, exc_n1, exc_n1)
+        lattice1.apply_given_position(setup_neuron1)
+        lattice1.connect(lambda x, y: x != y, lambda x, y: 5)
+        lattice1.update_grid_history = True
+
+        # lattice2 = ln.IzhikevichNeuronLattice(i1)
+        # lattice2.populate(neuron, exc_n2, exc_n2)
+        # lattice2.apply_given_position(setup_neuron2)
+        # lattice2.connect(lambda x, y: x != y, lambda x, y: 3)
+        # lattice2.update_grid_history = True
+
+        network = ln.IzhikevichNeuronNetwork.generate_network([lattice1], [spike_train_lattice])
+        # network.connect(e1, i1, lambda x, y: x == y, lambda x, y: 5)
+        # network.connect(i1, e1, lambda x, y: x == y, lambda x, y: -3)
+        network.connect(c1, e1, lambda x, y: x == y, lambda x, y: 5)
+        network.electrical_synapse = True
+        network.chemical_synapse = False
+        gpu_network = ln.IzhikevichNeuronNetworkGPU.from_network(network)
+
+        self.assertTrue(network.connecting_weights, gpu_network.connecting_weights)
+
+        network.run_lattices(iterations)
+        gpu_network.run_lattices(iterations)
+
+        np.save(f'cpu_history_{self._testMethodName}_e1.npy', np.array(network.get_lattice(e1).history))
+        np.save(f'gpu_history_{self._testMethodName}_e1.npy', np.array(gpu_network.get_lattice(e1).history))
+
+        # np.save(f'cpu_history_{self._testMethodName}_i1.npy', np.array(network.get_lattice(i1).history))
+        # np.save(f'gpu_history_{self._testMethodName}_i1.npy', np.array(gpu_network.get_lattice(i1).history))
+
+        self.assertTrue(np.abs((np.array(network.get_spike_train_lattice(c1).history) - np.array(gpu_network.get_spike_train_lattice(c1).history)).sum()) < 0.1)
+
+        # self.assertTrue(np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)).sum()) < 0.1)
+
+        self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
+        
 if __name__ == '__main__':
     unittest.main()
