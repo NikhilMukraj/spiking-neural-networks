@@ -260,13 +260,12 @@ impl LatticeHistoryGPU for GridVoltageHistory {
 const LAST_FIRING_TIME_KERNEL: &str = r#"
 __kernel void set_last_firing_time(
     __global const uint *index_to_position,
-    uint skip_index,
     __global const uint *is_spiking,
     __global int *last_firing_time,
     int iteration
 ) {
     int gid = get_global_id(0);
-    int index = index_to_position[gid + skip_index] - skip_index;
+    int index = index_to_position[gid];
 
     if (is_spiking[index] != 0) {
         last_firing_time[index] = iteration;
@@ -682,7 +681,6 @@ where
         let last_firing_time_event = unsafe {
             match ExecuteKernel::new(&self.last_firing_time_kernel)
                 .set_arg(&gpu_graph.index_to_position)
-                .set_arg(&0)
                 .set_arg(
                     match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
                         BufferGPU::UInt(buffer) => buffer,
@@ -2059,13 +2057,11 @@ where
         &self, 
         gpu_graph: &InterleavingGraphGPU, 
         gpu_cell_grid: &HashMap<String, BufferGPU>, 
-        skip_index: u32,
         size: usize,
     ) -> Result<(), GPUError> {
         let last_firing_time_event = unsafe {
             match ExecuteKernel::new(&self.last_firing_time_kernel)
                 .set_arg(&gpu_graph.index_to_position)
-                .set_arg(&skip_index)
                 .set_arg(
                     match &gpu_cell_grid.get("is_spiking").expect("Could not retrieve buffer: is_spiking") {
                         BufferGPU::UInt(buffer) => buffer,
@@ -2380,7 +2376,6 @@ where
                     self.execute_last_firing_time(
                         &gpu_graph, 
                         &gpu_cell_grid, 
-                        0, 
                         spike_train_skip_index as usize
                     )?
                 };
@@ -2454,7 +2449,6 @@ where
                     self.execute_last_firing_time(
                         &gpu_graph, 
                         &gpu_spike_train_grid, 
-                        spike_train_skip_index,
                         spike_train_size,
                     )?
                 };
@@ -2785,7 +2779,6 @@ where
                     self.execute_last_firing_time(
                         &gpu_graph, 
                         &gpu_cell_grid, 
-                        0, 
                         spike_train_skip_index as usize
                     )?
                 };
@@ -2858,7 +2851,6 @@ where
                         self.execute_last_firing_time(
                             &gpu_graph, 
                             &gpu_spike_train_grid, 
-                            spike_train_skip_index,
                             spike_train_size,
                         )?
                     };
