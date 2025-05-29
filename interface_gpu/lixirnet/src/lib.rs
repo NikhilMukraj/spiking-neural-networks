@@ -482,3 +482,118 @@ fn lixirnet(_py: Python, m: &PyModule) -> PyResult<()> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod test {
+    use rand::prelude::*;
+    use spiking_neural_networks::{
+        neuron::{
+            iterate_and_spike::Receptors,
+            gpu_lattices::LatticeNetworkGPU,
+            spike_train::RateSpikeTrain,
+            Lattice, SpikeTrainLattice, LatticeNetwork, RunNetwork
+        },
+    };
+    use super::{
+        DopaGluGABANeurotransmitterType, DopaGluGABAType, GlutamateReceptor, BoundedNeurotransmitterKinetics, IzhikevichNeuron,
+        PyIzhikevichNeuronNetwork, PyIzhikevichNeuronNetworkGPU,
+    };
+
+
+    fn check_history(history: &[Vec<Vec<f32>>], gpu_history: &[Vec<Vec<f32>>], tolerance: f32, msg: &str) {
+        assert_eq!(history.len(), gpu_history.len());
+
+        for (cpu_cell_grid, gpu_cell_grid) in history.iter().zip(gpu_history.iter()) {
+            for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
+                for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
+                    let error = (voltage1 - voltage2).abs();
+                    assert!(
+                        error <= tolerance, "{} | error: {}, voltage1: {}, voltage2: {}", 
+                        msg,
+                        error,
+                        voltage1,
+                        voltage2,
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_with_spike_trains() {
+        let mut spike_train = RateSpikeTrain { rate: 100., dt: 1., ..Default::default() }; 
+
+        spike_train.synaptic_neurotransmitters
+            .insert(DopaGluGABANeurotransmitterType::Glutamate, BoundedNeurotransmitterKinetics::default());
+
+        let mut spike_train_lattice = SpikeTrainLattice::default();
+        spike_train_lattice.set_id(0);
+        spike_train_lattice.populate(&spike_train, 3, 3).unwrap();
+        spike_train_lattice.apply(|neuron: &mut _| neuron.step = rand::thread_rng().gen_range(0.0..=100.));
+        spike_train_lattice.update_grid_history = true;
+
+        let mut base_neuron = IzhikevichNeuron::default_impl();
+        base_neuron.gap_conductance = 10.;
+        base_neuron.c_m = 25.;
+
+        base_neuron.receptors
+            .insert(DopaGluGABANeurotransmitterType::Glutamate, DopaGluGABAType::Glutamate(GlutamateReceptor::default()))
+            .expect("Valid neurotransmitter pairing");
+        base_neuron.synaptic_neurotransmitters
+            .insert(DopaGluGABANeurotransmitterType::Glutamate, BoundedNeurotransmitterKinetics::default());
+
+        let mut lattice: Lattice<IzhikevichNeuron<_, _>, _, _, _, DopaGluGABANeurotransmitterType> = Lattice::default_impl();
+        lattice.set_id(1);
+        lattice.populate(&base_neuron, 3, 3).unwrap();
+        lattice.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.c..=neuron.v_th));
+        lattice.connect(&(|x, y| x != y), Some(&(|_, _| 5.0)));
+        lattice.update_grid_history = true;
+
+        let lattices: Vec<Lattice<IzhikevichNeuron<_, _>, _, _, _, DopaGluGABANeurotransmitterType>> = vec![lattice];
+        let spike_train_lattices: Vec<_> = vec![spike_train_lattice];
+
+        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices).unwrap();
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.))).unwrap();
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+        network.parallel = true;
+        network.set_dt(1.);
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network.clone()).unwrap();
+        let mut py_network = PyIzhikevichNeuronNetwork { network: network.clone() };
+        let mut py_gpu_network = PyIzhikevichNeuronNetworkGPU { network: LatticeNetworkGPU::from_network(network.clone()).unwrap() };
+        
+        network.run_lattices(1000).unwrap();
+        gpu_network.run_lattices(1000).unwrap();
+        py_network.run_lattices(1000).unwrap();
+        py_gpu_network.run_lattices(1000).unwrap();
+        
+        let cpu_history = &network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+        let gpu_history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+        let py_history = &py_network.network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+        let py_gpu_history = &py_gpu_network.network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+
+        assert_eq!(cpu_history.len(), 1000);
+        assert_eq!(gpu_history.len(), 1000);
+        assert_eq!(py_history.len(), 1000);
+        assert_eq!(py_gpu_history.len(), 1000);
+
+        check_history(cpu_history, gpu_history, 1., "spike_train");
+        check_history(cpu_history, py_history, 1., "spike_train");
+        check_history(cpu_history, py_gpu_history, 1., "spike_train");
+
+        let cpu_history = &network.get_lattice(&1).unwrap().grid_history.history;
+        let gpu_history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
+        let py_history = &py_network.network.get_lattice(&1).unwrap().grid_history.history;
+        let py_gpu_history = &py_gpu_network.network.get_lattice(&1).unwrap().grid_history.history;
+
+        assert_eq!(cpu_history.len(), 1000);
+        assert_eq!(gpu_history.len(), 1000);
+        assert_eq!(py_history.len(), 1000);
+        assert_eq!(py_gpu_history.len(), 1000);
+
+        check_history(cpu_history, gpu_history, 3., "gpu");
+        check_history(cpu_history, py_history, 3., "py");
+        check_history(cpu_history, py_gpu_history, 3., "py-gpu");
+    }
+}
