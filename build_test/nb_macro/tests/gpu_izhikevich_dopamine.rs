@@ -13,14 +13,10 @@ mod test {
     use rand::prelude::*;
     use rand_chacha::ChaCha8Rng;
     use spiking_neural_networks::{
-        error::{GPUError, SpikingNeuralNetworksError},
-        neuron::{
+        error::{GPUError, SpikingNeuralNetworksError}, neuron::{
             gpu_lattices::{LatticeGPU, LatticeNetworkGPU}, iterate_and_spike::{
-                BufferGPU, IterateAndSpike, IterateAndSpikeGPU, 
-                NeurotransmitterConcentrations, NeurotransmitterTypeGPU, 
-                Receptors, Timestep
-            }, 
-            CellGrid, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork
+                BufferGPU, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Receptors, Timestep
+            }, CellGrid, GridVoltageHistory, Lattice, LatticeNetwork, RunLattice, RunNetwork,
         }
     };
 
