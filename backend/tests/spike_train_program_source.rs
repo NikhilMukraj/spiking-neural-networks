@@ -140,8 +140,6 @@ mod tests {
                         kernel_execution.set_arg(&IonotropicReceptorNeurotransmitterType::number_of_types());
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
-                    } else if i == "skip_index" { 
-                        kernel_execution.set_arg(&0);
                     } else if i == "neuro_flags" {
                         match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
