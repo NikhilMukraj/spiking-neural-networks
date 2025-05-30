@@ -37,7 +37,7 @@ mod test {
     fn check_history(history: &[Vec<Vec<f32>>], gpu_history: &[Vec<Vec<f32>>], tolerance: f32) {
         assert_eq!(history.len(), gpu_history.len());
 
-        for (cpu_cell_grid, gpu_cell_grid) in history.iter().zip(gpu_history.iter()) {
+        for (n, (cpu_cell_grid, gpu_cell_grid)) in history.iter().zip(gpu_history.iter()).enumerate() {
             for (row1, row2) in cpu_cell_grid.iter().zip(gpu_cell_grid) {
                 for (voltage1, voltage2) in row1.iter().zip(row2.iter()) {
                     if *voltage1 == -75. || *voltage2 == -75. {
@@ -45,7 +45,8 @@ mod test {
                     }
                     let error = (voltage1 - voltage2).abs();
                     assert!(
-                        error <= tolerance, "error: {}, voltage1: {}, voltage2: {}", 
+                        error <= tolerance, "{} | error: {}, voltage1: {}, voltage2: {}", 
+                        n,
                         error,
                         voltage1,
                         voltage2,
@@ -304,13 +305,9 @@ mod test {
         let mut network: NetworkType = LatticeNetwork::generate_network(lattices, spike_trains)?;
 
         network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
-        if electrical_synapse {
-            network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| -3.0)))?;
-        } else {
-            network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
-        }
+        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
         network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
-
+        
         network.electrical_synapse = electrical_synapse;
         network.chemical_synapse = chemical_synapse;
 
@@ -363,6 +360,70 @@ mod test {
     #[test]
     fn test_spike_train_with_multiple_lattices_electrochemical() -> Result<(), SpikingNeuralNetworksError> {
         test_spike_train_with_multiple_lattices(true, true, 100.)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_single_spike_train_lattice_and_lattice() -> Result<(), SpikingNeuralNetworksError> {
+        let mut spike_train: RateSpikeTrain<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness> = RateSpikeTrain { rate: 100., dt: 1., ..Default::default() }; 
+
+        spike_train.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+
+        let mut spike_train_lattice: SpikeTrainLattice<IonotropicNeurotransmitterType, RateSpikeTrain<_, _, _>, _> = SpikeTrainLattice::default();
+        spike_train_lattice.set_id(0);
+        spike_train_lattice.populate(&spike_train, 2, 2)?;
+        spike_train_lattice.apply(|neuron: &mut _| neuron.step = rand::thread_rng().gen_range(0.0..=100.));
+        spike_train_lattice.update_grid_history = true;
+
+        let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+        base_neuron.gap_conductance = 10.;
+        base_neuron.c_m = 25.;
+
+        base_neuron.receptors
+            .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))
+            .expect("Valid neurotransmitter pairing");
+        base_neuron.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+
+        let mut lattice = Lattice::default_impl();
+        lattice.set_id(1);
+        lattice.populate(&base_neuron, 2, 2)?;
+        lattice.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th));
+        lattice.connect(&(|x, y| x != y), Some(&(|_, _| 5.0)));
+        lattice.update_grid_history = true;
+
+        let lattices: Vec<Lattice<QuadraticIntegrateAndFireNeuron<_, _>, _, GridVoltageHistory, STDP, IonotropicNeurotransmitterType>> = vec![lattice];
+        let spike_train_lattices: Vec<SpikeTrainLattice<IonotropicNeurotransmitterType, RateSpikeTrain<_, _, _>, SpikeTrainGridHistory>> = vec![spike_train_lattice];
+
+        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.)))?;
+        network.electrical_synapse = true;
+        network.chemical_synapse = false;
+        network.parallel = true;
+        network.set_dt(1.);
+
+        let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
+
+        network.run_lattices(ITERATIONS)?;
+        gpu_network.run_lattices(ITERATIONS)?;
+
+        let cpu_history = &network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+        let gpu_history = &gpu_network.get_spike_train_lattice(&0).unwrap().grid_history.history;
+
+        assert_eq!(cpu_history.len(), ITERATIONS);
+        assert_eq!(gpu_history.len(), ITERATIONS);
+
+        check_history(cpu_history, gpu_history, 1.);
+
+        let cpu_history = &network.get_lattice(&1).unwrap().grid_history.history;
+        let gpu_history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
+
+        assert_eq!(cpu_history.len(), ITERATIONS);
+        assert_eq!(gpu_history.len(), ITERATIONS);
+
+        check_history(cpu_history, gpu_history, 5.);
 
         Ok(())
     }
