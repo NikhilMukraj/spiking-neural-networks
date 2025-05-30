@@ -156,6 +156,24 @@ __kernel void add_grid_voltage_history(
 
 const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
 
+// const SPIKE_HISTORY_KERNEL: &str = r#"
+// __kernel void add_spike_history(
+//     __global const uint *index_to_position,
+//     __global const uint *is_spiking,
+//     __global uint *history,
+//     int iteration,
+//     int size,
+//     int skip_index
+// ) {
+//     int gid = get_global_id(0);
+//     int index = index_to_position[gid + skip_index];
+
+//     history[iteration * size + index_to_position[gid]] = is_spiking[index]; 
+// }
+// "#;
+
+// const SPIKE_HISTORY_KERNEL_NAME: &str = "add_spike_history";
+
 pub trait LatticeHistoryGPU: LatticeHistory {
     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
@@ -1280,7 +1298,7 @@ __kernel void calculate_network_chemical_inputs(
 
     for (int t_index = 0; t_index < number_of_types; t_index++) {
         if (counts[gid * number_of_types + t_index] != 0.0f) {
-            res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+            res[gid * number_of_types + t_index] /= counts[gid * number_of_types + t_index];
         } else {
             res[gid * number_of_types + t_index] = 0.0f;
         }
@@ -1432,9 +1450,9 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
                             sum += weights[i * n + gid] * gap_junction;
                         }} else {{
                             if (last_firing_time[presynaptic_index - skip_index] < 0) {{
-                                sum += {}v_resting[presynaptic_index - skip_index];
+                                sum += weights[i * n + gid] * {}v_resting[presynaptic_index - skip_index];
                             }} else {{
-                                sum += gap_conductances[postsynaptic_index] * get_effect(timestep, {});
+                                sum += weights[i * n + gid] * gap_conductances[postsynaptic_index] * get_effect(timestep, {});
                             }}
                         }}
                         count++;
