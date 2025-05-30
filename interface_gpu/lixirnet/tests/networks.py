@@ -441,15 +441,15 @@ class TestCPUGPUImpl(unittest.TestCase):
         lattice1.connect(lambda x, y: x != y, lambda x, y: 5)
         lattice1.update_grid_history = True
 
-        lattice2 = ln.IzhikevichNeuronLattice(i1)
+        lattice2 = ln.IzhikevichNeuronLattice(e2)
         lattice2.populate(neuron, exc_n2, exc_n2)
         lattice2.apply_given_position(setup_neuron2)
         lattice2.connect(lambda x, y: x != y, lambda x, y: 3)
         lattice2.update_grid_history = True
 
         network = ln.IzhikevichNeuronNetwork.generate_network([lattice1, lattice2], [spike_train_lattice])
-        network.connect(e1, i1, lambda x, y: x == y, lambda x, y: 5)
-        network.connect(i1, e1, lambda x, y: x == y, lambda x, y: 3)
+        network.connect(e1, e2, lambda x, y: x == y, lambda x, y: 5)
+        network.connect(e2, e1, lambda x, y: x == y, lambda x, y: 3)
         network.connect(c1, e1, lambda x, y: x == y, lambda x, y: 5)
         network.electrical_synapse = False
         network.chemical_synapse = True
@@ -463,12 +463,12 @@ class TestCPUGPUImpl(unittest.TestCase):
         np.save(f'cpu_history_{self._testMethodName}_e1.npy', np.array(network.get_lattice(e1).history))
         np.save(f'gpu_history_{self._testMethodName}_e1.npy', np.array(gpu_network.get_lattice(e1).history))
 
-        np.save(f'cpu_history_{self._testMethodName}_i1.npy', np.array(network.get_lattice(i1).history))
-        np.save(f'gpu_history_{self._testMethodName}_i1.npy', np.array(gpu_network.get_lattice(i1).history))
+        np.save(f'cpu_history_{self._testMethodName}_e2.npy', np.array(network.get_lattice(e2).history))
+        np.save(f'gpu_history_{self._testMethodName}_e2.npy', np.array(gpu_network.get_lattice(e2).history))
 
         self.assertTrue(np.abs((np.array(network.get_spike_train_lattice(c1).history) - np.array(gpu_network.get_spike_train_lattice(c1).history)).sum()) < 0.1)
 
-        self.assertTrue(np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
 
         self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
 
