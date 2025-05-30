@@ -1,20 +1,15 @@
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use opencl3::{command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}};
+    use opencl3::{command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}};
     use rand::Rng;
     use spiking_neural_networks::{
         error::{GPUError, SpikingNeuralNetworksError},
         graph::{AdjacencyMatrix, Graph, GraphPosition, InterleavingGraphGPU}, 
         neuron::{
-            integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
-            iterate_and_spike::{
+            integrate_and_fire::QuadraticIntegrateAndFireNeuron, iterate_and_spike::{
                 ApproximateNeurotransmitter, ApproximateReceptor, IonotropicNeurotransmitterType
-            }, 
-            spike_train::{DeltaDiracRefractoriness, PoissonNeuron}, 
-            plasticity::STDP,
-            Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice,
-            GridVoltageHistory,
+            }, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, PoissonNeuron, RateSpikeTrain}, GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice
         }
     };
 
@@ -81,7 +76,7 @@ mod tests {
         let queue = match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
@@ -216,7 +211,7 @@ mod tests {
         let queue = match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
@@ -351,7 +346,7 @@ mod tests {
         let queue = match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
@@ -457,7 +452,7 @@ mod tests {
         let queue = match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
@@ -535,6 +530,156 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    type SpikeTrainType = RateSpikeTrain<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
+    type SpikeTrainLatticeType = SpikeTrainLattice<IonotropicNeurotransmitterType, SpikeTrainType, SpikeTrainGridHistory>;
+    type NeuronType = QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
+    type LatticeType = Lattice<NeuronType, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDP, IonotropicNeurotransmitterType>;
+    type NetworkType = LatticeNetwork<
+        NeuronType,
+        AdjacencyMatrix<(usize, usize), f32>,
+        GridVoltageHistory,
+        SpikeTrainType,
+        SpikeTrainGridHistory,
+        AdjacencyMatrix<GraphPosition, f32>,
+        STDP,
+        IonotropicNeurotransmitterType,
+    >;
+
+    #[test]
+    pub fn test_graph_conversion_various_weights() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = QuadraticIntegrateAndFireNeuron {
+            gap_conductance: 0.1,
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
+        };
+
+        let spike_train: SpikeTrainType = RateSpikeTrain::default(); 
+
+        let mut spike_train_lattice: SpikeTrainLatticeType = SpikeTrainLattice::default();
+        spike_train_lattice.set_id(0);
+        spike_train_lattice.populate(&spike_train, 3, 3)?;
+        spike_train_lattice.apply(|neuron: &mut SpikeTrainType| neuron.step = rand::thread_rng().gen_range(0.0..=100.));
+        spike_train_lattice.update_grid_history = true;
+        
+        let mut lattice1: LatticeType = Lattice::default();
+        lattice1.set_id(1);
+        lattice1.populate(&base_neuron, 3, 3)?;
+        lattice1.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th));
+        lattice1.connect(&(|x, y| x != y), Some(&(|_, _| 4.0)));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2: LatticeType = Lattice::default();
+        lattice2.set_id(2);
+        lattice2.populate(&base_neuron, 2, 2)?;
+        lattice2.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th));
+        lattice2.connect(&(|x, y| x != y), Some(&(|_, _| 2.0)));
+        lattice2.update_grid_history = true;
+
+        let lattices = vec![lattice1, lattice2];
+        let spike_trains = vec![spike_train_lattice];
+        let mut network: NetworkType = LatticeNetwork::generate_network(lattices, spike_trains)?;
+
+        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 1.0)))?;
+        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
+
+        let connecting_graph: &AdjacencyMatrix<GraphPosition, f32> = network.get_connecting_graph();
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = match Context::from_device(&device) {
+            Ok(value) => value,
+            Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+        };
+
+        let queue = match CommandQueue::create_default_with_properties(
+                &context, 
+                CL_QUEUE_PROFILING_ENABLE,
+                0,
+            ) {
+                Ok(value) => value,
+                Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+            };
+
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
+            &context, &queue, network.get_lattices(), network.get_spike_train_lattices(), connecting_graph
+        )?;
+
+        let mut editable_connecting_graph = AdjacencyMatrix::<GraphPosition, f32>::default();
+        let mut editable_lattices: HashMap<usize, _> = network.get_all_lattice_ids()
+            .iter()
+            .map(|key| 
+                (*key, {
+                    let lattice_to_copy = network.get_lattice(key).unwrap();
+                    let mut current_lattice = Lattice::default_impl();
+                    current_lattice.set_id(*key);
+                    current_lattice.populate(
+                        &base_neuron, 
+                        lattice_to_copy.cell_grid().len(),
+                        lattice_to_copy.cell_grid().first().unwrap_or(&vec![]).len(),
+                    ).unwrap();
+
+                    current_lattice
+                })
+            )
+            .collect();
+        let mut editable_spike_train_lattices: HashMap<usize, _> = network.get_all_spike_train_lattice_ids()
+            .iter()
+            .map(|key| 
+                (*key, {
+                    let lattice_to_copy = network.get_spike_train_lattice(key).unwrap();
+                    let mut current_lattice = SpikeTrainLattice::default_impl();
+                    current_lattice.set_id(*key);
+                    current_lattice.populate(
+                        &spike_train,
+                        lattice_to_copy.spike_train_grid().len(),
+                        lattice_to_copy.spike_train_grid().first().unwrap_or(&vec![]).len(),
+                    ).unwrap();
+
+                    current_lattice
+                })
+            )
+            .collect();
+
+        InterleavingGraphGPU::convert_to_cpu(
+            &queue, &gpu_graph, &mut editable_lattices, &mut editable_spike_train_lattices, &mut editable_connecting_graph
+        )?;
+
+        for i in network.get_all_lattice_ids() {
+            let actual_index_to_position = &editable_lattices.get(&i).unwrap().graph().index_to_position;
+            let expected_index_to_position = &network.get_lattice(&i).unwrap().graph().index_to_position;
+            assert_eq!(
+                actual_index_to_position, 
+                expected_index_to_position,
+            );
+
+            for pre in actual_index_to_position.values() {
+                for post in actual_index_to_position.values() {
+                    let actual_weight = editable_lattices.get(&i).unwrap().graph().lookup_weight(pre, post)
+                        .unwrap();
+                    let expected_weight = network.get_lattice(&i).unwrap().graph().lookup_weight(pre, post)
+                        .unwrap();
+
+                    assert_eq!(actual_weight, expected_weight);
+                }
+            }
+        }
+
+        for pre in connecting_graph.index_to_position.values() {
+            for post in connecting_graph.index_to_position.values() {
+                let actual_weight = connecting_graph.lookup_weight(pre, post).unwrap();
+                let expected_weight = editable_connecting_graph.lookup_weight(pre, post).unwrap();
+
+                assert_eq!(actual_weight, expected_weight);
+            }
+        }
+        
         Ok(())
     }
 }
