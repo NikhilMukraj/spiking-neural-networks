@@ -116,7 +116,7 @@ pub fn iterate_coupled_spiking_neurons<T: IterateAndSpike>(
 /// Calculates the input to the postsynaptic neuron given a spike train
 /// and the potenation of the spike train as well as the current timestep 
 /// of the simulation
-pub fn spike_train_gap_juncton<T: SpikeTrain, U: GapConductance>(
+pub fn spike_train_gap_junction<T: SpikeTrain, U: GapConductance>(
     presynaptic_neuron: &T,
     postsynaptic_neuron: &U,
     timestep: usize,
@@ -174,7 +174,7 @@ where
     };
 
     let (pre_current, post_current) = if electrical_synapse {
-        let pre_current = spike_train_gap_juncton(
+        let pre_current = spike_train_gap_junction(
             spike_train, 
             presynaptic_neuron, 
             timestep
@@ -2137,7 +2137,7 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
+                    spike_train_gap_junction(input_cell, postsynaptic_neuron, self.internal_clock)
                 };
 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
@@ -4506,7 +4506,7 @@ where
                         .unwrap()
                         .cell_grid[pos_x][pos_y];
 
-                    spike_train_gap_juncton(input_cell, postsynaptic_neuron, self.internal_clock)
+                    spike_train_gap_junction(input_cell, postsynaptic_neuron, self.internal_clock)
                 };
 
                 let weight: f32 = if input_position.id != postsynaptic_position.id {
