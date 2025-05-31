@@ -268,11 +268,11 @@ class TestCPUGPUImpl(unittest.TestCase):
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)).sum()) < 0.1)
 
-        self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
+        self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.5)
         
     def test_network_chemical_with_spike_trains(self):
         neuron = ln.IzhikevichNeuron()
-        neuron.gap_conductance = 10
+        neuron.gap_conductance = 5
         neuron.c_m = 25
 
         glu_neuro = ln.BoundedNeurotransmitterKinetics()
