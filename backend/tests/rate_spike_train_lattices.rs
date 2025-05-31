@@ -34,7 +34,7 @@ mod test {
         IonotropicNeurotransmitterType,
     >;
 
-    fn check_history(history: &[Vec<Vec<f32>>], gpu_history: &[Vec<Vec<f32>>], tolerance: f32) {
+    fn check_history(history: &[Vec<Vec<f32>>], gpu_history: &[Vec<Vec<f32>>], tolerance: f32, msg: &str) {
         assert_eq!(history.len(), gpu_history.len());
 
         for (n, (cpu_cell_grid, gpu_cell_grid)) in history.iter().zip(gpu_history.iter()).enumerate() {
@@ -45,7 +45,8 @@ mod test {
                     }
                     let error = (voltage1 - voltage2).abs();
                     assert!(
-                        error <= tolerance, "{} | error: {}, voltage1: {}, voltage2: {}", 
+                        error <= tolerance, "{} | {} | error: {}, voltage1: {}, voltage2: {}", 
+                        msg, 
                         n,
                         error,
                         voltage1,
@@ -80,7 +81,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "alone");
 
         Ok(())
     }
@@ -133,7 +134,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "spike train");
 
         let cpu_history = &network.get_lattice(&1).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
@@ -141,7 +142,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 5.);
+        check_history(cpu_history, gpu_history, 5., "lattice");
 
         Ok(())
     }
@@ -223,7 +224,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "spike_train");
 
         let cpu_history = &network.get_spike_train_lattice(&1).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_spike_train_lattice(&1).unwrap().grid_history.history;
@@ -231,7 +232,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "spike_train");
 
         let cpu_history = &network.get_lattice(&2).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_lattice(&2).unwrap().grid_history.history;
@@ -239,7 +240,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 5.);
+        check_history(cpu_history, gpu_history, 5., "lattice");
 
         Ok(())
     }
@@ -277,7 +278,10 @@ mod test {
         spike_train_lattice.apply(|neuron: &mut SpikeTrainType| neuron.step = rand::thread_rng().gen_range(0.0..=100.));
         spike_train_lattice.update_grid_history = true;
 
-        let mut base_neuron = QuadraticIntegrateAndFireNeuron::default_impl();
+        let mut base_neuron = QuadraticIntegrateAndFireNeuron {
+            gap_conductance: 5.,
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
+        };
 
         base_neuron.receptors
             .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))
@@ -290,21 +294,23 @@ mod test {
         lattice1.set_id(1);
         lattice1.populate(&base_neuron, 3, 3)?;
         lattice1.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th));
-        lattice1.connect(&(|x, y| x != y), Some(&(|_, _| 5.0)));
+        lattice1.connect(&(|x, y| x != y), Some(&(|_, _| 6.0)));
         lattice1.update_grid_history = true;
 
         let mut lattice2: LatticeType = Lattice::default();
         lattice2.set_id(2);
         lattice2.populate(&base_neuron, 2, 2)?;
         lattice2.apply(|neuron: &mut _| neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th));
-        lattice2.connect(&(|x, y| x != y), Some(&(|_, _| 3.0)));
+        lattice2.connect(&(|x, y| x != y), Some(&(|_, _| 2.0)));
         lattice2.update_grid_history = true;
 
         let lattices = vec![lattice1, lattice2];
         let spike_trains = vec![spike_train_lattice];
         let mut network: NetworkType = LatticeNetwork::generate_network(lattices, spike_trains)?;
 
-        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
+        network.set_dt(1.);
+
+        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 4.0)))?;
         network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
         network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
         
@@ -322,7 +328,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "spike train");
 
         let cpu_history = &network.get_lattice(&1).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
@@ -330,7 +336,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 3.);
+        check_history(cpu_history, gpu_history, 3., "lattice 1");
 
         let cpu_history = &network.get_lattice(&2).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_lattice(&2).unwrap().grid_history.history;
@@ -338,7 +344,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 3.);
+        check_history(cpu_history, gpu_history, 3., "lattice 2");
 
         Ok(())
     }
@@ -415,7 +421,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 1.);
+        check_history(cpu_history, gpu_history, 1., "spike train");
 
         let cpu_history = &network.get_lattice(&1).unwrap().grid_history.history;
         let gpu_history = &gpu_network.get_lattice(&1).unwrap().grid_history.history;
@@ -423,7 +429,7 @@ mod test {
         assert_eq!(cpu_history.len(), ITERATIONS);
         assert_eq!(gpu_history.len(), ITERATIONS);
 
-        check_history(cpu_history, gpu_history, 5.);
+        check_history(cpu_history, gpu_history, 5., "lattice");
 
         Ok(())
     }
