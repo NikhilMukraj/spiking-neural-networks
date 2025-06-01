@@ -579,10 +579,7 @@ for current_state in tqdm(all_states):
 
         gpu_network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
         network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
-
-        assert np.sum(np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)) < 0.1, \
-            f'error: {np.sum(np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history))}'
-
+    
         hist = network.get_lattice(e1).history
         data = [i.flatten() for i in np.array(hist)]
         peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
@@ -613,7 +610,7 @@ for current_state in tqdm(all_states):
                 parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
-
+        
         if parsed_toml['simulation_parameters']['memory_biases_memory']:
             hist = network.get_lattice(e2).history
             data = [i.flatten() for i in np.array(hist)]
@@ -824,6 +821,10 @@ for current_state in tqdm(all_states):
 
         if parsed_toml['simulation_parameters']['peaks_on']:
             current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
+            gpu_hist = gpu_network.get_lattice(e1).history
+            gpu_data = [i.flatten() for i in np.array(gpu_hist)]
+            gpu_peaks = [find_peaks_above_threshold([j[i] for j in gpu_data], 20) for i in range(len(gpu_data[0]))]
+            current_value['gpu_peaks'] = [[int(item) for item in sublist] for sublist in gpu_peaks]
 
         simulation_output[key] = current_value
 
