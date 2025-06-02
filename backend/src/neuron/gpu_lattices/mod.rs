@@ -3175,3 +3175,171 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::{cl_float, create_and_write_buffer, SpikingNeuralNetworksError};
+    use std::ptr;
+    use opencl3::{command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, program::Program, types::{cl_uint, CL_NON_BLOCKING}};
+    use crate::error::GPUError;
+    use crate::neuron::gpu_lattices::{
+        NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, 
+        NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME
+    };
+
+    fn fill_buffer_f32(
+        context: &Context,
+        queue: &CommandQueue,
+        size: usize,
+        data: &[f32],
+    ) -> Result<Buffer<cl_float>, GPUError> {
+        let mut buffer = unsafe {
+            Buffer::<cl_float>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+                .map_err(|_| GPUError::BufferCreateError)?
+        };
+
+        let write_event = unsafe {
+            queue
+                .enqueue_write_buffer(&mut buffer, CL_NON_BLOCKING, 0, data, &[])
+                .map_err(|_| GPUError::BufferWriteError)?
+        };
+
+        write_event.wait().map_err(|_| GPUError::WaitError)?;
+
+        Ok(buffer)
+    }
+
+    fn fill_buffer_u32(
+        context: &Context,
+        queue: &CommandQueue,
+        size: usize,
+        data: &[u32],
+    ) -> Result<Buffer<cl_uint>, GPUError> {
+        let mut buffer = unsafe {
+            Buffer::<cl_uint>::create(context, CL_MEM_READ_WRITE, size, ptr::null_mut())
+                .map_err(|_| GPUError::BufferCreateError)?
+        };
+
+        let write_event = unsafe {
+            queue
+                .enqueue_write_buffer(&mut buffer, CL_NON_BLOCKING, 0, data, &[])
+                .map_err(|_| GPUError::BufferWriteError)?
+        };
+
+        write_event.wait().map_err(|_| GPUError::WaitError)?;
+
+        Ok(buffer)
+    }
+
+    #[test]
+    fn test_chemical_kernel_with_spike_trains() -> Result<(), SpikingNeuralNetworksError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = match Context::from_device(&device) {
+            Ok(value) => value,
+            Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+        };
+
+        let queue = match CommandQueue::create_default_with_properties(
+            &context, 
+            CL_QUEUE_PROFILING_ENABLE,
+            0,
+        ) {
+            Ok(value) => value,
+            Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+        };  
+
+        let chemical_inputs = match Program::create_and_build_from_source(&context, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::ProgramCompileFailure)),
+        };
+
+        let kernel = match Kernel::create(&chemical_inputs, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::KernelCompileFailure)),
+        };
+
+        let n: u32 = 2;
+        let num_types: u32 = 3;
+        let connections: Vec<cl_uint> = vec![0, 0, 1, 0];
+        let weights: Vec<cl_float> = vec![0.0, 0.0, 0.7, 0.0];
+        let index_to_position: Vec<cl_uint> = vec![0, 1];
+        let is_spike_train: Vec<cl_uint> = vec![0, 1];
+        let flags: Vec<cl_uint> = vec![1, 1, 0];
+        let spike_train_flags: Vec<cl_uint> = vec![1, 1, 0];
+        let t: Vec<cl_float> = vec![0.5, 1.0, 0.0];
+        let spike_train_t: Vec<cl_float> = vec![0.2, 0.4, 0.0];
+
+        // let mut res = vec![0.0f32; num_types * n];
+        // let mut counts = vec![0.0f32; num_types * n];
+
+        let t_sums_buffer = create_and_write_buffer(&context, &queue, (num_types * n) as usize, 0.0)?;
+        let counts_buffer = create_and_write_buffer(&context, &queue, (num_types * n) as usize, 0.0)?;
+
+        let connections_buffer = fill_buffer_u32(&context, &queue, (n * n) as usize, &connections)?;
+        let weights_buffer = fill_buffer_f32(&context, &queue, (n * n) as usize, &weights)?;     
+        let index_to_position_buffer = fill_buffer_u32(&context, &queue, n as usize, &index_to_position)?;
+        let is_spike_train_buffer = fill_buffer_u32(&context, &queue, n as usize, &is_spike_train)?;      
+        let flags_buffer = fill_buffer_u32(&context, &queue, num_types as usize, &flags)?;      
+        let spike_train_flags_buffer = fill_buffer_u32(&context, &queue, num_types as usize, &spike_train_flags)?;     
+        let t_buffer = fill_buffer_f32(&context, &queue, num_types as usize, &t)?;      
+        let spike_train_t_buffer = fill_buffer_f32(&context, &queue, num_types as usize, &spike_train_t)?; 
+
+        let mut kernel_execution = ExecuteKernel::new(&kernel);
+
+        unsafe {
+            kernel_execution.set_arg(&connections_buffer);
+            kernel_execution.set_arg(&weights_buffer);
+            kernel_execution.set_arg(&index_to_position_buffer);
+            kernel_execution.set_arg(&is_spike_train_buffer);
+            kernel_execution.set_arg(&flags_buffer);
+            kernel_execution.set_arg(&t_buffer);
+            kernel_execution.set_arg(&spike_train_flags_buffer);
+            kernel_execution.set_arg(&spike_train_t_buffer);
+            kernel_execution.set_arg(&1);
+            kernel_execution.set_arg(&n);
+            kernel_execution.set_arg(&num_types);
+            kernel_execution.set_arg(&counts_buffer);
+            kernel_execution.set_arg(&t_sums_buffer);
+        }
+
+        let event = unsafe {
+            match kernel_execution.set_global_work_size(n as usize)
+                .enqueue_nd_range(&queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::QueueFailure)),
+                }
+        };
+
+        match event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError)),
+        };
+
+        let mut counts_result = vec![0.0f32; (num_types * n) as usize];
+        let mut res_result = vec![0.0f32; (num_types * n) as usize];
+
+        let read_counts_event = unsafe {
+            queue.enqueue_read_buffer(&counts_buffer, CL_NON_BLOCKING, 0, &mut counts_result, &[])
+                .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::BufferReadError))?
+        };
+        read_counts_event.wait()
+            .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
+
+        let read_res_event = unsafe {
+            queue.enqueue_read_buffer(&t_sums_buffer, CL_NON_BLOCKING, 0, &mut res_result, &[])
+                .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::BufferReadError))?
+        };
+        read_res_event.wait()
+            .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
+
+        assert_eq!(counts_result, vec![1., 1., 0., 0., 0., 0.]);
+        assert_eq!(res_result, vec![0.2 * 0.7, 0.4 * 0.7, 0., 0., 0., 0.]);
+
+        Ok(())    
+    }
+}
