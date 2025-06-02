@@ -1359,7 +1359,7 @@ __kernel void calculate_network_with_spike_train_chemical_inputs(
 
     for (int t_index = 0; t_index < number_of_types; t_index++) {
         if (counts[gid * number_of_types + t_index] != 0.0f) {
-            res[gid * number_of_types + t_index] /= counts[gid  * number_of_types + t_index];
+            res[gid * number_of_types + t_index] /= counts[gid * number_of_types + t_index];
         } else {
             res[gid * number_of_types + t_index] = 0.0f;
         }
