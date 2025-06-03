@@ -3643,6 +3643,8 @@ mod test {
                     //         *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
                     //     );
                     // }
+
+                    // may want to check full result vec and full ref vec
                 }
             }
         }
