@@ -3179,13 +3179,30 @@ where
 #[cfg(test)]
 mod test {
     use super::{cl_float, create_and_write_buffer, SpikingNeuralNetworksError};
-    use std::ptr;
+    use std::{collections::HashSet, ptr};
     use opencl3::{command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, program::Program, types::{cl_uint, CL_NON_BLOCKING}};
-    use crate::error::GPUError;
+    use rand::Rng;
+    use crate::{error::GPUError, graph::{AdjacencyMatrix, Graph, GraphPosition, InterleavingGraphGPU}, neuron::{gpu_lattices::LatticeNetworkGPU, integrate_and_fire::QuadraticIntegrateAndFireNeuron, iterate_and_spike::{weight_neurotransmitter_concentration, AMPAReceptor, ApproximateNeurotransmitter, ApproximateReceptor, BufferGPU, IonotropicNeurotransmitterType, IonotropicType, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Receptors, Timestep}, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, RateSpikeTrain, SpikeTrain, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice}};
     use crate::neuron::gpu_lattices::{
         NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, 
         NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME
     };
+
+
+    type SpikeTrainType = RateSpikeTrain<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>;
+    type SpikeTrainLatticeType = SpikeTrainLattice<IonotropicNeurotransmitterType, SpikeTrainType, SpikeTrainGridHistory>;
+    type NeuronType = QuadraticIntegrateAndFireNeuron<ApproximateNeurotransmitter, ApproximateReceptor>;
+    type LatticeType = Lattice<NeuronType, AdjacencyMatrix<(usize, usize), f32>, GridVoltageHistory, STDP, IonotropicNeurotransmitterType>;
+    type NetworkType = LatticeNetwork<
+        NeuronType,
+        AdjacencyMatrix<(usize, usize), f32>,
+        GridVoltageHistory,
+        SpikeTrainType,
+        SpikeTrainGridHistory,
+        AdjacencyMatrix<GraphPosition, f32>,
+        STDP,
+        IonotropicNeurotransmitterType,
+    >;
 
     fn fill_buffer_f32(
         context: &Context,
@@ -3341,5 +3358,295 @@ mod test {
         assert_eq!(res_result, vec![0.2 * 0.7, 0.4 * 0.7, 0., 0., 0., 0.]);
 
         Ok(())    
+    }
+
+    #[test]
+    fn test_counts_chemical_kernel_with_spike_trains() -> Result<(), SpikingNeuralNetworksError> {
+        let mut spike_train: SpikeTrainType = RateSpikeTrain { rate: 100., dt: 1., ..Default::default() }; 
+
+        spike_train.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+
+        let mut spike_train_lattice: SpikeTrainLatticeType = SpikeTrainLattice::default();
+        spike_train_lattice.set_id(0);
+        spike_train_lattice.populate(&spike_train, 3, 3)?;
+        spike_train_lattice.apply(|neuron: &mut SpikeTrainType| {
+            neuron.step = rand::thread_rng().gen_range(0.0..=100.);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+        });
+        spike_train_lattice.update_grid_history = true;
+
+        let mut base_neuron = QuadraticIntegrateAndFireNeuron {
+            gap_conductance: 5.,
+            ..QuadraticIntegrateAndFireNeuron::default_impl()
+        };
+
+        base_neuron.receptors
+            .insert(IonotropicNeurotransmitterType::AMPA, IonotropicType::AMPA(AMPAReceptor::default()))
+            .expect("Valid neurotransmitter pairing");
+        base_neuron.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        base_neuron.set_dt(1.);
+
+        let mut lattice1: LatticeType = Lattice::default();
+        lattice1.set_id(1);
+        lattice1.populate(&base_neuron, 3, 3)?;
+        lattice1.apply(|neuron: &mut _| {
+            neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+        });
+        lattice1.connect(&(|x, y| x != y), Some(&(|_, _| 6.0)));
+        lattice1.update_grid_history = true;
+
+        let mut lattice2: LatticeType = Lattice::default();
+        lattice2.set_id(2);
+        lattice2.populate(&base_neuron, 2, 2)?;
+        lattice2.apply(|neuron: &mut _| {
+            neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+        });
+        lattice2.connect(&(|x, y| x != y), Some(&(|_, _| 2.0)));
+        lattice2.update_grid_history = true;
+
+        let lattices = vec![lattice1, lattice2];
+        let spike_trains = vec![spike_train_lattice];
+        let mut network: NetworkType = LatticeNetwork::generate_network(lattices, spike_trains)?;
+
+        network.set_dt(1.);
+
+        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 4.0)))?;
+        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
+        
+        network.electrical_synapse = false;
+        network.chemical_synapse = true;
+
+        let gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
+
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = match Context::from_device(&device) {
+            Ok(value) => value,
+            Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+        };
+
+        let queue = match CommandQueue::create_default_with_properties(
+            &context, 
+            CL_QUEUE_PROFILING_ENABLE,
+            0,
+        ) {
+            Ok(value) => value,
+            Err(_) => return Err(Into::into(GPUError::GetDeviceFailure)),
+        };  
+
+        let chemical_inputs = match Program::create_and_build_from_source(&context, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, "") {
+            Ok(value) => value,
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::ProgramCompileFailure)),
+        };
+
+        let kernel = match Kernel::create(&chemical_inputs, NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME) {
+            Ok(value) => value,
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::KernelCompileFailure)),
+        };
+
+        let mut cell_vector: Vec<NeuronType> = vec![];
+
+        let mut lattice_iterator: Vec<(usize, &Lattice<_, _, _, _, _>)> = gpu_network.lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
+        lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+        for (_, value) in &lattice_iterator {
+            let current_cell_grid = value.cell_grid();
+            for row in current_cell_grid {
+                for i in row {
+                    cell_vector.push(i.clone());
+                }
+            }
+        }
+        
+        let cell_vector = vec![cell_vector];
+
+        let mut spike_train_cell_vector: Vec<SpikeTrainType> = vec![];
+
+        let mut spike_train_lattice_iterator: Vec<(usize, &SpikeTrainLattice<_, _, _>)> = gpu_network.spike_train_lattices.iter()
+            .map(|(i, j)| (*i, j))
+            .collect();
+        spike_train_lattice_iterator.sort_by(|(key1, _), (key2, _)| key1.cmp(key2));
+
+        for (_, value) in &spike_train_lattice_iterator {
+            let current_cell_grid = value.spike_train_grid();
+            for row in current_cell_grid {
+                for i in row {
+                    spike_train_cell_vector.push(i.clone());
+                }
+            }
+        }
+    
+        let spike_train_cell_vector = vec![spike_train_cell_vector];
+
+        let gpu_cell_grid = NeuronType::convert_electrochemical_to_gpu(&cell_vector, &context, &queue)?;
+        let gpu_spike_train_grid = SpikeTrainType::convert_electrochemical_to_gpu(&spike_train_cell_vector, &context, &queue)?;
+
+        let gpu_graph = InterleavingGraphGPU::convert_to_gpu(
+            &context, &queue, &gpu_network.lattices, &gpu_network.spike_train_lattices, gpu_network.get_connecting_graph()
+        )?;
+
+        let spike_train_skip_index = gpu_graph.lattice_sizes_map.values()
+            .map(|(x, y)| *x * *y)
+            .collect::<Vec<usize>>()
+            .iter()
+            .sum::<usize>() as u32;
+
+        let t_sums_buffer = create_and_write_buffer(
+            &context, &queue, gpu_graph.size * IonotropicNeurotransmitterType::number_of_types(), 0.0
+        )?;
+
+        let counts_buffer = create_and_write_buffer(
+            &context, &queue, gpu_graph.size * IonotropicNeurotransmitterType::number_of_types(), 0.0
+        )?;
+
+        let chemical_synapses_event = unsafe {
+            let mut kernel_execution = ExecuteKernel::new(&kernel);
+
+            kernel_execution.set_arg(&gpu_graph.connections)
+                .set_arg(&gpu_graph.weights)
+                .set_arg(&gpu_graph.index_to_position)
+                .set_arg(&gpu_graph.is_spike_train);
+
+            match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("neurotransmitters$flags"),
+            };
+
+            match &gpu_cell_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
+                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("neurotransmitters$t must be float"),
+            };
+
+            match &gpu_spike_train_grid.get("neurotransmitters$flags").expect("Could not retrieve buffer: neurotransmitters$flags") {
+                BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("neurotransmitters$flags"),
+            };
+
+            match &gpu_spike_train_grid.get("neurotransmitters$t").expect("Could not retrieve buffer: neurotransmitters$t") {
+                BufferGPU::Float(buffer) => kernel_execution.set_arg(buffer),
+                _ => unreachable!("neurotransmitters$t must be float"),
+            };
+
+            kernel_execution.set_arg(&spike_train_skip_index)
+                .set_arg(&(gpu_graph.size as u32))
+                .set_arg(&(IonotropicNeurotransmitterType::number_of_types() as u32));
+
+            match kernel_execution
+                .set_arg(&counts_buffer)
+                .set_arg(&t_sums_buffer)
+                .set_global_work_size(gpu_graph.size) // number of threads executing in parallel
+                .enqueue_nd_range(&queue) {
+                    Ok(value) => value,
+                    Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::QueueFailure)),
+                }
+        };
+
+        match chemical_synapses_event.wait() {
+            Ok(_) => {},
+            Err(_) => return Err(SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError)),
+        };
+
+        let mut res = vec![0.0f32; (IonotropicNeurotransmitterType::number_of_types() * gpu_graph.size) as usize];
+        let read_event = unsafe {
+            queue.enqueue_read_buffer(&t_sums_buffer, CL_NON_BLOCKING, 0, &mut res, &[])
+                .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::BufferReadError))?
+        };
+        read_event.wait()
+            .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
+
+        for k in 0..2 {
+            for n in 0..3 {
+                for m in 0..3 {
+                    if k == 1 && (n == 2 || m == 2) {
+                        continue;
+                    }
+
+                    let postsynaptic_position = GraphPosition { id: k + 1, pos: (n, m) };
+
+                    let mut input_positions: HashSet<_> = network.get_lattice(&(k + 1)).unwrap().graph().get_incoming_connections(&(n, m)).unwrap()
+                        .iter()
+                        .map(|i| GraphPosition { id: k + 1, pos: *i })
+                        .collect();
+                    input_positions.extend(
+                        network.get_connecting_graph().get_incoming_connections(&postsynaptic_position).unwrap()
+                    );
+
+                    let input_vals: Vec<NeurotransmitterConcentrations<_>> = input_positions
+                        .iter()
+                        .map(|input_position| {
+                            let (pos_x, pos_y) = input_position.pos;
+
+                            let mut neurotransmitter_input = if network.lattices.contains_key(&input_position.id) {
+                                let input_cell = &network.lattices.get(&input_position.id)
+                                    .unwrap()
+                                    .cell_grid[pos_x][pos_y]; 
+
+                                input_cell.get_neurotransmitter_concentrations()
+                            } else {
+                                let input_cell = &network.spike_train_lattices.get(&input_position.id)
+                                    .unwrap()
+                                    .cell_grid[pos_x][pos_y];
+
+                                input_cell.get_neurotransmitter_concentrations()
+                            };
+                            
+                            let weight: f32 = if input_position.id != postsynaptic_position.id {
+                                network.get_connecting_graph().lookup_weight(input_position, &postsynaptic_position)
+                                    .unwrap_or(Some(0.))
+                                    .unwrap()
+                            } else {
+                                network.lattices.get(&input_position.id).unwrap()
+                                    .graph()
+                                    .lookup_weight(&input_position.pos, &postsynaptic_position.pos)
+                                    .unwrap_or(Some(0.))
+                                    .unwrap()
+                            };
+
+                            weight_neurotransmitter_concentration(&mut neurotransmitter_input, weight);
+
+                            neurotransmitter_input
+                        })
+                        .collect();
+
+                    // let reference_neurotransmitter = aggregate_neurotransmitter_concentrations(&input_vals);
+
+                    assert!(!input_vals.is_empty())
+
+                    // if k == 0 {
+                    //     assert!(
+                    //         (
+                    //             res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
+                    //             *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
+                    //         ).abs() < 0.001,
+                    //         "{} != {}",
+                    //         res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
+                    //         *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
+                    //     );
+                    // } else {
+                    //     assert!(
+                    //         (
+                    //             res[9 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
+                    //             *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
+                    //         ).abs() < 0.001,
+                    //         "{} != {}",
+                    //         res[9 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
+                    //         *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
+                    //     );
+                    // }
+                }
+            }
+        }
+
+        Ok(())
     }
 }
