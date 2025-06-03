@@ -3182,7 +3182,21 @@ mod test {
     use std::{collections::HashSet, ptr};
     use opencl3::{command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::{ExecuteKernel, Kernel}, memory::{Buffer, CL_MEM_READ_WRITE}, program::Program, types::{cl_uint, CL_NON_BLOCKING}};
     use rand::Rng;
-    use crate::{error::GPUError, graph::{AdjacencyMatrix, Graph, GraphPosition, InterleavingGraphGPU}, neuron::{gpu_lattices::LatticeNetworkGPU, integrate_and_fire::QuadraticIntegrateAndFireNeuron, iterate_and_spike::{weight_neurotransmitter_concentration, AMPAReceptor, ApproximateNeurotransmitter, ApproximateReceptor, BufferGPU, IonotropicNeurotransmitterType, IonotropicType, IterateAndSpike, IterateAndSpikeGPU, NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Receptors, Timestep}, plasticity::STDP, spike_train::{DeltaDiracRefractoriness, RateSpikeTrain, SpikeTrain, SpikeTrainGPU}, GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice}};
+    use crate::{
+        error::GPUError, 
+        graph::{AdjacencyMatrix, Graph, GraphPosition, InterleavingGraphGPU}, 
+        neuron::{
+            gpu_lattices::LatticeNetworkGPU, 
+            integrate_and_fire::QuadraticIntegrateAndFireNeuron, 
+            iterate_and_spike::{
+                aggregate_neurotransmitter_concentrations, weight_neurotransmitter_concentration, 
+                AMPAReceptor, ApproximateNeurotransmitter, ApproximateReceptor, BufferGPU, 
+                IonotropicNeurotransmitterType, IonotropicType, IterateAndSpike, IterateAndSpikeGPU, 
+                NeurotransmitterConcentrations, NeurotransmitterTypeGPU, Receptors, Timestep
+            }, 
+            plasticity::STDP, 
+            spike_train::{DeltaDiracRefractoriness, RateSpikeTrain, SpikeTrain, SpikeTrainGPU},
+            GridVoltageHistory, Lattice, LatticeNetwork, SpikeTrainGrid, SpikeTrainGridHistory, SpikeTrainLattice}};
     use crate::neuron::gpu_lattices::{
         NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL, 
         NETWORK_WITH_SPIKE_TRAIN_CHEMICAL_INPUTS_KERNEL_NAME
@@ -3618,31 +3632,29 @@ mod test {
                         })
                         .collect();
 
-                    // let reference_neurotransmitter = aggregate_neurotransmitter_concentrations(&input_vals);
+                    let reference_neurotransmitter = aggregate_neurotransmitter_concentrations(&input_vals);
 
-                    assert!(!input_vals.is_empty())
-
-                    // if k == 0 {
-                    //     assert!(
-                    //         (
-                    //             res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
-                    //             *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
-                    //         ).abs() < 0.001,
-                    //         "{} != {}",
-                    //         res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
-                    //         *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
-                    //     );
-                    // } else {
-                    //     assert!(
-                    //         (
-                    //             res[9 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
-                    //             *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
-                    //         ).abs() < 0.001,
-                    //         "{} != {}",
-                    //         res[9 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
-                    //         *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
-                    //     );
-                    // }
+                    if k == 0 {
+                        assert!(
+                            (
+                                res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
+                                *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
+                            ).abs() < 0.001,
+                            "{} != {}",
+                            res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
+                            *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
+                        );
+                    } else {
+                        assert!(
+                            (
+                                res[2 * IonotropicNeurotransmitterType::number_of_types() * 3 + 2 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
+                                *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
+                            ).abs() < 0.001,
+                            "{} != {}",
+                            res[2 * IonotropicNeurotransmitterType::number_of_types() * 3 + 2 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
+                            *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
+                        );
+                    }
 
                     // may want to check full result vec and full ref vec
                 }
