@@ -826,6 +826,9 @@ for current_state in tqdm(all_states):
             gpu_peaks = [find_peaks_above_threshold([j[i] for j in gpu_data], 20) for i in range(len(gpu_data[0]))]
             current_value['gpu_peaks'] = [[int(item) for item in sublist] for sublist in gpu_peaks]
 
+            current_value['voltages'] = np.array(network.get_lattice(e1).history).tolist()
+            current_value['gpu_voltages'] = np.array(gpu_network.get_lattice(e1).history).tolist()
+
         simulation_output[key] = current_value
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
