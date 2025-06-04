@@ -21,7 +21,7 @@ skew = 0.1
 c_m = 25
 
 # trials = 20
-trials = 5
+trials = 1
 # gpu_batch = 10
 
 filename = "bayesian_inf_varied_distortion_d1.json"
