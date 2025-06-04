@@ -3380,6 +3380,10 @@ mod test {
 
         spike_train.synaptic_neurotransmitters
             .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        spike_train.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default());
+        spike_train.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::GABA, ApproximateNeurotransmitter::default());
 
         let mut spike_train_lattice: SpikeTrainLatticeType = SpikeTrainLattice::default();
         spike_train_lattice.set_id(0);
@@ -3387,6 +3391,8 @@ mod test {
         spike_train_lattice.apply(|neuron: &mut SpikeTrainType| {
             neuron.step = rand::thread_rng().gen_range(0.0..=100.);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
         spike_train_lattice.update_grid_history = true;
 
@@ -3400,6 +3406,10 @@ mod test {
             .expect("Valid neurotransmitter pairing");
         base_neuron.synaptic_neurotransmitters
             .insert(IonotropicNeurotransmitterType::AMPA, ApproximateNeurotransmitter::default());
+        base_neuron.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::NMDA, ApproximateNeurotransmitter::default());
+        base_neuron.synaptic_neurotransmitters
+            .insert(IonotropicNeurotransmitterType::GABA, ApproximateNeurotransmitter::default());
         base_neuron.set_dt(1.);
 
         let mut lattice1: LatticeType = Lattice::default();
@@ -3408,8 +3418,10 @@ mod test {
         lattice1.apply(|neuron: &mut _| {
             neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
-        lattice1.connect(&(|x, y| x != y), Some(&(|_, _| 6.0)));
+        lattice1.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.0) < 0.5), Some(&(|_, _| 6.0 + rand::thread_rng().gen_range(-1.0..=1.0))));
         lattice1.update_grid_history = true;
 
         let mut lattice2: LatticeType = Lattice::default();
@@ -3418,8 +3430,10 @@ mod test {
         lattice2.apply(|neuron: &mut _| {
             neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
-        lattice2.connect(&(|x, y| x != y), Some(&(|_, _| 2.0)));
+        lattice2.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.0) < 0.5), Some(&(|_, _| 2.0 + rand::thread_rng().gen_range(-1.0..=1.0))));
         lattice2.update_grid_history = true;
 
         let lattices = vec![lattice1, lattice2];
@@ -3428,9 +3442,9 @@ mod test {
 
         network.set_dt(1.);
 
-        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 4.0)))?;
-        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0)))?;
-        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0)))?;
+        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 4.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
         
         network.electrical_synapse = false;
         network.chemical_synapse = true;
@@ -3578,6 +3592,8 @@ mod test {
         read_event.wait()
             .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
 
+        let mut expected_res = vec![];
+
         for k in 0..2 {
             for n in 0..3 {
                 for m in 0..3 {
@@ -3634,31 +3650,17 @@ mod test {
 
                     let reference_neurotransmitter = aggregate_neurotransmitter_concentrations(&input_vals);
 
-                    if k == 0 {
-                        assert!(
-                            (
-                                res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
-                                *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
-                            ).abs() < 0.001,
-                            "{} != {}",
-                            res[n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
-                            *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
-                        );
-                    } else {
-                        assert!(
-                            (
-                                res[2 * IonotropicNeurotransmitterType::number_of_types() * 3 + 2 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()] - 
-                                *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap()
-                            ).abs() < 0.001,
-                            "{} != {}",
-                            res[2 * IonotropicNeurotransmitterType::number_of_types() * 3 + 2 * IonotropicNeurotransmitterType::number_of_types() + n * IonotropicNeurotransmitterType::number_of_types() * 3 + m * IonotropicNeurotransmitterType::number_of_types()],
-                            *reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap(),
-                        );
-                    }
-
-                    // may want to check full result vec and full ref vec
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap());
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::NMDA).unwrap());
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::GABA).unwrap());
                 }
             }
+        }
+
+        expected_res.extend(std::iter::repeat_n(0., res.len() - expected_res.len()));
+
+        for (n, (i, j)) in res.iter().zip(expected_res.iter()).enumerate() {
+            assert!((i - j).abs() < 0.001, "{} | {} != {}", n, i, j);
         }
 
         Ok(())
