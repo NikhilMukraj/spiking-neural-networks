@@ -3385,16 +3385,27 @@ mod test {
         spike_train.synaptic_neurotransmitters
             .insert(IonotropicNeurotransmitterType::GABA, ApproximateNeurotransmitter::default());
 
-        let mut spike_train_lattice: SpikeTrainLatticeType = SpikeTrainLattice::default();
-        spike_train_lattice.set_id(0);
-        spike_train_lattice.populate(&spike_train, 3, 3)?;
-        spike_train_lattice.apply(|neuron: &mut SpikeTrainType| {
+        let mut spike_train_lattice1: SpikeTrainLatticeType = SpikeTrainLattice::default();
+        spike_train_lattice1.set_id(2);
+        spike_train_lattice1.populate(&spike_train, 3, 3)?;
+        spike_train_lattice1.apply(|neuron: &mut SpikeTrainType| {
             neuron.step = rand::thread_rng().gen_range(0.0..=100.);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
-        spike_train_lattice.update_grid_history = true;
+        spike_train_lattice1.update_grid_history = true;
+
+        let mut spike_train_lattice2: SpikeTrainLatticeType = SpikeTrainLattice::default();
+        spike_train_lattice2.set_id(3);
+        spike_train_lattice2.populate(&spike_train, 3, 3)?;
+        spike_train_lattice2.apply(|neuron: &mut SpikeTrainType| {
+            neuron.step = rand::thread_rng().gen_range(0.0..=100.);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::AMPA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+            neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
+        });
+        spike_train_lattice2.update_grid_history = true;
 
         let mut base_neuron = QuadraticIntegrateAndFireNeuron {
             gap_conductance: 5.,
@@ -3413,7 +3424,7 @@ mod test {
         base_neuron.set_dt(1.);
 
         let mut lattice1: LatticeType = Lattice::default();
-        lattice1.set_id(1);
+        lattice1.set_id(0);
         lattice1.populate(&base_neuron, 3, 3)?;
         lattice1.apply(|neuron: &mut _| {
             neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
@@ -3425,7 +3436,7 @@ mod test {
         lattice1.update_grid_history = true;
 
         let mut lattice2: LatticeType = Lattice::default();
-        lattice2.set_id(2);
+        lattice2.set_id(1);
         lattice2.populate(&base_neuron, 2, 2)?;
         lattice2.apply(|neuron: &mut _| {
             neuron.current_voltage = rand::thread_rng().gen_range(neuron.v_reset..=neuron.v_th);
@@ -3437,15 +3448,16 @@ mod test {
         lattice2.update_grid_history = true;
 
         let lattices = vec![lattice1, lattice2];
-        let spike_trains = vec![spike_train_lattice];
+        let spike_trains = vec![spike_train_lattice1, spike_train_lattice2];
         let mut network: NetworkType = LatticeNetwork::generate_network(lattices, spike_trains)?;
 
         network.set_dt(1.);
 
-        network.connect(1, 2, &(|x, y| x == y), Some(&(|_, _| 4.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 3.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 5.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        
+        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 4.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(1, 0, &(|x, y| x == y), Some(&(|_, _| 3.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 5.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(3, 1, &(|x, y| x == y), Some(&(|_, _| 7.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+
         network.electrical_synapse = false;
         network.chemical_synapse = true;
 
@@ -3601,11 +3613,11 @@ mod test {
                         continue;
                     }
 
-                    let postsynaptic_position = GraphPosition { id: k + 1, pos: (n, m) };
+                    let postsynaptic_position = GraphPosition { id: k, pos: (n, m) };
 
-                    let mut input_positions: HashSet<_> = network.get_lattice(&(k + 1)).unwrap().graph().get_incoming_connections(&(n, m)).unwrap()
+                    let mut input_positions: HashSet<_> = network.get_lattice(&k).unwrap().graph().get_incoming_connections(&(n, m)).unwrap()
                         .iter()
-                        .map(|i| GraphPosition { id: k + 1, pos: *i })
+                        .map(|i| GraphPosition { id: k, pos: *i })
                         .collect();
                     input_positions.extend(
                         network.get_connecting_graph().get_incoming_connections(&postsynaptic_position).unwrap()
