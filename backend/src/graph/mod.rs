@@ -706,6 +706,9 @@ impl InterleavingGraphGPU {
             for i in associated_lattice_sizes.iter() {
                 skip_index += i;
             }
+            for i in associated_spike_train_lattice_sizes.iter() {
+                skip_index += i;
+            }
 
             let current_cell_grid = value.spike_train_grid();    
             let rows = current_cell_grid.len();
