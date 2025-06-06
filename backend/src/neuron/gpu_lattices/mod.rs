@@ -3432,7 +3432,7 @@ mod test {
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
-        lattice1.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.0) < 0.5), Some(&(|_, _| 6.0 + rand::thread_rng().gen_range(-1.0..=1.0))));
+        lattice1.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 6.0 + rand::thread_rng().gen_range(0.0..=0.5))));
         lattice1.update_grid_history = true;
 
         let mut lattice2: LatticeType = Lattice::default();
@@ -3444,7 +3444,7 @@ mod test {
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::NMDA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
             neuron.synaptic_neurotransmitters.get_mut(&IonotropicNeurotransmitterType::GABA).unwrap().t = rand::thread_rng().gen_range(0.0..=1.0);
         });
-        lattice2.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.0) < 0.5), Some(&(|_, _| 2.0 + rand::thread_rng().gen_range(-1.0..=1.0))));
+        lattice2.connect(&(|x, y| x != y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 2.0 + rand::thread_rng().gen_range(0.0..=0.5))));
         lattice2.update_grid_history = true;
 
         let lattices = vec![lattice1, lattice2];
@@ -3453,10 +3453,10 @@ mod test {
 
         network.set_dt(1.);
 
-        network.connect(0, 1, &(|x, y| x == y), Some(&(|_, _| 4.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        network.connect(1, 0, &(|x, y| x == y), Some(&(|_, _| 3.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        network.connect(2, 1, &(|x, y| x == y), Some(&(|_, _| 5.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
-        network.connect(3, 1, &(|x, y| x == y), Some(&(|_, _| 7.0 + rand::thread_rng().gen_range(-1.0..=1.0))))?;
+        network.connect(0, 1, &(|x, y| x == y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 4.0 + rand::thread_rng().gen_range(0.0..=0.5))))?;
+        network.connect(1, 0, &(|x, y| x == y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 3.0 + rand::thread_rng().gen_range(0.0..=0.5))))?;
+        network.connect(2, 0, &(|x, y| x == y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 5.0 + rand::thread_rng().gen_range(0.0..=0.5))))?;
+        network.connect(3, 0, &(|x, y| x == y && rand::thread_rng().gen_range(0.0..=1.) < 0.5), Some(&(|_, _| 7.0 + rand::thread_rng().gen_range(0.0..=0.5))))?;
 
         network.electrical_synapse = false;
         network.chemical_synapse = true;
@@ -3548,6 +3548,36 @@ mod test {
         let counts_buffer = create_and_write_buffer(
             &context, &queue, gpu_graph.size * IonotropicNeurotransmitterType::number_of_types(), 0.0
         )?;
+
+        // println!("{} x {}", gpu_graph.size, gpu_graph.size);
+
+        // let mut weights = vec![0.0f32; (gpu_graph.size * gpu_graph.size) as usize];
+        // let read_event = unsafe {
+        //     queue.enqueue_read_buffer(&gpu_graph.weights, CL_NON_BLOCKING, 0, &mut weights, &[])
+        //         .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::BufferReadError))?
+        // };
+        // read_event.wait()
+        //     .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
+
+        // let mut file = std::fs::File::create("./weights.txt").unwrap();
+
+        // for i in weights {
+        //     std::io::Write::write_fmt(&mut file, format_args!("{}, ", i)).expect("Could not write to file");
+        // }
+
+        // let mut connections = vec![0u32; (gpu_graph.size * gpu_graph.size) as usize];
+        // let read_event = unsafe {
+        //     queue.enqueue_read_buffer(&gpu_graph.connections, CL_NON_BLOCKING, 0, &mut connections, &[])
+        //         .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::BufferReadError))?
+        // };
+        // read_event.wait()
+        //     .map_err(|_| SpikingNeuralNetworksError::GPURelatedError(GPUError::WaitError))?;
+
+        // let mut file = std::fs::File::create("./connections.txt").unwrap();
+
+        // for i in connections {
+        //     std::io::Write::write_fmt(&mut file, format_args!("{}, ", i)).expect("Could not write to file");
+        // }
 
         let chemical_synapses_event = unsafe {
             let mut kernel_execution = ExecuteKernel::new(&kernel);
@@ -3676,5 +3706,7 @@ mod test {
         }
 
         Ok(())
+
+        // issue is indexing in spike train
     }
 }
