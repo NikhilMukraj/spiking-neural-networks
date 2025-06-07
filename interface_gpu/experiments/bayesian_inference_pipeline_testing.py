@@ -575,9 +575,9 @@ for current_state in tqdm(all_states):
                     )
                 )
 
-        gpu_network = ln.IzhikevichNeuronNetworkGPU.from_network(network)
+        network = ln.IzhikevichNeuronNetworkGPU.from_network(network)
 
-        gpu_network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
+        # gpu_network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
         network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
     
         hist = network.get_lattice(e1).history
@@ -821,13 +821,6 @@ for current_state in tqdm(all_states):
 
         if parsed_toml['simulation_parameters']['peaks_on']:
             current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
-            gpu_hist = gpu_network.get_lattice(e1).history
-            gpu_data = [i.flatten() for i in np.array(gpu_hist)]
-            gpu_peaks = [find_peaks_above_threshold([j[i] for j in gpu_data], 20) for i in range(len(gpu_data[0]))]
-            current_value['gpu_peaks'] = [[int(item) for item in sublist] for sublist in gpu_peaks]
-
-            current_value['voltages'] = np.array(network.get_lattice(e1).history).tolist()
-            current_value['gpu_voltages'] = np.array(gpu_network.get_lattice(e1).history).tolist()
 
         simulation_output[key] = current_value
 
