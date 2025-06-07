@@ -1,5 +1,4 @@
 [simulation_parameters]
-peaks_on = true
 bayesian_is_not_main = true
 use_correlation_as_accuracy = true
 measure_snr = true
@@ -20,9 +19,8 @@ inh_weights_scalar = 1
 skew = 0.1
 c_m = 25
 
-# trials = 20
-trials = 1
-# gpu_batch = 10
+trials = 20
+gpu_batch = 10
 
 filename = "bayesian_inf_varied_distortion_d1.json"
 
