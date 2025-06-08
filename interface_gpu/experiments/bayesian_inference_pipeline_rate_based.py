@@ -244,227 +244,233 @@ network = ln.IzhikevichNeuronNetworkGPU()
 print(json.dumps(parsed_toml, indent=4))
 
 for current_state in tqdm(all_states):
-    for trial in range(parsed_toml['simulation_parameters']['trials']):
-        if parsed_toml['simulation_parameters']['reset_patterns']:
-            patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+    glu_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['glutamate_clearance'])
+    gaba_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['gabaa_clearance'])
+    dopa_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['dopamine_clearance'])
+
+    exc_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Glutamate : glu_neuro}
+    inh_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.GABA : gaba_neuro}
+    dopa_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Dopamine : dopa_neuro}
+
+    glu = ln.GlutamateReceptor()
+    gabaa = ln.GABAReceptor()
+    dopamine_rs = ln.DopamineReceptor()
+
+    if parsed_toml['simulation_parameters']['d1']:
+        dopamine_rs.s_d1 = current_state['s_d1']
+    else:
+        dopamine_rs.s_d1 = 0
+    if parsed_toml['simulation_parameters']['d2']:
+        dopamine_rs.s_d2 = current_state['s_d2']
+    else:
+        dopamine_rs.s_d2 = 0
+
+    glu.g_ampa = current_state['nmda_g']
+    glu.g_nmda = current_state['ampa_g']
+    gabaa.g = current_state['gabaa_g']
+
+    spike_train = ln.RateSpikeTrain()
+    spike_train.set_synaptic_neurotransmitters(exc_neurotransmitters)
+
+    receptors = ln.DopaGluGABA()
+    receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
+    receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
+    receptors.insert(ln.DopaGluGABANeurotransmitterType.Dopamine, dopamine_rs)
+
+    exc_neuron = ln.IzhikevichNeuron()
+    exc_neuron.set_synaptic_neurotransmitters(exc_neurotransmitters)
+    exc_neuron.set_receptors(receptors)
+
+    inh_neuron = ln.IzhikevichNeuron()
+    inh_neuron.set_synaptic_neurotransmitters(inh_neurotransmitters)
+    inh_neuron.set_receptors(receptors)
+
+    for trial_batch in range(int(parsed_toml['simulation_parameters']['trials'] / parsed_toml['simulation_parameters']['gpu_batch']))::
+        all_patterns = []
+        all_bayesian_memory_patterns = []
+        all_ws = []
+        all_w_ies = []
+
+        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            all_w_2s = []
+            all_w_ie_2s = []
+        
+        all_pattern1s = []
+        all_pattern2s = []
+        all_bayesian_memory_pattern_indexes = []
+        all_pattern_switches = []
+
+        i1s = []
+        e1s = []
+        c1s = []
+        i2s = []
+        e2s = []
+        c2s = []
+        ds = []
+
+        all_first_accs = []
+        all_bayesian_first_accs = []
+        all_bayesian_memory_first_accs = []
+
+        all_seconds_accs = []
+        all_bayesian_second_acc = []
+        all_bayesian_memory_second_acc = []
+        all_pattern_switch_accs = []
+
+        networks = []
+
+        for element in range(parsed_toml['simulation_parameters']['gpu_batch']):
+            if parsed_toml['simulation_parameters']['reset_patterns']:
+                patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+                if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                    bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+
+                w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
+                w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+            
+            all_patterns.append(patterns)
+            all_ws.append(w)
+            all_w_ies.append(w_ie)
+
             if parsed_toml['simulation_parameters']['memory_biases_memory']:
-                bayesian_memory_patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
+                all_bayesian_memory_patterns.append(bayesian_memory_patterns)
 
-            w = get_weights(num, patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
-            w_ie = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], patterns, num_patterns)
+                w_2 = get_weights(num, bayesian_memory_patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
+                w_ie_2 = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], bayesian_memory_patterns, num_patterns)
 
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            w_2 = get_weights(num, bayesian_memory_patterns, a=parsed_toml['simulation_parameters']['a'], b=parsed_toml['simulation_parameters']['b'], scalar=parsed_toml['simulation_parameters']['weights_scalar'] / num_patterns)
-            w_ie_2 = weights_ie(exc_n, parsed_toml['simulation_parameters']['inh_weights_scalar'], bayesian_memory_patterns, num_patterns)
+                all_ws.append(w_2)
+                all_w_ies.append(w_ie_2)
 
-        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
-            pattern1, pattern2 = np.random.choice(range(num_patterns), 2, replace=False)
-        else:
-            pattern1 = np.random.choice(range(num_patterns))
-            pattern2 = pattern1
-
-        if parsed_toml['simulation_parameters']['pattern_switch']:
-            pattern_switch1 = np.random.choice(
-                [i for i in range(num_patterns) if i != pattern1 and i != pattern2]
-            ) 
-
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            bayesian_memory_pattern = np.random.choice(range(num_patterns))
-
-        glu_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['glutamate_clearance'])
-        gaba_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['gabaa_clearance'])
-        dopa_neuro = ln.BoundedNeurotransmitterKinetics(clearance_constant=current_state['dopamine_clearance'])
-
-        exc_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Glutamate : glu_neuro}
-
-        inh_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.GABA : gaba_neuro}
-
-        dopa_neurotransmitters = {ln.DopaGluGABANeurotransmitterType.Dopamine : dopa_neuro}
-
-        glu = ln.GlutamateReceptor()
-        gabaa = ln.GABAReceptor()
-        dopamine_rs = ln.DopamineReceptor()
-
-        if parsed_toml['simulation_parameters']['d1']:
-            dopamine_rs.s_d1 = current_state['s_d1']
-        else:
-            dopamine_rs.s_d1 = 0
-        if parsed_toml['simulation_parameters']['d2']:
-            dopamine_rs.s_d2 = current_state['s_d2']
-        else:
-            dopamine_rs.s_d2 = 0
-
-        glu.g_ampa = current_state['nmda_g']
-        glu.g_nmda = current_state['ampa_g']
-        gabaa.g = current_state['gabaa_g']
-
-        spike_train = ln.RateSpikeTrain()
-        spike_train.set_synaptic_neurotransmitters(exc_neurotransmitters)
-
-        receptors = ln.DopaGluGABA()
-        receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
-        receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
-        receptors.insert(ln.DopaGluGABANeurotransmitterType.Dopamine, dopamine_rs)
-
-        exc_neuron = ln.IzhikevichNeuron()
-        exc_neuron.set_synaptic_neurotransmitters(exc_neurotransmitters)
-        exc_neuron.set_receptors(receptors)
-
-        inh_neuron = ln.IzhikevichNeuron()
-        inh_neuron.set_synaptic_neurotransmitters(inh_neurotransmitters)
-        inh_neuron.set_receptors(receptors)
-
-        inh_lattice = ln.IzhikevichNeuronLattice(i1)
-        inh_lattice.populate(inh_neuron, inh_n, inh_n)
-        inh_lattice.apply(setup_neuron)
-
-        exc_lattice = ln.IzhikevichNeuronLattice(e1)
-        exc_lattice.populate(exc_neuron, exc_n, exc_n)
-        exc_lattice.apply(setup_neuron)
-        position_to_index = exc_lattice.position_to_index
-        exc_lattice.connect(
-            lambda x, y: bool(w[position_to_index[x]][position_to_index[y]] != 0), 
-            lambda x, y: w[position_to_index[x]][position_to_index[y]],
-        )
-        exc_lattice.update_grid_history = True
-
-        spike_train_lattice = ln.RateSpikeTrainLattice(c1)
-        spike_train_lattice.populate(spike_train, exc_n, exc_n)
-
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            inh_lattice_2 = ln.IzhikevichNeuronLattice(i2)
-            inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
-            inh_lattice_2.apply(setup_neuron)
-
-            exc_lattice_2 = ln.IzhikevichNeuronLattice(e2)
-            exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
-            exc_lattice_2.apply(setup_neuron)
-            position_to_index_2 = exc_lattice_2.position_to_index
-            exc_lattice_2.connect(
-                lambda x, y: bool(w_2[position_to_index_2[x]][position_to_index_2[y]] != 0), 
-                lambda x, y: w_2[position_to_index_2[x]][position_to_index_2[y]],
-            )
-            exc_lattice_2.update_grid_history = True
-
-            cue_lattice = ln.RateSpikeTrainLattice(c2)
-            cue_lattice.populate(spike_train, exc_n, exc_n)
-
-            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                dopa_neuron = ln.IzhikevichNeuron()
-                dopa_neuron.set_synaptic_neurotransmitters(dopa_neurotransmitters)
-                dopa_neuron.set_receptors(receptors)
-
-                d_intermediate = ln.IzhikevichNeuronLattice(d)
-                d_intermediate.populate(dopa_neuron, exc_n, exc_n)
-
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            current_lattices = [exc_lattice, inh_lattice, exc_lattice_2, inh_lattice_2]
-
-            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                current_lattices.append(d_intermediate)
-
-            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
-                current_lattices, 
-                [spike_train_lattice, cue_lattice],
-            )
-        else:
-            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
-                spike_train_dopa = ln.RateSpikeTrain()
-                spike_train_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
-
-                cue_lattice = ln.RateSpikeTrainLattice(c2)
-                cue_lattice.populate(spike_train_dopa, exc_n, exc_n)
+            if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+                pattern1, pattern2 = np.random.choice(range(num_patterns), 2, replace=False)
             else:
+                pattern1 = np.random.choice(range(num_patterns))
+                pattern2 = pattern1
+
+            all_pattern1s.append(pattern1)
+            all_pattern2s.append(pattern2)
+
+            if parsed_toml['simulation_parameters']['pattern_switch']:
+                pattern_switch1 = np.random.choice(
+                    [i for i in range(num_patterns) if i != pattern1 and i != pattern2]
+                ) 
+
+                all_pattern_switches.append(pattern_switch1)
+
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                bayesian_memory_pattern = np.random.choice(range(num_patterns))
+
+                all_bayesian_memory_indexes.append(bayesian_memory_pattern)
+
+            inh_lattice = ln.IzhikevichNeuronLattice(i1)
+            inh_lattice.populate(inh_neuron, inh_n, inh_n)
+            inh_lattice.apply(setup_neuron)
+
+            exc_lattice = ln.IzhikevichNeuronLattice(e1)
+            exc_lattice.populate(exc_neuron, exc_n, exc_n)
+            exc_lattice.apply(setup_neuron)
+            position_to_index = exc_lattice.position_to_index
+            exc_lattice.connect(
+                lambda x, y: bool(w[position_to_index[x]][position_to_index[y]] != 0), 
+                lambda x, y: w[position_to_index[x]][position_to_index[y]],
+            )
+            exc_lattice.update_grid_history = True
+
+            spike_train_lattice = ln.RateSpikeTrainLattice(c1)
+            spike_train_lattice.populate(spike_train, exc_n, exc_n)
+
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                inh_lattice_2 = ln.IzhikevichNeuronLattice(i2)
+                inh_lattice_2.populate(inh_neuron, inh_n, inh_n)
+                inh_lattice_2.apply(setup_neuron)
+
+                exc_lattice_2 = ln.IzhikevichNeuronLattice(e2)
+                exc_lattice_2.populate(exc_neuron, exc_n, exc_n)
+                exc_lattice_2.apply(setup_neuron)
+                position_to_index_2 = exc_lattice_2.position_to_index
+                exc_lattice_2.connect(
+                    lambda x, y: bool(w_2[position_to_index_2[x]][position_to_index_2[y]] != 0), 
+                    lambda x, y: w_2[position_to_index_2[x]][position_to_index_2[y]],
+                )
+                exc_lattice_2.update_grid_history = True
+
                 cue_lattice = ln.RateSpikeTrainLattice(c2)
                 cue_lattice.populate(spike_train, exc_n, exc_n)
 
-            network = ln.IzhikevichNeuronNetworkGPU.generate_network(
-                [exc_lattice, inh_lattice], 
-                [spike_train_lattice, cue_lattice]
-            )
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                    dopa_neuron = ln.IzhikevichNeuron()
+                    dopa_neuron.set_synaptic_neurotransmitters(dopa_neurotransmitters)
+                    dopa_neuron.set_receptors(receptors)
 
-        network.connect(
-            i1, e1, 
-            lambda x, y: True, 
-            lambda x, y: w_ie[int(position_to_index[y] / exc_n), position_to_index[y] % exc_n],
-        )
-        network.connect(
-            e1, i1, 
-            lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
-            lambda x, y: current_state['exc_to_inh'],
-        )
-        network.connect(c1, e1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
+                    d_intermediate = ln.IzhikevichNeuronLattice(d)
+                    d_intermediate.populate(dopa_neuron, exc_n, exc_n)
 
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                current_lattices = [exc_lattice, inh_lattice, exc_lattice_2, inh_lattice_2]
+
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                    current_lattices.append(d_intermediate)
+
+                network = ln.IzhikevichNeuronNetworkGPU.generate_network(
+                    current_lattices, 
+                    [spike_train_lattice, cue_lattice],
+                )
+            else:
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                    spike_train_dopa = ln.RateSpikeTrain()
+                    spike_train_dopa.set_synaptic_neurotransmitters(dopa_neurotransmitters)
+
+                    cue_lattice = ln.RateSpikeTrainLattice(c2)
+                    cue_lattice.populate(spike_train_dopa, exc_n, exc_n)
+                else:
+                    cue_lattice = ln.RateSpikeTrainLattice(c2)
+                    cue_lattice.populate(spike_train, exc_n, exc_n)
+
+                network = ln.IzhikevichNeuronNetworkGPU.generate_network(
+                    [exc_lattice, inh_lattice], 
+                    [spike_train_lattice, cue_lattice]
+                )
+
             network.connect(
-                i2, e2, 
+                i1, e1, 
                 lambda x, y: True, 
-                lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
+                lambda x, y: w_ie[int(position_to_index[y] / exc_n), position_to_index[y] % exc_n],
             )
             network.connect(
-                e2, i2, 
+                e1, i1, 
                 lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
                 lambda x, y: current_state['exc_to_inh'],
             )
+            network.connect(c1, e1, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
-            network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
+                network.connect(
+                    i2, e2, 
+                    lambda x, y: True, 
+                    lambda x, y: w_ie_2[int(position_to_index_2[y] / exc_n), position_to_index_2[y] % exc_n],
+                )
+                network.connect(
+                    e2, i2, 
+                    lambda x, y: np.random.uniform() <= current_state['prob_of_exc_to_inh'], 
+                    lambda x, y: current_state['exc_to_inh'],
+                )
 
-            if not parsed_toml['simulation_parameters']['d_acts_on_inh']:
-                e2_to_e1_mapping = {}
-                current_pointer = -1
+                network.connect(c2, e2, lambda x, y: x == y, lambda x, y: current_state['spike_train_to_exc'])
 
-                if parsed_toml['simulation_parameters']['d2']:
-                    patterns_to_use = [np.logical_not(i).astype(int) for i in patterns]
-                else:
-                    patterns_to_use = patterns  
-
-                for n1, i in enumerate(bayesian_memory_patterns[bayesian_memory_pattern]):
-                    if i == 0:
-                        continue
-
-                    to_iterate = list(enumerate(patterns_to_use[pattern2]))[current_pointer+1:]
-
-                    if len(to_iterate) == 0:
-                        break
-
-                    for n2, j in to_iterate:
-                        if j == 0:
-                            continue
-
-                        current_pointer = n2
-                        break
-
-                    e2_to_e1_mapping[n1] = current_pointer
-
-            if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
                 if not parsed_toml['simulation_parameters']['d_acts_on_inh']:
-                    network.connect(
-                        e2, 
-                        d, 
-                        lambda x, y: bool(
-                            x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
-                            y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
-                        ), 
-                        lambda x, y: current_state['bayesian_to_exc']
-                    )
-                    network.connect(
-                        d, 
-                        e1, 
-                        lambda x, y: bool(
-                            x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
-                            y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
-                        ), 
-                        lambda x, y: current_state['bayesian_to_exc']
-                    )
-                else:
-                    d_to_i1_mapping = {}
+                    e2_to_e1_mapping = {}
                     current_pointer = -1
+
+                    if parsed_toml['simulation_parameters']['d2']:
+                        patterns_to_use = [np.logical_not(i).astype(int) for i in patterns]
+                    else:
+                        patterns_to_use = patterns  
 
                     for n1, i in enumerate(bayesian_memory_patterns[bayesian_memory_pattern]):
                         if i == 0:
                             continue
 
-                        to_iterate = list(enumerate([1 for _ in range(inh_n * inh_n)]))[current_pointer+1:]
+                        to_iterate = list(enumerate(patterns_to_use[pattern2]))[current_pointer+1:]
 
                         if len(to_iterate) == 0:
                             break
@@ -476,174 +482,92 @@ for current_state in tqdm(all_states):
                             current_pointer = n2
                             break
 
-                        d_to_i1_mapping[n1] = current_pointer
+                        e2_to_e1_mapping[n1] = current_pointer
 
+                if parsed_toml['simulation_parameters']['d1'] or parsed_toml['simulation_parameters']['d2']:
+                    if not parsed_toml['simulation_parameters']['d_acts_on_inh']:
+                        network.connect(
+                            e2, 
+                            d, 
+                            lambda x, y: bool(
+                                x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                                y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
+                            ), 
+                            lambda x, y: current_state['bayesian_to_exc']
+                        )
+                        network.connect(
+                            d, 
+                            e1, 
+                            lambda x, y: bool(
+                                x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                                y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
+                            ), 
+                            lambda x, y: current_state['bayesian_to_exc']
+                        )
+                    else:
+                        d_to_i1_mapping = {}
+                        current_pointer = -1
+
+                        for n1, i in enumerate(bayesian_memory_patterns[bayesian_memory_pattern]):
+                            if i == 0:
+                                continue
+
+                            to_iterate = list(enumerate([1 for _ in range(inh_n * inh_n)]))[current_pointer+1:]
+
+                            if len(to_iterate) == 0:
+                                break
+
+                            for n2, j in to_iterate:
+                                if j == 0:
+                                    continue
+
+                                current_pointer = n2
+                                break
+
+                            d_to_i1_mapping[n1] = current_pointer
+
+                        network.connect(
+                            e2, 
+                            d, 
+                            lambda x, y: bool(
+                                bayesian_memory_patterns[bayesian_memory_pattern][x[0] * exc_n + x[1]]
+                            ), 
+                            lambda x, y: current_state['bayesian_to_exc']
+                        )
+                        network.connect(
+                            d, 
+                            i1, 
+                            lambda x, y: bool(
+                                x[0] * exc_n + x[1] in d_to_i1_mapping.keys() and 
+                                y[0] * exc_n + y[1] in d_to_i1_mapping.values() and
+                                np.random.uniform() < current_state['prob_of_d_to_inh']
+                            ), 
+                            lambda x, y: current_state['bayesian_to_exc']
+                        )
+                else:
                     network.connect(
                         e2, 
-                        d, 
+                        e1, 
                         lambda x, y: bool(
-                            bayesian_memory_patterns[bayesian_memory_pattern][x[0] * exc_n + x[1]]
-                        ), 
-                        lambda x, y: current_state['bayesian_to_exc']
-                    )
-                    network.connect(
-                        d, 
-                        i1, 
-                        lambda x, y: bool(
-                            x[0] * exc_n + x[1] in d_to_i1_mapping.keys() and 
-                            y[0] * exc_n + y[1] in d_to_i1_mapping.values() and
-                            np.random.uniform() < current_state['prob_of_d_to_inh']
+                            x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
+                            y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
                         ), 
                         lambda x, y: current_state['bayesian_to_exc']
                     )
             else:
-                network.connect(
-                    e2, 
-                    e1, 
-                    lambda x, y: bool(
-                        x[0] * exc_n + x[1] in e2_to_e1_mapping.keys() and 
-                        y[0] * exc_n + y[1] in e2_to_e1_mapping.values()
-                    ), 
-                    lambda x, y: current_state['bayesian_to_exc']
-                )
-        else:
-            network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
+                network.connect(c2, e1, lambda x, y: x == y, lambda x, y: current_state['bayesian_to_exc'])
 
-        network.set_dt(parsed_toml['simulation_parameters']['dt'])
+            network.set_dt(parsed_toml['simulation_parameters']['dt'])
 
-        network.electrical_synapse = False
-        network.chemical_synapse = True
+            network.electrical_synapse = False
+            network.chemical_synapse = True
 
-        if parsed_toml['simulation_parameters']['main_1_on']:
-            main_firing_rate = current_state['main_firing_rate']
-        else:
-            main_firing_rate = 0
-
-        if not parsed_toml['simulation_parameters']['main_noisy']:
-            network.apply_spike_train_lattice_given_position(
-                c1, 
-                get_rate_spike_train_setup_function(
-                    patterns,
-                    pattern1, 
-                    current_state['distortion'],
-                    main_firing_rate,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['distortion_on_only'],
-                )
-            )
-        else:
-            network.apply_spike_train_lattice(
-                c1, 
-                get_noisy_spike_train_setup_function(
-                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
-                    main_firing_rate,
-                )
-            )
-
-        if parsed_toml['simulation_parameters']['bayesian_1_on']:
-            bayesian_firing_rate = current_state['bayesian_firing_rate']
-        else:
-            bayesian_firing_rate = 0
-
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            network.apply_spike_train_lattice_given_position(
-                c2, 
-                get_rate_spike_train_setup_function(
-                    bayesian_memory_patterns,
-                    bayesian_memory_pattern, 
-                    current_state['bayesian_distortion'],
-                    bayesian_firing_rate,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['distortion_on_only'],
-                )
-            )
-        else:
-            if not parsed_toml['simulation_parameters']['d2']:
-                network.apply_spike_train_lattice_given_position(
-                    c2, 
-                    get_rate_spike_train_setup_function(
-                        patterns,
-                        pattern2, 
-                        current_state['bayesian_distortion'],
-                        bayesian_firing_rate,
-                        exc_n,
-                        parsed_toml['simulation_parameters']['distortion_on_only'],
-                    )
-                )
+            if parsed_toml['simulation_parameters']['main_1_on']:
+                main_firing_rate = current_state['main_firing_rate']
             else:
-                inv_patterns = [np.logical_not(i).astype(int) for i in patterns]
+                main_firing_rate = 0
 
-                network.apply_spike_train_lattice_given_position(
-                    c2, 
-                    get_rate_spike_train_setup_function(
-                        inv_patterns,
-                        pattern2, 
-                        current_state['bayesian_distortion'],
-                        bayesian_firing_rate,
-                        exc_n,
-                        parsed_toml['simulation_parameters']['distortion_on_only'],
-                    )
-                )
-
-        network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
-    
-        hist = network.get_lattice(e1).history
-        data = [i.flatten() for i in np.array(hist)]
-        peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
-
-        first_window = parsed_toml['simulation_parameters']['iterations1'] - parsed_toml['simulation_parameters']['first_window'] 
-
-        current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
-        firing_max = current_pred_pattern.max()
-
-        first_acc = determine_accuracy(
-            patterns,
-            pattern1,
-            num_patterns,
-            first_window,
-            peaks,
-            exc_n,
-            parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
-            parsed_toml['simulation_parameters']['get_all_accuracies'],
-        )
-        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
-            bayesian_first_acc = determine_accuracy(
-                patterns,
-                pattern2,
-                num_patterns,
-                first_window,
-                peaks,
-                exc_n,
-                parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
-                parsed_toml['simulation_parameters']['get_all_accuracies'],
-            )
-        
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            hist = network.get_lattice(e2).history
-            data = [i.flatten() for i in np.array(hist)]
-            peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
-
-            current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
-            firing_max = current_pred_pattern.max()
-
-            bayesian_memory_first_acc = determine_accuracy(
-                bayesian_memory_patterns,
-                bayesian_memory_pattern,
-                num_patterns,
-                first_window,
-                peaks,
-                exc_n,
-                parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
-                parsed_toml['simulation_parameters']['get_all_accuracies'],
-            )
-
-        if parsed_toml['simulation_parameters']['main_2_on']:
-            main_firing_rate = current_state['main_firing_rate']
-        else:
-            main_firing_rate = 0
-
-        if not parsed_toml['simulation_parameters']['main_noisy']:
-            if not parsed_toml['simulation_parameters']['pattern_switch']:
+            if not parsed_toml['simulation_parameters']['main_noisy']:
                 network.apply_spike_train_lattice_given_position(
                     c1, 
                     get_rate_spike_train_setup_function(
@@ -656,50 +580,25 @@ for current_state in tqdm(all_states):
                     )
                 )
             else:
-                network.apply_spike_train_lattice_given_position(
+                network.apply_spike_train_lattice(
                     c1, 
-                    get_rate_spike_train_setup_function(
-                        patterns,
-                        pattern_switch1, 
-                        current_state['distortion'],
+                    get_noisy_spike_train_setup_function(
+                        parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
                         main_firing_rate,
-                        exc_n,
-                        parsed_toml['simulation_parameters']['distortion_on_only'],
                     )
                 )
-        else:
-            network.apply_spike_train_lattice(
-                c1, 
-                get_noisy_spike_train_setup_function(
-                    parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
-                    main_firing_rate,
-                )
-            )
 
-        if parsed_toml['simulation_parameters']['bayesian_2_on']:
-            bayesian_firing_rate = current_state['bayesian_firing_rate']
-        else:
-            bayesian_firing_rate = 0
+            if parsed_toml['simulation_parameters']['bayesian_1_on']:
+                bayesian_firing_rate = current_state['bayesian_firing_rate']
+            else:
+                bayesian_firing_rate = 0
 
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            network.apply_spike_train_lattice_given_position(
-                c2, 
-                get_rate_spike_train_setup_function(
-                    bayesian_memory_patterns,
-                    bayesian_memory_pattern, 
-                    current_state['bayesian_distortion'],
-                    bayesian_firing_rate,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['distortion_on_only'],
-                )
-            )
-        else:
-            if not parsed_toml['simulation_parameters']['d2']:
+            if parsed_toml['simulation_parameters']['memory_biases_memory']:
                 network.apply_spike_train_lattice_given_position(
                     c2, 
                     get_rate_spike_train_setup_function(
-                        patterns,
-                        pattern2, 
+                        bayesian_memory_patterns,
+                        bayesian_memory_pattern, 
                         current_state['bayesian_distortion'],
                         bayesian_firing_rate,
                         exc_n,
@@ -707,46 +606,62 @@ for current_state in tqdm(all_states):
                     )
                 )
             else:
-                inv_patterns = [np.logical_not(i).astype(int) for i in patterns]
-
-                network.apply_spike_train_lattice_given_position(
-                    c2, 
-                    get_rate_spike_train_setup_function(
-                        inv_patterns,
-                        pattern2, 
-                        current_state['bayesian_distortion'],
-                        bayesian_firing_rate,
-                        exc_n,
-                        parsed_toml['simulation_parameters']['distortion_on_only'],
+                if not parsed_toml['simulation_parameters']['d2']:
+                    network.apply_spike_train_lattice_given_position(
+                        c2, 
+                        get_rate_spike_train_setup_function(
+                            patterns,
+                            pattern2, 
+                            current_state['bayesian_distortion'],
+                            bayesian_firing_rate,
+                            exc_n,
+                            parsed_toml['simulation_parameters']['distortion_on_only'],
+                        )
                     )
-                )
+                else:
+                    inv_patterns = [np.logical_not(i).astype(int) for i in patterns]
 
-        network.run_lattices(parsed_toml['simulation_parameters']['iterations2'])
+                    network.apply_spike_train_lattice_given_position(
+                        c2, 
+                        get_rate_spike_train_setup_function(
+                            inv_patterns,
+                            pattern2, 
+                            current_state['bayesian_distortion'],
+                            bayesian_firing_rate,
+                            exc_n,
+                            parsed_toml['simulation_parameters']['distortion_on_only'],
+                        )
+                    )
 
-        hist = network.get_lattice(e1).history
-        data = [i.flatten() for i in np.array(hist)]
-        peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+            networks.append(nework)
 
-        second_window = parsed_toml['simulation_parameters']['iterations2'] - parsed_toml['simulation_parameters']['second_window'] 
+        for network in networks:
+            network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
+        
+        for element, network in zip(range(parsed_toml['simulation_parameters']['gpu_batch']), networks)
+            hist = network.get_lattice(e1).history
+            data = [i.flatten() for i in np.array(hist)]
+            peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
 
-        current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
-        firing_max = current_pred_pattern.max()
+            first_window = parsed_toml['simulation_parameters']['iterations1'] - parsed_toml['simulation_parameters']['first_window'] 
 
-        if parsed_toml['simulation_parameters']['iterations2'] != 0:
-            second_acc = determine_accuracy(
-                patterns,
-                pattern1,
+            current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
+            firing_max = current_pred_pattern.max()
+
+            first_acc = determine_accuracy(
+                all_patterns[element],
+                all_pattern1[element],
                 num_patterns,
-                second_window,
+                first_window,
                 peaks,
                 exc_n,
                 parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
                 parsed_toml['simulation_parameters']['get_all_accuracies'],
             )
             if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
-                bayesian_second_acc = determine_accuracy(
-                    patterns,
-                    pattern2,
+                bayesian_first_acc = determine_accuracy(
+                    all_patterns[element],
+                    all_pattern2[element],
                     num_patterns,
                     first_window,
                     peaks,
@@ -763,9 +678,9 @@ for current_state in tqdm(all_states):
                 current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
                 firing_max = current_pred_pattern.max()
 
-                bayesian_memory_second_acc = determine_accuracy(
-                    bayesian_memory_patterns,
-                    bayesian_memory_pattern,
+                bayesian_memory_first_acc = determine_accuracy(
+                    all_bayesian_memory_patterns[element],
+                    all_bayesian_memory_pattern_indexes[element],
                     num_patterns,
                     first_window,
                     peaks,
@@ -774,62 +689,199 @@ for current_state in tqdm(all_states):
                     parsed_toml['simulation_parameters']['get_all_accuracies'],
                 )
 
+            # if parsed_toml['simulation_parameters']['main_2_on']:
+            #     main_firing_rate = current_state['main_firing_rate']
+            # else:
+            #     main_firing_rate = 0
+
+            # if not parsed_toml['simulation_parameters']['main_noisy']:
+            #     if not parsed_toml['simulation_parameters']['pattern_switch']:
+            #         network.apply_spike_train_lattice_given_position(
+            #             c1, 
+            #             get_rate_spike_train_setup_function(
+            #                 patterns,
+            #                 pattern1, 
+            #                 current_state['distortion'],
+            #                 main_firing_rate,
+            #                 exc_n,
+            #                 parsed_toml['simulation_parameters']['distortion_on_only'],
+            #             )
+            #         )
+            #     else:
+            #         network.apply_spike_train_lattice_given_position(
+            #             c1, 
+            #             get_rate_spike_train_setup_function(
+            #                 patterns,
+            #                 pattern_switch1, 
+            #                 current_state['distortion'],
+            #                 main_firing_rate,
+            #                 exc_n,
+            #                 parsed_toml['simulation_parameters']['distortion_on_only'],
+            #             )
+            #         )
+            # else:
+            #     network.apply_spike_train_lattice(
+            #         c1, 
+            #         get_noisy_spike_train_setup_function(
+            #             parsed_toml['simulation_parameters']['noisy_cue_noise_level'],
+            #             main_firing_rate,
+            #         )
+            #     )
+
+            # if parsed_toml['simulation_parameters']['bayesian_2_on']:
+            #     bayesian_firing_rate = current_state['bayesian_firing_rate']
+            # else:
+            #     bayesian_firing_rate = 0
+
+            # if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            #     network.apply_spike_train_lattice_given_position(
+            #         c2, 
+            #         get_rate_spike_train_setup_function(
+            #             bayesian_memory_patterns,
+            #             bayesian_memory_pattern, 
+            #             current_state['bayesian_distortion'],
+            #             bayesian_firing_rate,
+            #             exc_n,
+            #             parsed_toml['simulation_parameters']['distortion_on_only'],
+            #         )
+            #     )
+            # else:
+            #     if not parsed_toml['simulation_parameters']['d2']:
+            #         network.apply_spike_train_lattice_given_position(
+            #             c2, 
+            #             get_rate_spike_train_setup_function(
+            #                 patterns,
+            #                 pattern2, 
+            #                 current_state['bayesian_distortion'],
+            #                 bayesian_firing_rate,
+            #                 exc_n,
+            #                 parsed_toml['simulation_parameters']['distortion_on_only'],
+            #             )
+            #         )
+            #     else:
+            #         inv_patterns = [np.logical_not(i).astype(int) for i in patterns]
+
+            #         network.apply_spike_train_lattice_given_position(
+            #             c2, 
+            #             get_rate_spike_train_setup_function(
+            #                 inv_patterns,
+            #                 pattern2, 
+            #                 current_state['bayesian_distortion'],
+            #                 bayesian_firing_rate,
+            #                 exc_n,
+            #                 parsed_toml['simulation_parameters']['distortion_on_only'],
+            #             )
+            #         )
+
+            # network.run_lattices(parsed_toml['simulation_parameters']['iterations2'])
+
+            # hist = network.get_lattice(e1).history
+            # data = [i.flatten() for i in np.array(hist)]
+            # peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+            # second_window = parsed_toml['simulation_parameters']['iterations2'] - parsed_toml['simulation_parameters']['second_window'] 
+
+            # current_pred_pattern = np.array([len([j for j in i if j >= second_window]) for i in peaks])
+            # firing_max = current_pred_pattern.max()
+
+            # if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            #     second_acc = determine_accuracy(
+            #         patterns,
+            #         pattern1,
+            #         num_patterns,
+            #         second_window,
+            #         peaks,
+            #         exc_n,
+            #         parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+            #         parsed_toml['simulation_parameters']['get_all_accuracies'],
+            #     )
+            #     if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+            #         bayesian_second_acc = determine_accuracy(
+            #             patterns,
+            #             pattern2,
+            #             num_patterns,
+            #             first_window,
+            #             peaks,
+            #             exc_n,
+            #             parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+            #             parsed_toml['simulation_parameters']['get_all_accuracies'],
+            #         )
+                
+            #     if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            #         hist = network.get_lattice(e2).history
+            #         data = [i.flatten() for i in np.array(hist)]
+            #         peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
+
+            #         current_pred_pattern = np.array([len([j for j in i if j >= first_window]) for i in peaks])
+            #         firing_max = current_pred_pattern.max()
+
+            #         bayesian_memory_second_acc = determine_accuracy(
+            #             bayesian_memory_patterns,
+            #             bayesian_memory_pattern,
+            #             num_patterns,
+            #             first_window,
+            #             peaks,
+            #             exc_n,
+            #             parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+            #             parsed_toml['simulation_parameters']['get_all_accuracies'],
+            #         )
+
+            #     if parsed_toml['simulation_parameters']['pattern_switch']:
+            #         pattern_switch_acc = determine_accuracy(
+            #             patterns,
+            #             pattern_switch1,
+            #             num_patterns,
+            #             second_window,
+            #             peaks,
+            #             exc_n,
+            #             parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
+            #             parsed_toml['simulation_parameters']['get_all_accuracies'],
+            #         )
+            # else:
+            #     second_acc = 0
+            #     bayesian_second_acc = 0
+
+            #     bayesian_memory_second_acc = 0
+
+            current_state['trial'] = trial
+            current_state['pattern1'] = pattern1
+            current_state['pattern2'] = pattern2
             if parsed_toml['simulation_parameters']['pattern_switch']:
-                pattern_switch_acc = determine_accuracy(
-                    patterns,
-                    pattern_switch1,
-                    num_patterns,
-                    second_window,
-                    peaks,
-                    exc_n,
-                    parsed_toml['simulation_parameters']['use_correlation_as_accuracy'],
-                    parsed_toml['simulation_parameters']['get_all_accuracies'],
-                )
-        else:
-            second_acc = 0
-            bayesian_second_acc = 0
+                current_state['switched_pattern'] = pattern_switch1
 
-            bayesian_memory_second_acc = 0
+            key = generate_key(parsed_toml, current_state)
 
-        current_state['trial'] = trial
-        current_state['pattern1'] = pattern1
-        current_state['pattern2'] = pattern2
-        if parsed_toml['simulation_parameters']['pattern_switch']:
-            current_state['switched_pattern'] = pattern_switch1
-
-        key = generate_key(parsed_toml, current_state)
-
-        current_value = {}
-        current_value['first_acc'] = first_acc
-        if parsed_toml['simulation_parameters']['memory_biases_memory']:
-            current_value['memory_biases_memory_first_acc'] = bayesian_memory_first_acc
-        if parsed_toml['simulation_parameters']['iterations2'] != 0:
-            current_value['second_acc'] = second_acc
-
+            current_value = {}
+            current_value['first_acc'] = first_acc
             if parsed_toml['simulation_parameters']['memory_biases_memory']:
-                current_value['memory_biases_memory_second_acc'] = bayesian_memory_second_acc
+                current_value['memory_biases_memory_first_acc'] = bayesian_memory_first_acc
+            # if parsed_toml['simulation_parameters']['iterations2'] != 0:
+            #     current_value['second_acc'] = second_acc
 
-            if parsed_toml['simulation_parameters']['pattern_switch']:
-                current_value['pattern_switch_acc'] = pattern_switch_acc
+            #     if parsed_toml['simulation_parameters']['memory_biases_memory']:
+            #         current_value['memory_biases_memory_second_acc'] = bayesian_memory_second_acc
 
-        if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
-            current_value['bayesian_first_acc'] = bayesian_first_acc
-            if parsed_toml['simulation_parameters']['iterations2'] != 0:
-                current_value['bayesian_second_acc'] = bayesian_second_acc
+            #     if parsed_toml['simulation_parameters']['pattern_switch']:
+            #         current_value['pattern_switch_acc'] = pattern_switch_acc
 
-        if parsed_toml['simulation_parameters']['measure_snr']:
-            signal = np.array([np.array(i).mean() for i in hist])
+            if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
+                current_value['bayesian_first_acc'] = bayesian_first_acc
+                if parsed_toml['simulation_parameters']['iterations2'] != 0:
+                    current_value['bayesian_second_acc'] = bayesian_second_acc
 
-            current_value['first_snr'] = float(signal_to_noise(signal[:parsed_toml['simulation_parameters']['iterations1']]))
-            if parsed_toml['simulation_parameters']['iterations2'] != 0:
-                current_value['second_snr'] = float(signal_to_noise(signal[parsed_toml['simulation_parameters']['iterations1']:]))
-            else:
-                current_value['second_snr'] = None
+            if parsed_toml['simulation_parameters']['measure_snr']:
+                signal = np.array([np.array(i).mean() for i in hist])
 
-        if parsed_toml['simulation_parameters']['peaks_on']:
-            current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
+                current_value['first_snr'] = float(signal_to_noise(signal[:parsed_toml['simulation_parameters']['iterations1']]))
+                # if parsed_toml['simulation_parameters']['iterations2'] != 0:
+                #     current_value['second_snr'] = float(signal_to_noise(signal[parsed_toml['simulation_parameters']['iterations1']:]))
+                # else:
+                #     current_value['second_snr'] = None
 
-        simulation_output[key] = current_value
+            if parsed_toml['simulation_parameters']['peaks_on']:
+                current_value['peaks'] = [[int(item) for item in sublist] for sublist in peaks]
+
+            simulation_output[key] = current_value
 
 with open(parsed_toml['simulation_parameters']['filename'], 'w') as file:
     json.dump(simulation_output, file, indent=4)
