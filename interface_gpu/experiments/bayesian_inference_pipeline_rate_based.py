@@ -633,7 +633,7 @@ for current_state in tqdm(all_states):
                         )
                     )
 
-            networks.append(nework)
+            networks.append(network)
 
         for network in networks:
             network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
@@ -650,7 +650,7 @@ for current_state in tqdm(all_states):
 
             first_acc = determine_accuracy(
                 all_patterns[element],
-                all_pattern1[element],
+                all_pattern1s[element],
                 num_patterns,
                 first_window,
                 peaks,
@@ -661,7 +661,7 @@ for current_state in tqdm(all_states):
             if parsed_toml['simulation_parameters']['bayesian_is_not_main']:
                 bayesian_first_acc = determine_accuracy(
                     all_patterns[element],
-                    all_pattern2[element],
+                    all_pattern2s[element],
                     num_patterns,
                     first_window,
                     peaks,
@@ -843,7 +843,7 @@ for current_state in tqdm(all_states):
 
             #     bayesian_memory_second_acc = 0
 
-            current_state['trial'] = trial
+            current_state['trial'] = trial_batch * parsed_toml['simulation_parameters']['gpu_batch'] + element
             current_state['pattern1'] = pattern1
             current_state['pattern2'] = pattern2
             if parsed_toml['simulation_parameters']['pattern_switch']:
