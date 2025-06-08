@@ -285,7 +285,7 @@ for current_state in tqdm(all_states):
     inh_neuron.set_synaptic_neurotransmitters(inh_neurotransmitters)
     inh_neuron.set_receptors(receptors)
 
-    for trial_batch in range(int(parsed_toml['simulation_parameters']['trials'] / parsed_toml['simulation_parameters']['gpu_batch']))::
+    for trial_batch in range(int(parsed_toml['simulation_parameters']['trials'] / parsed_toml['simulation_parameters']['gpu_batch'])):
         all_patterns = []
         all_bayesian_memory_patterns = []
         all_ws = []
@@ -638,7 +638,7 @@ for current_state in tqdm(all_states):
         for network in networks:
             network.run_lattices(parsed_toml['simulation_parameters']['iterations1'])
         
-        for element, network in zip(range(parsed_toml['simulation_parameters']['gpu_batch']), networks)
+        for element, network in zip(range(parsed_toml['simulation_parameters']['gpu_batch']), networks):
             hist = network.get_lattice(e1).history
             data = [i.flatten() for i in np.array(hist)]
             peaks = [find_peaks_above_threshold([j[i] for j in data], 20) for i in range(len(data[0]))]
