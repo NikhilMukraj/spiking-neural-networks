@@ -1620,8 +1620,8 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
 //         Ast::StructAssignments(variables) => {
 //             variables.iter()
 //                 .map(|i| {
-//                     let name = match i {
-//                         Ast::StructAssignment { name, ..} => name,
+//                     let (var_name, type_name) = match i {
+//                         Ast::StructAssignment { name, type_name } => (name, type_name),
 //                         _ => unreachable!()
 //                     };
 
@@ -1634,7 +1634,7 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
 //                                     _ => unreachable!(),
 //                                 }};
 //                                 format!(\"__global {{}} *{}_{{}}\", type_name, i.0.split(\"$\").join(\"_\"))
-//                             })
+//                             }})
 //                             .collect::<Vec<_>>();",
 //                         var_name,
 //                         type_name,
@@ -1647,82 +1647,101 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
 //     }
 // }
 
-// #[cfg(feature = "gpu")]
-// fn generate_ion_channel_attrs_getter(vars: &Ast) -> Vec<String> {
-//     match vars {
-//         Ast::StructAssignments(variables) => {
-//             variables.iter()
-//                 .map(|i| {
-//                     let (var_name, type_name) = match i {
-//                         Ast::StructAssignment { name, type_name } => (name, type_name),
-//                         _ => unreachable!(),
-//                     };
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_args_names(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let name = match i {
+                        Ast::StructAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
 
-//                     format!(
-//                         "let {}_args = {}::get_all_attributes_as_vec().iter().map(|i| format!(\"{}_{{}}\", i.0)).collect::<Vec<_>>();",
-//                         var_name,
-//                         type_name,
-//                         var_name,
-//                     )
-//                 })
-//                 .collect()
-//         },
-//         _ => unreachable!(),
-//     }
-// }
+                    format!("{}_args", name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
 
-// #[cfg(feature = "gpu")]
-// fn generate_ion_channel_prefixes(vars: &Ast) -> Vec<String> {
-//     match vars {
-//         Ast::StructAssignments(variables) => {
-//             variables.iter()
-//                 .map(|i| {
-//                     let var_name = match i {
-//                         Ast::StructAssignment { name, .. } => name,
-//                         _ => unreachable!(),
-//                     };
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_attrs_getter(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
 
-//                     format!(
-//                         "let {}_prefix = generate_unique_prefix(&argument_names, \"{}_ion_channel\");",
-//                         var_name,
-//                         var_name,
-//                     )
-//                 })
-//                 .collect()
-//         },
-//         _ => unreachable!(),
-//     }
-// }
+                    format!(
+                        "let {}_args = {}::get_attribute_names_as_vector().iter().map(|i| format!(\"{}_{{}}\", i.0)).collect::<Vec<_>>();",
+                        var_name,
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
 
-// #[cfg(feature = "gpu")]
-// fn generate_ion_channel_replacements_in_neuron_kernel(vars: &Ast) -> Vec<String> {
-//     match vars {
-//         Ast::StructAssignments(variables) => {
-//             variables.iter()
-//                 .map(|i| {
-//                     let (var_name, type_name) = match i {
-//                         Ast::StructAssignment { name, type_name } => (name, type_name),
-//                         _ => unreachable!(),
-//                     };
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_prefixes(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let var_name = match i {
+                        Ast::StructAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
 
-//                     format!(
-//                         "for (attr, _) in {}::get_all_attributes_as_vec() {{
-//                             let current_split: Vec<_> = attr.split(\"$\").collect();
-//                             program_source.replace(
-//                                 &format!(\"{}${{}}\", &current_split[1..].join(\"$\")),
-//                                 &format!(\"{{}}\", {}_prefix, &current_split[1..].join(\"$\")),
-//                             );
-//                         }}",
-//                         type_name,
-//                         var_name,
-//                         var_name,
-//                     )
-//                 })
-//                 .collect()
-//         },
-//         _ => unreachable!(),
-//     }
-// }
+                    format!(
+                        "let {}_prefix = generate_unique_prefix(&argument_names, \"{}_ion_channel\");",
+                        var_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_replacements_in_neuron_kernel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "for (attr, _) in {}::get_attribute_names_as_vector() {{
+                            let current_split: Vec<_> = attr.split(\"$\").collect();
+                            program_source = program_source.replace(
+                                &format!(\"{}${{}}\", &current_split[1..].join(\"$\")),
+                                &format!(\"{{}}_{{}}\", {}_prefix, &current_split[1..].join(\"$\")),
+                            );
+                        }}",
+                        type_name,
+                        var_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!(),
+    }
+}
 
 #[cfg(feature = "py")]
 fn generate_py_getter_and_setters(field_name: &str, var_name: &str, type_name: &str) -> String {
@@ -2153,123 +2172,119 @@ impl NeuronDefinition {
         // use them to replace vars
         // replace update func with actual function, only add func if it is found in kernel
         
-        // let ion_channel_args = generate_ion_channel_attrs_getter(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
-        // let ion_channel_prefixes = generate_ion_channel_prefixes(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
-        // let ion_channel_var_replacements = generate_ion_channel_replacements_in_neuron_kernel(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
+        let ion_channel_args = generate_ion_channel_attrs_getter(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
+        let ion_channel_prefixes = generate_ion_channel_prefixes(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
+        let ion_channel_var_replacements = generate_ion_channel_replacements_in_neuron_kernel(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
+        let ion_channel_args_names = generate_ion_channel_args_names(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
 
-        // let iterate_and_spike_electrical_function = if ion_channel_prefixes.is_empty() {
-        //     let argument_names = format!(
-        //         "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];",
-        //         mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
-        //         generate_vars_as_arg_strings(&self.vars).join(", "),
-        //     );
+        let iterate_and_spike_electrical_function = if ion_channel_prefixes.is_empty() {
+            let kernel_header = format!(
+                "__kernel void iterate_and_spike(
+                    __global const float *inputs,
+                    __global const uint *index_to_position,
+                    {},
+                    {}
+                ) {{
+                    int gid = get_global_id(0);
+                    int index = index_to_position[gid];",
+                mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                generate_kernel_args(&self.vars).join(",\n"),
+            );
 
-        //     let kernel_header = format!(
-        //         "__kernel void iterate_and_spike(
-        //             __global const float *inputs,
-        //             __global const uint *index_to_position,
-        //             {},
-        //             {}
-        //         ) {{
-        //             int gid = get_global_id(0);
-        //             int index = index_to_position[gid];",
-        //         mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
-        //         generate_kernel_args(&self.vars).join(",\n"),
-        //     );
+            let kernel_body = format!(
+                "{}\n{}",
+                generate_gpu_kernel_on_iteration(&self.on_iteration), 
+                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+            );
 
-        //     let kernel_body = format!(
-        //         "{}\n{}",
-        //         generate_gpu_kernel_on_iteration(&self.on_iteration), 
-        //         generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
-        //     );
+            let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
-        //     let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
+            format!(
+                "{}\n{}\n{}\n{}\n{}", 
+                iterate_and_spike_electrical_kernel_header, 
+                kernel_name,
+                argument_names,
+                kernel,
+                iterate_and_spike_kernel_footer,
+            )
+        } else {
+            let ion_channel_prefixes = ion_channel_prefixes.join("\n");
+            let ion_channel_kernel_args = ion_channel_args.join("\n");
+            let ion_channel_kernel_args_replacements = ion_channel_var_replacements.join("\n");
 
-        //     format!(
-        //         "{}\n{}\n{}\n{}\n{}", 
-        //         iterate_and_spike_electrical_kernel_header, 
-        //         kernel_name,
-        //         argument_names,
-        //         kernel,
-        //         iterate_and_spike_kernel_footer,
-        //     )
-        // } else {
-        //     let argument_names = format!(
-        //     "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];",
-        //         mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
-        //         generate_vars_as_arg_strings(&self.vars).join(", "),
-        //     );
+            let kernel_header = format!(
+                "__kernel void iterate_and_spike(
+                    __global const float *inputs,
+                    __global const uint *index_to_position,
+                    {},
+                    {},
+                    {}
+                ) {{
+                    int gid = get_global_id(0);
+                    int index = index_to_position[gid];",
+                mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                generate_kernel_args(&self.vars).join(",\n"),
+                ion_channel_args_names.iter().map(|i| format!("@{}", i)).collect::<Vec<String>>().join(",\n"),
+            );
 
-        //     let ion_channel_prefixes = ion_channel_prefixes.join("\n");
-        //     let ion_channel_args = ion_channel_args.join("\n");
-        //     let ion_channel_kernel_args = ;
+            let kernel_body = format!(
+                "{}\n{}",
+                generate_gpu_kernel_on_iteration(&self.on_iteration), 
+                generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+            );
 
-        //     let kernel_header = format!(
-        //         "__kernel void iterate_and_spike(
-        //             __global const float *inputs,
-        //             __global const uint *index_to_position,
-        //             {},
-        //             {},
-        //             {{}}
-        //         ) {{
-        //             int gid = get_global_id(0);
-        //             int index = index_to_position[gid];",
-        //         mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
-        //         generate_kernel_args(&self.vars).join(",\n"),
-        //     );
+            let kernel = format!(
+                "let mut program_source = \"{}\n{}\n}}\".to_string();", 
+                kernel_header, 
+                kernel_body,
+            );
 
-        //     let kernel_body = format!(
-        //         "{}\n{}",
-        //         generate_gpu_kernel_on_iteration(&self.on_iteration), 
-        //         generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
-        //     );
+            format!(
+                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", 
+                iterate_and_spike_electrical_kernel_header, 
+                kernel_name,
+                argument_names,
+                ion_channel_prefixes,
+                ion_channel_kernel_args,
+                kernel,
+                ion_channel_kernel_args_replacements,
+                iterate_and_spike_kernel_footer,
+            )
+        };
 
-        //     let kernel = format!("let mut program_source = format!(\"{}\n{}\n}}\", );", kernel_header, kernel_body);
+        // let kernel_header = format!(
+        //     "__kernel void iterate_and_spike(
+        //         __global const float *inputs,
+        //         __global const uint *index_to_position,
+        //         {},
+        //         {}
+        //     ) {{
+        //         int gid = get_global_id(0);
+        //         int index = index_to_position[gid];",
+        //     mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+        //     generate_kernel_args(&self.vars).join(",\n"),
+        // );
 
-        //     format!(
-        //         "{}\n{}\n{}\n{}\n{}\n{}", 
-        //         iterate_and_spike_electrical_kernel_header, 
-        //         kernel_name,
-        //         ion_channel_prefixes,
-        //         argument_names,
-        //         kernel,
-        //         iterate_and_spike_kernel_footer,
-        //     )
-        // };
-
-        let kernel_header = format!(
-            "__kernel void iterate_and_spike(
-                __global const float *inputs,
-                __global const uint *index_to_position,
-                {},
-                {}
-            ) {{
-                int gid = get_global_id(0);
-                int index = index_to_position[gid];",
-            mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
-            generate_kernel_args(&self.vars).join(",\n"),
-        );
-
-        let kernel_body = format!(
-            "{}\n{}",
-            generate_gpu_kernel_on_iteration(&self.on_iteration), 
-            generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
-        );
+        // let kernel_body = format!(
+        //     "{}\n{}",
+        //     generate_gpu_kernel_on_iteration(&self.on_iteration), 
+        //     generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
+        // );
 
         // iterate over ion channel vars
         // use them to replace vars
         // replace update func with actual function, only add func if it is found in kernel
 
-        let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
+        // let kernel = format!("let program_source = \"{}\n{}\n}}\".to_string();", kernel_header, kernel_body);
 
-        let iterate_and_spike_electrical_function = format!(
-            "{}\n{}\n{}\n{}\n{}", 
-            iterate_and_spike_electrical_kernel_header, 
-            kernel_name,
-            argument_names,
-            kernel,
-            iterate_and_spike_kernel_footer,
-        );
+        // let iterate_and_spike_electrical_function = format!(
+        //     "{}\n{}\n{}\n{}\n{}", 
+        //     iterate_and_spike_electrical_kernel_header, 
+        //     kernel_name,
+        //     argument_names,
+        //     kernel,
+        //     iterate_and_spike_kernel_footer,
+        // );
 
         // generate electrochemical kernel
         // if no chemical iteration, add neurotransmitter update, receptor kinetics, receptor update to end
