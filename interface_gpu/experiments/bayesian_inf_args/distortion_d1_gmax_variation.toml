@@ -1,0 +1,36 @@
+[simulation_parameters]
+peaks_on = true
+bayesian_is_not_main = true
+use_correlation_as_accuracy = true
+measure_snr = true
+
+distortion_on_only = false
+
+reset_patterns = true
+
+d1 = true
+
+iterations1 = 5000
+iterations2 = 0
+a = -1
+b = 0
+
+weights_scalar = 1
+inh_weights_scalar = 1
+skew = 0.1
+c_m = 25
+
+trials = 20
+
+filename = "bayesian_inf_varied_distortion_d1_gmax_variation.json"
+
+[variables]
+spike_train_to_exc = [4] # may need to decrease weight
+bayesian_to_exc = [0.45] # somewhere around here is good, may wanna try pattern reset
+prob_of_exc_to_inh = [1]
+ampa_g = [0.5, 1.0, 1.5]
+nmda_g = [0.3, 0.6, 0.9]
+gabaa_g = [0.6, 1.2, 1.8]
+s_d1 = [1]
+distortion = [0.2, 0.4, 0.6, 0.8]
+bayesian_distortion = [0]
