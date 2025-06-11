@@ -1678,10 +1678,9 @@ fn generate_ion_channel_attrs_getter(vars: &Ast) -> Vec<String> {
                     };
 
                     format!(
-                        "let {}_args = {}::get_attribute_names_as_vector().iter().map(|i| format!(\"{}_{{}}\", i.0)).collect::<Vec<_>>();",
+                        "let {}_args = {}::get_attribute_names_as_vector().iter().map(|i| i.0.clone()).collect::<Vec<_>>();",
                         var_name,
                         type_name,
-                        var_name,
                     )
                 })
                 .collect()
@@ -1729,7 +1728,7 @@ fn generate_ion_channel_replacements_in_neuron_kernel(vars: &Ast) -> Vec<String>
                             let current_split: Vec<_> = attr.split(\"$\").collect();
                             program_source = program_source.replace(
                                 &format!(\"{}${{}}\", &current_split[1..].join(\"$\")),
-                                &format!(\"{{}}_{{}}\", {}_prefix, &current_split[1..].join(\"$\")),
+                                &format!(\"{{}}{{}}[index]\", {}_prefix, &current_split[1..].join(\"$\")),
                             );
                         }}",
                         type_name,
@@ -1740,6 +1739,50 @@ fn generate_ion_channel_replacements_in_neuron_kernel(vars: &Ast) -> Vec<String>
                 .collect()
         },
         _ => unreachable!(),
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_replacements_in_neuron_kernel_header(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "program_source = program_source.replace(
+                            \"@{}_args\", 
+                            {}::get_attribute_names_as_vector()
+                            .iter().map(|i| {{
+                                let type_name = match i.1 {{
+                                    AvailableBufferType::Float => \"float\",
+                                    AvailableBufferType::UInt => \"uint\",
+                                    AvailableBufferType::OptionalUInt => \"int\",
+                                }};
+
+                                format!(
+                                    \"__global {{}} *{{}}{{}}\", 
+                                    type_name, 
+                                    {}_prefix, 
+                                    (&i.0.split(\"$\").collect::<Vec<_>>()[1..]).join(\"\")
+                                )
+                            }})
+                            .collect::<Vec<_>>()
+                            .join(\",\n\")
+                            .as_str()
+                        );",
+                        var_name,
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        }, 
+        _ => unreachable!()
     }
 }
 
@@ -2239,8 +2282,12 @@ impl NeuronDefinition {
                 kernel_body,
             );
 
+            let ion_channel_header_replacements = generate_ion_channel_replacements_in_neuron_kernel_header(
+                self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
+            ).join("\n");
+
             format!(
-                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", 
+                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}println!(\"{{}}\", program_source);\n{}", 
                 iterate_and_spike_electrical_kernel_header, 
                 kernel_name,
                 argument_names,
@@ -2248,6 +2295,7 @@ impl NeuronDefinition {
                 ion_channel_kernel_args,
                 kernel,
                 ion_channel_kernel_args_replacements,
+                ion_channel_header_replacements,
                 iterate_and_spike_kernel_footer,
             )
         };
