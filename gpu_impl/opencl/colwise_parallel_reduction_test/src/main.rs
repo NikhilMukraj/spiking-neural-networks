@@ -41,19 +41,19 @@ __kernel void colwise_sum_parallel(__global const float *mat, __global float *re
 
 const KERNEL_NAME: &str = "colwise_sum_parallel";
 
-// const SERIAL_PROGRAM_SOURCE: &str = r#"
-// __kernel void colwise_sum_serial(
-//     __global const float *mat, __global float *res, uint m, uint n
-// ) {
-//     int gid = get_global_id(0);
-//     float sum = 0.0f;
-//     for (int i = 0; i < n; i++) {
-//         sum += mat[i * m + gid];
-//     }
-//     res[gid] = sum;
-// }"#;
+const SERIAL_PROGRAM_SOURCE: &str = r#"
+__kernel void colwise_sum_serial(
+    __global const float *mat, __global float *res, uint m, uint n
+) {
+    int gid = get_global_id(0);
+    float sum = 0.0f;
+    for (int i = 0; i < n; i++) {
+        sum += mat[i * m + gid];
+    }
+    res[gid] = sum;
+}"#;
 
-// const SERIAL_KERNEL_NAME: &str = "colwise_sum_serial";
+const SERIAL_KERNEL_NAME: &str = "colwise_sum_serial";
 
 fn colwise_sum(matrix: &[f32], m: usize, n: usize) -> Vec<f32> {
     let mut output: Vec<f32> = vec![0.; m];
@@ -86,8 +86,12 @@ fn main()  -> Result<()> {
         .expect("Program::create_and_build_from_source failed");
     let kernel = Kernel::create(&program, KERNEL_NAME).expect("Kernel::create failed");
 
-    const N: usize = 64;
-    const M: usize = 64;
+    let serial_program = Program::create_and_build_from_source(&context, SERIAL_PROGRAM_SOURCE, "")
+        .expect("Program::create_and_build_from_source failed");
+    let serial_kernel = Kernel::create(&serial_program, SERIAL_KERNEL_NAME).expect("Kernel::create failed");
+
+    const N: usize = 256;
+    const M: usize = 512;
     const FULL_SIZE: usize = M * N;
 
     let mut matrix: [cl_float; FULL_SIZE] = [1.0; FULL_SIZE];
@@ -139,8 +143,53 @@ fn main()  -> Result<()> {
 
     let gpu_load_duration = gpu_load_and_execute_start.elapsed();
 
-    println!("results front: {}", results[0]);
-    println!("results back: {}", results[M - 1]);
+    let serial_gpu_load_and_execute_start = Instant::now();
+
+    let mut matrix_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, FULL_SIZE, ptr::null_mut())?
+    };
+    let mut sums_buffer = unsafe {
+        Buffer::<cl_float>::create(&context, CL_MEM_READ_ONLY, M, ptr::null_mut())?
+    };
+
+    let _matrix_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut matrix_buffer, CL_BLOCKING, 0, &matrix, &[])? 
+    };
+    let sums_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums, &[])? 
+    };
+
+    let m_cl: cl_uint = M as u32;
+    let n_cl: cl_uint = N as u32;
+
+    let serial_kernel_event = unsafe {
+        ExecuteKernel::new(&serial_kernel)
+            .set_arg(&matrix_buffer)
+            .set_arg(&sums_buffer)
+            .set_arg(&m_cl)
+            .set_arg(&n_cl)
+            .set_global_work_size(FULL_SIZE)
+            .set_local_work_size(64)
+            .set_wait_event(&sums_write_event)
+            .enqueue_nd_range(&queue)?
+    };
+
+    let events: Vec<cl_event> = vec![kernel_event.get()];
+
+    let mut serial_results: [cl_float; M] = [0.0; M];
+    let serial_results_read_event = unsafe {
+        queue.enqueue_read_buffer(&sums_buffer, CL_NON_BLOCKING, 0, &mut serial_results, &events)?
+    };
+
+    serial_results_read_event.wait()?;
+
+    let serial_gpu_load_duration = serial_gpu_load_and_execute_start.elapsed();
+
+    println!("parallel results front: {}", results[0]);
+    println!("parallel results back: {}", results[M - 1]);
+
+    println!("serial results front: {}", serial_results[0]);
+    println!("serial results back: {}", serial_results[M - 1]);
 
     let start = Instant::now();
     let cpu_results = colwise_sum(&matrix, M, N);
@@ -152,10 +201,15 @@ fn main()  -> Result<()> {
     let start_time = kernel_event.profiling_command_start()?;
     let end_time = kernel_event.profiling_command_end()?;
     let duration = end_time - start_time;
-    println!("kernel execution duration (ns): {}", duration);
+    let serial_start_time = serial_kernel_event.profiling_command_start()?;
+    let serial_end_time = serial_kernel_event.profiling_command_end()?;
+    let serial_duration = serial_end_time - serial_start_time;
+    println!("parallel kernel execution duration (ns): {}", duration);
+    println!("serial kernel execution duration (ns): {}", serial_duration);
     println!("cpu execution duration (ns): {}", cpu_duration.as_nanos());
 
-    println!("gpu load and execution (ns): {}", gpu_load_duration.as_nanos());
+    println!("parallel gpu load and execution (ns): {}", gpu_load_duration.as_nanos());
+    println!("serial gpu load and execution (ns): {}", serial_gpu_load_duration.as_nanos());
     
     Ok(())
 }
