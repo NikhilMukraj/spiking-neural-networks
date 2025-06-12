@@ -11,18 +11,49 @@ use std::time::Instant;
 
 
 const PROGRAM_SOURCE: &str = r#"
-__kernel void colwise_sum(
-    __global const float *mat, __global float *res, uint m, uint n
-) {
-    int gid = get_global_id(0);
+__kernel void colwise_sum_parallel(__global const float *mat, __global float *res, uint m, uint n) {
+    int col = get_group_id(0);
+    int lid = get_local_id(0);
+    int lsize = get_local_size(0);
+
+    __local float scratch[256];
+
     float sum = 0.0f;
-    for (int i = 0; i < n; i++) {
-        sum += mat[i * m + gid];
+
+    for (int i = lid; i < n; i += lsize) {
+        sum += mat[i * m + col];
     }
-    res[gid] = sum;
+
+    scratch[lid] = sum;
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int stride = lsize / 2; stride > 0; stride >>= 1) {
+        if (lid < stride) {
+            scratch[lid] += scratch[lid + stride];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (lid == 0) {
+        res[col] = scratch[0];
+    }
 }"#;
 
-const KERNEL_NAME: &str = "colwise_sum";
+const KERNEL_NAME: &str = "colwise_sum_parallel";
+
+// const SERIAL_PROGRAM_SOURCE: &str = r#"
+// __kernel void colwise_sum_serial(
+//     __global const float *mat, __global float *res, uint m, uint n
+// ) {
+//     int gid = get_global_id(0);
+//     float sum = 0.0f;
+//     for (int i = 0; i < n; i++) {
+//         sum += mat[i * m + gid];
+//     }
+//     res[gid] = sum;
+// }"#;
+
+// const SERIAL_KERNEL_NAME: &str = "colwise_sum_serial";
 
 fn colwise_sum(matrix: &[f32], m: usize, n: usize) -> Vec<f32> {
     let mut output: Vec<f32> = vec![0.; m];
@@ -55,7 +86,7 @@ fn main()  -> Result<()> {
         .expect("Program::create_and_build_from_source failed");
     let kernel = Kernel::create(&program, KERNEL_NAME).expect("Kernel::create failed");
 
-    const N: usize = 12;
+    const N: usize = 64;
     const M: usize = 64;
     const FULL_SIZE: usize = M * N;
 
@@ -92,6 +123,7 @@ fn main()  -> Result<()> {
             .set_arg(&m_cl)
             .set_arg(&n_cl)
             .set_global_work_size(FULL_SIZE)
+            .set_local_work_size(64)
             .set_wait_event(&sums_write_event)
             .enqueue_nd_range(&queue)?
     };
