@@ -27,20 +27,20 @@ mod test {
         [end]
     "#);
 
-    // #[test]
-    // fn test_electrical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
-    //         let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-    //         .expect("Could not get GPU devices")
-    //         .first()
-    //         .expect("No GPU found");
-    //     let device = Device::new(device_id);
+    #[test]
+    fn test_electrical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
+            let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
 
-    //     let context = Context::from_device(&device).expect("Context::from_device failed");
+        let context = Context::from_device(&device).expect("Context::from_device failed");
 
-    //     assert!(LIF::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context).is_ok());
+        assert!(LIF::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context).is_ok());
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 
     // #[test]
     // fn test_chemical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {}
