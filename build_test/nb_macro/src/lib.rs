@@ -1648,6 +1648,33 @@ fn generate_ion_channels_to_cpu(vars: &Ast) -> Vec<String> {
 // }
 
 #[cfg(feature = "gpu")]
+fn generate_ion_channel_argument_names_for_neuron_kernel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "argument_names.extend(
+                            {}::get_attribute_names_as_vector().iter()
+                                .map(|i| format!(\"{}${{}}\", i.0))
+                                .collect::<Vec<_>>()
+                        );",
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
 fn generate_ion_channel_args_names(vars: &Ast) -> Vec<String> {
     match vars {
         Ast::StructAssignments(variables) => {
@@ -1782,6 +1809,130 @@ fn generate_ion_channel_replacements_in_neuron_kernel_header(vars: &Ast) -> Vec<
                 })
                 .collect()
         }, 
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_get_function_calls_to_replace(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let name = match i {
+                        Ast::StructAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    format!("@{}_function", name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_get_function_calls(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "program_source = program_source.replace(\"@{}_function\", {}::get_update_function().1.as_str());", 
+                        var_name,
+                        type_name,
+                    )
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_ion_channel_replace_call_in_neuron_kernel(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::StructAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::StructAssignment { name, type_name } => (name, type_name),
+                        _ => unreachable!(),
+                    };
+
+                    format!(
+                        "let update_current_name = \"{}$update_current(\";
+                        let update_current_replacement_function = |args: &Vec<&str>| -> String {{
+                            format!(
+                                \"update_{}_ion_channel(index, {{}}, {{}})\", 
+                                args[0],
+                                {}::get_attribute_names_as_vector()
+                                    .iter().map(|i| {{
+                                        format!(
+                                            \"{{}}{{}}\", 
+                                            {}_prefix, 
+                                            (&i.0.split(\"$\").collect::<Vec<_>>()[1..]).join(\"\")
+                                        )
+                                    }})
+                                    .collect::<Vec<_>>()
+                                    .join(\", \")
+                                    .as_str()
+                            )
+                        }};
+
+                        let mut result = String::new();
+                        let mut last_end = 0;
+
+                        while let Some(func_start) = program_source[last_end..].find(update_current_name) {{
+                            let args_start = last_end + func_start + update_current_name.len() - 1;
+                            result.push_str(&program_source[last_end..last_end + func_start]);
+
+                            let remaining_text = &program_source[args_start..];
+                            
+                            let mut cursor = 1;
+                            let mut depth = 1;
+                            let mut args_end = 1;
+                            
+                            while cursor < remaining_text.len() {{
+                                match remaining_text.chars().nth(cursor).unwrap() {{
+                                    '(' => depth += 1,
+                                    ')' => {{
+                                        depth -= 1;
+                                        if depth == 0 {{
+                                            args_end = cursor;
+                                            break;
+                                        }}
+                                    }},
+                                    _ => {{}}
+                                }}
+                                cursor += 1;
+                            }}
+
+                            let args_str = &remaining_text[1..args_end];
+                            let args = args_str.split(\",\").collect::<Vec<_>>();
+                            
+                            result.push_str(&update_current_replacement_function(&args));
+                            
+                            last_end = args_start + args_end + 1;
+                        }}
+
+                        result.push_str(&program_source[last_end..]);
+
+                        program_source = result;",
+                        var_name,
+                        type_name, 
+                        type_name,
+                        var_name,
+                    )
+                })
+                .collect()
+        },
         _ => unreachable!()
     }
 }
@@ -2185,12 +2336,6 @@ impl NeuronDefinition {
             ("gap_conductance", "float"), 
             ("c_m", "float"),
         ];
-
-        let argument_names = format!(
-            "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];",
-            mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
-            generate_vars_as_arg_strings(&self.vars).join(", "),
-        );
         
         let iterate_and_spike_kernel_footer = "
             let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, \"\") {
@@ -2220,7 +2365,13 @@ impl NeuronDefinition {
         let ion_channel_var_replacements = generate_ion_channel_replacements_in_neuron_kernel(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
         let ion_channel_args_names = generate_ion_channel_args_names(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![])));
 
-        let iterate_and_spike_electrical_function = if ion_channel_prefixes.is_empty() {
+        let iterate_and_spike_electrical_function = if ion_channel_prefixes.is_empty() {    
+            let argument_names = format!(
+                "let argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];",
+                mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+                generate_vars_as_arg_strings(&self.vars).join(", "),
+            );
+            
             let kernel_header = format!(
                 "__kernel void iterate_and_spike(
                     __global const float *inputs,
@@ -2255,6 +2406,17 @@ impl NeuronDefinition {
             let ion_channel_kernel_args = ion_channel_args.join("\n");
             let ion_channel_kernel_args_replacements = ion_channel_var_replacements.join("\n");
 
+            
+            let argument_names = format!(
+                "let mut argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];
+                {}",
+                mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+                generate_vars_as_arg_strings(&self.vars).join(", "),
+                generate_ion_channel_argument_names_for_neuron_kernel(
+                    self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
+                ).join("\n"),
+            );
+
             let kernel_header = format!(
                 "__kernel void iterate_and_spike(
                     __global const float *inputs,
@@ -2276,8 +2438,12 @@ impl NeuronDefinition {
                 generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection),
             );
 
+            let ion_channel_get_function_calls_to_replace = generate_ion_channel_get_function_calls_to_replace(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))).join("\n");
+            let ion_channel_get_function_calls_replacements = generate_ion_channel_get_function_calls(self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))).join(", ");
+
             let kernel = format!(
-                "let mut program_source = \"{}\n{}\n}}\".to_string();", 
+                "let mut program_source = \"{}\n{}\n{}\n}}\".to_string();", 
+                ion_channel_get_function_calls_to_replace,
                 kernel_header, 
                 kernel_body,
             );
@@ -2286,8 +2452,12 @@ impl NeuronDefinition {
                 self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
             ).join("\n");
 
+            let ion_channel_function_call_replacements_in_kernel = generate_ion_channel_replace_call_in_neuron_kernel(
+                self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
+            ).join("\n");
+
             format!(
-                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}println!(\"{{}}\", program_source);\n{}", 
+                "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", 
                 iterate_and_spike_electrical_kernel_header, 
                 kernel_name,
                 argument_names,
@@ -2296,6 +2466,8 @@ impl NeuronDefinition {
                 kernel,
                 ion_channel_kernel_args_replacements,
                 ion_channel_header_replacements,
+                ion_channel_function_call_replacements_in_kernel,
+                ion_channel_get_function_calls_replacements,
                 iterate_and_spike_kernel_footer,
             )
         };
@@ -3919,7 +4091,7 @@ impl IonChannelDefinition {
                             {}
                         ) {{
                             {}
-                        }}\")
+                        }}\"){}
                     )
                 }}",
                 if self.get_use_timestep() {
@@ -3930,12 +4102,17 @@ impl IonChannelDefinition {
                 generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
                 self.type_name.generate(),
                 if self.get_use_timestep() {
-                    "__global float *current_voltage,\n__global float *dt,\n__global float *current"
+                    "float current_voltage,\nfloat dt,\n__global float *current"
                 } else {
-                    "__global float *current_voltage,\n__global float *current"
+                    "float current_voltage,\n__global float *current"
                 },
                 generate_kernel_args(&self.vars).join(",\n"),
                 generate_gpu_kernel_on_iteration(&self.on_iteration),
+                if self.get_use_timestep() {
+                    ".replace(\"current_voltage[index]\", \"current_voltage\").replace(\"dt[index]\", \"dt\")"
+                } else {
+                    ".replace(\"current_voltage[index]\", \"current_voltage\")"
+                }
             )
         } else {
             let kernel_on_iteration = generate_gpu_kernel_on_iteration(&self.on_iteration);
