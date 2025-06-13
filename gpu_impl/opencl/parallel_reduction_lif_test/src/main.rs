@@ -46,6 +46,62 @@ __kernel void calculate_internal_electrical_inputs(
 
 const INPUTS_KERNEL_NAME: &str = "calculate_internal_electrical_inputs";
 
+const PARALLEL_INPUTS_KERNEL: &str = r#"
+__kernel void calculate_parallel_internal_electrical_inputs(
+    __global const uint *connections,
+    __global const float *weights,
+    __global const uint *index_to_position,
+    __global const float *gap_conductances,
+    __global const float *voltages,
+    uint n,
+    __global float *res
+) {
+    int gid = get_global_id(1);
+    int lid = get_local_id(0);
+    int lsize = get_local_size(0);
+
+    __local float partial_sums[256];
+    __local uint partial_counts[256];
+
+    float local_sum = 0.0f;
+    uint local_count = 0;
+
+    for (int i = lid; i < n; i += lsize) {
+        if (i * n + gid <= n * n && connections[i * n + gid] == 1) {
+            uint presynaptic_index = index_to_position[i];
+            uint postsynaptic_index = index_to_position[gid];
+            float weight = weights[i * n + gid];
+            float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
+            local_sum += weight * gap_junction;
+            local_count++;
+        }
+    }
+
+    partial_sums[lid] = local_sum;
+    partial_counts[lid] = local_count;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (int offset = lsize / 2; offset > 0; offset >>= 1) {
+        if (lid < offset) {
+            partial_sums[lid] += partial_sums[lid + offset];
+            partial_counts[lid] += partial_counts[lid + offset];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (lid == 0) {
+        if (partial_counts[0] != 0) {
+            res[gid] = partial_sums[0] / (float)partial_counts[0];
+        } else {
+            res[gid] = 0.0f;
+        }
+    }
+}
+"#;
+
+const PARALLEL_INPUTS_KERNEL_NAME: &str = "calculate_parallel_internal_electrical_inputs";
+
 const ITERATE_AND_SPIKE_KERNEL: &str = r#"
 __kernel void iterate_and_spike(
     __global const float *inputs,
@@ -213,6 +269,11 @@ fn main() -> Result<()> {
     let incoming_connections_kernel = Kernel::create(&incoming_connections_program, INPUTS_KERNEL_NAME)
         .expect("Kernel::create failed");
 
+    let parallel_incoming_connections_program = Program::create_and_build_from_source(&context, PARALLEL_INPUTS_KERNEL, "")
+        .expect("Program::create_and_build_from_source failed");
+    let parallel_incoming_connections_kernel = Kernel::create(&parallel_incoming_connections_program, PARALLEL_INPUTS_KERNEL_NAME)
+        .expect("Kernel::create failed");
+
     let iterate_and_spike_program = Program::create_and_build_from_source(&context, ITERATE_AND_SPIKE_KERNEL, "")
         .expect("Program::create_and_build_from_source failed");
     let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
@@ -226,14 +287,14 @@ fn main() -> Result<()> {
 
     let index_to_position: Vec<u32> = (0..N).map(|i| i as u32).collect();
 
-    let mut voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
-    let mut gs: Vec<f32> = (0..N).map(|_| -0.1).collect();
-    let mut es: Vec<f32> = (0..N).map(|_| 0.).collect();
-    let mut v_ths: Vec<f32> = (0..N).map(|_| -55.).collect();
-    let mut v_resets: Vec<f32> = (0..N).map(|_| -75.).collect();
-    let mut is_spikings: Vec<u32> = (0..N).map(|_| 0).collect();
-    let mut dts: Vec<f32> = (0..N).map(|_| 0.1).collect();
-    let gap_conductances: Vec<f32> = (0..N).map(|_| 10.).collect();
+    let initial_voltages: Vec<f32> = (0..N).map(|_| rand::thread_rng().gen_range(-75.0..-50.)).collect();
+    let initial_gs: Vec<f32> = (0..N).map(|_| -0.1).collect();
+    let initial_es: Vec<f32> = (0..N).map(|_| 0.).collect();
+    let initial_v_ths: Vec<f32> = (0..N).map(|_| -55.).collect();
+    let initial_v_resets: Vec<f32> = (0..N).map(|_| -75.).collect();
+    let initial_is_spikings: Vec<u32> = (0..N).map(|_| 0).collect();
+    let initial_dts: Vec<f32> = (0..N).map(|_| 0.1).collect();
+    let initial_gap_conductances: Vec<f32> = (0..N).map(|_| 10.).collect();
     let sums: Vec<f32> = (0..N).map(|_| 0.).collect();
 
     let mut connections_buffer = unsafe {
@@ -260,6 +321,15 @@ fn main() -> Result<()> {
     create_cl_float_buffer!(v_ths_buffer, &context, N);
     create_cl_float_buffer!(v_resets_buffer, &context, N);
     create_cl_float_buffer!(dts_buffer, &context, N);
+
+    let voltages = initial_voltages.clone();
+    let gs = initial_gs.clone();
+    let es = initial_es.clone();
+    let v_ths = initial_v_ths.clone();
+    let v_resets = initial_v_resets.clone();
+    let is_spikings = initial_is_spikings.clone();
+    let dts = initial_dts.clone();
+    let gap_conductances = initial_gap_conductances.clone();
 
     let mut cl_float_buffers: Vec<(&mut Buffer<cl_float>, &Vec<f32>)> = vec![
         (&mut voltages_buffer, &voltages),
@@ -346,6 +416,103 @@ fn main() -> Result<()> {
 
     results_read_event.wait()?;
 
+    let voltages = initial_voltages.clone();
+    let gs = initial_gs.clone();
+    let es = initial_es.clone();
+    let v_ths = initial_v_ths.clone();
+    let v_resets = initial_v_resets.clone();
+    let is_spikings = initial_is_spikings.clone();
+    let dts = initial_dts.clone();
+    // let gap_conductances = initial_gap_conductances.clone();
+
+    let mut cl_float_buffers: Vec<(&mut Buffer<cl_float>, &Vec<f32>)> = vec![
+        (&mut voltages_buffer, &voltages),
+        (&mut gs_buffer, &gs),
+        (&mut es_buffer, &es),
+        (&mut v_ths_buffer, &v_ths),
+        (&mut v_resets_buffer, &v_resets),
+        (&mut dts_buffer, &dts),
+    ];
+
+    for (buffer, array) in cl_float_buffers.iter_mut() {
+        let _ = unsafe { 
+            queue.enqueue_write_buffer(buffer, CL_BLOCKING, 0, array, &[])? 
+        };
+    }
+
+    let _is_spiking_event = unsafe {
+        queue.enqueue_write_buffer(&mut is_spikings_buffer, CL_BLOCKING, 0, &is_spikings, &[])?
+    };
+
+
+    let sums_write_event = unsafe { 
+        queue.enqueue_write_buffer(&mut sums_buffer, CL_NON_BLOCKING, 0, &sums, &[])? 
+    };
+
+    sums_write_event.wait()?;
+
+    let max_work_group_size = device.max_work_group_size()?;
+    let local_work_size = std::cmp::min(256, max_work_group_size);
+    
+    let padded_global_size = N.div_ceil(local_work_size) * local_work_size;
+
+    let start = Instant::now();
+
+    for _ in 0..NUM_ITERATIONS {
+        let gap_junctions_event = unsafe {
+            ExecuteKernel::new(&parallel_incoming_connections_kernel)
+                .set_arg(&connections_buffer)
+                .set_arg(&weights_buffer)
+                .set_arg(&index_to_position_buffer)
+                .set_arg(&gap_conductances_buffer)
+                .set_arg(&voltages_buffer)
+                .set_arg(&n_cl)
+                .set_arg(&sums_buffer)
+                .set_global_work_size(padded_global_size)
+                .set_local_work_size(local_work_size)
+                // .set_wait_event(&sums_write_event)
+                .enqueue_nd_range(&queue)?
+        };
+
+        // gap_junctions_event.wait()?;
+
+        let iterate_and_spike_event = unsafe {
+            ExecuteKernel::new(&iterate_and_spike_kernel)
+                .set_arg(&sums_buffer)
+                .set_arg(&index_to_position_buffer)
+                .set_arg(&voltages_buffer)
+                .set_arg(&gs_buffer)
+                .set_arg(&es_buffer)
+                .set_arg(&v_ths_buffer)
+                .set_arg(&v_resets_buffer)
+                .set_arg(&is_spikings_buffer)
+                .set_arg(&dts_buffer)
+                .set_global_work_size(N) // number of threads executing in parallel
+                .set_wait_event(&gap_junctions_event)
+                .enqueue_nd_range(&queue)?
+        };
+
+        iterate_and_spike_event.wait()?;
+    }
+
+    let parallel_gpu_duration = start.elapsed().as_nanos();
+
+    let mut parallel_results: [cl_float; N] = [0.0; N];
+    let results_read_event = unsafe {
+        queue.enqueue_read_buffer(&voltages_buffer, CL_NON_BLOCKING, 0, &mut parallel_results, &[])?
+    };
+
+    results_read_event.wait()?;
+
+    let mut voltages = initial_voltages.clone();
+    let mut gs = initial_gs.clone();
+    let mut es = initial_es.clone();
+    let mut v_ths = initial_v_ths.clone();
+    let mut v_resets = initial_v_resets.clone();
+    let mut is_spikings = initial_is_spikings.clone();
+    let mut dts = initial_dts.clone();
+    let gap_conductances = initial_gap_conductances.clone();
+
     let start = Instant::now();
 
     for _ in 0..NUM_ITERATIONS {
@@ -374,9 +541,11 @@ fn main() -> Result<()> {
     let cpu_duration = start.elapsed().as_nanos();
 
     assert_vec_eq_with_tolerance(&results, &voltages, 1.);
+    // assert_vec_eq_with_tolerance(&parallel_results, &voltages, 1.);
 
     println!("CPU execution (ns): {}", cpu_duration);
-    println!("GPU execution (ns): {}", gpu_duration);
+    println!("Serial GPU execution (ns): {}", gpu_duration);
+    println!("Parallel GPU execution (ns): {}", parallel_gpu_duration);
     
     Ok(())
 }
