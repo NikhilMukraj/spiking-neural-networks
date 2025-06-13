@@ -27,6 +27,7 @@ __kernel void calculate_internal_electrical_inputs(
     float sum = 0.0f;
     uint count = 0;
     for (int i = 0; i < n; i++) {
+        // printf("serial | %u | %f | %f\n", index_to_position[i], voltages[index_to_position[i]], voltages[index_to_position[i]]);
         if (connections[i * n + gid] == 1) {
             int presynaptic_index = index_to_position[i];
             int postsynaptic_index = index_to_position[gid];
@@ -56,7 +57,7 @@ __kernel void calculate_parallel_internal_electrical_inputs(
     uint n,
     __global float *res
 ) {
-    int gid = get_global_id(1);
+    int gid = get_group_id(0);
     int lid = get_local_id(0);
     int lsize = get_local_size(0);
 
@@ -67,12 +68,12 @@ __kernel void calculate_parallel_internal_electrical_inputs(
     uint local_count = 0;
 
     for (int i = lid; i < n; i += lsize) {
+        // printf("para | %u | %f | %f\n", index_to_position[i], voltages[index_to_position[i]], voltages[index_to_position[i]]);
         if (i * n + gid <= n * n && connections[i * n + gid] == 1) {
-            uint presynaptic_index = index_to_position[i];
-            uint postsynaptic_index = index_to_position[gid];
-            float weight = weights[i * n + gid];
+            int presynaptic_index = index_to_position[i];
+            int postsynaptic_index = index_to_position[gid];
             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
-            local_sum += weight * gap_junction;
+            local_sum += weights[i * n + gid] * gap_junction;
             local_count++;
         }
     }
@@ -279,8 +280,8 @@ fn main() -> Result<()> {
     let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
         .expect("Kernel::create failed");
 
-    const N: usize = 1000;
-    const NUM_ITERATIONS: usize = 10;
+    const N: usize = 4;
+    const NUM_ITERATIONS: usize = 1;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
     let connections: Vec<u32> = connections.iter().map(|i| if *i { 1 } else { 0 } ).collect();
@@ -469,7 +470,7 @@ fn main() -> Result<()> {
                 .set_arg(&n_cl)
                 .set_arg(&sums_buffer)
                 .set_global_work_size(padded_global_size)
-                .set_local_work_size(local_work_size)
+                // .set_local_work_size(local_work_size)
                 // .set_wait_event(&sums_write_event)
                 .enqueue_nd_range(&queue)?
         };
