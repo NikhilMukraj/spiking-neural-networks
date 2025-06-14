@@ -2764,6 +2764,21 @@ impl NeuronDefinition {
 
         let iterate_and_spike_electrochemical_function = match (&self.on_electrochemical_iteration, &self.ion_channels.is_some()) {
             (Some(body), true) => {
+                let argument_names = format!(
+                    "let mut argument_names = vec![
+                        String::from(\"number_of_types\"), String::from(\"inputs\"), String::from(\"t\"),
+                        String::from(\"index_to_position\"), String::from(\"neurotransmitters$flags\"), String::from(\"receptors$flags\"),
+                        {}, {}
+                    ];
+                    {}
+                    argument_names.extend(
+                        T::get_attribute_names_as_vector().iter().map(|(i, _)| i.clone()).collect::<Vec<_>>()
+                    );",
+                    mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+                    generate_vars_as_arg_strings(&self.vars).join(", "),
+                    ion_channel_argument_names_extensions,
+                );
+
                 let kernel_header = format!(
                     "__kernel void iterate_and_spike(
                         uint number_of_types,
@@ -2819,11 +2834,10 @@ impl NeuronDefinition {
                 );
 
                 format!(
-                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
                     iterate_and_spike_electrochemical_header, 
                     kernel_name,
                     argument_names,
-                    ion_channel_argument_names_extensions,
                     neurotransmitter_vars_generation,
                     receptors_vars_generation,
                     ion_channel_prefixes,
@@ -2890,23 +2904,32 @@ impl NeuronDefinition {
                 );
 
                 format!(
-                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
                     iterate_and_spike_electrochemical_header, 
                     kernel_name,
                     argument_names,
                     neurotransmitter_vars_generation,
                     receptors_vars_generation,
-                    ion_channel_prefixes,
-                    ion_channel_kernel_args,
                     kernel,
-                    ion_channel_kernel_args_replacements,
-                    ion_channel_header_replacements,
-                    ion_channel_function_call_replacements_in_kernel,
-                    ion_channel_get_function_calls_replacements,
                     iterate_and_spike_kernel_footer,
                 )
             },
             (None, true) => {
+                let argument_names = format!(
+                    "let mut argument_names = vec![
+                        String::from(\"number_of_types\"), String::from(\"inputs\"), String::from(\"t\"),
+                        String::from(\"index_to_position\"), String::from(\"neurotransmitters$flags\"), String::from(\"receptors$flags\"),
+                        {}, {}
+                    ];
+                    {}
+                    argument_names.extend(
+                        T::get_attribute_names_as_vector().iter().map(|(i, _)| i.clone()).collect::<Vec<_>>()
+                    );",
+                    mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
+                    generate_vars_as_arg_strings(&self.vars).join(", "),
+                    ion_channel_argument_names_extensions,
+                );
+
                 let kernel_header = format!(
                     "__kernel void iterate_and_spike(
                         uint number_of_types,
@@ -2936,7 +2959,7 @@ impl NeuronDefinition {
                 );
 
                 let kernel = format!(
-                    "let program_source = format!(
+                    "let mut program_source = format!(
                         \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n{}\n}}}}\", 
                         R::get_update_function().1,
                         T::get_update_function().1, 
@@ -2957,13 +2980,19 @@ impl NeuronDefinition {
                 );
 
                 format!(
-                    "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
                     iterate_and_spike_electrochemical_header, 
                     kernel_name,
                     argument_names,
                     neurotransmitter_vars_generation,
                     receptors_vars_generation,
+                    ion_channel_prefixes,
+                    ion_channel_kernel_args,
                     kernel,
+                    ion_channel_kernel_args_replacements,
+                    ion_channel_header_replacements,
+                    ion_channel_function_call_replacements_in_kernel,
+                    ion_channel_get_function_calls_replacements,
                     iterate_and_spike_kernel_footer,
                 )
             },
