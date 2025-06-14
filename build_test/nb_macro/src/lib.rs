@@ -2376,6 +2376,13 @@ impl NeuronDefinition {
             self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
         ).join("\n");
 
+        let ion_channel_argument_names_extensions = generate_ion_channel_argument_names_for_neuron_kernel(
+            self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
+        ).join("\n");
+
+        let ion_channel_prefixes = ion_channel_prefixes.join("\n");
+        let ion_channel_kernel_args = ion_channel_args.join("\n");
+        let ion_channel_kernel_args_replacements = ion_channel_var_replacements.join("\n");
 
         let iterate_and_spike_electrical_function = if ion_channel_prefixes.is_empty() {    
             let argument_names = format!(
@@ -2414,18 +2421,12 @@ impl NeuronDefinition {
                 iterate_and_spike_kernel_footer,
             )
         } else {
-            let ion_channel_prefixes = ion_channel_prefixes.join("\n");
-            let ion_channel_kernel_args = ion_channel_args.join("\n");
-            let ion_channel_kernel_args_replacements = ion_channel_var_replacements.join("\n");
-            
             let argument_names = format!(
                 "let mut argument_names = vec![String::from(\"inputs\"), String::from(\"index_to_position\"), {}, {}];
                 {}",
                 mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
                 generate_vars_as_arg_strings(&self.vars).join(", "),
-                generate_ion_channel_argument_names_for_neuron_kernel(
-                    self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
-                ).join("\n"),
+                ion_channel_argument_names_extensions,
             );
 
             let kernel_header = format!(
@@ -2498,25 +2499,6 @@ impl NeuronDefinition {
             );",
             mandatory_variables.iter().map(|i| format!("String::from(\"{}\")", i.0)).collect::<Vec<String>>().join(","),
             generate_vars_as_arg_strings(&self.vars).join(", "),
-        );
-
-        let kernel_header = format!(
-            "__kernel void iterate_and_spike(
-                uint number_of_types,
-                __global const float *inputs,
-                __global const float *t,
-                __global const uint *index_to_position,
-                __global const uint *neuro_flags,
-                __global const uint *receptors_flags,
-                {},
-                {},
-                {{}},
-                {{}}
-            ) {{{{
-                int gid = get_global_id(0);
-                int index = index_to_position[gid];",
-            mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
-            generate_kernel_args(&self.vars).join(",\n"),
         );
 
         let neurotransmitter_vars_generation = "
@@ -2715,98 +2697,177 @@ impl NeuronDefinition {
                 {}
             );"
         );
+        
+        let update_receptors_replace = "
+            let kinetics_name = \"receptors$update_receptor_kinetics(\";
+            let set_receptor_currents_name = \"receptors$set_receptor_currents(\";
+            let get_receptor_currents_name = \"receptors$get_receptor_currents(\";
 
-        let kernel = match &self.on_electrochemical_iteration {
-            Some(body) => {
+            let kinetics_replacement = |args: &Vec<&str>| -> String { 
+                update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1])
+            };
+            let set_receptor_currents_replacement = |args: &Vec<&str>| -> String {
+                receptor_updates.join(\"\n\").replace(\"current_voltage[index]\", args[0])
+                    .replace(\"dt[index]\", args[1])
+            };
+            let get_receptor_currents_replacement = |args: &Vec<&str>| -> String {
+                format!(\"({} / {}) * {}\", args[0], args[1], get_currents)
+            };
+
+            let to_replace: Vec<(_, Box<dyn Fn(&Vec<&str>) -> String>)> = vec![
+                (kinetics_name, Box::new(kinetics_replacement)), 
+                (set_receptor_currents_name, Box::new(set_receptor_currents_replacement)),
+                (get_receptor_currents_name, Box::new(get_receptor_currents_replacement)),
+            ];
+
+            for (name_to_replace, replacement_function) in to_replace.iter() {
+                let mut result = String::new();
+                let mut last_end = 0;
+
+                while let Some(func_start) = program_source[last_end..].find(name_to_replace) {
+                    let args_start = last_end + func_start + name_to_replace.len() - 1;
+                    result.push_str(&program_source[last_end..last_end + func_start]);
+
+                    let remaining_text = &program_source[args_start..];
+                    
+                    let mut cursor = 1;
+                    let mut depth = 1;
+                    let mut args_end = 1;
+                    
+                    while cursor < remaining_text.len() {
+                        match remaining_text.chars().nth(cursor).unwrap() {
+                            '(' => depth += 1,
+                            ')' => {
+                                depth -= 1;
+                                if depth == 0 {
+                                    args_end = cursor;
+                                    break;
+                                }
+                            },
+                            _ => {}
+                        }
+                        cursor += 1;
+                    }
+
+                    let args_str = &remaining_text[1..args_end];
+                    let args = args_str.split(\",\").collect::<Vec<_>>();
+                    
+                    result.push_str(&replacement_function(&args));
+                    
+                    last_end = args_start + args_end + 1;
+                }
+
+                result.push_str(&program_source[last_end..]);
+
+                program_source = result;
+            }";
+
+        let iterate_and_spike_electrochemical_function = match (&self.on_electrochemical_iteration, &self.ion_channels.is_some()) {
+            (Some(body), true) => {
+                let kernel_header = format!(
+                    "__kernel void iterate_and_spike(
+                        uint number_of_types,
+                        __global const float *inputs,
+                        __global const float *t,
+                        __global const uint *index_to_position,
+                        __global const uint *neuro_flags,
+                        __global const uint *receptors_flags,
+                        {},
+                        {},
+                        {},
+                        {{}},
+                        {{}}
+                    ) {{{{
+                        int gid = get_global_id(0);
+                        int index = index_to_position[gid];",
+                    mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                    generate_kernel_args(&self.vars).join(",\n"),
+                    ion_channel_args_names.iter().map(|i| format!("@{}", i)).collect::<Vec<String>>().join(",\n"),
+                );
+
                 let kernel_body = format!(
                     "{}\n{}",
                     generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
                     generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
                 );
 
-                // replace statements with correct gpu code by modifying program source
-                // "synaptic_neurotransmitters_apply_t_changes()"
                 let neurotransmitters_replace = format!(
                     "let neurotransmitter_replace = format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"));", 
                     neurotransmitters_update_code,
                 );
-                // "receptors.update_receptor_kinetics(t, dt)"
-                // "receptors_update_receptor_kinetics(t, dt);"
-                // update_receptor_kinetics.join(\"\n\")
-                // need to find what is after t and use it in update receptor kinetics
-                // search for this string and parse out the t, dt args
-                // then use the args in the function
-                // use ); to get end of struct call
-                // first arg will always be t[index], can replace dt with arbitrary arg
-
-                // iterate over func names and associated replacement function
-                // that says how to use the args vec
-                // ensure code reuse
-                let update_receptors_replace = "
-                    let kinetics_name = \"receptors$update_receptor_kinetics(\";
-                    let set_receptor_currents_name = \"receptors$set_receptor_currents(\";
-                    let get_receptor_currents_name = \"receptors$get_receptor_currents(\";
-
-                    let kinetics_replacement = |args: &Vec<&str>| -> String { 
-                        update_receptor_kinetics.join(\"\n\").replace(\"dt[index]\", args[1])
-                    };
-                    let set_receptor_currents_replacement = |args: &Vec<&str>| -> String {
-                        receptor_updates.join(\"\n\").replace(\"current_voltage[index]\", args[0])
-                            .replace(\"dt[index]\", args[1])
-                    };
-                    let get_receptor_currents_replacement = |args: &Vec<&str>| -> String {
-                        format!(\"({} / {}) * {}\", args[0], args[1], get_currents)
-                    };
-
-                    let to_replace: Vec<(_, Box<dyn Fn(&Vec<&str>) -> String>)> = vec![
-                        (kinetics_name, Box::new(kinetics_replacement)), 
-                        (set_receptor_currents_name, Box::new(set_receptor_currents_replacement)),
-                        (get_receptor_currents_name, Box::new(get_receptor_currents_replacement)),
-                    ];
-
-                    for (name_to_replace, replacement_function) in to_replace.iter() {
-                        let mut result = String::new();
-                        let mut last_end = 0;
-
-                        while let Some(func_start) = program_source[last_end..].find(name_to_replace) {
-                            let args_start = last_end + func_start + name_to_replace.len() - 1;
-                            result.push_str(&program_source[last_end..last_end + func_start]);
-
-                            let remaining_text = &program_source[args_start..];
-                            
-                            let mut cursor = 1;
-                            let mut depth = 1;
-                            let mut args_end = 1;
-                            
-                            while cursor < remaining_text.len() {
-                                match remaining_text.chars().nth(cursor).unwrap() {
-                                    '(' => depth += 1,
-                                    ')' => {
-                                        depth -= 1;
-                                        if depth == 0 {
-                                            args_end = cursor;
-                                            break;
-                                        }
-                                    },
-                                    _ => {}
-                                }
-                                cursor += 1;
-                            }
-
-                            let args_str = &remaining_text[1..args_end];
-                            let args = args_str.split(\",\").collect::<Vec<_>>();
-                            
-                            result.push_str(&replacement_function(&args));
-                            
-                            last_end = args_start + args_end + 1;
-                        }
-
-                        result.push_str(&program_source[last_end..]);
-
-                        program_source = result;
-                    }";
+               
+                let kernel = format!("
+                    {}
+                    let mut program_source = format!(
+                        \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n{}\n}}}}\", 
+                        R::get_update_function().1,
+                        T::get_update_function().1, 
+                        <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
+                        Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                        neurotransmitter_arg_and_type.join(\",\n\"),
+                        receptor_arg_and_type.join(\",\n\"),
+                    ).replace(\"synaptic_neurotransmitters$apply_t_changes();\", &neurotransmitter_replace);
+                    
+                    {}", 
+                    neurotransmitters_replace,
+                    ion_channel_get_function_calls_to_replace,
+                    kernel_header, 
+                    kernel_body,
+                    receptors_name,
+                    receptors_name,
+                    update_receptors_replace,
+                );
 
                 format!(
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    iterate_and_spike_electrochemical_header, 
+                    kernel_name,
+                    argument_names,
+                    ion_channel_argument_names_extensions,
+                    neurotransmitter_vars_generation,
+                    receptors_vars_generation,
+                    ion_channel_prefixes,
+                    ion_channel_kernel_args,
+                    kernel,
+                    ion_channel_kernel_args_replacements,
+                    ion_channel_header_replacements,
+                    ion_channel_function_call_replacements_in_kernel,
+                    ion_channel_get_function_calls_replacements,
+                    iterate_and_spike_kernel_footer,
+                )
+            },
+            (Some(body), false) => {
+                let kernel_header = format!(
+                    "__kernel void iterate_and_spike(
+                        uint number_of_types,
+                        __global const float *inputs,
+                        __global const float *t,
+                        __global const uint *index_to_position,
+                        __global const uint *neuro_flags,
+                        __global const uint *receptors_flags,
+                        {},
+                        {},
+                        {{}},
+                        {{}}
+                    ) {{{{
+                        int gid = get_global_id(0);
+                        int index = index_to_position[gid];",
+                    mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                    generate_kernel_args(&self.vars).join(",\n"),
+                );
+
+                let kernel_body = format!(
+                    "{}\n{}",
+                    generate_gpu_kernel_on_iteration(body).replace("{", "{{").replace("}", "}}"), 
+                    generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
+                );
+
+                let neurotransmitters_replace = format!(
+                    "let neurotransmitter_replace = format!(\"{}\", neurotransmitter_arg_names.join(\",\n\"));", 
+                    neurotransmitters_update_code,
+                );
+
+                let kernel = format!(
                     "
                     {}
                     let mut program_source = format!(
@@ -2826,9 +2887,47 @@ impl NeuronDefinition {
                     receptors_name,
                     receptors_name,
                     update_receptors_replace,
+                );
+
+                format!(
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    iterate_and_spike_electrochemical_header, 
+                    kernel_name,
+                    argument_names,
+                    neurotransmitter_vars_generation,
+                    receptors_vars_generation,
+                    ion_channel_prefixes,
+                    ion_channel_kernel_args,
+                    kernel,
+                    ion_channel_kernel_args_replacements,
+                    ion_channel_header_replacements,
+                    ion_channel_function_call_replacements_in_kernel,
+                    ion_channel_get_function_calls_replacements,
+                    iterate_and_spike_kernel_footer,
                 )
-            }
-            None => {
+            },
+            (None, true) => {
+                let kernel_header = format!(
+                    "__kernel void iterate_and_spike(
+                        uint number_of_types,
+                        __global const float *inputs,
+                        __global const float *t,
+                        __global const uint *index_to_position,
+                        __global const uint *neuro_flags,
+                        __global const uint *receptors_flags,
+                        {},
+                        {},
+                        {},
+                        {{}},
+                        {{}}
+                    ) {{{{
+                        int gid = get_global_id(0);
+                        int index = index_to_position[gid];",
+                    mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                    generate_kernel_args(&self.vars).join(",\n"),
+                    ion_channel_args_names.iter().map(|i| format!("@{}", i)).collect::<Vec<String>>().join(",\n"),
+                );
+
                 let kernel_body = format!(
                     "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
                     generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
@@ -2836,7 +2935,66 @@ impl NeuronDefinition {
                     generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
                 );
 
+                let kernel = format!(
+                    "let program_source = format!(
+                        \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n{}\n}}}}\", 
+                        R::get_update_function().1,
+                        T::get_update_function().1, 
+                        <{}<R> as ReceptorsGPU>::get_updates().iter().map(|i| i.0.clone()).collect::<Vec<_>>().join(\"\n\"),
+                        Neurotransmitters::<<{}<R> as Receptors>::N, T>::get_neurotransmitter_update_kernel_code(),
+                        neurotransmitter_arg_and_type.join(\",\n\"),
+                        receptor_arg_and_type.join(\",\n\"),
+                        update_receptor_kinetics.join(\"\n\"),
+                        receptor_updates.join(\"\n\"),
+                        format!(\"current_voltage[index] -= (dt[index] / c_m[index]) * ({{}});\", get_currents),
+                        neurotransmitter_arg_names.join(\",\n\"),
+                    );", 
+                    ion_channel_get_function_calls_to_replace,
+                    kernel_header, 
+                    kernel_body,
+                    receptors_name,
+                    receptors_name,
+                );
+
                 format!(
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    iterate_and_spike_electrochemical_header, 
+                    kernel_name,
+                    argument_names,
+                    neurotransmitter_vars_generation,
+                    receptors_vars_generation,
+                    kernel,
+                    iterate_and_spike_kernel_footer,
+                )
+            },
+            (None, false) => {
+                let kernel_header = format!(
+                    "__kernel void iterate_and_spike(
+                        uint number_of_types,
+                        __global const float *inputs,
+                        __global const float *t,
+                        __global const uint *index_to_position,
+                        __global const uint *neuro_flags,
+                        __global const uint *receptors_flags,
+                        {},
+                        {},
+                        {{}},
+                        {{}}
+                    ) {{{{
+                        int gid = get_global_id(0);
+                        int index = index_to_position[gid];",
+                    mandatory_variables.iter().map(|i| format!("__global {} *{}", i.1, i.0)).collect::<Vec<String>>().join(",\n"),
+                    generate_kernel_args(&self.vars).join(",\n"),
+                );
+
+                let kernel_body = format!(
+                    "{{}}\n{{}}\n{}\n{{}}\n{}\n{}",
+                    generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"), 
+                    neurotransmitters_update_code,
+                    generate_gpu_kernel_handle_spiking(&self.on_spike, &self.spike_detection).replace("{", "{{").replace("}", "}}"),
+                );
+
+                let kernel = format!(
                     "let program_source = format!(
                         \"{{}}\n{{}}\n{{}}\n{{}}\n{}\n{}\n}}}}\", 
                         R::get_update_function().1,
@@ -2854,31 +3012,20 @@ impl NeuronDefinition {
                     kernel_body,
                     receptors_name,
                     receptors_name,
+                );
+
+                format!(
+                    "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
+                    iterate_and_spike_electrochemical_header, 
+                    kernel_name,
+                    argument_names,
+                    neurotransmitter_vars_generation,
+                    receptors_vars_generation,
+                    kernel,
+                    iterate_and_spike_kernel_footer,
                 )
-            }
+            },
         };
-
-        // kernel should only add neurotransmitters update functions
-        // and receptor functions if neurotranmsitters or receptors is called
-
-        let iterate_and_spike_electrochemical_function = format!(
-            "{}\n{}\n{}\n{}\n{}\n{}\n{}", // \nprintln!(\"{{}}\", program_source);
-            iterate_and_spike_electrochemical_header, 
-            kernel_name,
-            argument_names,
-            neurotransmitter_vars_generation,
-            receptors_vars_generation,
-            kernel,
-            iterate_and_spike_kernel_footer,
-        );
-
-        // dont match on kernel, just generate kernel according to first part of tuple
-        // let iterate_and_spike_electrochemical_function = match (&self.on_electrochemical_iteration, &self.ion_channels.is_some()) {
-        //     (Some(body), true) => todo!("modify to use ion channel"),
-        //     (Some(body), false) => todo!("use original"),
-        //     (None, true) => todo!("modify to use ion channel"),
-        //     (None, false) => todo!("use original"),
-        // };
 
         let ion_channels_to_gpu = generate_ion_channels_to_gpu(
             self.ion_channels.as_ref().unwrap_or(&Ast::StructAssignments(vec![]))
