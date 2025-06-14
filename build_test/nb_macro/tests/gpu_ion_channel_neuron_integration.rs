@@ -29,7 +29,7 @@ mod test {
 
     #[test]
     fn test_electrical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
-            let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
             .expect("Could not get GPU devices")
             .first()
             .expect("No GPU found");
@@ -42,8 +42,20 @@ mod test {
         Ok(())
     }
 
-    // #[test]
-    // fn test_electrochemical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {}
+    #[test]
+    fn test_electrochemical_kernel_compiles() -> Result<(), SpikingNeuralNetworksError> {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        assert!(LIF::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrochemical_kernel(&context).is_ok());
+
+        Ok(())
+    }
 
     unsafe fn create_and_write_buffer<T>(
         context: &Context,
@@ -257,6 +269,27 @@ mod test {
         Ok(())
     }
 
+    #[test]
+    fn test_gpu_voltages_chemical() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(
+            0.,
+            1.,
+            &get_voltage, 
+            &get_gpu_voltage,
+            true,
+            true,
+        )?;
+
+        for (i, j) in cpu_voltages.iter().zip(gpu_voltages.iter()) {
+            if !i.is_finite() || !j.is_finite() {
+                continue;
+            }
+            assert!((i - j).abs() < 2., "({} - {}).abs() < 2.", i, j);
+        }
+       
+        Ok(())
+    }
+
     fn get_is_spiking(neuron: &FullNeuronType, tracker: &mut Vec<f32>) {
         if neuron.is_spiking {
             tracker.push(1.);
@@ -299,6 +332,26 @@ mod test {
             &gpu_get_is_spiking,
             false,
             false,
+        )?;
+
+        let cpu_sum = cpu_spikings.iter().sum::<f32>();
+        let gpu_sum = gpu_spikings.iter().sum::<f32>();
+        let error = (cpu_sum - gpu_sum).abs();
+
+        assert!(error < 2., "error: {} ({} - {})", error, cpu_sum, gpu_sum);
+
+        Ok(())
+    }
+
+    #[test]
+    pub fn test_gpu_is_spiking_chemical() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_spikings, gpu_spikings) = iterate_neuron(
+            0.,
+            1.,
+            &get_is_spiking, 
+            &gpu_get_is_spiking,
+            true,
+            true,
         )?;
 
         let cpu_sum = cpu_spikings.iter().sum::<f32>();
