@@ -1,7 +1,7 @@
 mod tests {
     use std::{collections::HashMap, ptr};
     use opencl3::{
-        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE, CL_QUEUE_SIZE}, 
+        command_queue::{CommandQueue, CL_QUEUE_PROFILING_ENABLE}, 
         context::Context, 
         device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
         kernel::ExecuteKernel, 
@@ -77,7 +77,7 @@ mod tests {
         // give constant ampa input, then constant nmda, gaba, etc
         // check against cpu equavilent
 
-        let t_values = vec![t_values_tuple.0, t_values_tuple.1, t_values_tuple.2, 0.];
+        let t_values = vec![t_values_tuple.0, t_values_tuple.1, t_values_tuple.2];
 
         let iterations = 1000;
         
@@ -128,7 +128,7 @@ mod tests {
         let queue =  match CommandQueue::create_default_with_properties(
                 &context, 
                 CL_QUEUE_PROFILING_ENABLE,
-                CL_QUEUE_SIZE,
+                0,
             ) {
                 Ok(value) => value,
                 Err(_) => return Err(SpikingNeuralNetworksError::from(GPUError::GetDeviceFailure)),
@@ -178,7 +178,7 @@ mod tests {
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
                     } else if i == "number_of_types" {
-                        kernel_execution.set_arg(&IonotropicNeurotransmitterType::number_of_types());
+                        kernel_execution.set_arg(&(IonotropicNeurotransmitterType::number_of_types() as u32));
                     } else if i == "neuro_flags" {
                         match &gpu_cell_grid.get("neurotransmitters$flags").expect("Could not retrieve neurotransmitter flags") {
                             BufferGPU::UInt(buffer) => kernel_execution.set_arg(buffer),
