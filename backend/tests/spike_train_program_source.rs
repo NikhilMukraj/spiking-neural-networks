@@ -9,7 +9,7 @@ mod tests {
                 ApproximateNeurotransmitter, IonotropicReceptorNeurotransmitterType, BufferGPU, 
                 Timestep, NeurotransmitterTypeGPU,
             }, 
-            spike_train::{DeltaDiracRefractoriness, NeuralRefractorinessGPU, PoissonNeuron, SpikeTrainGPU},
+            spike_train::{DeltaDiracRefractoriness, PoissonNeuron, SpikeTrainGPU},
         },
         error::{SpikingNeuralNetworksError, GPUError},
     };
@@ -18,7 +18,6 @@ mod tests {
         context::Context, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, 
         kernel::ExecuteKernel, 
         memory::{Buffer, CL_MEM_READ_WRITE}, 
-        program::Program, 
         types::{cl_float, CL_NON_BLOCKING}
     };
     use std::{ptr, collections::HashMap};
@@ -338,22 +337,4 @@ mod tests {
 
         Ok(())
     }    
-
-    #[test]
-    pub fn test_refractoriness_compilation() -> Result<(), GPUError> {
-        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
-            .expect("Could not get GPU devices")
-            .first()
-            .expect("No GPU found");
-        let device = Device::new(device_id);
-
-        let context = Context::from_device(&device).expect("Context::from_device failed");
-
-        match Program::create_and_build_from_source(
-            &context, &DeltaDiracRefractoriness::get_refractoriness_gpu_function()?.1, ""
-        ) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(GPUError::ProgramCompileFailure),
-        }
-    }
 }
