@@ -239,20 +239,6 @@ macro_rules! create_cl_float_buffer {
 }
 
 fn main() -> Result<()> {
-    // move relevant data to gpu
-    // for n in iterations
-        // execute inputs kernel
-        // execute iterate kernel
-
-    // check against cpu calculation
-        // potential issues: 
-            // conversion between rust and opencl types
-            // kernel waits not being correct
-            
-    // benchmark on cpu
-
-    // seperate key set associating indexes to positions
-
     let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)?
         .first()
         .expect("No GPU found");
