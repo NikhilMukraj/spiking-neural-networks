@@ -57,9 +57,11 @@ __kernel void calculate_parallel_internal_electrical_inputs(
     uint n,
     __global float *res
 ) {
-    int gid = get_group_id(0);
+    int gid = get_global_id(0);
     int lid = get_local_id(0);
     int lsize = get_local_size(0);
+
+    // printf("para | %d | %d | %d\n", gid, lid, lsize);
 
     __local float partial_sums[256];
     __local uint partial_counts[256];
@@ -470,7 +472,7 @@ fn main() -> Result<()> {
                 .set_arg(&n_cl)
                 .set_arg(&sums_buffer)
                 .set_global_work_size(padded_global_size)
-                // .set_local_work_size(local_work_size)
+                .set_local_work_size(1)
                 // .set_wait_event(&sums_write_event)
                 .enqueue_nd_range(&queue)?
         };
@@ -542,7 +544,7 @@ fn main() -> Result<()> {
     let cpu_duration = start.elapsed().as_nanos();
 
     assert_vec_eq_with_tolerance(&results, &voltages, 1.);
-    // assert_vec_eq_with_tolerance(&parallel_results, &voltages, 1.);
+    assert_vec_eq_with_tolerance(&parallel_results, &voltages, 1.);
 
     println!("CPU execution (ns): {}", cpu_duration);
     println!("Serial GPU execution (ns): {}", gpu_duration);
