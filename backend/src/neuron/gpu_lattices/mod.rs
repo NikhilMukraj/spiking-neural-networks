@@ -738,7 +738,7 @@ where
 
             for i in self.grid_history_kernel.argument_names.iter() {
                 if i == "iteration" {
-                    kernel_execution.set_arg(&self.internal_clock);
+                    kernel_execution.set_arg(&(self.internal_clock as i32));
                 } else if i == "size" {
                     kernel_execution.set_arg(&(gpu_graph.size as u32));
                 } else if i == "skip_index" {
@@ -3692,14 +3692,16 @@ mod test {
 
                     let reference_neurotransmitter = aggregate_neurotransmitter_concentrations(&input_vals);
 
-                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap());
-                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::NMDA).unwrap());
-                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::GABA).unwrap());
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::AMPA).unwrap_or(&0.));
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::NMDA).unwrap_or(&0.));
+                    expected_res.push(*reference_neurotransmitter.get(&IonotropicNeurotransmitterType::GABA).unwrap_or(&0.));
                 }
             }
         }
 
-        expected_res.extend(std::iter::repeat_n(0., res.len() - expected_res.len()));
+        for _ in 0..(res.len() - expected_res.len()) {
+            expected_res.push(0.)
+        }
 
         for (n, (i, j)) in res.iter().zip(expected_res.iter()).enumerate() {
             assert!((i - j).abs() < 0.001, "{} | {} != {}", n, i, j);
