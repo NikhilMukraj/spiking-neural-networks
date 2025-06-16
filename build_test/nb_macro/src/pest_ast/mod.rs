@@ -107,6 +107,15 @@ neuron_definition = {
 	"[end]"
 }
 
+spike_train_definition = {
+    "[spike_train]" ~ NEWLINE ~ 
+	(
+		on_iteration_def | type_def | 
+		vars_with_default_def | on_electrochemical_iteration_def
+	){3,} ~ 
+	"[end]"
+}
+
 gating_variables_block = _{ "gating_vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
 gating_variables_def = { gating_variables_block ~ NEWLINE+ }
 
@@ -137,7 +146,7 @@ receptors_definition = {
 
 full = _{
 	SOI ~ NEWLINE* ~ ((
-		neuron_definition | ion_channel_definition | 
+		neuron_definition | spike_train_definition | ion_channel_definition | 
 		neurotransmitter_kinetics_definition | receptor_kinetics_definition |
         receptors_definition
 	)+ ~ NEWLINE*
