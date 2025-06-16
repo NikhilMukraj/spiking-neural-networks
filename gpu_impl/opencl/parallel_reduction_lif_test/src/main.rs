@@ -71,7 +71,7 @@ __kernel void calculate_parallel_internal_electrical_inputs(
 
     for (int i = lid; i < n; i += lsize) {
         // printf("para | %u | %f | %f\n", index_to_position[i], voltages[index_to_position[i]], voltages[index_to_position[i]]);
-        if (i * n + gid <= n * n && connections[i * n + gid] == 1) {
+        if (i < n && gid < n && connections[i * n + gid] == 1) {
             int presynaptic_index = index_to_position[i];
             int postsynaptic_index = index_to_position[gid];
             float gap_junction = gap_conductances[postsynaptic_index] * (voltages[presynaptic_index] - voltages[postsynaptic_index]);
@@ -268,7 +268,7 @@ fn main() -> Result<()> {
     let iterate_and_spike_kernel = Kernel::create(&iterate_and_spike_program, ITERATE_AND_SPIKE_KERNEL_NAME)
         .expect("Kernel::create failed");
 
-    const N: usize = 4;
+    const N: usize = 256;
     const NUM_ITERATIONS: usize = 1;
 
     let (connections, weights) = create_random_flattened_adj_matrix(N, 0., 2.);
@@ -535,6 +535,7 @@ fn main() -> Result<()> {
     println!("CPU execution (ns): {}", cpu_duration);
     println!("Serial GPU execution (ns): {}", gpu_duration);
     println!("Parallel GPU execution (ns): {}", parallel_gpu_duration);
+    println!("Diff: {}", gpu_duration as isize - parallel_gpu_duration as isize);
     
     Ok(())
 }
