@@ -4610,6 +4610,74 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     )
 }
 
+// fn generate_spike_train() -> Result<SpikeTrainDefinition> {
+//     let mut definitions: HashMap<String, Ast> = HashMap::new();
+
+//     for pair in pairs {
+//         let (key, current_ast) = match pair.as_rule() {
+//             Rule::type_def => {
+//                 parse_type_definition(pair)
+//             },
+//             Rule::on_iteration_def => {
+//                 parse_on_iteration(pair)
+//             },
+//             Rule::vars_with_default_def => {
+//                 parse_vars_with_default(pair)
+//             },
+//             Rule::on_electrochemical_iteration_def => {
+//                 parse_on_electrochemical_iteration(pair)
+//             },
+//             definition => unreachable!("Unexpected definiton: {:#?}", definition)
+//         };
+
+//         if definitions.contains_key(&key) {
+//             return Err(
+//                 Error::new(
+//                     ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+//                 )
+//             )
+//         }
+
+//         definitions.insert(key, current_ast);
+//     }
+
+//     let type_name = definitions.remove("type").ok_or_else(|| {
+//         Error::new(ErrorKind::InvalidInput, "Type definition expected")
+//     })?;
+    
+//     let vars = definitions.remove("vars").ok_or_else(|| {
+//         Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+//     })?;
+
+//     let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+//         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+//     })?;
+    
+//     let on_electrochemical_iteration = definitions.remove("on_electrochemical_iteration");
+
+//     Ok(
+//         SpikeTrainDefinition {
+//             type_name,
+//             vars,
+//             on_iteration,
+//             on_electrochemical_iteration,
+//         }
+//     )
+// }
+
+// pub struct SpikeTrainDefinition {
+//     type_name: Ast,
+//     vars: Ast,
+//     on_iteration: Ast,
+//     on_electrochemical_iteration: Option<Ast>,
+// }
+
+// impl SpikeTrainDefinition {
+//     fn to_cpu_code(&self) -> (Vec<String>, String) {}
+//     fn to_gpu_code(&self) -> (Vec<String>, String) {}
+//     fn to_pyo3_code(&self) -> (Vec<String>, String) {}
+// }
+
 struct NeurotransmitterKineticsDefinition {
     type_name: Ast,
     vars: Ast,
