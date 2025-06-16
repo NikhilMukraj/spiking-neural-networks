@@ -136,7 +136,7 @@ mod tests {
 
                 for i in iterate_kernel.argument_names.iter() {
                     if i == "number_of_types" {
-                        kernel_execution.set_arg(&IonotropicReceptorNeurotransmitterType::number_of_types());
+                        kernel_execution.set_arg(&(IonotropicReceptorNeurotransmitterType::number_of_types() as u32));
                     } else if i == "index_to_position" {
                         kernel_execution.set_arg(&index_to_position_buffer);
                     } else if i == "neuro_flags" {
