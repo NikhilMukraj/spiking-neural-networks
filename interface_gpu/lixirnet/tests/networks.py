@@ -275,11 +275,11 @@ class TestCPUGPUImpl(unittest.TestCase):
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)).sum()) < 0.5)
         diff_hist = np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)))
-        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.product(diff_hist.shape) > 0.95)
+        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.prod(diff_hist.shape) > 0.95)
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.5)
         diff_hist = np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)))
-        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.product(diff_hist.shape) > 0.95)
+        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.prod(diff_hist.shape) > 0.95)
 
         
     def test_network_chemical_with_spike_trains(self):
@@ -490,11 +490,11 @@ class TestCPUGPUImpl(unittest.TestCase):
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)).sum()) < 0.1)
         diff_hist = np.abs((np.array(network.get_lattice(e2).history) - np.array(gpu_network.get_lattice(e2).history)))
-        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.product(diff_hist.shape) > 0.9)
+        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.prod(diff_hist.shape) > 0.9)
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
         diff_hist = np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)))
-        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.product(diff_hist.shape) > 0.9)
+        self.assertTrue(np.sum((np.abs(diff_hist) < 0.1)) / np.prod(diff_hist.shape) > 0.9)
 
     def test_network_chemical_various_neurotransmitters(self):
         exc_neuron = ln.IzhikevichNeuron()
@@ -598,7 +598,7 @@ class TestCPUGPUImpl(unittest.TestCase):
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)).sum()) < 0.1)
         # diff_hist = np.abs((np.array(network.get_lattice(i1).history) - np.array(gpu_network.get_lattice(i1).history)))
-        # self.assertTrue(np.sum((np.abs(diff_hist) < 25)) / np.product(diff_hist.shape) > 0.9)
+        # self.assertTrue(np.sum((np.abs(diff_hist) < 25)) / np.prod(diff_hist.shape) > 0.9)
 
         cpu_history = np.array(network.get_lattice(i1).history)
         gpu_history = np.array(gpu_network.get_lattice(i1).history)
@@ -609,7 +609,7 @@ class TestCPUGPUImpl(unittest.TestCase):
 
         # self.assertTrue(np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)).sum()) < 0.1)
         # diff_hist = np.abs((np.array(network.get_lattice(e1).history) - np.array(gpu_network.get_lattice(e1).history)))
-        # self.assertTrue(np.sum((np.abs(diff_hist) < 25)) / np.product(diff_hist.shape) > 0.9)
+        # self.assertTrue(np.sum((np.abs(diff_hist) < 25)) / np.prod(diff_hist.shape) > 0.9)
 
         cpu_history = np.array(network.get_lattice(e1).history)
         gpu_history = np.array(gpu_network.get_lattice(e1).history)
