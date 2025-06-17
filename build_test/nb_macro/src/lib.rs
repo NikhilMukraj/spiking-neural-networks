@@ -4673,9 +4673,56 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
 // }
 
 // impl SpikeTrainDefinition {
-//     fn to_cpu_code(&self) -> (Vec<String>, String) {}
-//     fn to_gpu_code(&self) -> (Vec<String>, String) {}
-//     fn to_pyo3_code(&self) -> (Vec<String>, String) {}
+//     fn to_code(&self) -> (Vec<String>, String) {
+//         let struct_def = format!("#[derive(Debug, Clone, SpikeTrainBase)]
+//             pub struct {}<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {{
+//                 {},
+//                 pub dt: f32,
+//                 pub v_resting: f32,
+//                 pub v_th: f32,
+//                 pub current_voltage: f32,
+//                 pub synaptic_neurotransmitters: Neurotransmitters<N, T>,
+//                 pub neural_refractoriness: U,
+//             }}",
+//             type_name.generate(),
+//             generate_fields(&self.vars).join(",\n"),
+//         );
+
+//         let mut defaults = vec!["dt: 0.1", "v_resting: 0", "v_th: 30.", "current_voltage: 0."];
+//         defaults.extend(generate_defaults(&self.vars));
+
+//         let default_impl = format!(
+//             "impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {}<N, T, U> {{
+//                 fn default() -> Self {{
+//                     {} {{
+//                         {},
+//                         synaptic_neurotransmitters: Neurotransmitters::default(),
+//                         neural_refractoriness: U::default(),
+//                     }}
+//                 }}
+//             }}",
+//             self.type_name.generate(),
+//             self.type_name.generate(),
+//             defaults.join(",\n")
+//         );
+
+//         (
+//             vec![],
+//             format!(
+//                 "{}\n{}",
+//                 struct_def,
+//                 default_impl,
+//             )
+//         )
+//     }
+    
+//     fn to_gpu_code(&self) -> (Vec<String>, String) {
+
+//     }
+
+//     fn to_pyo3_code(&self) -> (Vec<String>, String) {
+
+//     }
 // }
 
 struct NeurotransmitterKineticsDefinition {
