@@ -110,8 +110,7 @@ neuron_definition = {
 spike_train_definition = {
     "[spike_train]" ~ NEWLINE ~ 
 	(
-		on_iteration_def | type_def | 
-		vars_with_default_def | on_electrochemical_iteration_def
+		on_iteration_def | type_def | vars_with_default_def
 	){3,} ~ 
 	"[end]"
 }
