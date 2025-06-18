@@ -4610,120 +4610,162 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     )
 }
 
-// fn generate_spike_train() -> Result<SpikeTrainDefinition> {
-//     let mut definitions: HashMap<String, Ast> = HashMap::new();
+fn generate_spike_train(pairs: Pairs<Rule>) -> Result<SpikeTrainDefinition> {
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
 
-//     for pair in pairs {
-//         let (key, current_ast) = match pair.as_rule() {
-//             Rule::type_def => {
-//                 parse_type_definition(pair)
-//             },
-//             Rule::on_iteration_def => {
-//                 parse_on_iteration(pair)
-//             },
-//             Rule::vars_with_default_def => {
-//                 parse_vars_with_default(pair)
-//             },
-//             Rule::on_electrochemical_iteration_def => {
-//                 parse_on_electrochemical_iteration(pair)
-//             },
-//             definition => unreachable!("Unexpected definiton: {:#?}", definition)
-//         };
+    for pair in pairs {
+        let (key, current_ast) = match pair.as_rule() {
+            Rule::type_def => {
+                parse_type_definition(pair)
+            },
+            Rule::on_iteration_def => {
+                parse_on_iteration(pair)
+            },
+            Rule::vars_with_default_def => {
+                parse_vars_with_default(pair)
+            },
+            definition => unreachable!("Unexpected definiton: {:#?}", definition)
+        };
 
-//         if definitions.contains_key(&key) {
-//             return Err(
-//                 Error::new(
-//                     ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
-//                 )
-//             )
-//         }
+        if definitions.contains_key(&key) {
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                )
+            )
+        }
 
-//         definitions.insert(key, current_ast);
-//     }
+        definitions.insert(key, current_ast);
+    }
 
-//     let type_name = definitions.remove("type").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "Type definition expected")
-//     })?;
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type definition expected")
+    })?;
     
-//     let vars = definitions.remove("vars").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "Variables definition expected")
-//     })?;
+    let vars = definitions.remove("vars").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Variables definition expected")
+    })?;
 
-//     let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
-//     })?;
+    let on_iteration = definitions.remove("on_iteration").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
+    })?;
+
+    Ok(
+        SpikeTrainDefinition {
+            type_name,
+            vars,
+            on_iteration,
+        }
+    )
+}
+
+struct SpikeTrainDefinition {
+    type_name: Ast,
+    vars: Ast,
+    on_iteration: Ast,
+}
+
+impl SpikeTrainDefinition {
+    fn to_code(&self) -> (Vec<String>, String) {
+        let struct_def = format!("#[derive(Debug, Clone, Timestep, SpikeTrainBase)]
+            pub struct {}<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {{
+                {},
+                pub dt: f32,
+                pub v_resting: f32,
+                pub v_th: f32,
+                pub current_voltage: f32,
+                pub is_spiking: bool,
+                pub last_firing_time: Option<usize>,
+                pub synaptic_neurotransmitters: Neurotransmitters<N, T>,
+                pub neural_refractoriness: U,
+            }}",
+            self.type_name.generate(),
+            generate_fields(&self.vars).join(",\n"),
+        );
+
+        let mut defaults = vec![
+            String::from("dt: 0.1"), String::from("v_resting: 0."), String::from("v_th: 30."), 
+            String::from("current_voltage: 0."), String::from("is_spiking: false"), String::from("last_firing_time: None"),
+        ];
+        defaults.extend(generate_defaults(&self.vars));
+
+        let default_impl = format!(
+            "impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> Default for {}<N, T, U> {{
+                fn default() -> Self {{
+                    {} {{
+                        {},
+                        synaptic_neurotransmitters: Neurotransmitters::default(),
+                        neural_refractoriness: U::default(),
+                    }}
+                }}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            defaults.join(",\n")
+        );
+
+        let spike_train_impl = format!(
+            "impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> SpikeTrain for {}<N, T, U> {{
+                type U = U;
+                type N = N;
+
+                fn get_height(&self) -> (f32, f32) {{
+                    (self.v_th, self.v_resting)
+                }}
+            
+                fn get_neurotransmitter_concentrations(&self) -> NeurotransmitterConcentrations<Self::N> {{
+                    self.synaptic_neurotransmitters.get_concentrations()
+                }}
+            
+                fn get_refractoriness_function(&self) -> &Self::U {{
+                    &self.neural_refractoriness
+                }}
+
+                fn iterate(&mut self) -> bool {{
+                    {}
+
+                    self.synaptic_neurotransmitters.apply_t_changes(&NeurotransmittersIntermediate::from_neuron(self));
+
+                    self.is_spiking
+                }}
+            }}",
+            self.type_name.generate(),
+            generate_on_iteration(&self.on_iteration),
+        );
+
+        (
+            vec![
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike_traits::SpikeTrainBase;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike_traits::Timestep;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::CurrentVoltage;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::Timestep;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::IsSpiking;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::LastFiringTime;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterType;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKinetics;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::Neurotransmitters;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterConcentrations;"),
+                String::from("use spiking_neural_networks::neuron::intermediate_delegate::NeurotransmittersIntermediate;"),
+                String::from("use spiking_neural_networks::neuron::spike_train::NeuralRefractoriness;"),
+                String::from("use spiking_neural_networks::neuron::spike_train::SpikeTrain;"),
+            ],
+            format!(
+                "{}\n{}\n{}",
+                struct_def,
+                default_impl,
+                spike_train_impl,
+            )
+        )
+    }
     
-//     let on_electrochemical_iteration = definitions.remove("on_electrochemical_iteration");
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
 
-//     Ok(
-//         SpikeTrainDefinition {
-//             type_name,
-//             vars,
-//             on_iteration,
-//             on_electrochemical_iteration,
-//         }
-//     )
-// }
+    // }
 
-// pub struct SpikeTrainDefinition {
-//     type_name: Ast,
-//     vars: Ast,
-//     on_iteration: Ast,
-//     on_electrochemical_iteration: Option<Ast>,
-// }
+    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
 
-// impl SpikeTrainDefinition {
-//     fn to_code(&self) -> (Vec<String>, String) {
-//         let struct_def = format!("#[derive(Debug, Clone, SpikeTrainBase)]
-//             pub struct {}<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {{
-//                 {},
-//                 pub dt: f32,
-//                 pub v_resting: f32,
-//                 pub v_th: f32,
-//                 pub current_voltage: f32,
-//                 pub synaptic_neurotransmitters: Neurotransmitters<N, T>,
-//                 pub neural_refractoriness: U,
-//             }}",
-//             type_name.generate(),
-//             generate_fields(&self.vars).join(",\n"),
-//         );
-
-//         let mut defaults = vec!["dt: 0.1", "v_resting: 0", "v_th: 30.", "current_voltage: 0."];
-//         defaults.extend(generate_defaults(&self.vars));
-
-//         let default_impl = format!(
-//             "impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {}<N, T, U> {{
-//                 fn default() -> Self {{
-//                     {} {{
-//                         {},
-//                         synaptic_neurotransmitters: Neurotransmitters::default(),
-//                         neural_refractoriness: U::default(),
-//                     }}
-//                 }}
-//             }}",
-//             self.type_name.generate(),
-//             self.type_name.generate(),
-//             defaults.join(",\n")
-//         );
-
-//         (
-//             vec![],
-//             format!(
-//                 "{}\n{}",
-//                 struct_def,
-//                 default_impl,
-//             )
-//         )
-//     }
-    
-//     fn to_gpu_code(&self) -> (Vec<String>, String) {
-
-//     }
-
-//     fn to_pyo3_code(&self) -> (Vec<String>, String) {
-
-//     }
-// }
+    // }
+}
 
 struct NeurotransmitterKineticsDefinition {
     type_name: Ast,
@@ -7516,6 +7558,25 @@ fn build_function(model_description: String) -> TokenStream {
                             );
                         }
                     },
+                    Rule::spike_train_definition => {
+                        let spike_train = generate_spike_train(pair.into_inner())
+                            .expect("Could not generate spike train");
+
+                        let (spike_train_imports, spike_train_code) = spike_train.to_code();
+
+                        for i in spike_train_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+
+                        let spike_train_type_name = spike_train.type_name.generate();
+                    
+                        let spike_train_code_map = code.entry(String::from("ion_channel"))
+                            .or_default();
+    
+                        spike_train_code_map.insert(spike_train_type_name, spike_train_code); 
+                    }
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner())
                             .expect("Could not generate ion channel");
