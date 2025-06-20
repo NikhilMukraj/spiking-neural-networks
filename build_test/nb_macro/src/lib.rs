@@ -8059,7 +8059,11 @@ fn build_function(model_description: String) -> TokenStream {
             );
             functions.insert(
                 String::from("heaviside"),
-                String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x }"),
+                String::from("fn heaviside(x: f32) -> f32 { if x < 0 { 0 } else { x } }"),
+            );
+            functions.insert(
+                String::from("isnan"),
+                String::from("fn isnan(x: f32) -> bool { x.is_nan() }"),
             );
             // continous is also a reserved function name
     
