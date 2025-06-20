@@ -2813,7 +2813,7 @@ impl <N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU> Neurotransmitt
                 __kernel void neurotransmitters_update(
                     uint index,
                     uint number_of_types,
-                    __global uint* neuro_flags,
+                    __global const uint* neuro_flags,
                     {}
                 ) {{
                     for (int i = 0; i < number_of_types; i++) {{
