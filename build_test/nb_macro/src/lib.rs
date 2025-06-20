@@ -4792,7 +4792,7 @@ impl SpikeTrainDefinition {
             r#"fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {{
                 let kernel_name = String::from("spike_train_electrical_kernel");
 
-                let argument_names = vec![{}];
+                let argument_names = vec![String::from("index_to_position"), {}];
 
                 {}
 
@@ -4818,7 +4818,99 @@ impl SpikeTrainDefinition {
             kernel,
         );
 
-        let spike_train_chemical_kernel = "fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> { todo!() }";
+        let kernel = format!(
+            "let program_source = format!(\"
+                {{}}
+                {{}}
+            
+                __kernel void spike_train_electrochemical_kernel(
+                    __global uint *index_to_position,
+                    __global uint *neuro_flags,
+                    uint number_of_types,
+                    {{}}
+                ) {{{{
+                    int gid = get_global_id(0);
+                    int index = index_to_position[gid];
+
+                    {}
+
+                    neurotransmitters_update(
+                        index, 
+                        number_of_types,
+                        neuro_flags,
+                        current_voltage,
+                        is_spiking,
+                        dt,
+                        {{}}
+                    );
+                }}}}\", 
+                T::get_update_function().1,
+                Neurotransmitters::<IonotropicNeurotransmitterType, T>::get_neurotransmitter_update_kernel_code(),
+                kernel_args.join(\",\n\"),
+                neurotransmitter_arg_names.join(\",\n\"),
+            );",
+            generate_gpu_kernel_on_iteration(&self.on_iteration).replace("{", "{{").replace("}", "}}"),
+        );
+
+        let spike_train_chemical_kernel = format!(
+            r#"fn spike_train_electrochemical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {{
+                let kernel_name = String::from("spike_train_electrochemical_kernel");
+
+                let mut argument_names = vec![String::from("index_to_position"), String::from("neuro_flags"), String::from("number_of_types"), {}];
+                argument_names.extend(
+                    T::get_attribute_names_as_vector().iter()
+                        .map(|i| i.0.clone())
+                        .collect::<Vec<_>>()
+                );
+
+                let neuro_prefix = generate_unique_prefix(&argument_names, "neuro");
+                let neurotransmitter_args = T::get_attribute_names_as_vector()
+                    .iter()
+                    .map(|i| (
+                        i.1, 
+                        format!(
+                            "{{}}{{}}", neuro_prefix,
+                            i.0.split("$").collect::<Vec<&str>>()[1],
+                        )
+                    ))
+                    .collect::<Vec<(AvailableBufferType, String)>>();
+                let neurotransmitter_arg_names = neurotransmitter_args.iter()
+                    .map(|i| i.1.clone())
+                    .collect::<Vec<String>>();
+
+                let neurotransmitter_kernel_args = neurotransmitter_args.iter()
+                    .map(|i| format!("__global {{}} *{{}}", i.0.to_str(), i.1))
+                    .collect::<Vec<String>>();
+
+                let mut kernel_args = vec![{}];
+                kernel_args.extend(vec![{}]);
+                kernel_args.extend(neurotransmitter_kernel_args);
+
+                {}
+
+                let spike_train_program = match Program::create_and_build_from_source(context, &program_source, "") {{
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::ProgramCompileFailure),
+                }};
+                let kernel = match Kernel::create(&spike_train_program, &kernel_name) {{
+                    Ok(value) => value,
+                    Err(_) => return Err(GPUError::KernelCompileFailure),
+                }};
+
+                Ok(
+                    KernelFunction {{
+                        kernel, 
+                        program_source, 
+                        kernel_name, 
+                        argument_names, 
+                    }}
+                )
+            }}"#,
+            argument_names.iter().map(|i| format!("String::from(\"{}\")", i)).collect::<Vec<_>>().join(", "),
+            generate_kernel_args(&self.vars).iter().map(|i| format!("String::from(\"{}\")", i)).collect::<Vec<_>>().join(",\n"),
+            mandatory_vars.iter().map(|i| format!("String::from(\"__global {} *{}\")", i.1, i.0)).collect::<Vec<_>>().join(",\n"),
+            kernel,
+        );
 
         let convert_to_gpu = "fn convert_to_gpu(
             cell_grid: &[Vec<Self>], 
@@ -4856,6 +4948,8 @@ impl SpikeTrainDefinition {
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::NeurotransmitterKineticsGPU;"),
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::KernelFunction;"),
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::generate_unique_prefix;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
                 String::from("use spiking_neural_networks::error::GPUError;"),
                 String::from("use opencl3::context::Context;"),
                 String::from("use opencl3::program::Program;"),
