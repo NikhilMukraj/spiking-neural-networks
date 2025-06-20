@@ -37,4 +37,20 @@ mod test {
 
         assert!(kernel_function.is_ok());
     }
+
+    #[test]
+    fn test_electrochemical_kernel_compiles() {
+        let device_id = *get_all_devices(CL_DEVICE_TYPE_GPU)
+            .expect("Could not get GPU devices")
+            .first()
+            .expect("No GPU found");
+        let device = Device::new(device_id);
+
+        let context = Context::from_device(&device).expect("Context::from_device failed");
+
+        let kernel_function = RateSpikeTrain::<IonotropicNeurotransmitterType, ApproximateNeurotransmitter, DeltaDiracRefractoriness>::
+            spike_train_electrochemical_kernel(&context);
+
+        assert!(kernel_function.is_ok());
+    }
 }
