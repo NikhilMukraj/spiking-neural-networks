@@ -4824,8 +4824,8 @@ impl SpikeTrainDefinition {
                 {{}}
             
                 __kernel void spike_train_electrochemical_kernel(
-                    __global uint *index_to_position,
-                    __global uint *neuro_flags,
+                    __global const uint *index_to_position,
+                    __global const uint *neuro_flags,
                     uint number_of_types,
                     {{}}
                 ) {{{{
