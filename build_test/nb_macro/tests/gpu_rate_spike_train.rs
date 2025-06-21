@@ -53,4 +53,6 @@ mod test {
 
         assert!(kernel_function.is_ok());
     }
+    
+    // make sure to test that refractoriness is edited properly
 }
