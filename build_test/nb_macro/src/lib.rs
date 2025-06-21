@@ -4912,25 +4912,173 @@ impl SpikeTrainDefinition {
             kernel,
         );
 
-        let convert_to_gpu = "fn convert_to_gpu(
-            cell_grid: &[Vec<Self>], 
-            context: &Context,
-            queue: &CommandQueue,
-        ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }";
+        let convert_to_gpu = format!("fn convert_to_gpu(
+                cell_grid: &[Vec<Self>], 
+                context: &Context,
+                queue: &CommandQueue,
+            ) -> Result<HashMap<String, BufferGPU>, GPUError> {{
+                if cell_grid.is_empty() || cell_grid.iter().all(|i| i.is_empty()) {{
+                    return Ok(HashMap::new());
+                }}
 
-        let convert_to_cpu = "fn convert_to_cpu(
-            cell_grid: &mut Vec<Vec<Self>>,
-            buffers: &HashMap<String, BufferGPU>,
-            rows: usize,
-            cols: usize,
-            queue: &CommandQueue,
-        ) -> Result<(), GPUError> { todo!() }";
+                let mut buffers = HashMap::new();
+
+                {}
+                {}
+
+                create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
+
+                {}
+                {}
+
+                buffers.insert(String::from(\"last_firing_time\"), BufferGPU::OptionalUInt(last_firing_time_buffer));
+
+                let refractoriness: Vec<Vec<_>> = cell_grid.iter()
+                    .map(|row| row.iter().map(|cell| cell.neural_refractoriness.clone()).collect())
+                    .collect();
+
+                let refractoriness_buffers = U::convert_to_gpu(
+                    &refractoriness, context, queue
+                )?;
+
+                buffers.extend(refractoriness_buffers);
+
+                Ok(buffers)
+            }}",
+            mandatory_vars.iter()
+                .map(|(i, j)| 
+                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", j, i, i)
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_create_buffers(&self.vars).join("\n"),
+            mandatory_vars.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "buffers.insert(String::from(\"{}\"), BufferGPU::{}({}_buffer));", 
+                        i, 
+                        if *j == "float" { "Float" } else { "UInt" }, 
+                        i
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_insert_buffers(&self.vars).join("\n"),
+        );
+
+        let convert_to_cpu = format!("fn convert_to_cpu(
+                cell_grid: &mut Vec<Vec<Self>>,
+                buffers: &HashMap<String, BufferGPU>,
+                rows: usize,
+                cols: usize,
+                queue: &CommandQueue,
+            ) -> Result<(), GPUError> {{
+                if rows == 0 || cols == 0 {{
+                    cell_grid.clear();
+
+                    return Ok(());
+                }}
+
+                let mut neural_refractorinesses: Vec<Vec<_>> = cell_grid.iter()
+                    .map(|row| row.iter().map(|cell| cell.neural_refractoriness.clone()).collect())
+                    .collect();
+
+                {}
+                {}
+                let mut last_firing_time: Vec<i32> = vec![0; rows * cols];
+
+                {}
+                {}
+                read_and_set_buffer!(buffers, queue, \"last_firing_time\", &mut last_firing_time, OptionalUInt);
+
+                for i in 0..rows {{
+                    for j in 0..cols {{
+                        let idx = i * cols + j;
+                        let cell = &mut cell_grid[i][j];
+
+                        {}
+                        {}
+
+                        cell.last_firing_time = if last_firing_time[idx] == -1 {{
+                            None
+                        }} else {{
+                            Some(last_firing_time[idx] as usize)
+                        }};
+                    }}
+                }}
+
+                U::convert_to_cpu(
+                    &mut neural_refractorinesses, buffers, rows, cols, queue
+                )?;
+
+                for (i, row) in cell_grid.iter_mut().enumerate() {{
+                    for (j, cell) in row.iter_mut().enumerate() {{
+                        cell.neural_refractoriness = neural_refractorinesses[i][j].clone();
+                    }}
+                }}
+
+                Ok(())
+            }}",
+            mandatory_vars.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "let mut {}: Vec<{}> = vec![{}; rows * cols];", 
+                        i, 
+                        if *j == "float" { "f32" } else { "u32" },
+                        if *j == "float" { "0.0" } else { "0" },
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_field_vecs(&self.vars).join("\n"),
+            mandatory_vars.iter()
+                .map(|(i, j)| 
+                    format!(
+                        "read_and_set_buffer!(buffers, queue, \"{}\", &mut {}, {});", 
+                        i, 
+                        i,
+                        if *j == "float" { "Float" } else { "UInt" },
+                    )
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_read_and_set(&self.vars).join("\n"),
+            mandatory_vars.iter()
+                .map(|(i, j)| 
+                    if *j == "float" {
+                        format!("cell.{} = {}[idx];", i, i)
+                    } else {
+                        format!("cell.{} = {}[idx] == 1;", i, i)
+                    }
+                )
+                .collect::<Vec<String>>()
+                .join("\n"),
+            generate_vars_as_field_setters(&self.vars).join("\n"),
+        );
 
         let convert_electrochemical_to_gpu = "fn convert_electrochemical_to_gpu(
             cell_grid: &[Vec<Self>], 
             context: &Context,
             queue: &CommandQueue,
-        ) -> Result<HashMap<String, BufferGPU>, GPUError> { todo!() }";
+        ) -> Result<HashMap<String, BufferGPU>, GPUError> {
+            if cell_grid.is_empty() {
+                return Ok(HashMap::new());
+            }
+
+            let mut buffers = Self::convert_to_gpu(cell_grid, context, queue)?;
+
+            let neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+                .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+                .collect();
+
+            let neurotransmitter_buffers = Neurotransmitters::<N, T>::convert_to_gpu(
+                &neurotransmitters, context, queue
+            )?;
+
+            buffers.extend(neurotransmitter_buffers);
+
+            Ok(buffers)
+        }";
 
         let convert_electrochemical_to_cpu = "fn convert_electrochemical_to_cpu(
             cell_grid: &mut Vec<Vec<Self>>,
@@ -4938,7 +5086,31 @@ impl SpikeTrainDefinition {
             rows: usize,
             cols: usize,
             queue: &CommandQueue,
-        ) -> Result<(), GPUError> { todo!() }";
+        ) -> Result<(), GPUError> {
+            if rows == 0 || cols == 0 {
+                cell_grid.clear();
+
+                return Ok(());
+            }
+
+            let mut neurotransmitters: Vec<Vec<_>> = cell_grid.iter()
+                .map(|row| row.iter().map(|cell| cell.synaptic_neurotransmitters.clone()).collect())
+                .collect();
+
+            Self::convert_to_cpu(cell_grid, buffers, rows, cols, queue)?;
+            
+            Neurotransmitters::<N, T>::convert_to_cpu(
+                &mut neurotransmitters, buffers, queue, rows, cols
+            )?;
+
+            for (i, row) in cell_grid.iter_mut().enumerate() {
+                for (j, cell) in row.iter_mut().enumerate() {
+                    cell.synaptic_neurotransmitters = neurotransmitters[i][j].clone();
+                }
+            }
+
+            Ok(())
+        }";
 
         (
             vec![
@@ -4950,12 +5122,26 @@ impl SpikeTrainDefinition {
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::generate_unique_prefix;"),
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_optional_uint_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_float_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_uint_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::flatten_and_retrieve_field;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::read_and_set_buffer;"),
                 String::from("use spiking_neural_networks::error::GPUError;"),
                 String::from("use opencl3::context::Context;"),
                 String::from("use opencl3::program::Program;"),
                 String::from("use opencl3::kernel::Kernel;"),
                 String::from("use opencl3::command_queue::CommandQueue;"),
+                String::from("use opencl3::memory::Buffer;"),
+                String::from("use opencl3::memory::CL_MEM_READ_WRITE;"),
+                String::from("use opencl3::types::cl_float;"),
+                String::from("use opencl3::types::cl_uint;"),
+                String::from("use opencl3::types::cl_int;"),
+                String::from("use opencl3::types::CL_BLOCKING;"),
+                String::from("use opencl3::types::CL_NON_BLOCKING;"),
                 String::from("use std::collections::HashMap;"),
+                String::from("use std::ptr;"),
             ],
             format!(
                 "impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for {}<N, T, U> {{
