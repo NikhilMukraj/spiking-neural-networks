@@ -75,7 +75,7 @@ macro_rules! impl_default_neural_refractoriness {
 }
 
 /// Calculates refractoriness based on the delta dirac function
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DeltaDiracRefractoriness {
     /// Decay value
     pub k: f32,
