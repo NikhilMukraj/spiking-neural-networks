@@ -474,4 +474,6 @@ mod test {
 
         Ok(())
     }
+
+    // check kernel works as expected
 }
