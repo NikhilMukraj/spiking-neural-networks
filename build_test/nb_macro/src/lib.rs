@@ -4759,8 +4759,7 @@ impl SpikeTrainDefinition {
     }
     
     fn to_gpu_code(&self) -> (Vec<String>, String) {
-        let mut argument_names = vec![String::from("index_to_position")];
-        argument_names.extend(generate_fields_as_names(&self.vars));
+        let mut argument_names = generate_fields_as_names(&self.vars);
 
         let mandatory_vars = vec![
             (String::from("dt"), String::from("float")), 
