@@ -115,6 +115,16 @@ spike_train_definition = {
 	"[end]"
 }
 
+effect_definition = { "effect:" ~ " "* ~ expr ~ NEWLINE+ }
+
+neural_refractoriness_definition = {
+	"[neural_refractoriness]" ~ NEWLINE ~
+	(
+		type_def | vars_with_default_def | effect_definition
+	){2,} ~
+	"[end]"
+}
+
 gating_variables_block = _{ "gating_vars:" ~ " "* ~ name ~ (" "* ~ "," ~ " "* ~ name)* ~ ","? }
 gating_variables_def = { gating_variables_block ~ NEWLINE+ }
 
