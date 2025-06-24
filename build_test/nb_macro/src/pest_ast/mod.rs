@@ -155,8 +155,8 @@ receptors_definition = {
 
 full = _{
 	SOI ~ NEWLINE* ~ ((
-		neuron_definition | spike_train_definition | ion_channel_definition | 
-		neurotransmitter_kinetics_definition | receptor_kinetics_definition |
+		neuron_definition | spike_train_definition | neural_refractoriness_definition | 
+		ion_channel_definition | neurotransmitter_kinetics_definition | receptor_kinetics_definition |
         receptors_definition
 	)+ ~ NEWLINE*
 	)* ~ EOI
