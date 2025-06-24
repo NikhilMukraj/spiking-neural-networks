@@ -73,7 +73,7 @@ enum Ast {
     OnSpike(Vec<Ast>),
     OnIteration(Vec<Ast>),
     SpikeDetection(Box<Ast>),
-    // Expression(Box<Ast>),
+    Expression(Box<Ast>),
     GatingVariables(Vec<String>),
     VariableAssignment {
         name: String,
@@ -220,7 +220,7 @@ impl Ast {
                     .join("\n\t\t")
             },
             Ast::SpikeDetection(expr) => { expr.generate() },
-            // Ast::Expression(expr) => { expr.generate() },
+            Ast::Expression(expr) => { expr.generate() },
             Ast::GatingVariables(vars) => {
                 format!("gating_vars: {}", vars.join(", "))
             },
@@ -5169,99 +5169,135 @@ impl SpikeTrainDefinition {
     // }
 }
 
-// fn parse_effect_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
-//     (
-//         String::from("effect"), 
-//         Ast::Expression(
-//             Box::new(parse_expr(pair.into_inner()))
-//         )
-//     )
-// }
+fn parse_effect_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("effect"), 
+        Ast::Expression(
+            Box::new(parse_expr(pair.into_inner()))
+        )
+    )
+}
 
-// fn generate_neural_refractoriness() -> Result<(), NeuralRefractorinessDefinition> {
-//     let mut definitions: HashMap<String, Ast> = HashMap::new();
+fn generate_neural_refractoriness(pairs: Pairs<'_, Rule>) -> Result<NeuralRefractorinessDefinition> {
+    let mut definitions: HashMap<String, Ast> = HashMap::new();
 
-//     for pair in pairs {
-//         let (key, current_ast) = match pair.as_rule() {
-//             Rule::type_def => {
-//                 parse_type_definition(pair)
-//             },
-//             Rule::vars_with_default_def => {
-//                 parse_vars_with_default(pair)
-//             },
-//             Rule::effect_definition => {
-//                 parse_effect_definition(pair)
-//             },
-//             definition => unreachable!("Unexpected definiton: {:#?}", definition)
-//         };
+    for pair in pairs {
+        let (key, current_ast) = match pair.as_rule() {
+            Rule::type_def => {
+                parse_type_definition(pair)
+            },
+            Rule::vars_with_default_def => {
+                parse_vars_with_default(pair)
+            },
+            Rule::effect_definition => {
+                parse_effect_definition(pair)
+            },
+            definition => unreachable!("Unexpected definiton: {:#?}", definition)
+        };
 
-//         if definitions.contains_key(&key) {
-//             return Err(
-//                 Error::new(
-//                     ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
-//                 )
-//             )
-//         }
+        if definitions.contains_key(&key) {
+            return Err(
+                Error::new(
+                    ErrorKind::InvalidInput, format!("Duplicate definition found: {}", key),
+                )
+            )
+        }
 
-//         definitions.insert(key, current_ast);
-//     }
+        definitions.insert(key, current_ast);
+    }
 
-//     let type_name = definitions.remove("type").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "Type definition expected")
-//     })?;
+    let type_name = definitions.remove("type").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Type definition expected")
+    })?;
 
-//     let effect = definitions.remove("effect").ok_or_else(|| {
-//         Error::new(ErrorKind::InvalidInput, "Effect definition expected")
-//     })?;
+    let effect = definitions.remove("effect").ok_or_else(|| {
+        Error::new(ErrorKind::InvalidInput, "Effect definition expected")
+    })?;
     
-//     let vars = definitions.remove("vars")?;
+    let vars = definitions.remove("vars");
 
-//     Ok(
-//         NeuralRefractorinessDefinition {
-//             type_name,
-//             vars,
-//             effect,
-//         }
-//     )
-// }
+    Ok(
+        NeuralRefractorinessDefinition {
+            type_name,
+            vars,
+            effect,
+        }
+    )
+}
 
-// struct NeuralRefractorinessDefinition {
-//     type_name: Ast,
-//     vars: Option<Ast>,
-//     effect: Ast,
-// }
+struct NeuralRefractorinessDefinition {
+    type_name: Ast,
+    vars: Option<Ast>,
+    effect: Ast,
+}
 
-// impl NeuralRefractorinessDefinition {
-//     fn to_code(&self) -> (Vec<String>, String) {
-//         let struct_def = format!(
-//             "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{
-//                 pub decay: f32,
-//                 {}
-//             }}",
-//             self.type_name.generate(),
-//             generate_fields(vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
-//         );
+impl NeuralRefractorinessDefinition {
+    fn to_code(&self) -> (Vec<String>, String) {
+        let struct_def = format!(
+            "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{
+                pub decay: f32,
+                {}
+            }}",
+            self.type_name.generate(),
+            generate_fields(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
+        );
 
-//         let effect_def = self.effect.generate()
-//             .replace("self.v_max", "v_max")
-//             .replace("self.v_resting", "v_resting")
-//             .replace("self.time_difference", "time_difference")
-//             .replace("self.dt", "dt");
+        let effect_def = self.effect.generate()
+            .replace("self.v_max", "v_max")
+            .replace("self.v_resting", "v_resting")
+            .replace("self.time_difference", "time_difference")
+            .replace("self.dt", "dt");
 
-//         (
-//             vec![],
-//             format!()
-//         )
-//     }
+        let default_impl = format!(
+            "impl Default for {} {{
+                fn default() -> Self {{
+                    {} {{
+                        decay: 10000.,
+                        {}
+                    }}
+                }}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            generate_fields(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
+        );
 
-//     fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let trait_impl = format!(
+            "impl NeuralRefractoriness for {} {{
+                fn set_decay(&mut self, decay_factor: f32) {{
+                    self.decay = decay_factor;
+                }}
 
-//     }
+                fn get_decay(&self) -> f32 {{
+                    self.decay
+                }}
 
-//     fn to_pyo3_code(&self) -> (Vec<String>, String) {
+                fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {{
+                    let time_difference = (timestep - last_firing_time) as f32;
 
-//     }
-// }
+                    {}
+                }}
+            }}",
+            self.type_name.generate(),
+            effect_def,
+        );
+
+        (
+            vec![
+                String::from("use spiking_neural_networks::neuron::spike_train::NeuralRefractoriness;"),
+            ],
+            format!("{}\n{}\n{}", struct_def, default_impl, trait_impl)
+        )
+    }
+
+    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+
+    // }
+
+    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+
+    // }
+}
 
 struct NeurotransmitterKineticsDefinition {
     type_name: Ast,
@@ -8088,6 +8124,25 @@ fn build_function(model_description: String) -> TokenStream {
                             );
                         }
                     }
+                    Rule::neural_refractoriness_definition => {
+                        let neural_refractoriness = generate_neural_refractoriness(pair.into_inner())
+                            .expect("Could not generate spike train");
+
+                        let (neural_refractoriness_imports, neural_refractoriness_code) = neural_refractoriness.to_code();
+
+                        for i in neural_refractoriness_imports {
+                            if !imports.contains(&i) {
+                                imports.push(i);
+                            }
+                        }
+
+                        let neural_refractoriness_type_name = neural_refractoriness.type_name.generate();
+                    
+                        let neural_refractoriness_code_map = code.entry(String::from("neural_refractoriness"))
+                            .or_default();
+    
+                        neural_refractoriness_code_map.insert(neural_refractoriness_type_name, neural_refractoriness_code); 
+                    },
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner())
                             .expect("Could not generate ion channel");
