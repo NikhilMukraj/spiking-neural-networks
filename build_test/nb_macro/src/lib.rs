@@ -398,6 +398,7 @@ impl Ast {
                     .collect::<Vec<String>>()
                     .join("\n\t\t")
             },
+            Ast::Expression(expr) => expr.generate_non_kernel_gpu(),
             Ast::IfStatement { conditions, declarations } => {
                 if conditions.len() == 1 && declarations.len() == 1 {
                     format!(
@@ -5169,6 +5170,122 @@ impl SpikeTrainDefinition {
     // }
 }
 
+#[cfg(feature = "gpu")]
+fn generate_neural_refractoriness_args(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::VariableAssignment { name, value } => {
+                            let type_name = match value {
+                                NumOrBool::Number(_) => "Float",
+                                NumOrBool::Bool(_) => "UInt",
+                            };
+
+                            (name, type_name)
+                        },
+                        _ => unreachable!()
+                    };
+
+                    format!("(String::from(\"neural_refractoriness${}\"), AvailableBufferType::{})", var_name, type_name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_neural_refractoriness_write_to_gpu(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!()
+                    };
+
+                    format!("create_float_buffer!({}_buffer, context, queue, grid, {}, last);", name, name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_neural_refractoriness_insert_into_buffers(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::VariableAssignment { name, value } => {
+                            let type_name = match value {
+                                NumOrBool::Number(_) => "Float",
+                                NumOrBool::Bool(_) => "UInt",
+                            };
+
+                            (name, type_name)                            
+                        },
+                        _ => unreachable!()
+                    };
+
+                    format!("buffers.insert(String::from(\"neural_refractoriness${}\"), BufferGPU::{}({}_buffer));", var_name, type_name, var_name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_neural_refractoriness_read_and_set(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let (var_name, type_name) = match i {
+                        Ast::VariableAssignment { name, value } => {
+                            let type_name = match value {
+                                NumOrBool::Number(_) => "Float",
+                                NumOrBool::Bool(_) => "UInt",
+                            };
+
+                            (name, type_name)
+                        },
+                        _ => unreachable!()
+                    };
+
+                    format!("read_and_set_buffer!(buffers, queue, \"neural_refractoriness${}\", &mut {}, {});", var_name, var_name, type_name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
+#[cfg(feature = "gpu")]
+fn generate_neural_refractoriness_set(vars: &Ast) -> Vec<String> {
+    match vars {
+        Ast::VariablesAssignments(variables) => {
+            variables.iter()
+                .map(|i| {
+                    let name = match i {
+                        Ast::VariableAssignment { name, .. } => name,
+                        _ => unreachable!(),
+                    };
+
+                    format!("refractoriness.{} = {}[idx];", name, name)
+                })
+                .collect()
+        },
+        _ => unreachable!()
+    }
+}
+
 fn parse_effect_definition(pair: Pair<'_, Rule>) -> (String, Ast) {
     (
         String::from("effect"), 
@@ -5246,7 +5363,8 @@ impl NeuralRefractorinessDefinition {
             .replace("self.v_max", "v_max")
             .replace("self.v_resting", "v_resting")
             .replace("self.time_difference", "time_difference")
-            .replace("self.dt", "dt");
+            .replace("self.dt", "dt")
+            .replace("self.last_firing_time", "last_firing_time.unwrap_or(-1)");
 
         let default_impl = format!(
             "impl Default for {} {{
@@ -5290,9 +5408,145 @@ impl NeuralRefractorinessDefinition {
         )
     }
 
-    // fn to_gpu_code(&self) -> (Vec<String>, String) {
+    fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let refractoriness_function = format!(
+            r#"fn get_refractoriness_gpu_function() -> Result<(Vec<(String, Option<AvailableBufferType>)>, String), GPUError> {{
+                let args = vec![
+                    (String::from("timestep"), None), (String::from("last_firing_time"), Some(AvailableBufferType::OptionalUInt)),
+                    (String::from("v_th"), Some(AvailableBufferType::Float)), (String::from("v_resting"), Some(AvailableBufferType::Float)), 
+                    (String::from("dt"), Some(AvailableBufferType::Float)), (String::from("neural_refractoriness$decay"), Some(AvailableBufferType::Float)), 
+                    {}
+                ];
 
-    // }
+                let program_source = String::from("
+                    float get_effect(
+                        int timestep,
+                        int last_firing_time,
+                        float v_th,
+                        float v_resting,
+                        float dt,
+                        float decay{}
+                        {} 
+                    ) {{
+                        float a = v_th - v_resting;
+                        float time_difference = (float) (timestep - last_firing_time);
+
+                        return {};
+                    }}
+                ");
+                
+                Ok((args, program_source))
+            }}"#,
+            generate_neural_refractoriness_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            if self.vars.is_some() {
+                ","
+            } else {
+                ""
+            },
+            generate_non_kernel_gpu_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            self.effect.generate_non_kernel_gpu(),
+        );
+
+        let convert_to_gpu = format!(r#"
+            fn convert_to_gpu(
+                grid: &[Vec<Self>], 
+                context: &Context,
+                queue: &CommandQueue,
+            ) -> Result<HashMap<String, BufferGPU>, GPUError> {{
+                if grid.is_empty() {{
+                    return Ok(HashMap::new());
+                }}
+
+                let mut buffers = HashMap::new();
+
+                create_float_buffer!(decay_buffer, context, queue, grid, decay, last);
+
+                {}
+
+                buffers.insert(String::from("neural_refractoriness$decay"), BufferGPU::Float(decay_buffer));
+
+                {}
+
+                Ok(buffers)
+            }}"#,
+            generate_neural_refractoriness_write_to_gpu(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_insert_into_buffers(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+        );
+
+        let convert_to_cpu = format!(r#"
+            fn convert_to_cpu(
+                grid: &mut Vec<Vec<Self>>,
+                buffers: &HashMap<String, BufferGPU>,
+                rows: usize,
+                cols: usize,
+                queue: &CommandQueue,
+            ) -> Result<(), GPUError> {{
+                if rows == 0 || cols == 0 {{
+                    grid.clear();
+
+                    return Ok(());
+                }}
+
+                let mut decay: Vec<f32> = vec![0.0; rows * cols];
+
+                {}
+
+                read_and_set_buffer!(buffers, queue, "neural_refractoriness$decay", &mut decay, Float);
+
+                {}
+
+                for i in 0..rows {{
+                    for j in 0..cols {{
+                        let idx = i * cols + j;
+                        let refractoriness = &mut grid[i][j];
+
+                        refractoriness.decay = decay[idx];
+
+                        {}
+                    }}
+                }}
+
+                Ok(())
+            }}"#,
+            generate_vars_as_field_vecs(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_read_and_set(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_set(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+        );
+
+        (
+            vec![
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::create_float_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::write_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::read_and_set_buffer;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::flatten_and_retrieve_field;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::AvailableBufferType;"),
+                String::from("use spiking_neural_networks::neuron::iterate_and_spike::BufferGPU;"),
+                String::from("use spiking_neural_networks::neuron::spike_train::NeuralRefractorinessGPU;"),
+                String::from("use spiking_neural_networks::error::GPUError;"),
+                String::from("use opencl3::context::Context;"),
+                String::from("use opencl3::command_queue::CommandQueue;"),
+                String::from("use opencl3::memory::Buffer;"),
+                String::from("use opencl3::memory::CL_MEM_READ_WRITE;"),
+                String::from("use opencl3::types::cl_float;"),
+                String::from("use opencl3::types::cl_uint;"),
+                String::from("use opencl3::types::CL_BLOCKING;"),
+                String::from("use opencl3::types::CL_NON_BLOCKING;"),
+                String::from("use std::collections::HashMap;"),
+                String::from("use std::ptr;"),
+            ],
+            format!(
+                "impl NeuralRefractorinessGPU for {} {{
+                    {}
+                    {}
+                    {}
+                }}",
+                self.type_name.generate(),
+                refractoriness_function,
+                convert_to_gpu,
+                convert_to_cpu,
+            )
+        )
+    }
 
     // fn to_pyo3_code(&self) -> (Vec<String>, String) {
 
@@ -8142,6 +8396,21 @@ fn build_function(model_description: String) -> TokenStream {
                             .or_default();
     
                         neural_refractoriness_code_map.insert(neural_refractoriness_type_name, neural_refractoriness_code); 
+
+                        #[cfg(feature = "gpu")]
+                        {
+                            let (neural_refractoriness_imports, neural_refractoriness_code) = neural_refractoriness.to_gpu_code();
+
+                            for i in neural_refractoriness_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            neural_refractoriness_code_map.insert(
+                                format!("{}GPU", neural_refractoriness.type_name.generate()), neural_refractoriness_code
+                            );
+                        }
                     },
                     Rule::ion_channel_definition => {
                         let ion_channel = generate_ion_channel(pair.into_inner())
