@@ -8,7 +8,7 @@ mod test {
     neuron_builder!(
         "[neural_refractoriness]
             type: TestRefractoriness
-            effect: (v_max - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
+            effect: (v_th - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
         [end]"
     );
 
