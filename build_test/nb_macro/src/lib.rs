@@ -341,7 +341,7 @@ impl Ast {
                     Op::Subtract => format!("({} - {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Multiply => format!("({} * {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Divide => format!("({} / {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
-                    Op::Power => format!("pow({}, {}))", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
+                    Op::Power => format!("pow({}, {})", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::Equal => format!("{} == {}", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::NotEqual => format!("{} != {}", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
                     Op::GreaterThan => format!("{} > {}", lhs.generate_non_kernel_gpu(), rhs.generate_non_kernel_gpu()),
@@ -5360,7 +5360,7 @@ impl NeuralRefractorinessDefinition {
         );
 
         let effect_def = self.effect.generate()
-            .replace("self.v_max", "v_max")
+            .replace("self.v_th", "v_th")
             .replace("self.v_resting", "v_resting")
             .replace("self.time_difference", "time_difference")
             .replace("self.dt", "dt")
@@ -5390,7 +5390,7 @@ impl NeuralRefractorinessDefinition {
                     self.decay
                 }}
 
-                fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {{
+                fn get_effect(&self, timestep: usize, last_firing_time: usize, v_th: f32, v_resting: f32, dt: f32) -> f32 {{
                     let time_difference = (timestep - last_firing_time) as f32;
 
                     {}
@@ -5453,7 +5453,7 @@ impl NeuralRefractorinessDefinition {
                 context: &Context,
                 queue: &CommandQueue,
             ) -> Result<HashMap<String, BufferGPU>, GPUError> {{
-                if grid.is_empty() {{
+                if grid.is_empty() || grid.iter().all(|i| i.is_empty()) {{
                     return Ok(HashMap::new());
                 }}
 
