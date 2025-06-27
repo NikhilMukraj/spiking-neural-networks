@@ -4761,6 +4761,7 @@ impl SpikeTrainDefinition {
         )
     }
     
+    #[cfg(feature = "gpu")]
     fn to_gpu_code(&self) -> (Vec<String>, String) {
         let mut argument_names = generate_fields_as_names(&self.vars);
 
@@ -5408,6 +5409,7 @@ impl NeuralRefractorinessDefinition {
         )
     }
 
+    #[cfg(feature = "gpu")]
     fn to_gpu_code(&self) -> (Vec<String>, String) {
         let refractoriness_function = format!(
             r#"fn get_refractoriness_gpu_function() -> Result<(Vec<(String, Option<AvailableBufferType>)>, String), GPUError> {{
@@ -5548,9 +5550,68 @@ impl NeuralRefractorinessDefinition {
         )
     }
 
-    // fn to_pyo3_code(&self) -> (Vec<String>, String) {
+    #[cfg(feature = "py")]
+    fn to_pyo3_code(&self) -> (Vec<String>, String) {
+        let struct_def = format!(
+            "#[pyclass]
+            #[pyo3(name = \"{}\")]
+            #[derive(Clone, Copy)]
+            pub struct Py{} {{
+                neural_refractoriness: {}
+            }}",
+            self.type_name.generate(),
+            self.type_name.generate(),
+            self.type_name.generate(),
+        );
 
-    // }
+        let py_impl = format!(
+            "#[pymethods]
+            impl Py{} {{
+                #[new]
+                #[pyo3(signature = (decay=10000., {}))]
+                fn new(decay: f32, {}) -> Self {{
+                    Py{} {{
+                        neural_refractoriness: {} {{
+                            decay,
+                            {}
+                        }}
+                    }}
+                }}
+
+                #[getter]
+                fn get_decay(&self) -> f32 {{
+                    self.neural_refractoriness.decay
+                }}
+
+                #[setter]
+                fn set_decay(&mut self, new_param: f32) {{
+                    self.neural_refractoriness.decay = new_param;
+                }}
+
+                {}
+
+                fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.neural_refractoriness)) }}
+
+                fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {{
+                    self.neural_refractoriness.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
+                }}
+            }}",
+            self.type_name.generate(),
+            generate_fields_as_fn_new_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            generate_fields_as_immutable_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            self.type_name.generate(),
+            self.type_name.generate(),
+            generate_fields_as_names(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
+            generate_vars_as_getter_setters("neural_refractoriness", self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+        );
+
+        (
+            vec![
+                String::from("use pyo3::prelude::*;"), 
+            ],
+            format!("{}\n{}", struct_def, py_impl)
+        )
+    }
 }
 
 struct NeurotransmitterKineticsDefinition {
@@ -8409,6 +8470,21 @@ fn build_function(model_description: String) -> TokenStream {
     
                             neural_refractoriness_code_map.insert(
                                 format!("{}GPU", neural_refractoriness.type_name.generate()), neural_refractoriness_code
+                            );
+                        }
+
+                        #[cfg(feature = "py")]
+                        {
+                            let (neural_refractoriness_imports, neural_refractoriness_code) = neural_refractoriness.to_pyo3_code();
+
+                            for i in neural_refractoriness_imports {
+                                if !imports.contains(&i) {
+                                    imports.push(i);
+                                }
+                            }
+    
+                            neural_refractoriness_code_map.insert(
+                                format!("{}PY", neural_refractoriness.type_name.generate()), neural_refractoriness_code
                             );
                         }
                     },
