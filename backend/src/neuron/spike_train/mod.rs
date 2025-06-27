@@ -1032,6 +1032,7 @@ impl<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractorine
     impl_default_spike_train_methods!();
 }
 
+#[cfg(feature = "gpu")]
 impl<N: NeurotransmitterTypeGPU, T: NeurotransmitterKineticsGPU, U: NeuralRefractorinessGPU> SpikeTrainGPU for RateSpikeTrain<N, T, U> {
     fn spike_train_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {
         let kernel_name = String::from("rate_spike_train_electrical_kernel");
