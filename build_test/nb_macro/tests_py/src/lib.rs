@@ -4,7 +4,7 @@ use spiking_neural_networks::{
         SpikeTrainLattice, SpikeTrainLatticeHistory, SpikeTrainGridHistory,
         RunSpikeTrainLattice, SpikeTrainGrid, LatticeNetwork, RunNetwork,
         plasticity::STDP,
-        spike_train::{SpikeTrain, NeuralRefractoriness, PoissonNeuron, DeltaDiracRefractoriness},
+        spike_train::{SpikeTrain, PoissonNeuron, DeltaDiracRefractoriness},
     }, 
     graph::{Graph, AdjacencyMatrix, GraphPosition},
     error::LatticeNetworkError,
@@ -100,6 +100,11 @@ neuron_builder!(r#"
     on_iteration:
         l.update_current(v)
         dv/dt = l.current + i
+[end]
+
+[neural_refractoriness]
+    type: TestDeltaDiracRefractoriness
+    effect: (v_th - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
 [end]
 "#);
 
@@ -455,6 +460,7 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyBasicIntegrateAndFireLattice>()?;
     m.add_class::<PyGraphPosition>()?;
     m.add_class::<PyDeltaDiracRefractoriness>()?;
+    m.add_class::<PyTestDeltaDiracRefractoriness>()?;
     m.add_class::<PyPoissonNeuron>()?;
     m.add_class::<PyPoissonLattice>()?;
     m.add_class::<PyBasicIntegrateAndFireNetwork>()?;
