@@ -107,10 +107,13 @@ neuron_definition = {
 	"[end]"
 }
 
+refractoriness_definiton = { "neural_refractorienss:" ~ " "* ~ name ~ NEWLINE+ }
+
 spike_train_definition = {
     "[spike_train]" ~ NEWLINE ~ 
 	(
-		on_iteration_def | type_def | vars_with_default_def
+		on_iteration_def | type_def | vars_with_default_def | 
+		neurotransmitter_def | single_kinetics_def | refractoriness_definiton
 	){3,} ~ 
 	"[end]"
 }
