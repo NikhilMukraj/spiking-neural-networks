@@ -4613,6 +4613,24 @@ fn generate_ion_channel(pairs: Pairs<Rule>) -> Result<IonChannelDefinition> {
     )
 }
 
+fn parse_neurotransmitter_def(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("neurotransmitter"), 
+        Ast::TypeDefinition(
+            String::from(pair.into_inner().next().unwrap().as_str())
+        )
+    )
+}
+
+fn parse_refractoriness_def(pair: Pair<'_, Rule>) -> (String, Ast) {
+    (
+        String::from("refractoriness"), 
+        Ast::TypeDefinition(
+            String::from(pair.into_inner().next().unwrap().as_str())
+        )
+    )
+}
+
 fn generate_spike_train(pairs: Pairs<Rule>) -> Result<SpikeTrainDefinition> {
     let mut definitions: HashMap<String, Ast> = HashMap::new();
 
@@ -4627,6 +4645,15 @@ fn generate_spike_train(pairs: Pairs<Rule>) -> Result<SpikeTrainDefinition> {
             Rule::vars_with_default_def => {
                 parse_vars_with_default(pair)
             },
+            Rule::neurotransmitter_def => {
+                parse_neurotransmitter_def(pair)
+            },
+            Rule::single_kinetics_def => {
+                parse_single_kinetics_definition(pair)
+            },
+            Rule::refractoriness_definiton => {
+                parse_refractoriness_def(pair)
+            }
             definition => unreachable!("Unexpected definiton: {:#?}", definition)
         };
 
@@ -4653,11 +4680,18 @@ fn generate_spike_train(pairs: Pairs<Rule>) -> Result<SpikeTrainDefinition> {
         Error::new(ErrorKind::InvalidInput, "On iteration definition expected")
     })?;
 
+    let neurotransmitter = definitions.remove("neurotransmitter");
+    let kinetics = definitions.remove("single_kinetics");
+    let refractoriness = definitions.remove("refractoriness");
+
     Ok(
         SpikeTrainDefinition {
             type_name,
             vars,
             on_iteration,
+            neurotransmitter,
+            kinetics,
+            refractoriness
         }
     )
 }
@@ -4666,6 +4700,9 @@ struct SpikeTrainDefinition {
     type_name: Ast,
     vars: Ast,
     on_iteration: Ast,
+    neurotransmitter: Option<Ast>,
+    kinetics: Option<Ast>,
+    refractoriness: Option<Ast>,
 }
 
 impl SpikeTrainDefinition {
@@ -4736,6 +4773,18 @@ impl SpikeTrainDefinition {
             generate_on_iteration(&self.on_iteration),
         );
 
+        let default_impl_impl = format!(
+            "impl {}<{}, {}, {}> {{
+                fn default_impl() -> Self {{
+                    Self::default()
+                }}
+            }}",
+            self.type_name.generate(),
+            self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
+            self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),
+            self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+        );
+
         (
             vec![
                 String::from("use spiking_neural_networks::neuron::iterate_and_spike_traits::SpikeTrainBase;"),
@@ -4753,9 +4802,10 @@ impl SpikeTrainDefinition {
                 String::from("use spiking_neural_networks::neuron::spike_train::SpikeTrain;"),
             ],
             format!(
-                "{}\n{}\n{}",
+                "{}\n{}\n{}\n{}",
                 struct_def,
                 default_impl,
+                default_impl_impl,
                 spike_train_impl,
             )
         )
