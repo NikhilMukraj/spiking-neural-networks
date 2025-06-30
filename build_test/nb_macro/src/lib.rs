@@ -5217,7 +5217,19 @@ impl SpikeTrainDefinition {
     }
 
     // fn to_pyo3_code(&self) -> (Vec<String>, String) {
-
+        // let struct_def = format!(
+        //     "#[pyclass]
+        //     #[pyo3(name = \"{}\")]
+        //     pub struct Py{} {{
+        //         model: {}<{}, {}, {}>
+        //     }}",
+        //     self.type_name.generate(),
+        //     self.type_name.generate(),
+        //     self.type_name.generate(),
+        //     self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
+        //     self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),
+        //     self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+        // )
     // }
 }
 
