@@ -5229,6 +5229,27 @@ impl SpikeTrainDefinition {
         //     self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
         //     self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),
         //     self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+        // );
+
+        // let py_impl = format!(
+        //     "[pymethod]
+        //     impl Py{} {{
+        //         {}
+
+        //         fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.model)) }}
+
+        //         fn iterate(&mut self) -> bool {{
+        //             model.iterate()
+        //         }}
+
+        //         fn get_neural_refractoriness(&self) -> Py{} {{
+        //             Py{} {{ neural_refractoriness: model.neural_refractoriness.clone() }}
+        //         }}
+
+        //         fn get_neural_refractoriness(&mut self, neural_refractoriness: Py{}) {{
+        //             model.neural_refractoriness = neural_refractoriness.neural_refractoriness;
+        //         }}
+        //     }}" // get synaptic neurotransmitters
         // )
     // }
 }
