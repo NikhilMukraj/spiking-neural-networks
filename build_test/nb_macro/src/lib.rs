@@ -2028,6 +2028,42 @@ fn generate_receptor_vars_as_getter_setters(type_name: &str, vars: &Ast) -> Vec<
     }
 }
 
+// #[cfg(feature = "gpu")]
+// fn generate_gpu_kernel_debug(vars: &Ast) -> String {
+//     let flags = match vars {
+//         Ast::VariablesAssignments(variables) => {
+//             variables.iter()
+//                 .map(|i|
+//                     match i {
+//                         Ast::VariableAssignment { value, .. } => match value {
+//                             NumOrBool::Bool(_) => "%d",
+//                             NumOrBool::Number(_) => "%f",
+//                         },
+//                         _ => unreachable!(),
+//                     }
+//                 )
+//                 .collect::<Vec<_>>()
+//         },
+//         _ => unreachable!(),
+//     }.join(" | ");
+
+//     let values = match vars {
+//         Ast::VariablesAssignments(variables) => {
+//             variables.iter()
+//                 .map(|i|
+//                     match i {
+//                         Ast::VariableAssignment { name, .. } => format!("{}[index]", name),
+//                         _ => unreachable!(),
+//                     }
+//                 )
+//                 .collect::<Vec<_>>()
+//         },
+//         _ => unreachable!(),
+//     }.join(", ");
+
+//     format!("printf(\"%d | {}\n\", {});", flags, values)
+// }
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
@@ -5218,40 +5254,101 @@ impl SpikeTrainDefinition {
 
     // #[cfg(feature = "py")]
     // fn to_pyo3_code(&self) -> (Vec<String>, String) {
-        // let struct_def = format!(
-        //     "#[pyclass]
-        //     #[pyo3(name = \"{}\")]
-        //     pub struct Py{} {{
-        //         model: {}<{}, {}, {}>
-        //     }}",
-        //     self.type_name.generate(),
-        //     self.type_name.generate(),
-        //     self.type_name.generate(),
-        //     self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
-        //     self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),
-        //     self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
-        // );
+    //     let struct_def = format!(
+    //         "#[pyclass]
+    //         #[pyo3(name = \"{}\")]
+    //         pub struct Py{} {{
+    //             model: {}<{}, {}, {}>
+    //         }}",
+    //         self.type_name.generate(),
+    //         self.type_name.generate(),
+    //         self.type_name.generate(),
+    //         self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
+    //         self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),
+    //         self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+    //     );
 
-        // let py_impl = format!(
-        //     "[pymethod]
-        //     impl Py{} {{
-        //         {}
+    //     let neurotransmitters_getter_and_setter = format!(
+    //         "fn get_synaptic_neurotransmitters<'py>(&self, py: Python<'py>) -> PyResult<&'py PyDict> {{
+    //             let dict = PyDict::new(py);
+    //             for (key, value) in self.model.synaptic_neurotransmitters.iter() {{
+    //                 let key_py = Py::new(py, key.convert_type_to_py())?;
+    //                 let val_py = Py::new(py, Py{} {{
+    //                     neurotransmitter: value.clone(),
+    //                 }})?;
+    //                 dict.set_item(key_py, val_py)?;
+    //             }}
 
-        //         fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.model)) }}
+    //             Ok(dict)
+    //         }}
 
-        //         fn iterate(&mut self) -> bool {{
-        //             model.iterate()
-        //         }}
+    //         fn set_synaptic_neurotransmitters(&mut self, neurotransmitters: &PyDict) -> PyResult<()> {{
+    //             let current_copy = self.model.synaptic_neurotransmitters.clone();
+    //             let keys: Vec<_> = self.model.synaptic_neurotransmitters.keys().cloned().collect();
+    //             for key in keys.iter() {{
+    //                 self.model.synaptic_neurotransmitters.remove(key).unwrap();
+    //             }}
 
-        //         fn get_neural_refractoriness(&self) -> Py{} {{
-        //             Py{} {{ neural_refractoriness: model.neural_refractoriness.clone() }}
-        //         }}
+    //             for (key, value) in neurotransmitters.iter() {{
+    //                 let current_type = {}::convert_from_py(key);
+    //                 if current_type.is_none() {{
+    //                     self.model.synaptic_neurotransmitters = current_copy;
+    //                     return Err(PyTypeError::new_err(\"Incorrect neurotransmitter type\"));
+    //                 }}
+    //                 let current_neurotransmitter = value.extract::<Py{}>();
+    //                 if current_neurotransmitter.is_err() {{
+    //                     self.model.synaptic_neurotransmitters = current_copy;
+    //                     return Err(PyTypeError::new_err(\"Incorrect neurotransmitter kinetics type\"));
+    //                 }}
+    //                 self.model.synaptic_neurotransmitters.insert(
+    //                     current_type.unwrap(), 
+    //                     current_neurotransmitter.unwrap().neurotransmitter.clone(),
+    //                 );
+    //             }}
 
-        //         fn get_neural_refractoriness(&mut self, neural_refractoriness: Py{}) {{
-        //             model.neural_refractoriness = neural_refractoriness.neural_refractoriness;
-        //         }}
-        //     }}" // get synaptic neurotransmitters
-        // )
+    //             Ok(())
+    //         }}",
+    //         self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),,
+    //         self.neurotransmitter.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::IonotropicNeurotransmitterType"))).generate(),
+    //         self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::iterate_and_spike::ApproximateNeurotransmitter"))).generate(),,
+    //     );
+
+    //     let py_impl = format!(
+    //         "[pymethod]
+    //         impl Py{} {{
+    //             {}
+
+    //             fn __repr__(&self) -> PyResult<String> {{ Ok(format!(\"{{:#?}}\", self.model)) }}
+
+    //             fn iterate(&mut self) -> bool {{
+    //                 model.iterate()
+    //             }}
+
+    //             fn get_neural_refractoriness(&self) -> Py{} {{
+    //                 Py{} {{ neural_refractoriness: model.neural_refractoriness.clone() }}
+    //             }}
+
+    //             fn get_neural_refractoriness(&mut self, neural_refractoriness: Py{}) {{
+    //                 model.neural_refractoriness = neural_refractoriness.neural_refractoriness;
+    //             }}
+
+    //             {}
+    //         }}",
+    //         self.type_name.generate(),
+    //         generate_py_getter_and_setters("model", &self.vars).join("\n"),
+    //         self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+    //         self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+    //         self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("spiking_neural_networks::neuron::spike_train::DeltaDiracRefractoriness"))).generate(),
+    //         neurotransmitters_getter_and_setter,
+    //     );
+
+    //     (
+    //         vec![
+    //             String::from("use pyo3::prelude::*;"),
+    //             String::from("use pyo3::types::PyDict;"),
+    //         ],
+    //         format!("{}\n{}", struct_def, py_impl)
+    //     )
     // }
 }
 
