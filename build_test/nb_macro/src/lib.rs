@@ -5216,6 +5216,7 @@ impl SpikeTrainDefinition {
         )
     }
 
+    // #[cfg(feature = "py")]
     // fn to_pyo3_code(&self) -> (Vec<String>, String) {
         // let struct_def = format!(
         //     "#[pyclass]
