@@ -4,7 +4,7 @@ use spiking_neural_networks::{
         SpikeTrainLattice, SpikeTrainLatticeHistory, SpikeTrainGridHistory,
         RunSpikeTrainLattice, SpikeTrainGrid, LatticeNetwork, RunNetwork,
         plasticity::STDP,
-        spike_train::{SpikeTrain, PoissonNeuron, DeltaDiracRefractoriness},
+        spike_train::{PoissonNeuron, DeltaDiracRefractoriness},
     }, 
     graph::{Graph, AdjacencyMatrix, GraphPosition},
     error::LatticeNetworkError,
@@ -105,6 +105,23 @@ neuron_builder!(r#"
 [neural_refractoriness]
     type: TestDeltaDiracRefractoriness
     effect: (v_th - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
+[end]
+
+[spike_train]
+    type: RateSpikeTrain
+    vars: step = 0., rate = 0.
+    kinetics: BoundedNeurotransmitterKinetics
+    neurotransmitter: TestReceptorsNeurotransmitterType
+    on_iteration:
+        step += dt
+        [if] rate != 0. && step >= rate [then]
+            step = 0
+            current_voltage = v_th
+            is_spiking = true
+        [else]
+            current_voltage = v_resting
+            is_spiking = false
+        [end]
 [end]
 "#);
 
@@ -237,7 +254,7 @@ impl PyGraphPosition {
 #[pyo3(name = "DeltaDiracRefractoriness")]
 #[derive(Clone)]
 pub struct PyDeltaDiracRefractoriness {
-    refractoriness: DeltaDiracRefractoriness,
+    neural_refractoriness: DeltaDiracRefractoriness,
 }
 
 #[pymethods]
@@ -245,22 +262,22 @@ impl PyDeltaDiracRefractoriness {
     #[new]
     fn new(k: f32) -> Self {
         PyDeltaDiracRefractoriness {
-            refractoriness: DeltaDiracRefractoriness { k }
+            neural_refractoriness: DeltaDiracRefractoriness { k }
         }
     }
 
     #[getter]
     fn get_k(&self) -> f32 {
-        self.refractoriness.k
+        self.neural_refractoriness.k
     }
 
     #[setter]
     fn set_k(&mut self, new_param: f32) {
-        self.refractoriness.k = new_param;
+        self.neural_refractoriness.k = new_param;
     }
 
     fn get_effect(&self, timestep: usize, last_firing_time: usize, v_max: f32, v_resting: f32, dt: f32) -> f32 {
-        self.refractoriness.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
+        self.neural_refractoriness.get_effect(timestep, last_firing_time, v_max, v_resting, dt)
     }
 }
 
@@ -357,11 +374,11 @@ impl PyPoissonNeuron {
     }
 
     fn get_refractoriness(&self) -> PyDeltaDiracRefractoriness {
-        PyDeltaDiracRefractoriness { refractoriness: self.model.neural_refractoriness }
+        PyDeltaDiracRefractoriness { neural_refractoriness: self.model.neural_refractoriness }
     }
 
-    fn set_refractoriness(&mut self, refractoriness: PyDeltaDiracRefractoriness) {
-        self.model.neural_refractoriness = refractoriness.refractoriness;
+    fn set_refractoriness(&mut self, neural_refractoriness: PyDeltaDiracRefractoriness) {
+        self.model.neural_refractoriness = neural_refractoriness.neural_refractoriness;
     }
 
     fn get_synaptic_neurotransmitters<'py>(&self, py: Python<'py>) -> PyResult<&'py PyDict> {
@@ -461,6 +478,7 @@ fn tests_py(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<PyGraphPosition>()?;
     m.add_class::<PyDeltaDiracRefractoriness>()?;
     m.add_class::<PyTestDeltaDiracRefractoriness>()?;
+    m.add_class::<PyRateSpikeTrain>()?;
     m.add_class::<PyPoissonNeuron>()?;
     m.add_class::<PyPoissonLattice>()?;
     m.add_class::<PyBasicIntegrateAndFireNetwork>()?;
