@@ -5321,6 +5321,14 @@ impl SpikeTrainDefinition {
             (String::from("is_spiking"), String::from("bool")),
         ];
 
+        let default_values = vec![
+            (String::from("dt"), String::from("0.1")), 
+            (String::from("v_resting"), String::from("0.0")), 
+            (String::from("v_th"), String::from("30.0")), 
+            (String::from("current_voltage"), String::from("0.0")),
+            (String::from("is_spiking"), String::from("false")),
+        ];
+
         let mandatory_getter_setters = mandatory_vars.iter()
             .map(|(i, j)| generate_py_getter_and_setters("model", i, j))
             .collect::<Vec<_>>();
@@ -5328,6 +5336,26 @@ impl SpikeTrainDefinition {
         let py_impl = format!(
             "#[pymethods]
             impl Py{} {{
+                #[new]
+                #[pyo3(signature = ({}, {}, neural_refractoriness=Py{} {{ neural_refractoriness: {}::default() }}, synaptic_neurotransmitters=None))]
+                fn new({}, {}, neural_refractoriness: Py{}, synaptic_neurotransmitters: Option<&PyDict>) -> PyResult<Self> {{
+                    let mut spike_train = Self {{
+                        model: {} {{
+                            {},
+                            {},
+                            ..Default::default()
+                        }}
+                    }};
+
+                    spike_train.model.neural_refractoriness = neural_refractoriness.neural_refractoriness.clone();
+
+                    if let Some(dict) = synaptic_neurotransmitters {{
+                        spike_train.set_synaptic_neurotransmitters(dict)?;
+                    }};
+
+                    Ok(spike_train)
+                }}
+
                 {}
 
                 {}
@@ -5349,6 +5377,16 @@ impl SpikeTrainDefinition {
                 {}
             }}",
             self.type_name.generate(),
+            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            default_values.iter().map(|(i, j)| format!("{}={}", i, j)).collect::<Vec<_>>().join(", "),
+            self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("DeltaDiracRefractoriness"))).generate(),
+            self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("DeltaDiracRefractoriness"))).generate(),
+            generate_fields_as_immutable_args(&self.vars).join(", "),
+            mandatory_vars.iter().map(|(i, j)| format!("{}: {}", i, j)).collect::<Vec<_>>().join(", "),
+            self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("DeltaDiracRefractoriness"))).generate(),
+            self.type_name.generate(),
+            generate_fields_as_names(&self.vars).join(",\n"),
+            mandatory_vars.iter().map(|(i, _)| i.clone()).collect::<Vec<_>>().join(",\n"),
             generate_vars_as_getter_setters("model", &self.vars).join("\n"),
             mandatory_getter_setters.join("\n"),
             self.refractoriness.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("DeltaDiracRefractoriness"))).generate(),
