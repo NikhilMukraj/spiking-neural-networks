@@ -21,4 +21,6 @@ mod tests {
 
         assert_eq!(lif.dt, 100.);
     }
+
+    // test if gpu kernel and conversion works as expected
 }
