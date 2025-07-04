@@ -2135,6 +2135,8 @@ impl NeuronDefinition {
 
         let mut defaults = generate_defaults(&self.vars);
 
+        let names = generate_fields_as_names(&self.vars);
+
         let current_voltage_field = String::from("pub current_voltage: f32");
         let dt_field = String::from("pub dt: f32");
         let c_m_field = String::from("pub c_m: f32");
@@ -2144,10 +2146,18 @@ impl NeuronDefinition {
         let neurotransmitter_field = format!("pub synaptic_neurotransmitters: Neurotransmitters<{}, T>", neurotransmitter_kind);
         let receptors_field = format!("pub receptors: {}<R>", receptors_name);
 
-        fields.insert(0, current_voltage_field);
-        fields.push(gap_conductance_field);
-        fields.push(dt_field);
-        fields.push(c_m_field);
+        if !names.contains(&String::from("current_voltage")) {
+            fields.insert(0, current_voltage_field);
+        }
+        if !names.contains(&String::from("gap_conductance")) {
+            fields.push(gap_conductance_field);
+        }
+        if !names.contains(&String::from("dt")) {
+            fields.push(dt_field);
+        }
+        if !names.contains(&String::from("c_m")) {
+            fields.push(c_m_field);
+        }
 
         let ion_channels = match &self.ion_channels {
             Some(Ast::StructAssignments(variables)) => {
@@ -2169,17 +2179,27 @@ impl NeuronDefinition {
         ion_channels.iter()
             .for_each(|i| fields.push(i.clone()));
 
-        fields.push(is_spiking_field);
+        if !names.contains(&String::from("is_spiking")) {
+            fields.push(is_spiking_field);
+        }
         fields.push(last_firing_time_field);
         fields.push(neurotransmitter_field);
         fields.push(receptors_field);
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
-        defaults.push(String::from("current_voltage: 0."));
-        defaults.push(String::from("dt: 0.1"));
-        defaults.push(String::from("c_m: 1."));
-        defaults.push(String::from("gap_conductance: 10."));
+        if !names.contains(&String::from("current_voltage")) {
+            defaults.push(String::from("current_voltage: 0."));
+        }
+        if !names.contains(&String::from("dt")) {
+            defaults.push(String::from("dt: 0.1"));
+        }
+        if !names.contains(&String::from("c_m")) {
+            defaults.push(String::from("c_m: 1."));
+        }
+        if !names.contains(&String::from("gap_conductance")) {
+            defaults.push(String::from("gap_conductance: 10."));
+        }
 
         let default_ion_channels = match &self.ion_channels {
             Some(Ast::StructAssignments(variables)) => {
@@ -2199,7 +2219,9 @@ impl NeuronDefinition {
         };
 
         defaults.extend(default_ion_channels);
-        defaults.push(String::from("is_spiking: false"));
+        if !names.contains(&String::from("is_spiking")) {
+            defaults.push(String::from("is_spiking: false"));
+        }
         defaults.push(String::from("last_firing_time: None"));
         defaults.push(format!("synaptic_neurotransmitters: Neurotransmitters::<{}, T>::default()", neurotransmitter_kind));
         defaults.push(format!("receptors: {}::<R>::default()", receptors_name));
@@ -2368,6 +2390,9 @@ impl NeuronDefinition {
 
         let iterate_and_spike_electrical_kernel_header = "fn iterate_and_spike_electrical_kernel(context: &Context) -> Result<KernelFunction, GPUError> {";
         let kernel_name = "let kernel_name = String::from(\"iterate_and_spike\");"; 
+
+        let names = generate_fields_as_names(&self.vars);
+        
         let mandatory_variables = [
             ("current_voltage", "float"), 
             ("dt", "float"), 
@@ -2375,6 +2400,10 @@ impl NeuronDefinition {
             ("gap_conductance", "float"), 
             ("c_m", "float"),
         ];
+
+        let mandatory_variables: Vec<_> = mandatory_variables.iter()
+            .filter(|i| !names.contains(&i.0.to_string()))
+            .collect();
         
         let iterate_and_spike_kernel_footer = "
             let iterate_and_spike_program = match Program::create_and_build_from_source(context, &program_source, \"\") {
