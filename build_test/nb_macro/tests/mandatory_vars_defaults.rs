@@ -13,6 +13,13 @@ mod tests {
             on_iteration:
                 dv/dt = (v - e) + i
         [end]
+
+        [ion_channel]
+            type: TestLeak
+            vars: e = 0, g = 1, current = 10
+            on_iteration:
+                current = g * (v - e)
+        [end]
     "#);
 
     #[test]
@@ -20,6 +27,13 @@ mod tests {
         let lif = BasicIntegrateAndFire::default_impl();
 
         assert_eq!(lif.dt, 100.);
+    }
+
+    #[test]
+    fn test_custom_current() {
+        let ion_channel = TestLeak::default();
+
+        assert_eq!(ion_channel.current, 10.);
     }
 
     // test if gpu kernel and conversion works as expected
