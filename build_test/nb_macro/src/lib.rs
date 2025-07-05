@@ -3426,6 +3426,8 @@ impl NeuronDefinition {
             receptor_kinetics,
         );
 
+        let names = generate_fields_as_names(&self.vars);
+
         // iterate to generate getter and setters
         let mandatory_vars = [
             ("dt", "f32"), 
@@ -3435,10 +3437,18 @@ impl NeuronDefinition {
             ("is_spiking", "bool"),
         ];
 
+        let mandatory_vars: Vec<_> = mandatory_vars.iter()
+            .filter(|i| !names.contains(&i.0.to_string()))
+            .collect();
+
         let defaults = vec![
             String::from("dt=0.1"), String::from("current_voltage=0."), String::from("c_m=1."), 
             String::from("gap_conductance=10."), String::from("is_spiking=false"),
         ];
+
+        let defaults = defaults.into_iter()
+            .filter(|i| !names.contains(&(i.split("=").collect::<Vec<_>>()[0].to_string())))
+            .collect::<Vec<_>>();
 
         let receptors_name = self.receptors.as_ref()
             .unwrap_or(&Ast::TypeDefinition(String::from("DefaultReceptors")))
@@ -4009,8 +4019,12 @@ impl IonChannelDefinition {
             fields.push(i)
         }
 
-        let current_field = String::from("pub current: f32");
-        fields.push(current_field);
+        let names = generate_fields_as_names(&self.vars);
+
+        if !names.contains(&String::from("current")) {
+            let current_field = String::from("pub current: f32");
+            fields.push(current_field);
+        }
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
@@ -4068,7 +4082,9 @@ impl IonChannelDefinition {
 
         let mut defaults = generate_defaults(&self.vars);
 
-        defaults.push(String::from("current: 0."));
+        if !names.contains(&String::from("current")) {
+            defaults.push(String::from("current: 0."));
+        }
 
         let gating_defaults = match &self.gating_vars {
             Some(Ast::GatingVariables(variables)) => {
@@ -4123,6 +4139,24 @@ impl IonChannelDefinition {
             self.gating_vars.as_ref().unwrap_or(&Ast::GatingVariables(vec![]))
         );
 
+        let current_vars = match self.vars.clone() {
+            Ast::VariablesAssignments(variables) => {
+                Ast::VariablesAssignments(
+                    variables.into_iter()
+                        .filter(|i| {
+                            let var_name = match i {
+                                Ast::VariableAssignment { name, .. } => name,
+                                _ => unreachable!(),
+                            };
+
+                            var_name.as_str() != "current" 
+                        })
+                        .collect::<Vec<_>>()
+                )
+            },
+            _ => unreachable!()
+        };
+
         let get_all_attrs_as_vec = format!(
             "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {{
                 vec![(String::from(\"ion_channel$current\"), AvailableBufferType::Float), {} {}]
@@ -4168,7 +4202,7 @@ impl IonChannelDefinition {
         let set_attribute_body = format!(
             "match attribute {{ {},\n{},{}\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
             set_current_attribute,
-            generate_gpu_ion_channel_attribute_setting(&self.vars).join(",\n"),
+            generate_gpu_ion_channel_attribute_setting(&current_vars).join(",\n"),
             if !set_gating_vars.is_empty() {
                 format!("{},\n", set_gating_vars.join(",\n"))
             } else {
@@ -4236,9 +4270,9 @@ impl IonChannelDefinition {
 
                 Ok(())
             }}",
-            generate_vars_as_field_vecs(&self.vars).join("\n"),
-            generate_vars_as_read_and_set_ion_channel(&self.vars).join("\n"),
-            generate_vars_as_ion_channel_field_setters(&self.vars).join("\n"),
+            generate_vars_as_field_vecs(&current_vars).join("\n"),
+            generate_vars_as_read_and_set_ion_channel(&current_vars).join("\n"),
+            generate_vars_as_ion_channel_field_setters(&current_vars).join("\n"),
             gating_vars_conversion_to_cpu,
         );
 
@@ -4317,14 +4351,14 @@ impl IonChannelDefinition {
                 } else {
                     "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
                 },
-                generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
+                generate_gpu_ion_channel_attributes_vec_no_types(&current_vars).join(", "),
                 self.type_name.generate(),
                 if self.get_use_timestep() {
                     "float current_voltage,\nfloat dt,\n__global float *current"
                 } else {
                     "float current_voltage,\n__global float *current"
                 },
-                generate_kernel_args(&self.vars).join(",\n"),
+                generate_kernel_args(&current_vars).join(",\n"),
                 generate_gpu_kernel_on_iteration(&self.on_iteration),
                 if self.get_use_timestep() {
                     ".replace(\"current_voltage[index]\", \"current_voltage\").replace(\"dt[index]\", \"dt\")"
@@ -4377,7 +4411,7 @@ impl IonChannelDefinition {
                         update_function,
                     )
                 }}",
-                generate_kernel_args(&self.vars).iter()
+                generate_kernel_args(&current_vars).iter()
                     .map(|i| format!("String::from(\"{}\")", i)).collect::<Vec<_>>().join(",\n"),
                 generate_gating_vars_kernel_args(self.gating_vars.as_ref().unwrap()).join(",\n"),
                 if kernel_on_iteration.contains("$update") {
@@ -4403,7 +4437,7 @@ impl IonChannelDefinition {
                 } else {
                     "String::from(\"current_voltage\"), String::from(\"ion_channel$current\")"
                 },
-                generate_gpu_ion_channel_attributes_vec_no_types(&self.vars).join(", "),
+                generate_gpu_ion_channel_attributes_vec_no_types(&current_vars).join(", "),
                 gating_vars_attrs_no_types.join(", "),
             )
         };
@@ -4562,15 +4596,29 @@ impl IonChannelDefinition {
             _ => unreachable!()
         };
 
+       let current_vars = if !generate_fields_as_names(&self.vars).contains(&String::from("current")) {
+            match self.vars.clone() {
+                Ast::VariablesAssignments(mut variables) => {
+                    variables.push(Ast::VariableAssignment {
+                        name: String::from("current"),
+                        value: NumOrBool::Number(0.),
+                    });
+                    Ast::VariablesAssignments(variables)
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            self.vars.clone()
+        };
+
         let py_impl = format!(
             "#[pymethods]
             impl Py{} {{
                 #[new]
-                #[pyo3(signature = (current=0., {}, {}))]
-                fn new(current: f32, {}, {}) -> Self {{ 
+                #[pyo3(signature = ({}, {}))]
+                fn new({}, {}) -> Self {{ 
                     Py{} {{ 
                         ion_channel: {} {{
-                            current,
                             {},
                             {}
                         }}
@@ -4580,25 +4628,23 @@ impl IonChannelDefinition {
                 {}
                 {}
                 {}
-                {}
             }}",
             self.type_name.generate(),
-            generate_fields_as_fn_new_args(&self.vars).join(", "),
+            generate_fields_as_fn_new_args(&current_vars).join(", "),
             generate_py_basic_gating_vars_as_fn_new_args(&self.gating_vars.as_ref()
                 .unwrap_or(&Ast::GatingVariables(vec![]))
             ).join(", "),
-            generate_fields_as_immutable_args(&self.vars).join(", "),
+            generate_fields_as_immutable_args(&current_vars).join(", "),
             generate_fields_as_py_basic_gating_vars_args(&self.gating_vars.as_ref()
                 .unwrap_or(&Ast::GatingVariables(vec![]))
             ).join(","),
             self.type_name.generate(),
             self.type_name.generate(),
-            generate_fields_as_names(&self.vars).join(",\n"),
+            generate_fields_as_names(&current_vars).join(",\n"),
             generate_py_basic_gating_vars_as_args_in_ion_channel(&self.gating_vars.as_ref()
                 .unwrap_or(&Ast::GatingVariables(vec![]))
             ).join(",\n"),
-            generate_vars_as_getter_setters("ion_channel", &self.vars).join("\n"),
-            generate_py_getter_and_setters("ion_channel", "current", "f32"),
+            generate_vars_as_getter_setters("ion_channel", &current_vars).join("\n"),
             gating_vars.join("\n"),
             update_current,
         );
