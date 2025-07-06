@@ -4818,6 +4818,8 @@ struct SpikeTrainDefinition {
 
 impl SpikeTrainDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
+        let mandatory_vars = ["dt", "v_resting", "v_th", "current_voltage", "is_spiking"];
+        
         let struct_def = format!("#[derive(Debug, Clone, Timestep, SpikeTrainBase)]
             pub struct {}<N: NeurotransmitterType, T: NeurotransmitterKinetics, U: NeuralRefractoriness> {{
                 {},
@@ -4831,13 +4833,20 @@ impl SpikeTrainDefinition {
                 pub neural_refractoriness: U,
             }}",
             self.type_name.generate(),
-            generate_fields(&self.vars).join(",\n"),
+            generate_fields(&self.vars).into_iter()
+                .filter(|i| !mandatory_vars.contains(&i.split(" ").collect::<Vec<_>>()[1].split(":").collect::<Vec<_>>()[0]))
+                .collect::<Vec<_>>()
+                .join(",\n"),
         );
 
-        let mut defaults = vec![
+        let defaults = vec![
             String::from("dt: 0.1"), String::from("v_resting: 0."), String::from("v_th: 30."), 
             String::from("current_voltage: 0."), String::from("is_spiking: false"), String::from("last_firing_time: None"),
         ];
+        let names = generate_fields_as_names(&self.vars);
+        let mut defaults = defaults.into_iter()
+            .filter(|i| !names.contains(&i.split(":").collect::<Vec<_>>()[0].to_string()))
+            .collect::<Vec<_>>();
         defaults.extend(generate_defaults(&self.vars));
 
         let default_impl = format!(
@@ -4933,6 +4942,9 @@ impl SpikeTrainDefinition {
             (String::from("current_voltage"), String::from("float")),
             (String::from("is_spiking"), String::from("uint")),
         ];
+        let mandatory_vars = mandatory_vars.into_iter()
+            .filter(|i| !argument_names.contains(&i.0))
+            .collect::<Vec<_>>();
 
         argument_names.extend(mandatory_vars.iter().map(|i| i.0.clone()).collect::<Vec<_>>());
         
@@ -5388,6 +5400,8 @@ impl SpikeTrainDefinition {
             self.kinetics.as_ref().unwrap_or(&Ast::TypeDefinition(String::from("ApproximateNeurotransmitter"))).generate(),
         );
 
+        let names = generate_fields_as_names(&self.vars);
+
         let mandatory_vars = vec![
             (String::from("dt"), String::from("f32")), 
             (String::from("v_resting"), String::from("f32")), 
@@ -5395,6 +5409,9 @@ impl SpikeTrainDefinition {
             (String::from("current_voltage"), String::from("f32")),
             (String::from("is_spiking"), String::from("bool")),
         ];
+        let mandatory_vars = mandatory_vars.into_iter()
+            .filter(|i| !names.contains(&i.0))
+            .collect::<Vec<_>>();
 
         let default_values = vec![
             (String::from("dt"), String::from("0.1")), 
@@ -5403,6 +5420,9 @@ impl SpikeTrainDefinition {
             (String::from("current_voltage"), String::from("0.0")),
             (String::from("is_spiking"), String::from("false")),
         ];
+        let default_values = default_values.into_iter()
+            .filter(|i| !names.contains(&i.0))
+            .collect::<Vec<_>>();
 
         let mandatory_getter_setters = mandatory_vars.iter()
             .map(|(i, j)| generate_py_getter_and_setters("model", i, j))
