@@ -36,6 +36,21 @@ mod tests {
                     is_spiking = false
                 [end]
         [end]
+
+        [neurotransmitter_kinetics]
+            type: TestKinetics
+            vars: t = 0.5, t_max = 1, c = 0.001, conc = 0
+            on_iteration:
+                [if] is_spiking [then]
+                    conc = t_max
+                [else]
+                    conc = 0
+                [end]
+
+                t = t + dt * -c * t + conc
+
+                t = min(max(t, 0), t_max)
+        [end]
     "#);
 
     #[test]
@@ -57,6 +72,13 @@ mod tests {
         let spike_train = RateSpikeTrain::default_impl();
 
         assert_eq!(spike_train.v_resting, 24.);
+    }
+
+    #[test]
+    fn test_custom_kinetics() {
+        let kinetics = TestKinetics::default();
+
+        assert_eq!(kinetics.t, 0.5);
     }
 
     // test if gpu kernel and conversion works as expected
