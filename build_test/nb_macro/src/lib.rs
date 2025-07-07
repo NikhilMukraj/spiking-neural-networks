@@ -6435,8 +6435,11 @@ impl NeurotransmitterKineticsDefinition {
         
         let mut fields = generate_fields(&self.vars);
 
-        let t_field = String::from("pub t: f32");
-        fields.push(t_field);
+        let names = generate_fields_as_names(&self.vars);
+
+        if !names.contains(&String::from("t")) {
+            fields.push(String::from("pub t: f32"));
+        }
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
@@ -6453,7 +6456,9 @@ impl NeurotransmitterKineticsDefinition {
 
         let mut defaults = generate_defaults(&self.vars);
 
-        defaults.push(String::from("t: 0."));
+        if !names.contains(&String::from("t")) {
+            defaults.push(String::from("t: 0."));
+        }
 
         let default_fields = defaults.join(",\n\t");
 
@@ -6550,7 +6555,10 @@ impl NeurotransmitterKineticsDefinition {
             "{}\n((vec![{}],\nvec![String::from(\"neurotransmitters$t\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
             mandatory_args,
-            generate_gpu_neurotransmitters_attributes_vec_no_types(&self.vars).join(","),
+            generate_gpu_neurotransmitters_attributes_vec_no_types(&self.vars).into_iter()
+                .filter(|i| i.as_str() != "t")
+                .collect::<Vec<_>>()
+                .join(","),
             kinetics_function,
         );
 
@@ -6599,14 +6607,22 @@ impl NeurotransmitterKineticsDefinition {
             self.type_name.generate(),
         );
 
-        let mandatory_vars = [("t", "f32")];
+        let current_vars = if !generate_fields_as_names(&self.vars).contains(&String::from("t")) {
+            match self.vars.clone() {
+                Ast::VariablesAssignments(mut variables) => {
+                    variables.push(Ast::VariableAssignment {
+                        name: String::from("t"),
+                        value: NumOrBool::Number(0.),
+                    });
+                    Ast::VariablesAssignments(variables)
+                }
+                _ => unreachable!(),
+            }
+        } else {
+            self.vars.clone()
+        };
 
-        let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
-            .map(|(i, j)| generate_py_getter_and_setters("neurotransmitter", i, j))
-            .collect();
-
-        let mut basic_getter_setters = generate_vars_as_getter_setters("neurotransmitter", &self.vars);  
-        basic_getter_setters.extend(mandatory_getter_and_setters);
+        let basic_getter_setters = generate_vars_as_getter_setters("neurotransmitter", &current_vars);  
 
         let apply_t_changes_func = "fn apply_t_change(&mut self, voltage: f32, is_spiking: bool, dt: f32) {
             self.neurotransmitter.apply_t_change(&NeurotransmittersIntermediate { current_voltage: voltage, is_spiking, dt });
@@ -6614,20 +6630,19 @@ impl NeurotransmitterKineticsDefinition {
 
         let constructor = format!(
             "#[new]
-            #[pyo3(signature = (t=0., {}))]
-            fn new(t: f32, {}) -> Self {{
+            #[pyo3(signature = ({}))]
+            fn new({}) -> Self {{
                 Py{} {{ 
                     neurotransmitter: {} {{
-                        t,
                         {}
                     }}
                 }}
             }}",
-            generate_fields_as_fn_new_args(&self.vars).join(", "),
-            generate_fields_as_immutable_args(&self.vars).join(", "),
+            generate_fields_as_fn_new_args(&current_vars).join(", "),
+            generate_fields_as_immutable_args(&current_vars).join(", "),
             self.type_name.generate(),
             self.type_name.generate(),
-            generate_fields_as_names(&self.vars).join(",\n"),
+            generate_fields_as_names(&current_vars).join(",\n"),
         );
 
         let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.neurotransmitter)) }"#;
