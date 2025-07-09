@@ -68,13 +68,21 @@
 - [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
 - [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
-- [ ] gpu implementations
+- [x] gpu implementations
   - [x] neurotransmitter kinetics
   - [x] receptor kinetics
   - [x] receptors
-  - [ ] ion channels
+  - [x] ion channels
   - [x] neurons
+  - [x] spike train
 - [ ] more descriptive error handling
+- [ ] custom mandatory vars
+  - [x] neuron
+  - [x] ion channel
+  - [x] spike train
+  - [ ] neural refractoriness
+  - [x] neurotransmitter kinetics
+  - [ ] receptor kinetics
 - [x] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
