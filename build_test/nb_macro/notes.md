@@ -74,11 +74,23 @@
   - [x] spike train
 - [ ] more descriptive error handling
 - [ ] custom mandatory vars
-  - [x] neuron
-  - [x] ion channel
-  - [x] spike train
+  - [ ] neuron
+    - [x] cpu
+    - [ ] gpu
+    - [ ] pyo3
+  - [ ] ion channel
+    - [x] cpu
+    - [ ] gpu
+    - [ ] pyo3
+  - [ ] spike train
+    - [x] cpu
+    - [ ] gpu
+    - [ ] pyo3
   - [ ] neural refractoriness
-  - [x] neurotransmitter kinetics
+  - [ ] neurotransmitter kinetics
+    - [x] cpu
+    - [ ] gpu
+    - [ ] pyo3
   - [ ] receptor kinetics
 - [x] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
