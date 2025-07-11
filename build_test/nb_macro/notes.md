@@ -87,11 +87,17 @@
     - [ ] gpu
     - [ ] pyo3
   - [ ] neural refractoriness
+    - [ ] cpu
+    - [ ] gpu
+    - [ ] pyo3
   - [ ] neurotransmitter kinetics
     - [x] cpu
     - [ ] gpu
     - [ ] pyo3
   - [ ] receptor kinetics
+    - [ ] cpu
+    - [ ] gpu
+    - [ ] pyo3
 - [x] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
