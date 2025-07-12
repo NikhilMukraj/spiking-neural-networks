@@ -111,3 +111,6 @@
 - [ ] maybe use qualifying instead of imports
 - [ ] mark create buffer macros as unsafe
 - [ ] plasticity impl
+  - [ ] cpu
+  - [ ] gpu
+  - [ ] pyo3
