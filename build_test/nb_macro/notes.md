@@ -108,5 +108,6 @@
 - [ ] remove all `add_indents` calls
 - [ ] change default values of default variables (dt, current_voltage, etc), make sure to update pyo3 accordingly
 - [ ] **struct var call versus struct func call in declaration**
-- [ ] maybe use qualifyign instead of imports
+- [ ] maybe use qualifying instead of imports
 - [ ] mark create buffer macros as unsafe
+- [ ] plasticity impl
