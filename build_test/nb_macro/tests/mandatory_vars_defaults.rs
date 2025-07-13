@@ -38,7 +38,7 @@ mod tests {
         [end]
 
         [neurotransmitter_kinetics]
-            type: TestKinetics
+            type: TestNeurotransmitterKinetics
             vars: t = 0.5, t_max = 1, c = 0.001, conc = 0
             on_iteration:
                 [if] is_spiking [then]
@@ -50,6 +50,13 @@ mod tests {
                 t = t + dt * -c * t + conc
 
                 t = min(max(t, 0), t_max)
+        [end]
+
+        [receptor_kinetics]
+            type: TestReceptorKinetics
+            vars: r = 0.5, r_max = 1
+            on_iteration:
+                r = min(max(t, 0), r_max)
         [end]
     "#);
 
@@ -75,10 +82,17 @@ mod tests {
     }
 
     #[test]
-    fn test_custom_kinetics() {
-        let kinetics = TestKinetics::default();
+    fn test_custom_neurotransmitter_kinetics() {
+        let kinetics = TestNeurotransmitterKinetics::default();
 
         assert_eq!(kinetics.t, 0.5);
+    }
+
+    #[test]
+    fn test_custom_receptor_kinetics() {
+        let kinetics = TestReceptorKinetics::default();
+
+        assert_eq!(kinetics.r, 0.5);
     }
 
     // test if gpu kernel and conversion works as expected
