@@ -6704,11 +6704,14 @@ impl ReceptorKineticsDefinition {
             "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{", 
             self.type_name.generate(),
         );
+
+        let names = generate_fields_as_names(&self.vars);
         
         let mut fields = generate_fields(&self.vars);
 
-        let t_field = String::from("pub r: f32");
-        fields.push(t_field);
+        if !names.contains(&String::from("r")) {
+            fields.push(String::from("pub r: f32"));
+        }
 
         let fields = format!("\t{},", fields.join(",\n\t"));
 
@@ -6724,7 +6727,9 @@ impl ReceptorKineticsDefinition {
 
         let mut defaults = generate_defaults(&self.vars);
 
-        defaults.push(String::from("r: 0."));
+        if !names.contains(&String::from("r")) {
+            defaults.push(String::from("r: 0."));
+        }
 
         let default_fields = defaults.join(",\n\t");
 
@@ -6764,9 +6769,27 @@ impl ReceptorKineticsDefinition {
 
     #[cfg(feature = "gpu")]
     fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let current_vars = match self.vars.clone() {
+            Ast::VariablesAssignments(variables) => {
+                Ast::VariablesAssignments(
+                    variables.into_iter()
+                        .filter(|i| {
+                            let var_name = match i {
+                                Ast::VariableAssignment { name, .. } => name,
+                                _ => unreachable!(),
+                            };
+
+                            var_name.as_str() != "r" 
+                        })
+                        .collect::<Vec<_>>()
+                )
+            },
+            _ => unreachable!()
+        };
+
         let kinetics_function_header = format!(
             "float get_r(float t, float dt, float r, {}) {{", 
-            generate_non_kernel_gpu_args(&self.vars).join(", "),
+            generate_non_kernel_gpu_args(&current_vars).join(", "),
         );
 
         let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
@@ -6777,7 +6800,7 @@ impl ReceptorKineticsDefinition {
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
             "match value {{ \"receptors$kinetics$r\" => Some(BufferType::Float(self.r)),\n{},\n_ => None }}", 
-            generate_gpu_receptors_attribute_matching(&self.vars, "kinetics$").join(",\n")
+            generate_gpu_receptors_attribute_matching(&current_vars, "kinetics$").join(",\n")
         );
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
@@ -6790,7 +6813,7 @@ impl ReceptorKineticsDefinition {
         let set_attribute_body = format!(
             "match attribute {{ {},\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
             set_r_attribute,
-            generate_gpu_receptors_attribute_setting(&self.vars, "kinetics$").join(",\n")
+            generate_gpu_receptors_attribute_setting(&current_vars, "kinetics$").join(",\n")
         );
 
         let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
@@ -6799,14 +6822,14 @@ impl ReceptorKineticsDefinition {
         let vector_return_function = format!(
             "{}HashSet::from([(String::from(\"receptors$kinetics$r\"), AvailableBufferType::Float), {}\n])\n}}", 
             vector_return_header,
-            generate_gpu_receptors_attributes_vec(&self.vars, "kinetics$").join(",\n"),
+            generate_gpu_receptors_attributes_vec(&current_vars, "kinetics$").join(",\n"),
         );
 
         let get_update_function_header = "fn get_update_function() -> (Vec<String>, String) {";
         let get_update_function = format!(
             "{}\n((\nvec![String::from(\"neurotransmitters$t\"), String::from(\"dt\"), String::from(\"receptors$kinetics$r\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
-            generate_gpu_receptors_attributes_vec_no_types(&self.vars, "kinetics$").join(","),
+            generate_gpu_receptors_attributes_vec_no_types(&current_vars, "kinetics$").join(","),
             kinetics_function,
         );
 
@@ -6850,13 +6873,31 @@ impl ReceptorKineticsDefinition {
             self.type_name.generate(),
         );
 
+        let current_vars = match self.vars.clone() {
+            Ast::VariablesAssignments(variables) => {
+                Ast::VariablesAssignments(
+                    variables.into_iter()
+                        .filter(|i| {
+                            let var_name = match i {
+                                Ast::VariableAssignment { name, .. } => name,
+                                _ => unreachable!(),
+                            };
+
+                            var_name.as_str() != "r" 
+                        })
+                        .collect::<Vec<_>>()
+                )
+            },
+            _ => unreachable!()
+        };
+
         let mandatory_vars = [("r", "f32")];
 
         let mandatory_getter_and_setters: Vec<String> = mandatory_vars.iter()
             .map(|(i, j)| generate_py_getter_and_setters("receptor", i, j))
             .collect();
 
-        let mut basic_getter_setters = generate_vars_as_getter_setters("receptor", &self.vars);  
+        let mut basic_getter_setters = generate_vars_as_getter_setters("receptor", &current_vars);  
         basic_getter_setters.extend(mandatory_getter_and_setters);
 
         let apply_r_changes_func = "fn apply_r_change(&mut self, t: f32, dt: f32) {
@@ -6874,11 +6915,11 @@ impl ReceptorKineticsDefinition {
                     }}
                 }}
             }}",
-            generate_fields_as_fn_new_args(&self.vars).join(", "),
-            generate_fields_as_immutable_args(&self.vars).join(", "),
+            generate_fields_as_fn_new_args(&current_vars).join(", "),
+            generate_fields_as_immutable_args(&current_vars).join(", "),
             self.type_name.generate(),
             self.type_name.generate(),
-            generate_fields_as_names(&self.vars).join(",\n"),
+            generate_fields_as_names(&current_vars).join(",\n"),
         );
 
         let repr = r#"fn __repr__(&self) -> PyResult<String> { Ok(format!("{:#?}", self.receptor)) }"#;
