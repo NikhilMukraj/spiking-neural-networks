@@ -95,7 +95,7 @@
     - [ ] gpu
     - [ ] pyo3
   - [ ] receptor kinetics
-    - [ ] cpu
+    - [x] cpu
     - [ ] gpu
     - [ ] pyo3
 - [x] gpu set attribute should not panic but return an error type
