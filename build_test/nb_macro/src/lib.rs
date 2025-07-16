@@ -5680,6 +5680,8 @@ struct NeuralRefractorinessDefinition {
 
 impl NeuralRefractorinessDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
+        // if decay not in vars add to current vars
+
         let struct_def = format!(
             "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{
                 pub decay: f32,
