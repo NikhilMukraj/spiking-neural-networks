@@ -5680,15 +5680,37 @@ struct NeuralRefractorinessDefinition {
 
 impl NeuralRefractorinessDefinition {
     fn to_code(&self) -> (Vec<String>, String) {
-        // if decay not in vars add to current vars
+        let current_vars = if self.vars.is_none() || !generate_fields_as_names(
+            self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).contains(&String::from("decay")
+        ) {
+            match self.vars.clone() {
+                Some(Ast::VariablesAssignments(mut variables)) => {
+                    variables.push(Ast::VariableAssignment {
+                        name: String::from("decay"),
+                        value: NumOrBool::Number(10000.),
+                    });
+                    Some(Ast::VariablesAssignments(variables))
+                },
+                None => Some(
+                    Ast::VariablesAssignments(vec![
+                        Ast::VariableAssignment {
+                            name: String::from("decay"),
+                            value: NumOrBool::Number(10000.),
+                        }
+                    ])
+                ),
+                _ => unreachable!(),
+            }
+        } else {
+            self.vars.clone()
+        };
 
         let struct_def = format!(
             "#[derive(Debug, Clone, Copy, PartialEq)]\npub struct {} {{
-                pub decay: f32,
                 {}
             }}",
             self.type_name.generate(),
-            generate_fields(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
+            generate_fields(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
         );
 
         let effect_def = self.effect.generate()
@@ -5702,14 +5724,13 @@ impl NeuralRefractorinessDefinition {
             "impl Default for {} {{
                 fn default() -> Self {{
                     {} {{
-                        decay: 10000.,
                         {}
                     }}
                 }}
             }}",
             self.type_name.generate(),
             self.type_name.generate(),
-            generate_fields(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
+            generate_defaults(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(",\n"),
         );
 
         let trait_impl = format!(
@@ -5742,6 +5763,27 @@ impl NeuralRefractorinessDefinition {
 
     #[cfg(feature = "gpu")]
     fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let current_vars = match self.vars.clone() {
+            Some(Ast::VariablesAssignments(variables)) => {
+                Some(
+                    Ast::VariablesAssignments(
+                        variables.into_iter()
+                            .filter(|i| {
+                                let var_name = match i {
+                                    Ast::VariableAssignment { name, .. } => name,
+                                    _ => unreachable!(),
+                                };
+
+                                var_name.as_str() != "decay" 
+                            })
+                            .collect::<Vec<_>>()
+                    )
+                )
+            },
+            None => None,
+            _ => unreachable!()
+        };
+
         let refractoriness_function = format!(
             r#"fn get_refractoriness_gpu_function() -> Result<(Vec<(String, Option<AvailableBufferType>)>, String), GPUError> {{
                 let args = vec![
@@ -5770,13 +5812,13 @@ impl NeuralRefractorinessDefinition {
                 
                 Ok((args, program_source))
             }}"#,
-            generate_neural_refractoriness_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
-            if self.vars.is_some() {
+            generate_neural_refractoriness_args(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            if current_vars.is_some() {
                 ","
             } else {
                 ""
             },
-            generate_non_kernel_gpu_args(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
+            generate_non_kernel_gpu_args(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
             self.effect.generate_non_kernel_gpu(),
         );
 
@@ -5802,8 +5844,8 @@ impl NeuralRefractorinessDefinition {
 
                 Ok(buffers)
             }}"#,
-            generate_neural_refractoriness_write_to_gpu(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
-            generate_neural_refractoriness_insert_into_buffers(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_write_to_gpu(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_insert_into_buffers(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
         );
 
         let convert_to_cpu = format!(r#"
@@ -5841,9 +5883,9 @@ impl NeuralRefractorinessDefinition {
 
                 Ok(())
             }}"#,
-            generate_vars_as_field_vecs(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
-            generate_neural_refractoriness_read_and_set(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
-            generate_neural_refractoriness_set(self.vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_vars_as_field_vecs(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_read_and_set(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
+            generate_neural_refractoriness_set(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join("\n"),
         );
 
         (
