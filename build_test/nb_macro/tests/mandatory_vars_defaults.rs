@@ -58,6 +58,12 @@ mod tests {
             on_iteration:
                 r = min(max(t, 0), r_max)
         [end]
+
+        [neural_refractoriness]
+            type: TestRefractoriness
+            vars: decay = 5000
+            effect: (v_th - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
+        [end]
     "#);
 
     #[test]
@@ -93,6 +99,13 @@ mod tests {
         let kinetics = TestReceptorKinetics::default();
 
         assert_eq!(kinetics.r, 0.5);
+    }
+
+     #[test]
+    fn test_custom_neural_refractoriness() {
+        let refractoriness = TestRefractoriness::default();
+
+        assert_eq!(refractoriness.decay, 5000.);
     }
 
     // test if gpu kernel and conversion works as expected
