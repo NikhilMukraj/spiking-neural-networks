@@ -87,7 +87,7 @@
     - [ ] gpu
     - [ ] pyo3
   - [ ] neural refractoriness
-    - [ ] cpu
+    - [x] cpu
     - [ ] gpu
     - [ ] pyo3
   - [ ] neurotransmitter kinetics
