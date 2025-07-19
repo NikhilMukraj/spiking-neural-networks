@@ -76,7 +76,7 @@
 - [ ] custom mandatory vars
   - [ ] neuron
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
   - [ ] ion channel
     - [x] cpu
