@@ -7,3 +7,4 @@
 - ring attractor + point attractor + dopamine
 - general gpu plasticity implementation
 - toleman eichenbaum machine
+- toleman eichenbaum machine + dopamine
