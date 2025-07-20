@@ -6,6 +6,7 @@
 - if that does not work try using LIF (check kernel) instead of izhikevich or rent amd or intel gpu (cudo?)
 - two compartment model with ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
+- grid attractor
 - general gpu plasticity implementation
 - toleman eichenbaum machine (electrical then chemical)
 - toleman eichenbaum machine + dopamine
