@@ -6542,9 +6542,27 @@ impl NeurotransmitterKineticsDefinition {
 
     #[cfg(feature="gpu")] 
     fn to_gpu_code(&self) -> (Vec<String>, String) {
+        let current_vars = match self.vars.clone() {
+            Ast::VariablesAssignments(variables) => {
+                Ast::VariablesAssignments(
+                    variables.into_iter()
+                        .filter(|i| {
+                            let var_name = match i {
+                                Ast::VariableAssignment { name, .. } => name,
+                                _ => unreachable!(),
+                            };
+
+                            var_name.as_str() != "t" 
+                        })
+                        .collect::<Vec<_>>()
+                )
+            },
+            _ => unreachable!()
+        };
+
         let kinetics_function_header = format!(
             "float get_t(float current_voltage, uint is_spiking, float dt, float t, {}) {{", 
-            generate_non_kernel_gpu_args(&self.vars).join(", "),
+            generate_non_kernel_gpu_args(&current_vars).join(", "),
         );
 
         let kinetics_body = generate_non_kernel_gpu_on_iteration(&self.on_iteration);
@@ -6555,7 +6573,7 @@ impl NeurotransmitterKineticsDefinition {
         let get_attribute_header = "fn get_attribute(&self, value: &str) -> Option<BufferType> {";
         let get_attribute_body = format!(
             "match value {{ \"neurotransmitters$t\" => Some(BufferType::Float(self.t)),\n{},\n_ => None }}", 
-            generate_gpu_neurotransmitters_attribute_matching(&self.vars).join(",\n")
+            generate_gpu_neurotransmitters_attribute_matching(&current_vars).join(",\n")
         );
         
         let get_function = format!("{}\n{}}}", get_attribute_header, get_attribute_body);
@@ -6568,7 +6586,7 @@ impl NeurotransmitterKineticsDefinition {
         let set_attribute_body = format!(
             "match attribute {{ {},\n{},\n_ => return Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, \"Invalid attribute\")) }};\nOk(())",
             set_t_attribute,
-            generate_gpu_neurotransmitters_attribute_setting(&self.vars).join(",\n")
+            generate_gpu_neurotransmitters_attribute_setting(&current_vars).join(",\n")
         );
 
         let set_function = format!("{}\n{}\n}}", set_attribute_header, set_attribute_body);
@@ -6577,7 +6595,7 @@ impl NeurotransmitterKineticsDefinition {
         let vector_return_function = format!(
             "{}vec![(String::from(\"neurotransmitters$t\"), AvailableBufferType::Float), {}\n]\n}}", 
             vector_return_header,
-            generate_gpu_neurotransmitters_attributes_vec(&self.vars).join(",\n"),
+            generate_gpu_neurotransmitters_attributes_vec(&current_vars).join(",\n"),
         );
 
         let attribute_names_functions = r#"
@@ -6599,7 +6617,7 @@ impl NeurotransmitterKineticsDefinition {
             "{}\n((vec![{}],\nvec![String::from(\"neurotransmitters$t\"), {}]),\nString::from(\"{}\"))\n}}",
             get_update_function_header,
             mandatory_args,
-            generate_gpu_neurotransmitters_attributes_vec_no_types(&self.vars).into_iter()
+            generate_gpu_neurotransmitters_attributes_vec_no_types(&current_vars).into_iter()
                 .filter(|i| i.as_str() != "t")
                 .collect::<Vec<_>>()
                 .join(","),
