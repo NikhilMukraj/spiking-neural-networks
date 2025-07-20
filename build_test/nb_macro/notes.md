@@ -92,11 +92,11 @@
     - [ ] pyo3
   - [ ] neurotransmitter kinetics
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
   - [ ] receptor kinetics
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
 - [x] gpu set attribute should not panic but return an error type
 - [ ] handle spiking with continous spike detection
