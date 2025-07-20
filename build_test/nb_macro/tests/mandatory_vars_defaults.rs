@@ -8,6 +8,7 @@ mod tests {
     neuron_builder!(r#"
         [neuron]
             type: BasicIntegrateAndFire
+            kinetics: TestNeurotransmitterKinetics, TestReceptorKinetics
             vars: e = 0, v_reset = -75, v_th = -55, dt = 100
             on_spike: 
                 v = v_reset
@@ -137,7 +138,7 @@ mod tests {
         Ok(buffer)
     }
 
-    type FullNeuronType = BasicIntegrateAndFire<ApproximateNeurotransmitter, ApproximateReceptor>;
+    type FullNeuronType = BasicIntegrateAndFire<TestNeurotransmitterKinetics, TestReceptorKinetics>;
     type GetGPUAttribute = dyn Fn(&HashMap<String, BufferGPU>, &CommandQueue, &mut Vec<f32>) -> Result<(), SpikingNeuralNetworksError>;
 
     fn iterate_neuron(
@@ -155,7 +156,7 @@ mod tests {
 
         neuron.synaptic_neurotransmitters.insert(
             DefaultReceptorsNeurotransmitterType::X, 
-            ApproximateNeurotransmitter::default(),
+            TestNeurotransmitterKinetics::default(),
         );
         if receptors_on {
             neuron.receptors.insert(
@@ -208,9 +209,9 @@ mod tests {
             };
 
         let iterate_kernel = if !chemical {
-            BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrical_kernel(&context)?
+            BasicIntegrateAndFire::<TestNeurotransmitterKinetics, TestReceptorKinetics>::iterate_and_spike_electrical_kernel(&context)?
         } else {
-            BasicIntegrateAndFire::<ApproximateNeurotransmitter, ApproximateReceptor>::iterate_and_spike_electrochemical_kernel(&context)?
+            BasicIntegrateAndFire::<TestNeurotransmitterKinetics, TestReceptorKinetics>::iterate_and_spike_electrochemical_kernel(&context)?
         };
 
         let gpu_cell_grid = if !chemical {
@@ -364,6 +365,27 @@ mod tests {
             &get_gpu_voltage,
             false,
             false,
+        )?;
+
+        for (i, j) in cpu_voltages.iter().zip(gpu_voltages.iter()) {
+            if !i.is_finite() || !j.is_finite() {
+                continue;
+            }
+            assert!((i - j).abs() < 2., "({} - {}).abs() < 2.", i, j);
+        }
+       
+        Ok(())
+    }
+
+     #[test]
+    fn test_single_electrochemical_neuron_voltage() -> Result<(), SpikingNeuralNetworksError> {
+        let (cpu_voltages, gpu_voltages) = iterate_neuron(
+            0.,
+            1.,
+            &get_voltage, 
+            &get_gpu_voltage,
+            true,
+            true,
         )?;
 
         for (i, j) in cpu_voltages.iter().zip(gpu_voltages.iter()) {
