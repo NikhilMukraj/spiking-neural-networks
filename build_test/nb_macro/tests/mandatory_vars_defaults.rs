@@ -397,4 +397,22 @@ mod tests {
        
         Ok(())
     }
+
+    // #[test]
+    // fn test_spike_train_lattice() -> Result<(), SpikingNeuralNetworksError> {
+    //     let spike_train = RateSpikeTrain<DefaultReceptorsNeurotransmitterType, TestNeurotransmitterKinetics, TestRefractoriness>::default();
+
+    //     let mut spike_train_lattice = SpikeTrainLattice::default();
+    //     spike_train_lattice.populate(spike_train, 1, 1)?;
+
+    //     let neuron = BasicIntegrateAndFire::default();
+
+    //     let lattice = Lattice::default();
+
+    //     let gpu_network = 
+
+    //     gpu_network.run_lattices(1)?;
+
+    //     Ok(())
+    // }
 }
