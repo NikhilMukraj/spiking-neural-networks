@@ -111,5 +111,5 @@
 - [ ] mark create buffer macros as unsafe
 - [ ] plasticity impl
   - [ ] cpu
-  - [ ] gpu
+  - [ ] gpu (needs general impl first)
   - [ ] pyo3
