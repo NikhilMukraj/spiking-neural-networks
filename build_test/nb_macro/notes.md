@@ -57,7 +57,7 @@
   - [x] vars
   - [x] default kinetics, default refractoriness
   - [x] on iteration
-- [ ] refractoriness block
+- [x] refractoriness block
 - [x] eventually remove vars declaration without vars
 - [ ] ion channel use timestep also checks each expr for a dt too
 - [ ] comments/docs in/around blocks
