@@ -9,5 +9,4 @@
 - grid attractor (+ point attractor + dopamine)
 - serotonin model or other neurotransmitter
 - general gpu plasticity implementation
-- toleman eichenbaum machine (electrical then chemical)
-- toleman eichenbaum machine + dopamine
+- toleman eichenbaum machine (electrical then chemical) (+ dopamine)
