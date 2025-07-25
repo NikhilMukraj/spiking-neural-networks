@@ -8,5 +8,5 @@
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine)
 - serotonin model or other neurotransmitter
-- general gpu plasticity implementation
+- general gpu plasticity impl and nb macro impl
 - toleman eichenbaum machine (electrical then chemical) (+ dopamine)
