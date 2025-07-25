@@ -108,7 +108,7 @@
 - [ ] remove all `add_indents` calls
 - [ ] **struct var call versus struct func call in declaration**
 - [ ] maybe use qualifying instead of imports
-- [ ] mark create buffer macros as unsafe
+- [ ] mark create and read buffer macros as unsafe
 - [ ] plasticity impl
   - [ ] cpu
   - [ ] gpu (needs general impl first)
