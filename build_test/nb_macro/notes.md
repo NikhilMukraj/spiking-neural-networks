@@ -83,11 +83,11 @@
     - [ ] pyo3
   - [ ] spike train
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
   - [ ] neural refractoriness
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
   - [ ] neurotransmitter kinetics
     - [x] cpu
