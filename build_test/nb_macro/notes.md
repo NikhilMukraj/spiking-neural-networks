@@ -18,7 +18,6 @@
 - [x] **bool vars (should be listed in same `vars:` block)**
 - [x] `+=`, `-=`, `*=`, `/=`
 - [x] read neuron model from text file
-- [ ] check syntax tree to see if imports are already imported into scope, if they are do not re-import
 - [x] remove vars without defaults, all vars should have associated defaults
 - [ ] `to_code` abstraction in generation
 - [x] kinetics
