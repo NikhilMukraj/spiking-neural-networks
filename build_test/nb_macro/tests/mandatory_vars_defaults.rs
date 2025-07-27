@@ -2,7 +2,7 @@
 mod tests {
     use nb_macro::neuron_builder;
     use opencl3::{command_queue::CL_QUEUE_PROFILING_ENABLE, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel};
-    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::iterate_and_spike::{DefaultReceptorsType, IonotropicNeurotransmitterType, XReceptor}};
+    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{gpu_lattices::LatticeNetworkGPU, iterate_and_spike::{DefaultReceptorsType, IonotropicNeurotransmitterType, XReceptor}, Lattice, LatticeNetwork, RunNetwork, SpikeTrainLattice}};
 
 
     neuron_builder!(r#"
@@ -398,21 +398,43 @@ mod tests {
         Ok(())
     }
 
-    // #[test]
-    // fn test_spike_train_lattice() -> Result<(), SpikingNeuralNetworksError> {
-    //     let spike_train = RateSpikeTrain<DefaultReceptorsNeurotransmitterType, TestNeurotransmitterKinetics, TestRefractoriness>::default();
+    #[test]
+    fn test_spike_train_lattice() -> Result<(), SpikingNeuralNetworksError> {
+        let spike_train: RateSpikeTrain<DefaultReceptorsNeurotransmitterType, TestNeurotransmitterKinetics, TestRefractoriness> = RateSpikeTrain::default();
 
-    //     let mut spike_train_lattice = SpikeTrainLattice::default();
-    //     spike_train_lattice.populate(spike_train, 1, 1)?;
+        let mut spike_train_lattice = SpikeTrainLattice::default_impl();
+        spike_train_lattice.populate(&spike_train, 1, 1)?;
+        spike_train_lattice.update_grid_history = true;
 
-    //     let neuron = BasicIntegrateAndFire::default();
+        let base_neuron = BasicIntegrateAndFire::default_impl();
 
-    //     let lattice = Lattice::default();
+        let mut lattice = Lattice::default_impl();
+        lattice.set_id(1);
+        lattice.populate(&base_neuron, 1, 1)?;
+        lattice.update_grid_history = true;
 
-    //     let gpu_network = 
+        let lattices = vec![lattice];
+        let spike_train_lattices = vec![spike_train_lattice];
 
-    //     gpu_network.run_lattices(1)?;
+        let mut network = LatticeNetwork::generate_network(lattices, spike_train_lattices)?;
+        let mut gpu_network = LatticeNetworkGPU::from_network(network.clone())?;
 
-    //     Ok(())
-    // }
+        network.run_lattices(100)?;
+        gpu_network.run_lattices(100)?;
+
+        for (n, (cpu_grid, gpu_grid)) in network.get_lattice(&1).unwrap().grid_history.history.iter()
+            .zip(gpu_network.get_lattice(&1).unwrap().grid_history.history.iter())
+            .enumerate() {
+            for (cpu_row, gpu_row) in cpu_grid.iter().zip(gpu_grid.iter()) {
+                for (i, j) in cpu_row.iter().zip(gpu_row.iter()) {
+                    if !i.is_finite() || !j.is_finite() {
+                        continue;
+                    }
+                    assert!((i - j).abs() < 3., "{}: |{} - {}| = {}", n, i, j, (i - j).abs());
+                }
+            }
+        }
+
+        Ok(())
+    }
 }
