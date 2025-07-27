@@ -5813,7 +5813,7 @@ impl NeuralRefractorinessDefinition {
                 Ok((args, program_source))
             }}"#,
             generate_neural_refractoriness_args(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).join(", "),
-            if current_vars.is_some() {
+            if current_vars.is_some() && !generate_non_kernel_gpu_args(current_vars.as_ref().unwrap_or(&Ast::VariablesAssignments(vec![]))).is_empty() {
                 ","
             } else {
                 ""
