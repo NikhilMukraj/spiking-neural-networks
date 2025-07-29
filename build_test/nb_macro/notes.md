@@ -97,8 +97,7 @@
     - [x] cpu
     - [x] gpu
     - [ ] pyo3
-- [x] gpu set attribute should not panic but return an error type
-- [ ] handle spiking with continous spike detection
+- [ ] handle spiking with continous spike detection in gpu
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [x] **redo ligand gated channels using nb macro**
   - [x] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
