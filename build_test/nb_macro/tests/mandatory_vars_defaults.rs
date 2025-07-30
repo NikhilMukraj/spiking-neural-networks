@@ -437,4 +437,9 @@ mod tests {
 
         Ok(())
     }
+
+    // #[test]
+    // fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
+
+    // }
 }
