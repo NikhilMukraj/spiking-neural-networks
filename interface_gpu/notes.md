@@ -7,7 +7,7 @@
 - two compartment model with ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine)
-- serotonin model or other neurotransmitter (acetylcholine)
+- serotonin model or other neurotransmitters (acetylcholine)
 - general gpu plasticity impl and nb macro impl
 - toleman eichenbaum machine (electrical then chemical) (+ dopamine)
 - horizontal + vertical control (thousand brains theory + hierarchy + consensus voting) (+ dopamine)
