@@ -97,7 +97,7 @@
     - [x] cpu
     - [x] gpu
     - [ ] pyo3
-- [ ] handle spiking with continous spike detection in gpu
+- [ ] handle spiking with continuous spike detection in gpu
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [x] **redo ligand gated channels using nb macro**
   - [x] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
