@@ -24,6 +24,18 @@ mod tests {
                 current = g * (v - e)
         [end]
 
+        [neuron]
+            type: IonChannelNeuron
+            ion_channels: l = TestLeak
+            vars: v_reset = -75, v_th = -55
+            on_spike: 
+                v = v_reset
+            spike_detection: v >= v_th
+            on_iteration:
+                l.update_current(v)
+                dv/dt = l.current + i
+        [end]
+
         [spike_train]
             type: RateSpikeTrain
             vars: step = 0, rate = 0, v_resting = 24
@@ -440,6 +452,6 @@ mod tests {
 
     // #[test]
     // fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
-
+        // let base_neuron = IonChannelNeuron::default_impl();
     // }
 }
