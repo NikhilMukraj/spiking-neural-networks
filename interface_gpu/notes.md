@@ -3,7 +3,7 @@
 - attempt to debug current model with print statements during execution to isolate where nans appear, check if it happens during conversion
 - see what happens when all weights are 0 (including dopamine)
 - if still cannot debug, combine spike train and izhikevich neuron into one neuronal model and try that
-- if that does not work try using LIF (check kernel/conversion) instead of izhikevich or rent amd or intel gpu (cudo?)
+- if that does not work try using LIF or AdEx (check kernel/conversion) instead of izhikevich or rent amd or intel gpu (cudo?)
 - two compartment model with ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine)
