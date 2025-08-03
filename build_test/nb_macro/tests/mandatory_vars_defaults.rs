@@ -453,5 +453,11 @@ mod tests {
     // #[test]
     // fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
         // let base_neuron = IonChannelNeuron::default_impl();
+        // let mut lattice = Lattice::default_impl();
+        // lattice.populate(&base_neuron, 3, 3)?;
+        // lattice.update_grid_history = true;
+        // let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
+        // lattice.run_lattice(1000)?;
+        // gpu_lattice.run_lattice(1000)?;
     // }
 }
