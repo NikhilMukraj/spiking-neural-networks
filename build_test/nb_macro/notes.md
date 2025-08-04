@@ -107,7 +107,7 @@
 - [ ] **struct var call versus struct func call in declaration**
 - [ ] maybe use qualifying instead of imports
 - [ ] mark create and read buffer macros as unsafe
-- [ ] plasticity impl
+- [ ] plasticity impl (with basic traits that designate what shared getters/setters there are)
   - [ ] cpu
   - [ ] gpu (needs general impl first)
   - [ ] pyo3
