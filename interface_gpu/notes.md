@@ -9,5 +9,5 @@
 - grid attractor (+ point attractor + dopamine)
 - serotonin model or other neurotransmitters (acetylcholine) (hallucination/learning model?)
 - general gpu plasticity impl followed by nb macro impl
-- toleman eichenbaum machine (electrical then chemical) (+ dopamine)
+- toleman eichenbaum machine (tem) (electrical then chemical) (+ dopamine)
 - horizontal + vertical control (thousand brains theory + hierarchy + consensus voting) (+ dopamine)
