@@ -63,7 +63,6 @@
 - [x] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
 - [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
-- [ ] original ligand gated channels should implement `Receptors` and `IonotropicReception` traits
 - [x] gpu implementations
   - [x] neurotransmitter kinetics
   - [x] receptor kinetics
