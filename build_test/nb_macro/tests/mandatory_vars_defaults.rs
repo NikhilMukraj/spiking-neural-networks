@@ -450,7 +450,7 @@ mod tests {
         Ok(())
     }
 
-    // // check program source to see if commas are correct in function def
+    // print program source to check
     // #[test]
     // fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
     //     let base_neuron = IonChannelNeuron::default_impl();
