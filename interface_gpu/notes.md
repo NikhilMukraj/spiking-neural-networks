@@ -6,7 +6,7 @@
 - if that does not work try using LIF or AdEx (check kernel/conversion) instead of izhikevich or rent amd or intel gpu (cudo? or alternative)
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
-- grid attractor (+ point attractor + dopamine)
+- grid attractor (+ point attractor + dopamine) (find github ref)
 - serotonin model or other neurotransmitters (acetylcholine) (hallucination/learning model?)
 - general gpu plasticity impl followed by nb macro impl
 - toleman eichenbaum machine (tem) (find reference github) (electrical then chemical) (+ dopamine)
