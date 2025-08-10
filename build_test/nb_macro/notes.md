@@ -31,7 +31,6 @@
     - declare vars
     - assignment blocks
   - [x] default impl method for default kinetics
-  - [ ] default impl trait maybe
 - [x] **in `fn generate_x(pairs: Pairs<Rule>) -> Result<Def>`, create custom errors for when definition is not present**
 - [x] ion channel update current in neuron refactor
 - [x] replace statements should be replaced with regex that makes sure that it is the end of the variable, or just check for a space, `)`, or `;` at the end and see if that works as an acceptable delimiter
