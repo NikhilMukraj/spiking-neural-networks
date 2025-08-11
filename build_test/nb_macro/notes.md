@@ -75,7 +75,7 @@
     - [ ] pyo3
   - [ ] ion channel
     - [x] cpu
-    - [ ] gpu
+    - [x] gpu
     - [ ] pyo3
   - [ ] spike train
     - [x] cpu
