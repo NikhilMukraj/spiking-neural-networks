@@ -4161,7 +4161,7 @@ impl IonChannelDefinition {
             "fn get_attribute_names_as_vector() -> Vec<(String, AvailableBufferType)> {{
                 vec![(String::from(\"ion_channel$current\"), AvailableBufferType::Float), {} {}]
             }}",
-            generate_gpu_ion_channel_attributes_vec(&self.vars).join(", "),
+            generate_gpu_ion_channel_attributes_vec(&current_vars).join(", "),
             if !gating_vars_attrs.is_empty() {
                 format!(",{}", gating_vars_attrs.join(", "))
             } else {
