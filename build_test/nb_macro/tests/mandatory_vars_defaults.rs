@@ -2,7 +2,7 @@
 mod tests {
     use nb_macro::neuron_builder;
     use opencl3::{command_queue::CL_QUEUE_PROFILING_ENABLE, device::{get_all_devices, Device, CL_DEVICE_TYPE_GPU}, kernel::ExecuteKernel};
-    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{gpu_lattices::{LatticeNetworkGPU}, iterate_and_spike::{DefaultReceptorsType, IonotropicNeurotransmitterType, XReceptor}, Lattice, LatticeNetwork, RunNetwork, SpikeTrainLattice}};
+    use spiking_neural_networks::{error::SpikingNeuralNetworksError, neuron::{gpu_lattices::{LatticeGPU, LatticeNetworkGPU}, iterate_and_spike::{DefaultReceptorsType, IonotropicNeurotransmitterType, XReceptor}, Lattice, LatticeNetwork, RunLattice, RunNetwork, SpikeTrainLattice}};
 
 
     neuron_builder!(r#"
@@ -450,32 +450,31 @@ mod tests {
         Ok(())
     }
 
-    // print program source to check
-    // #[test]
-    // fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
-    //     let base_neuron = IonChannelNeuron::default_impl();
-    //     let mut lattice = Lattice::default_impl();
-    //     lattice.populate(&base_neuron, 3, 3)?;
-    //     lattice.update_grid_history = true;
+    #[test]
+    fn test_ion_channel_neuron() -> Result<(), SpikingNeuralNetworksError> {
+        let base_neuron = IonChannelNeuron::default_impl();
+        let mut lattice = Lattice::default_impl();
+        lattice.populate(&base_neuron, 3, 3)?;
+        lattice.update_grid_history = true;
 
-    //     let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
+        let mut gpu_lattice = LatticeGPU::from_lattice(lattice.clone())?;
 
-    //     lattice.run_lattice(1000)?;
-    //     gpu_lattice.run_lattice(1000)?;
+        lattice.run_lattice(1000)?;
+        gpu_lattice.run_lattice(1000)?;
 
-    //     for (n, (cpu_grid, gpu_grid)) in lattice.grid_history.history.iter()
-    //         .zip(gpu_lattice.grid_history.history.iter())
-    //         .enumerate() {
-    //         for (cpu_row, gpu_row) in cpu_grid.iter().zip(gpu_grid.iter()) {
-    //             for (i, j) in cpu_row.iter().zip(gpu_row.iter()) {
-    //                 if !i.is_finite() || !j.is_finite() {
-    //                     continue;
-    //                 }
-    //                 assert!((i - j).abs() < 3., "{}: |{} - {}| = {}", n, i, j, (i - j).abs());
-    //             }
-    //         }
-    //     }
+        for (n, (cpu_grid, gpu_grid)) in lattice.grid_history.history.iter()
+            .zip(gpu_lattice.grid_history.history.iter())
+            .enumerate() {
+            for (cpu_row, gpu_row) in cpu_grid.iter().zip(gpu_grid.iter()) {
+                for (i, j) in cpu_row.iter().zip(gpu_row.iter()) {
+                    if !i.is_finite() || !j.is_finite() {
+                        continue;
+                    }
+                    assert!((i - j).abs() < 3., "{}: |{} - {}| = {}", n, i, j, (i - j).abs());
+                }
+            }
+        }
 
-    //     Ok(())
-    // }
+        Ok(())
+    }
 }
