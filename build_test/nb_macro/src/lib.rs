@@ -640,13 +640,6 @@ impl Ast {
     }
 }
 
-fn add_indents(input: &str, indent: &str) -> String {
-    input.lines()
-        .map(|line| format!("{}{}", indent, line))
-        .collect::<Vec<String>>()
-        .join("\n")
-}
-
 struct NeuronDefinition {
     type_name: Ast,
     kinetics: Option<Ast>,
@@ -992,7 +985,7 @@ fn generate_handle_spiking(on_spike: &Option<Ast>, spike_detection: &Ast) -> Str
             "self.is_spiking = is_spiking;",
             "self.was_increasing = increasing_right_now;"
         ];
-        let handle_is_spiking_calc = add_indents(&handle_is_spiking_calc.join("\n"), "\t");
+        let handle_is_spiking_calc = handle_is_spiking_calc.join("\n");
 
         format!(
             "{}\n{}\n{}\n\tself.is_spiking\n}}",
@@ -2233,7 +2226,6 @@ impl NeuronDefinition {
             self.type_name.generate(),
             default_fields,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let impl_default = format!(
             "\nimpl<T: NeurotransmitterKinetics, R: ReceptorKinetics> Default for {}<T, R> {{\n\t{}\n}}\n}}\n",
@@ -2348,7 +2340,7 @@ impl NeuronDefinition {
             "impl<T: NeurotransmitterKinetics, R: ReceptorKinetics> {}<T, R> {{", 
             self.type_name.generate()
         );
-        let impl_body = add_indents(&handle_spiking, "\t");
+        let impl_body = handle_spiking;
         let impl_functions = format!("{}\n{}\n}}", impl_header, impl_body);
 
         let impl_header_iterate_and_spike = format!(
@@ -2362,7 +2354,6 @@ impl NeuronDefinition {
             iteration_function,
             iteration_with_neurotransmitter_function,
         );
-        let impl_iterate_and_spike_body = add_indents(&impl_iterate_and_spike_body, "\t");
         let impl_iterate_and_spike = format!(
             "{}\n{}\n}}", 
             impl_header_iterate_and_spike, 
@@ -4047,7 +4038,7 @@ impl IonChannelDefinition {
             )
         } else {
             let update_current_header = "fn update_current(&mut self, voltage: f32) {";
-            let update_current_body = add_indents(&self.on_iteration.generate(), "\t");
+            let update_current_body = self.on_iteration.generate();
             let update_current_body = replace_self_var(update_current_body, "current_voltage", "voltage");
 
             format!("{}\n{}\n}}", update_current_header, update_current_body)
@@ -4075,11 +4066,6 @@ impl IonChannelDefinition {
             );
         };
 
-        // code may need to be updated if current is assigned using 
-
-        let update_current = add_indents(&update_current, "\t");
-        let get_current = add_indents(get_current, "\t");
-
         let mut defaults = generate_defaults(&self.vars);
 
         if !names.contains(&String::from("current")) {
@@ -4106,14 +4092,12 @@ impl IonChannelDefinition {
             self.type_name.generate(),
             default_fields,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let default_function = format!(
             "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
             self.type_name.generate(),
             default_function,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         (
             imports, 
@@ -6511,14 +6495,12 @@ impl NeurotransmitterKineticsDefinition {
             self.type_name.generate(),
             default_fields,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let default_function = format!(
             "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
             self.type_name.generate(),
             default_function,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let impl_header = format!("impl NeurotransmitterKinetics for {} {{", self.type_name.generate());
 
@@ -6800,14 +6782,12 @@ impl ReceptorKineticsDefinition {
             self.type_name.generate(),
             default_fields,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let default_function = format!(
             "\nimpl Default for {} {{\n\t{}\n}}\n}}\n",
             self.type_name.generate(),
             default_function,
         );
-        let default_function = add_indents(&default_function, "\t");
 
         let impl_header = format!("impl ReceptorKinetics for {} {{", self.type_name.generate());
 
