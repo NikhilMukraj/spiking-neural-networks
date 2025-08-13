@@ -99,7 +99,7 @@
   - [x] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
 - [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
-- [ ] remove all `add_indents` calls
+- [x] remove all `add_indents` calls
 - [ ] **struct var call versus struct func call in declaration**
 - [ ] maybe use qualifying instead of imports
 - [ ] mark create and read buffer macros as unsafe
