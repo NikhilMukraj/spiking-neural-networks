@@ -56,7 +56,8 @@
 - [x] refractoriness block
 - [x] eventually remove vars declaration without vars
 - [ ] ion channel use timestep also checks each expr for a dt too
-- [ ] comments/docs in/around blocks
+- [x] comments in/around blocks
+- [ ] docs in/around blocks
 - [x] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
 - [ ] standardize whitespace in pest ast
 - [ ] check to make sure duplicate def blocks fail to compile, could use try build but only in test dependencies
