@@ -98,7 +98,7 @@
 - [x] **make sure to modify ApproximateReceptorKinetics** to be in line with new specs
 - [x] **redo ligand gated channels using nb macro**
   - [x] when you do, make sure that getting the associated receptor type is integrated into `NeurotransmitterTypeGPU` trait
-- [ ] make seperate update function for only metabotropic receptors so the iterate function can be called
+- [ ] make separate update function for only metabotropic receptors so the iterate function can be called
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
 - [x] remove all `add_indents` calls
 - [ ] **struct var call versus struct func call in declaration**
