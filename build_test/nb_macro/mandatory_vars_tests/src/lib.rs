@@ -1,6 +1,13 @@
-use pyo3::prelude::*;
+use nb_macro::neuron_builder;
+// use pyo3::{types::PyTuple, exceptions::{PyKeyError, PyValueError}};
+// mod lattices;
+// use lattices::{
+//     impl_lattice, impl_lattice_gpu, impl_spike_train_lattice,
+//     impl_network, impl_network_gpu,
+// };
 
- neuron_builder!(r#"
+
+neuron_builder!(r#"
     [neuron]
         type: BasicIntegrateAndFire
         kinetics: TestNeurotransmitterKinetics, TestReceptorKinetics
