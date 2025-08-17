@@ -511,7 +511,7 @@ mod test {
 
                 for (cpu_voltage, gpu_voltage) in cpu_voltages.iter().zip(gpu_voltages) {
                     let error = (cpu_voltage - gpu_voltage).abs();
-                    assert!(error < 3., "error: {} ({} - {})", error, cpu_voltage, gpu_voltage);
+                    assert!(error < 3., "(glu: {}, dopa: {}) | error: {} ({} - {})", glu, dopa, error, cpu_voltage, gpu_voltage);
                 }
             }
         }
