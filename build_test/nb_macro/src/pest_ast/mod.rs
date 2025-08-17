@@ -28,7 +28,7 @@ not_operator = { "!" }
 bin_op = _{ 
 	greater_than_or_equal | less_than_or_equal | equal | not_equal | 
 	greater_than | less_than | and_operator | or_operator |
-	add | subtract | multiply | divide | power 
+	add | subtract | multiply | divide | power | rpower
 }
 	equal = { "==" }
 	not_equal = { "!=" }
@@ -43,6 +43,7 @@ bin_op = _{
 	multiply = { "*" }
 	divide = { "/" }
 	power = { "^" }
+	rpower = { "r^" }
 
 expr = { atom ~ (bin_op ~ atom)* }
 
@@ -181,7 +182,7 @@ lazy_static::lazy_static! {
             )
             .op(Op::infix(add, Left) | Op::infix(subtract, Left))
             .op(Op::infix(multiply, Left) | Op::infix(divide, Left))
-			.op(Op::infix(power, Left))
+			.op(Op::infix(power, Left) | Op::infix(rpower, Left))
             .op(Op::prefix(unary_minus) | Op::prefix(not_operator))
     };
 }
