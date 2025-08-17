@@ -50,7 +50,7 @@ neuron_builder!("
     receptors: ampa_r, nmda_r
     vars: current = 0, g_ampa = 1, g_nmda = 0.6, e_ampa = 0, e_nmda = 0, mg = 0.3
     on_iteration:
-        current = inh_modifier * g_ampa * ampa_r * (v - e_ampa) + (1 / (1 + (exp(-0.062 * v) * mg / 3.57))) * inh_modifier * g_nmda * (nmda_r ^ nmda_modifier) * (v - e_nmda)
+        current = inh_modifier * g_ampa * ampa_r * (v - e_ampa) + (1 / (1 + (exp(-0.062 * v) * mg / 3.57))) * inh_modifier * g_nmda * (nmda_r r^ nmda_modifier) * (v - e_nmda)
     neurotransmitter: GABA
     vars: current = 0, g = 1.2, e = -80
     on_iteration:
@@ -74,7 +74,7 @@ neuron_builder!("
     spike_detection: v >= v_th
     on_iteration:
         du/dt = (a * (b * v - u)) / tau_m
-        dv/dt = (0.04 * v ^ 2 + 5 * v + 140 - u + i) / c_m
+        dv/dt = (0.04 * v * v + 5 * v + 140 - u + i) / c_m
 [end]"
 );
 
