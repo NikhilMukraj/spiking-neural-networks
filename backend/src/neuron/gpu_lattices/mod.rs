@@ -2801,6 +2801,14 @@ where
                     )?
                 };
 
+                // if this doesnt work check if forcing a cpu read works
+                // unsafe { 
+                //     match self.queue.enqueue_barrier_with_wait_list(&[iterate_event.get()]) {
+                //         Ok(_) => {},
+                //         Err(_) => return Err(GPUError::WaitError),
+                //     }
+                // };
+
                 for (key, value) in self.lattices.iter() {
                     if value.update_grid_history {
                         let mut skip_index = 0;
