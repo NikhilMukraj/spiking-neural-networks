@@ -102,7 +102,7 @@
 - [ ] consilidate struct call and struct function call or struct call should only be attrs while struct function call should only be funcs
 - [x] remove all `add_indents` calls
 - [ ] **struct var call versus struct func call in declaration**
-- [ ] maybe use qualifying instead of imports
+- [ ] use qualifying instead of imports
 - [ ] mark create and read buffer macros as unsafe
 - [ ] plasticity impl (with basic traits that designate what shared getters/setters there are for the neuron and spike train)
   - [ ] cpu
