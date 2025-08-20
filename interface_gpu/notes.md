@@ -7,7 +7,7 @@
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine) (find github reference)
-- serotonin model or other neurotransmitters (acetylcholine) (hallucination/learning model?)
+- serotonin model or other neurotransmitters (acetylcholine, etc) (hallucination/learning model?)
 - general gpu plasticity impl followed by nb macro impl
 - toleman eichenbaum machine (tem) (find reference on github) (electrical then chemical) (+ dopamine)
 - horizontal + vertical control (thousand brains theory + hierarchy + consensus voting) (+ dopamine)
