@@ -77,3 +77,5 @@ neuron_builder!(r#"
         effect: (v_th - v_resting) * exp((-1 / (decay / dt)) * (time_difference ^ 2)) + v_resting
     [end]
 "#);
+
+// add classes
