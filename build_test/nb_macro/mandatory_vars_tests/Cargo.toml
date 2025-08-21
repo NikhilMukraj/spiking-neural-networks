@@ -9,4 +9,7 @@ name = "mandatory_vars_tests"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.24.0"
+pyo3 = "0.18.3"
+opencl3 = "0.9.5"
+nb_macro = { path = "../", default-features = false, features = ["py", "gpu"] }
+spiking_neural_networks = { path = "../../../backend", features = ["gpu"] }
