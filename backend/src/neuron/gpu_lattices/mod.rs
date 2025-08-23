@@ -2802,13 +2802,22 @@ where
                 };
 
                 // if this doesnt work check if forcing a cpu read works
-                // let mut result = vec![0.0f32; gpu_graph.size];
-
+                // let mut result = vec![0.0f32; cell_vector_size];
+        
                 // unsafe {
-                //     match &gpu_cell_grid.get("current_voltage") {
-                //         Some(BufferGPU::Float(val)) => queue.enqueue_read_buffer(val, CL_BLOCKING, 0, &mut result, &[]).expect("Could not read buffer"),
-                //         _ => panic!(),
-                //     };
+                //     if let Some(BufferGPU::Float(buffer)) = gpu_cell_grid.get("current_voltage") {
+                //         let read_event = unsafe {
+                //             match self.queue.enqueue_read_buffer(buffer, CL_BLOCKING, 0, &mut result, &[]) {
+                //                 Ok(value) => value,
+                //                 Err(_) => return Err(GPUError::BufferReadError),
+                //             }
+                //         };
+            
+                //         match read_event.wait() {
+                //             Ok(value) => value,
+                //             Err(_) => return Err(GPUError::WaitError),
+                //         };
+                //     }
                 // }
 
                 for (key, value) in self.lattices.iter() {
