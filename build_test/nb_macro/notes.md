@@ -106,5 +106,5 @@
 - [ ] mark create and read buffer macros as unsafe
 - [ ] plasticity impl (with basic traits that designate what shared getters/setters there are for the neuron and spike train)
   - [ ] cpu
-  - [ ] gpu (needs general impl first)
+  - [ ] gpu (needs general impl first) (plasticity params for gpu dont need buffer conversion)
   - [ ] pyo3
