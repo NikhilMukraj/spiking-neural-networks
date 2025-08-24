@@ -2825,6 +2825,8 @@ impl NeuronDefinition {
                 program_source = result;
             }";
 
+        // intersplice the printf statements between each line of the kernel
+        // only printf for gid == 0
         let iterate_and_spike_electrochemical_function = match (&self.on_electrochemical_iteration, &self.ion_channels.is_some()) {
             (Some(body), true) => {
                 let argument_names = format!(
