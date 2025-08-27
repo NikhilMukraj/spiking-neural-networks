@@ -2,8 +2,6 @@
 
 ## todo
 
-- [x] ion channel defaults
-  - [x] basic gating variables defaults in ion channels
 - [ ] `(struct_call | name)` in front of declarations to edit struct variables
   - [ ] in assignments add a `struct_call_execution` to or where it execution is `_{ struct_call }`
     - eventually change to seperate struct_function_call
