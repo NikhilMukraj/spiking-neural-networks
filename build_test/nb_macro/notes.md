@@ -53,7 +53,7 @@
   - [x] on iteration
 - [x] refractoriness block
 - [x] eventually remove vars declaration without vars
-- [ ] ion channel use timestep also checks each expr for a dt too
+- [ ] ion channel use timestep also checks each expr/equation/function call for a dt too
 - [x] comments in/around blocks
 - [ ] docs in/around blocks
 - [x] option to customize chemical iterate and spike in nb macro, default to existing impl if no def found
