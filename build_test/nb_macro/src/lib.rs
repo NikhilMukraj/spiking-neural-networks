@@ -2058,7 +2058,7 @@ fn generate_receptor_vars_as_getter_setters(type_name: &str, vars: &Ast) -> Vec<
 //         _ => unreachable!(),
 //     }.join(", ");
 
-//     format!("(gid == 0) ? printf(\"%d | {}\n\", {}) : 0;", flags, values)
+//     format!("(gid == 0) ? printf(\"%d | %f, {}\n\", current_voltage[index], {}) : 0;", flags, values)
 // }
 
 impl NeuronDefinition {
