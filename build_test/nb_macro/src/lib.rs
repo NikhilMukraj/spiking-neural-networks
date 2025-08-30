@@ -2061,6 +2061,18 @@ fn generate_receptor_vars_as_getter_setters(type_name: &str, vars: &Ast) -> Vec<
 //     format!("(gid == 0) ? printf(\"# | %d | %f, {}\n\", current_voltage[index], {}) : 0;", flags, values)
 // }
 
+// #[cfg(feature = "gpu")]
+// fn intersplice_with_seq(s: &str, template: &str, start: usize) -> String {
+//     s.lines()
+//         .enumerate()
+//         .map(|(i, line)| {
+//             let numbered = template.replace('#', &(start + i).to_string());
+//             format!("{line}\n{numbered}")
+//         })
+//         .collect::<Vec<_>>()
+//         .join("\n")
+// }
+
 impl NeuronDefinition {
     // eventually adapt for documentation to be integrated
     // for now use default ligand gates and neurotransmitter implementation
