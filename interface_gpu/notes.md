@@ -1,7 +1,7 @@
 # notes
 
-- attempt to debug current model with print statements during execution to isolate where nans appear, check if it happens during conversion
-- if still cannot debug, combine spike train and izhikevich neuron into one neuronal model and try that
+- one of the buffers (a) appears to be initialized as nan for some reason, maybe try using different values to see if it always initializes as nan
+- if cannot make that work try LIF config on cpu and transfer over to gpu
 - rent amd or intel gpu (cudo (setup ssh stuff)? or alternative)
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
