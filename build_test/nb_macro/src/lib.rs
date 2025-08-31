@@ -1266,7 +1266,7 @@ fn generate_vars_as_create_buffers(vars: &Ast) -> Vec<String> {
                     };
 
                     format!(
-                        "create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", 
+                        "create_{}_buffer!({}_buffer, context, queue, cell_grid, {}, last);", 
                         type_name,
                         var_name,
                         var_name,
@@ -3169,7 +3169,7 @@ impl NeuronDefinition {
             ",
             mandatory_variables.iter()
                 .map(|(i, j)| 
-                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", j, i, i)
+                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {}, last);", j, i, i)
                 )
                 .collect::<Vec<String>>()
                 .join("\n"),
@@ -5104,7 +5104,7 @@ impl SpikeTrainDefinition {
                 {}
                 {}
 
-                create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time);
+                create_optional_uint_buffer!(last_firing_time_buffer, context, queue, cell_grid, last_firing_time, last);
 
                 {}
                 {}
@@ -5125,7 +5125,7 @@ impl SpikeTrainDefinition {
             }}",
             mandatory_vars.iter()
                 .map(|(i, j)| 
-                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {});", j, i, i)
+                    format!("create_{}_buffer!({}_buffer, context, queue, cell_grid, {}, last);", j, i, i)
                 )
                 .collect::<Vec<String>>()
                 .join("\n"),
