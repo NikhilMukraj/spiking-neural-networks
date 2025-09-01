@@ -2781,7 +2781,7 @@ where
                         }
                     }
 
-                    match kernel_execution.set_global_work_size(gpu_graph.size)
+                    match kernel_execution.set_global_work_size(cell_vector_size)
                         .enqueue_nd_range(&self.queue) {
                             Ok(value) => value,
                             Err(_) => return Err(GPUError::QueueFailure),
