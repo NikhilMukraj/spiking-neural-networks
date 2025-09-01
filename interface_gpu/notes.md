@@ -1,8 +1,6 @@
 # notes
 
-- one of the buffers (a) appears to be initialized as nan for some reason, maybe try using different values to see if it always initializes as nan
-- if cannot make that work try LIF config on cpu and transfer over to gpu
-- rent amd or intel gpu (cudo (setup ssh stuff)? or alternative)
+- test effect of d1 strength, d2 strength, dopamine clearance, ionotropic channel conductance, ionotropic neurotransmitter clearance
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine) (find github reference or just increase dimensions of ring attractor)
