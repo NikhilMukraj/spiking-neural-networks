@@ -1,5 +1,6 @@
 # notes
 
+- reference test on d1 distortion
 - test effect of d1 strength, d2 strength, dopamine clearance, ionotropic channel conductance, ionotropic neurotransmitter clearance
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
