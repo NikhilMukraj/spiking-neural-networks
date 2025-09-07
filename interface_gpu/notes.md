@@ -1,6 +1,6 @@
 # notes
 
-- test effect of d1 strength, d2 strength, dopamine clearance, ionotropic channel conductance, ionotropic neurotransmitter clearance, map as heatmap where x is conductance value and y is distortion value
+- test effect of d1 strength, d2 strength, dopamine clearance, ionotropic channel conductance, ionotropic neurotransmitter clearance
 - two compartment model with various ion channels + point attractor + dopamine
 - ring attractor + point attractor + dopamine
 - grid attractor (+ point attractor + dopamine) (find github reference or just increase dimensions of ring attractor)
