@@ -71,6 +71,7 @@
 /interface/experiments/*/*.html
 /interface/generate_methods.py
 /interface_gpu/.venv/*
+/interface_gpu/.wvenv/*
 /interface_gpu/janky/.venv/*
 /interface_gpu/experiments/__pycache__
 /interface_gpu/experiments/*/*.json
