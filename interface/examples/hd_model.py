@@ -79,7 +79,7 @@ turning_cells.apply_given_position(setup_poisson_given_direction(0))
 
 head_direction_attractor = ln.IzhikevichNetwork.generate_network([shift_left, shift_right, hd], [turning_cells])
 head_direction_attractor.connect(3, 0, lambda x, y: True, lambda x, y: 10)
-head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
+# head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
 head_direction_attractor.connect(0, 2, lambda x, y: True, shift_right_weight)
 head_direction_attractor.connect(1, 2, lambda x, y: True, shift_left_weight)
 head_direction_attractor.connect(2, 0, lambda x, y: True, hd_to_shift_weight)
