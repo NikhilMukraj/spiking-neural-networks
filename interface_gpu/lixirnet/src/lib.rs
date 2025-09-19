@@ -67,7 +67,7 @@ neuron_builder!("
     type: IzhikevichNeuron
     kinetics: BoundedNeurotransmitterKinetics, BoundedReceptorKinetics
     receptors: DopaGluGABA
-    vars: u = 30, a = 0.02, b = 0.2, c = -55, d = 8, v_th = 30, tau_m = 1
+    vars: u = 30, a = 0.02, b = 0.2, c = -55, d = 8, v_th = 30, tau_m = 1, c_m = 100
     on_spike: 
         v = c
         u += d
