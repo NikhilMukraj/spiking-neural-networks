@@ -31,7 +31,7 @@ def setup_neuron(neuron):
 def setup_poisson_given_direction(direction):
     def setup_poisson(pos, neuron):
         if pos[0] == direction:
-            neuron.chance_of_firing = 0.005
+            neuron.chance_of_firing = 0.01
         else:
             neuron.chance_of_firing = 0
         
@@ -75,7 +75,7 @@ hd.update_grid_history = True
 turning_cells = ln.PoissonLattice(3)
 turning_cells.populate(ln.PoissonNeuron(), 2, 1)
 turning_cells.apply_given_position(setup_poisson_given_direction(0))
-turning_cells.update_grid_history = True
+# turning_cells.update_grid_history = True
 
 head_direction_attractor = ln.IzhikevichNetwork.generate_network([shift_left, shift_right, hd], [turning_cells])
 head_direction_attractor.connect(3, 0, lambda x, y: True, lambda x, y: 10)
