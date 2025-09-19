@@ -7,6 +7,6 @@
 - grid attractor (+ point attractor + dopamine) (find github reference or just increase dimensions of ring attractor, make sure it is hexadirectional)
   - use to navigate symbolic vector space as continuous space
 - serotonin model or other neurotransmitters (acetylcholine, maybe nitric oxide, etc) (hallucination/learning model?)
-- general gpu plasticity impl followed by nb macro impl (cpu, gpu, and pyo3)
+- general gpu plasticity impl followed by nb macro impl (cpu + gpu + pyo3)
 - toleman eichenbaum machine (tem) (find reference on github as well as paper) (electrical then chemical) (+ dopamine or other neurotransmitter)
 - horizontal + vertical control (thousand brains theory + hierarchy + consensus voting) (+ dopamine)
