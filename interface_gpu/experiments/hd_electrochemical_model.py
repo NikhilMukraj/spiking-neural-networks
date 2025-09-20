@@ -66,33 +66,33 @@ inh_right_ring = 5
 hd_inh_ring = 6
 
 shift_left = ln.IzhikevichNeuronLattice(left_ring)
-shift_left.populate(ln.IzhikevichNeuron(), n, 1)
+shift_left.populate(exc_neuron, n, 1)
 shift_left.apply(setup_neuron)
 shift_left.update_grid_history = True
 
 shift_right = ln.IzhikevichNeuronLattice(right_ring)
-shift_right.populate(ln.IzhikevichNeuron(), n, 1)
+shift_right.populate(exc_neuron, n, 1)
 shift_right.apply(setup_neuron)
 shift_right.update_grid_history = True
 
 shift_left_inh = ln.IzhikevichNeuronLattice(inh_left_ring)
-shift_left_inh.populate(ln.IzhikevichNeuron(), n, 1)
+shift_left_inh.populate(inh_neuron, n, 1)
 shift_left_inh.apply(setup_neuron)
 shift_left_inh.update_grid_history = True
 
 shift_right_inh = ln.IzhikevichNeuronLattice(inh_right_ring)
-shift_right_inh.populate(ln.IzhikevichNeuron(), n, 1)
+shift_right_inh.populate(inh_neuron, n, 1)
 shift_right_inh.apply(setup_neuron)
 shift_right_inh.update_grid_history = True
 
 hd = ln.IzhikevichNeuronLattice(hd_ring)
-hd.populate(ln.IzhikevichNeuron(), n, 1)
+hd.populate(exc_neuron, n, 1)
 hd.connect(lambda x, y: True, hd_weight)
 hd.apply(setup_neuron)
 hd.update_grid_history = True
 
 hd_inh = ln.IzhikevichNeuronLattice(hd_inh_ring)
-hd_inh.populate(ln.IzhikevichNeuron(), n, 1)
+hd_inh.populate(inh_neuron, n, 1)
 hd_inh.connect(lambda x, y: True, hd_weight)
 hd_inh.apply(setup_neuron)
 hd_inh.update_grid_history = True
