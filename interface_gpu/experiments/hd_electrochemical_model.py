@@ -57,6 +57,13 @@ sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.
 shift_left_weight = lambda x, y: 20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
 shift_right_weight = lambda x, y: -20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
 
+# receptors = ln.DopaReceptors()
+
+exc_neuron = ln.IzikevichNeuron()
+# exc_neuron.set_neurotransmitters({ln.DopaNeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics})
+inh_neuron = ln.IzikevichNeuron()
+# exc_neuron.set_neurotransmitters({ln.DopaNeurotransmitterType.GABA : ln.BoundedNeurotransmitterKinetics})
+
 left_ring = 0
 right_ring = 1
 hd_ring = 2
