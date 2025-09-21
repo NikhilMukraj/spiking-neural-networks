@@ -57,19 +57,28 @@ sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.
 shift_left_weight = lambda x, y: 20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
 shift_right_weight = lambda x, y: -20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
 
-# receptors = ln.DopaReceptors()
+glu = ln.GlutamateReceptor()
+gabaa = ln.GABAReceptor()
+receptors = ln.DopaGluGABA()
+receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
+receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
 
-exc_neuron = ln.IzikevichNeuron()
-# exc_neuron.set_neurotransmitters({ln.DopaNeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics})
-inh_neuron = ln.IzikevichNeuron()
-# exc_neuron.set_neurotransmitters({ln.DopaNeurotransmitterType.GABA : ln.BoundedNeurotransmitterKinetics})
+exc_neuron = ln.IzhikevichNeuron()
+exc_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics()})
+exc_neuron.set_receptors(receptors)
+inh_neuron = ln.IzhikevichNeuron()
+inh_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.GABA : ln.BoundedNeurotransmitterKinetics()})
+inh_neuron.set_receptors(receptors)
+
+rate_spike_train = ln.RateSpikeTrain()
+rate_spike_train.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics()})
 
 left_ring = 0
 right_ring = 1
 hd_ring = 2
 turning = 3
-inh_left_ring = 4
-inh_right_ring = 5
+left_ring_inh = 4
+right_ring_inh = 5
 hd_inh_ring = 6
 
 shift_left = ln.IzhikevichNeuronLattice(left_ring)
@@ -82,12 +91,12 @@ shift_right.populate(exc_neuron, n, 1)
 shift_right.apply(setup_neuron)
 shift_right.update_grid_history = True
 
-shift_left_inh = ln.IzhikevichNeuronLattice(inh_left_ring)
+shift_left_inh = ln.IzhikevichNeuronLattice(left_ring_inh)
 shift_left_inh.populate(inh_neuron, n, 1)
 shift_left_inh.apply(setup_neuron)
 shift_left_inh.update_grid_history = True
 
-shift_right_inh = ln.IzhikevichNeuronLattice(inh_right_ring)
+shift_right_inh = ln.IzhikevichNeuronLattice(right_ring_inh)
 shift_right_inh.populate(inh_neuron, n, 1)
 shift_right_inh.apply(setup_neuron)
 shift_right_inh.update_grid_history = True
@@ -105,28 +114,32 @@ hd_inh.apply(setup_neuron)
 hd_inh.update_grid_history = True
 
 turning_cells = ln.RateSpikeTrainLattice(turning)
-turning_cells.populate(ln.RateSpikeTrain(), 2, 1)
+turning_cells.populate(rate_spike_train, 2, 1)
 turning_cells.apply_given_position(setup_poisson_given_direction(0))
 # turning_cells.update_grid_history = True
 
-##### maybe just clip the weights at 0? #####
+##### invert weights for inh and then clip it at 0 #####
+##### may need to plot out weights to confirm that it is as expected #####
+##### may need to decrease weights/conductances/timestep in order to slow down turning #####
 
-head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, hd], [turning_cells])
+head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells])
 head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: 10)
 # head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
-head_direction_attractor.connect(left_ring, hd_ring, lambda x, y: True, shift_right_weight)
-# head_direction_attractor.connect(left_ring, left_ring_inh, lambda x, y: True, shift_right_weight)
-# head_direction_attractor.connect(left_ring_inh, hd_ring, lambda x, y: True, shift_right_weight)
-head_direction_attractor.connect(right_ring, hd_ring, lambda x, y: True, shift_left_weight)
-# head_direction_attractor.connect(right_ring, right_ring_inh, lambda x, y: True, shift_left_weight)
-# head_direction_attractor.connect(right_ring_inh, hd_ring, lambda x, y: True, shift_left_weight)
-head_direction_attractor.connect(hd_ring, left_ring, lambda x, y: True, hd_to_shift_weight)
-# head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, hd_to_shift_weight)
-# head_direction_attractor.connect(hd_inh_ring, left_ring, lambda x, y: True, hd_to_shift_weight)
-head_direction_attractor.connect(hd_ring, right_ring, lambda x, y: True, hd_to_shift_weight)
-# head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, hd_to_shift_weight)
-# head_direction_attractor.connect(hd_inh_ring, right_ring, lambda x, y: True, hd_to_shift_weight)
+head_direction_attractor.connect(left_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_right_weight(x, y), 0))
+head_direction_attractor.connect(left_ring, left_ring_inh, lambda x, y: True, lambda x, y: max(-1 * shift_right_weight(x, y), 0))
+head_direction_attractor.connect(left_ring_inh, hd_ring, lambda x, y: True, lambda x, y: max(-1 * shift_right_weight(x, y), 0))
+head_direction_attractor.connect(right_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_left_weight(x, y), 0))
+head_direction_attractor.connect(right_ring, right_ring_inh, lambda x, y: True, lambda x, y: max(-1 * shift_left_weight(x, y), 0))
+head_direction_attractor.connect(right_ring_inh, hd_ring, lambda x, y: True, lambda x, y: max(-1 * shift_left_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, left_ring, lambda x, y: True, lambda x, y: max(hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_inh_ring, left_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, right_ring, lambda x, y: True, lambda x, y: max(hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_inh_ring, right_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
 head_direction_attractor.set_dt(1)
+head_direction_attractor.electrical_synapse = False
+head_direction_attractor.chemical_synapse = True
 head_direction_attractor.parallel = True
 
 iterations = 1_000
