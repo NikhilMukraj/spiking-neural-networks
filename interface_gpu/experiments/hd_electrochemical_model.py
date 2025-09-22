@@ -187,3 +187,8 @@ for key, value in firing_rates.items():
 plt.polar(np.deg2rad(np.array(thetas) * (360 / n)), range(0, iterations, window))
 plt.title('Path over Time')
 plt.show()
+
+plt.title('Raster Plot')
+for peak_index in range(len(peaks)):
+    plt.scatter(peaks[peak_index], [peak_index for i in range(len(peaks[peak_index]))], color='black')
+plt.show()
