@@ -47,9 +47,9 @@ def find_peaks_above_threshold(series, threshold):
     return filtered_peaks
 
 # weights for head direction layer
-hd_weight = lambda x, y: 3 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 10))) - 0.9
+hd_weight = lambda x, y: 3 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 5))) - 0.9
 # head direction feedback into shift layers to engage in shifting behavior when turning cells are on
-hd_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 10)) - 0.2)
+hd_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 5)) - 0.2)
 
 sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.exp(x) + 1) ** 3)
 
