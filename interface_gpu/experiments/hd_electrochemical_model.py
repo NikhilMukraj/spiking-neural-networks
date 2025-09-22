@@ -24,7 +24,7 @@ ring_distance = lambda length, i, j: min(abs(i - j), length - abs(i - j))
 
 def setup_neuron(neuron):
     neuron.current_voltage = np.random.uniform(neuron.c, neuron.v_th)
-    neuron.c_m = 100
+    neuron.c_m = 25
 
     return neuron
 
@@ -64,10 +64,10 @@ receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
 receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
 
 exc_neuron = ln.IzhikevichNeuron()
-exc_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics()})
+exc_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics(clearance_constant=0.001)})
 exc_neuron.set_receptors(receptors)
 inh_neuron = ln.IzhikevichNeuron()
-inh_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.GABA : ln.BoundedNeurotransmitterKinetics()})
+inh_neuron.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.GABA : ln.BoundedNeurotransmitterKinetics(clearance_constant=0.001)})
 inh_neuron.set_receptors(receptors)
 
 rate_spike_train = ln.RateSpikeTrain()
