@@ -54,8 +54,8 @@ hd_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * ring_distance(n, x[0], y[0]) 
 sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.exp(x) + 1) ** 3)
 
 # inhibits neurons in opposite direction, activates in desired direction
-shift_left_weight = lambda x, y: 20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
-shift_right_weight = lambda x, y: -20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 5)
+shift_left_weight = lambda x, y: 20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 10)
+shift_right_weight = lambda x, y: -20 * sigmoid_second_derivative(signed_ring_distance(x, y) / 10)
 
 glu = ln.GlutamateReceptor()
 gabaa = ln.GABAReceptor()
@@ -122,27 +122,29 @@ turning_cells.apply_given_position(setup_poisson_given_direction(0))
 ##### may need to plot out weights to confirm that it is as expected #####
 ##### may need to decrease weights/conductances/timestep in order to slow down turning #####
 
+inh_strength = 2
+
 head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells])
 head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: 10)
 # head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
 head_direction_attractor.connect(left_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_right_weight(x, y), 0))
-head_direction_attractor.connect(left_ring, left_ring_inh, lambda x, y: True, lambda x, y: max(-2 * shift_right_weight(x, y), 0))
+head_direction_attractor.connect(left_ring, left_ring_inh, lambda x, y: True, lambda x, y: max(-inh_strength * shift_right_weight(x, y), 0))
 head_direction_attractor.connect(left_ring_inh, hd_ring, lambda x, y: True, lambda x, y: max(-1 * shift_right_weight(x, y), 0))
 head_direction_attractor.connect(right_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_left_weight(x, y), 0))
-head_direction_attractor.connect(right_ring, right_ring_inh, lambda x, y: True, lambda x, y: max(-2 * shift_left_weight(x, y), 0))
+head_direction_attractor.connect(right_ring, right_ring_inh, lambda x, y: True, lambda x, y: max(-inh_strength * shift_left_weight(x, y), 0))
 head_direction_attractor.connect(right_ring_inh, hd_ring, lambda x, y: True, lambda x, y: max(-1 * shift_left_weight(x, y), 0))
 head_direction_attractor.connect(hd_ring, left_ring, lambda x, y: True, lambda x, y: max(hd_to_shift_weight(x, y), 0))
-head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-2 * hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-inh_strength * hd_to_shift_weight(x, y), 0))
 head_direction_attractor.connect(hd_inh_ring, left_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
 head_direction_attractor.connect(hd_ring, right_ring, lambda x, y: True, lambda x, y: max(hd_to_shift_weight(x, y), 0))
-head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-2 * hd_to_shift_weight(x, y), 0))
+head_direction_attractor.connect(hd_ring, hd_inh_ring, lambda x, y: True, lambda x, y: max(-inh_strength * hd_to_shift_weight(x, y), 0))
 head_direction_attractor.connect(hd_inh_ring, right_ring, lambda x, y: True, lambda x, y: max(-1 * hd_to_shift_weight(x, y), 0))
 head_direction_attractor.set_dt(1)
 head_direction_attractor.electrical_synapse = False
 head_direction_attractor.chemical_synapse = True
 head_direction_attractor.parallel = True
 
-iterations = 1_000
+iterations = 10_000
 
 for _ in tqdm(range(iterations)):
     head_direction_attractor.run_lattices(1)
