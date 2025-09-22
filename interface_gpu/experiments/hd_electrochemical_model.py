@@ -118,10 +118,6 @@ turning_cells.populate(rate_spike_train, 2, 1)
 turning_cells.apply_given_position(setup_poisson_given_direction(0))
 # turning_cells.update_grid_history = True
 
-##### invert weights for inh and then clip it at 0 #####
-##### may need to plot out weights to confirm that it is as expected #####
-##### may need to decrease weights/conductances/timestep in order to slow down turning #####
-
 inh_strength = 2
 
 head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells])
@@ -148,6 +144,8 @@ iterations = 10_000
 
 for _ in tqdm(range(iterations)):
     head_direction_attractor.run_lattices(1)
+
+# try converting to gpu after generation of network
 
 peak_threshold = 20
 
