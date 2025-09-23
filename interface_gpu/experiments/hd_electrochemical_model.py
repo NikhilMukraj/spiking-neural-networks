@@ -4,7 +4,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from tqdm import tqdm
 import lixirnet as ln
+import argparse
+import json
 
+
+parser = argparse.ArgumentParser(description='Electrochemical model of head direction')
+parser.add_argument('-i','--iterations', help='Number of iterations', required=False)
+parser.add_argument('-f','--file', help='Peaks output file', required=False)
+args = parser.parse_args()
 
 sns.set_theme(style='darkgrid')
 
@@ -47,9 +54,9 @@ def find_peaks_above_threshold(series, threshold):
     return filtered_peaks
 
 # weights for head direction layer
-hd_weight = lambda x, y: 3 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 5))) - 0.9
+hd_weight = lambda x, y: 3 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 3))) - 0.9
 # head direction feedback into shift layers to engage in shifting behavior when turning cells are on
-hd_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 5)) - 0.2)
+hd_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * ring_distance(n, x[0], y[0]) ** 2 / (n * 3)) - 0.2)
 
 sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.exp(x) + 1) ** 3)
 
@@ -140,7 +147,10 @@ head_direction_attractor.electrical_synapse = False
 head_direction_attractor.chemical_synapse = True
 head_direction_attractor.parallel = True
 
-iterations = 10_000
+if args.iterations is None:
+    iterations = 10_000
+else:
+    iterations = int(args.iterations)
 
 for _ in tqdm(range(iterations)):
     head_direction_attractor.run_lattices(1)
@@ -192,3 +202,7 @@ plt.title('Raster Plot')
 for peak_index in range(len(peaks)):
     plt.scatter(peaks[peak_index], [peak_index for i in range(len(peaks[peak_index]))], color='black')
 plt.show()
+
+if args.file is not None:
+    with open(args.file, 'w+') as f:
+        json.dump({'peaks' : [[int(item) for item in sublist] for sublist in peaks]}, f)
