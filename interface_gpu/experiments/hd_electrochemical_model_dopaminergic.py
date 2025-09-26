@@ -10,6 +10,8 @@ import json
 
 parser = argparse.ArgumentParser(description='Electrochemical model of head direction')
 parser.add_argument('-i','--iterations', help='Number of iterations', required=False)
+parser.add_argument('-d','--dopamine', help='Dopamine strength', required=False)
+parser.add_argument('-t', '--turning', help='Turning cell strength', required=False)
 parser.add_argument('-f','--file', help='Peaks output file', required=False)
 args = parser.parse_args()
 
@@ -47,6 +49,10 @@ def setup_poisson_given_direction(direction):
 
     return setup_poisson
 
+def setup_dopamine_spike_train(neuron):
+    neuron.rate = 0.01
+    return neuron
+
 def find_peaks_above_threshold(series, threshold):
     peaks, _ = scipy.signal.find_peaks(np.array(series))
     filtered_peaks = [index for index in peaks if series[index] > threshold]
@@ -80,6 +86,9 @@ inh_neuron.set_receptors(receptors)
 rate_spike_train = ln.RateSpikeTrain()
 rate_spike_train.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Glutamate : ln.BoundedNeurotransmitterKinetics()})
 
+dopamine_rate_spike_train = ln.RateSpikeTrain()
+dopamine_rate_spike_train.set_synaptic_neurotransmitters({ln.DopaGluGABANeurotransmitterType.Dopamine : ln.BoundedNeurotransmitterKinetics(clearance_constant=0.002)})
+
 left_ring = 0
 right_ring = 1
 hd_ring = 2
@@ -87,6 +96,7 @@ turning = 3
 left_ring_inh = 4
 right_ring_inh = 5
 hd_inh_ring = 6
+dopaminergic = 7
 
 shift_left = ln.IzhikevichNeuronLattice(left_ring)
 shift_left.populate(exc_neuron, n, 1)
@@ -126,12 +136,18 @@ turning_cells.apply_given_position(setup_poisson_given_direction(0))
 
 dopaminergic = ln.RateSpikeTrainLattice(dopaminergic)
 turning_cells.populate(rate_spike_train, 1, 1)
-turning_cells.apply_given_position(setup_dopamine_spike_train)
+turning_cells.apply(setup_dopamine_spike_train)
 
 inh_strength = 2
 
+if args.turning is None:
+    args.turning = 10
+if args.dopamine is None:
+    args.dopamine = 0.5
+
 head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells])
-head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: 10)
+head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
+head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: args.turning)
 # head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
 head_direction_attractor.connect(left_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_right_weight(x, y), 0))
 head_direction_attractor.connect(left_ring, left_ring_inh, lambda x, y: True, lambda x, y: max(-inh_strength * shift_right_weight(x, y), 0))
