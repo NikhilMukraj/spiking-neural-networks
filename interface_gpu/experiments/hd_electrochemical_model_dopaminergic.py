@@ -134,9 +134,9 @@ turning_cells = ln.RateSpikeTrainLattice(turning)
 turning_cells.populate(rate_spike_train, 2, 1)
 turning_cells.apply_given_position(setup_poisson_given_direction(0))
 
-dopaminergic = ln.RateSpikeTrainLattice(dopaminergic)
-turning_cells.populate(rate_spike_train, 1, 1)
-turning_cells.apply(setup_dopamine_spike_train)
+dopaminergic_cells = ln.RateSpikeTrainLattice(dopaminergic)
+dopaminergic_cells.populate(rate_spike_train, 1, 1)
+dopaminergic_cells.apply(setup_dopamine_spike_train)
 
 inh_strength = 2
 
@@ -145,7 +145,7 @@ if args.turning is None:
 if args.dopamine is None:
     args.dopamine = 0.5
 
-head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells])
+head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells, dopaminergic_cells])
 head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
 head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: args.turning)
 # head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
