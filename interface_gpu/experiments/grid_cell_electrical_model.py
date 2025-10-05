@@ -38,13 +38,9 @@ def setup_neuron(neuron):
 
     return neuron
 
-# direction 0 is right, direction 1 is left
-def setup_poisson_given_direction(direction):
+def setup_poisson_given_coords(x, y):
     def setup_poisson(pos, neuron):
-        if pos[0] == direction:
-            neuron.rate = 0.01
-        else:
-            neuron.rate = 0
+        neuron.rate = 0.01 * 1 / torodial_dist(pos, (x, y), n)
         
         return neuron
 
@@ -66,3 +62,7 @@ grid_cells.populate(exc_neuron, n, n)
 grid_cells.connect(lambda x, y: True, grid_weight)
 grid_cells.apply(setup_neuron)
 grid_cells.update_grid_history = True
+
+setting_cells = ln.SpikeTrainLattice(setters)
+setting_cells.populate(rate_spike_train, n, n)
+setting_cells.apply(setup_poisson_given_coords(0, 0))
