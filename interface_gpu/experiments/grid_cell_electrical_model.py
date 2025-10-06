@@ -11,6 +11,11 @@ import argparse
 import json
 
 
+parser = argparse.ArgumentParser(description='Electrical model of grid cells')
+parser.add_argument('-i','--iterations', help='Number of iterations', required=False)
+parser.add_argument('-f','--file', help='Peaks output file', required=False)
+args = parser.parse_args()
+
 # number of neurons
 n = 60
 
@@ -66,3 +71,19 @@ grid_cells.update_grid_history = True
 setting_cells = ln.SpikeTrainLattice(setters)
 setting_cells.populate(rate_spike_train, n, n)
 setting_cells.apply(setup_poisson_given_coords(0, 0))
+
+grid_attractor = ln.IzhikevichNeuronNetwork.generate_network([grid_cells], [setting_cells])
+grid_attractor.connect_layers(grid_cells, setting_cells, lambda x, y: True, lambda x, y: 1)
+grid_attractor.set_dt(1)
+
+for _ in tqdm(range(10_000)):
+    grid_attractor.run_lattices(1)
+
+peak_threshold = 20
+
+hist = head_direction_attractor.get_lattice(hd_ring).history
+data = [i.flatten() for i in np.array(hist)]
+peaks = [find_peaks_above_threshold([j[i] for j in data], peak_threshold) for i in range(len(data[0]))]
+if args.file is not None:
+    with open(args.file, 'w+') as f:
+        json.dump({'peaks' : [[int(item) for item in sublist] for sublist in peaks]}, f)
