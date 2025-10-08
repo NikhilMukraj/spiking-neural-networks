@@ -62,6 +62,9 @@ grid_weight = lambda x, y: 3 * (np.exp(-2 * torodial_distance(x, y, n) ** 2 / (n
 # head direction feedback into shift layers to engage in shifting behavior when turning cells are on
 grid_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * torodial_distance(x, y, n) ** 2 / (n * 3)) - 0.2)
 
+grid_cells_ring = 0
+setters = 1
+
 grid_cells = ln.IzhikevichNeuronLattice(grid_cells_ring)
 grid_cells.populate(exc_neuron, n, n)
 grid_cells.connect(lambda x, y: True, grid_weight)
