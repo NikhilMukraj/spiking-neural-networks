@@ -17,7 +17,7 @@ parser.add_argument('-f','--file', help='Peaks output file', required=False)
 args = parser.parse_args()
 
 # number of neurons
-n = 60
+n = 50
 
 def torodial_dist(a, b, n):
     x1, y1 = a
@@ -34,8 +34,6 @@ def torodial_dist(a, b, n):
     return np.sqrt(dx**2 + dy**2)
 
 sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.exp(x) + 1) ** 3)
-
-# sigmoid_second_derivative(torodial_dist(x, y, n))
 
 def setup_neuron(neuron):
     neuron.current_voltage = np.random.uniform(neuron.c, neuron.v_th)
