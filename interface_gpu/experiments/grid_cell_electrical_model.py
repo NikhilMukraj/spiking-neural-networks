@@ -43,7 +43,7 @@ def setup_neuron(neuron):
 
 def setup_poisson_given_coords(x, y):
     def setup_poisson(pos, neuron):
-        neuron.rate = 0.01 * 1 / torodial_dist(pos, (x, y), n)
+        neuron.rate = 0.01 * (1 / torodial_dist(pos, (x, y), n))
         
         return neuron
 
