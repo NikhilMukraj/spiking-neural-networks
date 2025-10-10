@@ -43,7 +43,7 @@ def setup_neuron(neuron):
 
 def setup_poisson_given_coords(x, y):
     def setup_poisson(pos, neuron):
-        neuron.rate = 0.01 * (1 / torodial_dist(pos, (x, y), n))
+        neuron.rate = 0.01 * (1 / np.clip(torodial_dist(pos, (x, y), n), 1e-10, None))
         
         return neuron
 
@@ -56,9 +56,13 @@ def find_peaks_above_threshold(series, threshold):
     return filtered_peaks
 
 # weights for head direction layer
-grid_weight = lambda x, y: 3 * (np.exp(-2 * torodial_distance(x, y, n) ** 2 / (n * 3))) - 0.9
+grid_weight = lambda x, y: 3 * (np.exp(-2 * torodial_dist(x, y, n) ** 2 / (n * 3))) - 0.9
 # head direction feedback into shift layers to engage in shifting behavior when turning cells are on
-grid_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * torodial_distance(x, y, n) ** 2 / (n * 3)) - 0.2)
+grid_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * torodial_dist(x, y, n) ** 2 / (n * 3)) - 0.2)
+
+exc_neuron = ln.IzhikevichNeuron()
+
+rate_spike_train = ln.RateSpikeTrain()
 
 grid_cells_ring = 0
 setters = 1
@@ -69,15 +73,16 @@ grid_cells.connect(lambda x, y: True, grid_weight)
 grid_cells.apply(setup_neuron)
 grid_cells.update_grid_history = True
 
-setting_cells = ln.SpikeTrainLattice(setters)
+setting_cells = ln.RateSpikeTrainLattice(setters)
 setting_cells.populate(rate_spike_train, n, n)
-setting_cells.apply(setup_poisson_given_coords(0, 0))
+setting_cells.apply_given_position(setup_poisson_given_coords(0, 0))
 
 grid_attractor = ln.IzhikevichNeuronNetwork.generate_network([grid_cells], [setting_cells])
-grid_attractor.connect_layers(grid_cells, setting_cells, lambda x, y: True, lambda x, y: 1)
+grid_attractor.connect(setters, grid_cells_ring, lambda x, y: True, lambda x, y: 1)
+grid_attractor.parallel = True
 grid_attractor.set_dt(1)
 
-for _ in tqdm(range(10_000)):
+for _ in tqdm(range(int(args.iterations) if args.iterations is not None else 10_000)):
     grid_attractor.run_lattices(1)
 
 peak_threshold = 20
