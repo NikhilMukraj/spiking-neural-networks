@@ -31,7 +31,7 @@ def torodial_dist(a, b, n):
     if dy > n / 2:
         dy = n - dy
 
-    return np.sqrt(dx**2 + dy**2)
+    return np.sqrt(dx ** 2 + dy ** 2)
 
 sigmoid_second_derivative = lambda x: -1 * ((np.exp(x) * (np.exp(x) - 1)) / (np.exp(x) + 1) ** 3)
 
