@@ -55,9 +55,9 @@ def find_peaks_above_threshold(series, threshold):
     
     return filtered_peaks
 
-# weights for head direction layer
+# weights for grid cell layer
 grid_weight = lambda x, y: 3 * (np.exp(-2 * torodial_dist(x, y, n) ** 2 / (n * 3))) - 0.9
-# head direction feedback into shift layers to engage in shifting behavior when turning cells are on
+# grid cell feedback into shift layers to engage in shifting behavior when turning cells are on
 grid_to_shift_weight = lambda x, y: 1 * (np.exp(-2 * torodial_dist(x, y, n) ** 2 / (n * 3)) - 0.2)
 
 exc_neuron = ln.IzhikevichNeuron()
