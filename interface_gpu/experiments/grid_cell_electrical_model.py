@@ -17,7 +17,7 @@ parser.add_argument('-f','--file', help='Peaks output file', required=False)
 args = parser.parse_args()
 
 # number of neurons
-n = 50
+n = 30
 
 def torodial_dist(a, b, n):
     x1, y1 = a
@@ -82,7 +82,7 @@ grid_attractor.connect(setters, grid_cells_ring, lambda x, y: True, lambda x, y:
 grid_attractor.parallel = True
 grid_attractor.set_dt(1)
 
-for _ in tqdm(range(int(args.iterations) if args.iterations is not None else 10_000)):
+for _ in tqdm(range(int(args.iterations) if args.iterations is not None else 1_000)):
     grid_attractor.run_lattices(1)
 
 peak_threshold = 20
