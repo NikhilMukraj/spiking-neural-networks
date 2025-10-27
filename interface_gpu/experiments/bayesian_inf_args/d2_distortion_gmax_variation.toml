@@ -1,11 +1,10 @@
 [simulation_parameters]
-peaks_on = true
+peaks_on = false
 bayesian_is_not_main = true
 use_correlation_as_accuracy = true
 measure_snr = true
 
 distortion_on_only = false
-
 reset_patterns = true
 
 d2 = true
