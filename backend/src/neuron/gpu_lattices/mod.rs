@@ -174,9 +174,13 @@ const GRID_VOLTAGE_HISTORY_KERNEL_NAME: &str = "add_grid_voltage_history";
 
 // const SPIKE_HISTORY_KERNEL_NAME: &str = "add_spike_history";
 
+/// A trait for lattice histories that can be run on the GPU
 pub trait LatticeHistoryGPU: LatticeHistory {
+    /// Gets the kernel function for updating the lattice history on the GPU
     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    /// Converts the lattice history to [`BufferGPU`]s for the GPU
     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Adds data from the [`BufferGPU`] back to the lattice history
     fn add_from_gpu(
         &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
     ) -> Result<(), GPUError>;  
@@ -319,7 +323,7 @@ where
     Ok(buffer)
 }
 
-/// An implementation of a lattice that can run on the GPU
+/// An implementation of [`Lattice`] that can run on the GPU
 pub struct LatticeGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
@@ -333,10 +337,14 @@ pub struct LatticeGPU<
     last_firing_time_kernel: Kernel,
     context: Context,
     queue: CommandQueue,
+    /// History of the lattice
     pub grid_history: V,
     grid_history_kernel: KernelFunction,
+    /// Whether or not to update the grid history
     pub update_grid_history: bool,
+    /// Whether or not the lattice uses electrical synapses
     pub electrical_synapse: bool,
+    /// Whether or not the lattice uses chemical synapses
     pub chemical_synapse: bool,
     internal_clock: usize,
 }
@@ -443,7 +451,7 @@ where
         }
     }
 
-    // Generates a GPU lattice given a lattice and a device
+    /// Generates a ['LatticeGPU`] given a lattice and a device
     pub fn from_lattice_given_device< 
         W: Plasticity<T, T, f32>,
     >(lattice: Lattice<T, U, V, W, N>, device: &Device) -> Result<Self, GPUError> {
@@ -779,6 +787,7 @@ where
 
     // modify to be falliable
     // modify to account for last firing time (reset firing time macro)
+    /// Runs the lattice for a given number of iterations using electrical synapses
     pub fn run_lattice_electrical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         let gpu_cell_grid = T::convert_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
 
@@ -887,6 +896,7 @@ where
     }
 
     // maybe turn on and off gap junctions depending on whether electrical synapses is on
+    /// Runs the lattice for a given number of iterations using chemical synapses
     pub fn run_lattice_chemical_synapses(&mut self, iterations: usize) -> Result<(), GPUError> {
         let gpu_cell_grid = T::convert_electrochemical_to_gpu(&self.cell_grid, &self.context, &self.queue)?;
 
@@ -1107,9 +1117,13 @@ where
     }
 }
 
+/// Trait for spike train lattice history GPU operations
 pub trait SpikeTrainLatticeHistoryGPU: SpikeTrainLatticeHistory {
+    /// Gets the kernel function for updating the lattice history on the GPU
     fn get_kernel(context: &Context) -> Result<KernelFunction, GPUError>;
+    /// Transfers the lattice history to [`BufferGPU`]s
     fn to_gpu(&self, context: &Context, iterations: usize, size: (usize, usize)) -> Result<HashMap<String, BufferGPU>, GPUError>;
+    /// Adds the lattice history from [`BufferGPU`]s back to the CPU
     fn add_from_gpu(
         &mut self, queue: &CommandQueue, buffers: HashMap<String, BufferGPU>, iterations: usize, size: (usize, usize)
     ) -> Result<(), GPUError>;  
@@ -1499,7 +1513,7 @@ fn generate_network_spike_train_electrical_inputs_kernel<U: NeuralRefractoriness
     )
 }
 
-/// An implementation of a lattice network that is compatible with the GPU
+/// An implementation of [`LatticeNetworkGPU`] that is compatible with the GPU
 pub struct LatticeNetworkGPU<
     T: IterateAndSpike<N=N> + IterateAndSpikeGPU, 
     U: Graph<K=(usize, usize), V=f32> + GraphToGPU<GraphGPU>, 
@@ -1523,7 +1537,9 @@ pub struct LatticeNetworkGPU<
     queue: CommandQueue,
     grid_history_kernel: KernelFunction,
     spike_train_grid_history_kernel: KernelFunction,
+    /// Whether or not to use electrical synapses
     pub electrical_synapse: bool,
+    /// Whether or not to use chemical synapses
     pub chemical_synapse: bool,
     internal_clock: usize,
 }
