@@ -4,7 +4,7 @@
 //! with neurotransmission and calculating dynamics between neurons over time.
 //! Neuronal dynamics are made using traits so they can be expanded via the
 //! type system to add new dynamics for different neurotransmitters, receptors
-//! or neuron models as well as plasticity. Currently implements system for spike trains, 
+//! or neuron models, as well as plasticity. Currently implements system for spike trains, 
 //! spike time depedent plasticity, basic attractors, reward modulated dynamics,
 //! and dynamics for neurons connected in a lattice using both CPU and GPU implementations.
 //! See below for examples and how to add custom models.
