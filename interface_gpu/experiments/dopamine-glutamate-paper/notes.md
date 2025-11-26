@@ -9,4 +9,5 @@ CITE THIS: [https://pmc.ncbi.nlm.nih.gov/articles/PMC4229578]/ and [https://www.
 replot isolated neuron tests with new values ($s_{D_{1}}$ and $s_{D_{2}}$ fitted for physiological conditions, $s_{D_{2}}$ should be 0.5)
 CITE THIS [https://www.oxcns.org/papers/476%20Rolls%20Attractor%20Networks%202010.pdf]
 
+RING ATTRACTOR INCLUDED??
 LIQUID NOT INCLUDED IN THIS PAPER
