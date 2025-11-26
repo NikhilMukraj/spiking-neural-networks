@@ -37,5 +37,17 @@ neuron_builder!(r#"
         on_iteration:
             current = g * (v - e)
     [end]
+
+    [neuron]
+        type: HodgkinHuxley
+        ion_channels: k = KIonChannel, na = NaIonChannel, leak = LeakIonChannel
+        spike_detection: continuous()
+        on_iteration:
+            na.update_current(v)
+            k.update_current(v)
+            leak.update_current(v)
+
+            dv/dt = -(na.current + k.current + leak.current) + i
+    [end]
     "#
 );
