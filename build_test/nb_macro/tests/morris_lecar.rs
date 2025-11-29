@@ -39,6 +39,6 @@ neuron_builder!(r#"
             k_channel.update_current(v)
             leak_channel.update_current(v)
 
-            dv/dt = (-ca_channel.current - k_channel.current - leak_channel.current + i + gap_conductance * (v - v_init) ) / c_m
+            dv/dt = (-ca_channel.current - k_channel.current - leak_channel.current + i) / c_m
     [end]
 "#);
