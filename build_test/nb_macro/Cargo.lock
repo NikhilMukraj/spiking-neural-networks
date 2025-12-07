@@ -144,7 +144,7 @@ dependencies = [
 
 [[package]]
 name = "iterate_and_spike_traits"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -573,7 +573,7 @@ checksum = "8917285742e9f3e1683f0a9c4e6b57960b7314d0b08d30d1ecd426713ee2eee9"
 
 [[package]]
 name = "spiking_neural_networks"
-version = "0.23.5"
+version = "0.24.0"
 dependencies = [
  "iterate_and_spike_traits",
  "ndarray",
