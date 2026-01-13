@@ -20,7 +20,7 @@ inh_weights_scalar = 1
 skew = 0.1
 c_m = 25
 
-trials = 10
+trials = 20
 
 filename = "bayesian_inf_varied_distortion_d2_inh_gmax_variation.json"
 
