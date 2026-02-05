@@ -22,7 +22,7 @@ c_m = 25
 
 trials = 20
 
-filename = "bayesian_inf_varied_distortion_d2_inh_gmax_variation.json"
+filename = "bayesian_inf_varied_distortion_d2_exc_gmax_variation.json"
 
 [variables]
 spike_train_to_exc = [4] # may need to decrease weight
