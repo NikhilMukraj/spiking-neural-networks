@@ -159,11 +159,37 @@ maybe analyze manifolds too
 \subsubsection{Glutamate Based Inference}
 \subsubsection{Dopamine Based Inference}
 
+\begin{tabular}{|c|c|}
+    \hline
+    Interaction & $\Pr(>F)$ \\ 
+    \hline
+    C (distortion):C ($\mathbf{AMPA_g}$)  & $2.36 \times 10^{-7}$ \\
+    \hline
+    C (distortion):C ($\mathbf{NMDA_g}$)  & $6.06 \times 10^{-1}$ \\
+    \hline
+    C (distortion):C ($\mathbf{GABAa_g}$) & $2.26 \times 10^{-7}$ \\
+    \hline
+\end{tabular}
+
+The D1 stimulation demonstrates that the attractor basins deepen with higher AMPA and lower GABAa conductances.
+NMDA does not appear to deepen the basins but instead seems to generally increase the bias towards $C_2$ as the prior cue. 
+For 20\% distortion when varying AMPA, increasing AMPA conductance from 0.3 to 0.9 shows a 21.4\% increase in hallucinating the $C_2$ to be the correct cue.
+Conversely, for 80\% distortion, increasing AMPA conductance from 0.3 to 0.9 shows a 13.5\% decrease in accuracy.
+Increasing AMPA conductance seems to generally show an increase in hallucination for more intact cues but a decrease for more distorted cues.
+This increase in hallucination is likely due to the strengthening of dopamine modulatory synapses between attractors.
+However, the decrease in hallucination for more distorted cues is likely due to the model settling on an attractor state that is neither $C_1$ or $C_2$.
+
+GABAa conductance appears to have the opposite effect of varying AMPA conductance, where lower GABAa conductances seem to show a higher tendency of hallucination at higher distortion levels.
+GABAa conductance is likely decreasing the attractor basin depth for $C_1$ and $C_2$, since the accuracy of each cue becomes more similar as GABAa conductance increases.
+This is seen clearly given the GABAa results with a distortion of 20\% which show a 35.2\% decrease in hallucinating $C_2$, while a distortion of 80\% shows an increase of hallucination by 30.6\%.
+The inhibition that GABAa provides appears to be necessary to prevent runaway excitation from dopamine modulation that causes hallucinations.
+Given stronger perceptual cues, it is likely that AMPA and GABAa conductances will have a lessened effect on the non-Bayesian $C_1$ cue.
+
 \section{Conclusion}
 
 \section{quick notes}
 \begin{itemize}
-    \item Generate the 4x4 grids for each parameter
+    \item Generate the 4$\times$4 grids for each parameter
     \item Demonstrate that c2 takes over with high enough distortion
     \item Should have noisy cue/no cue on c1 and c2 input, to trigger hallucinations
 \end{itemize}
