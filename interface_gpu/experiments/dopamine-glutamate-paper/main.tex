@@ -171,7 +171,8 @@ maybe analyze manifolds too
     \hline
 \end{tabular}
 
-The D1 stimulation demonstrates that the attractor basins deepen with higher AMPA and lower GABAa conductances.
+The D1 stimulation demonstrates that the AMPA, NMDA, and GABAa conductances, along with distortion, have a statistically significant effect on Bayesian accuracy. 
+This is likely due to $C_2$ attractor basins deepening with higher AMPA and lower GABAa conductances by stronger dopamine synapses either directly or indirectly.
 NMDA does not appear to deepen the basins but instead seems to generally increase the bias towards $C_2$ as the prior cue. 
 For 20\% distortion when varying AMPA, increasing AMPA conductance from 0.3 to 0.9 shows a 21.4\% increase in hallucinating the $C_2$ to be the correct cue.
 Conversely, for 80\% distortion, increasing AMPA conductance from 0.3 to 0.9 shows a 13.5\% decrease in accuracy.
@@ -184,6 +185,12 @@ GABAa conductance is likely decreasing the attractor basin depth for $C_1$ and $
 This is seen clearly given the GABAa results with a distortion of 20\% which show a 35.2\% decrease in hallucinating $C_2$, while a distortion of 80\% shows an increase of hallucination by 30.6\%.
 The inhibition that GABAa provides appears to be necessary to prevent runaway excitation from dopamine modulation that causes hallucinations.
 Given stronger perceptual cues, it is likely that AMPA and GABAa conductances will have a lessened effect on the non-Bayesian $C_1$ cue.
+
+NMDA conductance seems to have a different pattern of affect on hallucination compared to AMPA and GABAa conductances.
+Higher NMDA conductance biases all distortions towards hallucinating $C_2$ as the correct cue.
+For a distortion of 20\%, there is a 23.8\% increase in hallucinating $C_2$ when NMDA conductance is increased from 0.5 to 1.5.
+For a distortion of 80\%, there is a 27.0\% increase in hallucinating $C_2$ when NMDA conductance is given the same increase.
+This is likely due to the nature of NMDA channels which only activate during depolarization and may have a harder time deepening attractor basins.
 
 \section{Conclusion}
 
