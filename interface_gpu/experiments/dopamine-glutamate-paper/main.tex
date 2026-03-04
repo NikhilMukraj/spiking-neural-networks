@@ -171,6 +171,8 @@ maybe analyze manifolds too
     \hline
 \end{tabular}
 
+\vspace{1cm}
+
 The D1 stimulation demonstrates that the AMPA, NMDA, and GABAa conductances, along with distortion, have a statistically significant effect on Bayesian accuracy. 
 This is likely due to $C_2$ attractor basins deepening with higher AMPA and lower GABAa conductances by stronger dopamine synapses either directly or indirectly.
 NMDA does not appear to deepen the basins but instead seems to generally increase the bias towards $C_2$ as the prior cue. 
@@ -192,7 +194,35 @@ For a distortion of 20\%, there is a 23.8\% increase in hallucinating $C_2$ when
 For a distortion of 80\%, there is a 27.0\% increase in hallucinating $C_2$ when NMDA conductance is given the same increase.
 This is likely due to the nature of NMDA channels which only activate during depolarization and may have a harder time deepening attractor basins.
 
+\vspace{1cm}
+
+\begin{tabular}{|c|c|}
+\hline
+Interaction & $\Pr(>F)$ \\ 
+    \hline
+    C (distortion):C ($\mathbf{AMPA_g}$)  & $10 \times 10^-4$ \\
+    \hline
+    C (distortion):C ($\mathbf{NMDA_g}$)  & $2.9 \times 10^-3$ \\
+    \hline
+    C (distortion):C ($\mathbf{GABAa_g}$) & $4 \times 10^-6$ \\
+    \hline
+\end{tabular}
+
+\vspace{1cm}
+
+The D2 simulation shows that AMPA, NMDA, and GABAa conductances, along with distortion, also have a clear statistically significant effect on Bayesian accuracy.
+While D2 works in an inhibitory capacity it appears as though the effects of varying AMPA, NMDA, and GABAa conductances are similar to the D1 simulation.
+
+Varying AMPA conductance from 0.3 to 0.9 using a distortion of 20\% demonstrates a 18.7\% decrease in hallucination wheras using a distortion of 80\% shows a 21.1\% increase in hallucination.
+Varying GABAa from minimum to maximum with a distortion of 20\% shows an opposite trend where hallucination increases by 15\% and with a distortion of 80\%, there is a 33.1\% decrease of hallucination.
+NMDA does not show this pattern of variation between distortions.
+Varying NMDA from 0.5 to 1.5 only shows a 0.06\% increase in hallucination for a distortion of 20\% and a 26.9\% increase in hallucination for a distortion of 80\%.
+
 \section{Conclusion}
+
+The results of the simulations demonstrate that dopamine modulation of AMPA and GABAa conductances can have a significant effect on the accuracy of Bayesian inference in a manner that can explain hallucinations and have implications for antipsychotic action.
+NMDA modulation may be useful in treatment of schizophrenia but may not be as effective in the treatment of hallucination. 
+Pathways that more directly modulate AMPA inhibition and GABAa excitation may be more effective in treating hallucinations.
 
 \section{quick notes}
 \begin{itemize}
