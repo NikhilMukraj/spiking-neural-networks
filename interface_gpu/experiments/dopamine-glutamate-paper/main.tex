@@ -51,7 +51,7 @@ An Izhikevich neuron model was used to due its accuracy in describing membrane p
 
 The following equations describe a modified Izhikevich neuron that can model dopaminergic pathways that modify AMPA and NMDA action 
 (Potentially will be modified such that $c_{\mathrm{glutamate}}$ will be modified by $D_1$ or $D_2$) 
-(Currently $s_{D_1}$ and $s_{D_2}$ are 1 and 0.05 respectively):
+(Currently $s_{D_1}$ and $s_{D_2}$ are 1 and 0.5 respectively):
 \begin{equation*}
     C_m \frac{dv}{dt} = 0.04 v^2 + 5 v + 140 - u + I_{\mathrm{syn}}
 \end{equation*}
@@ -61,7 +61,7 @@ The following equations describe a modified Izhikevich neuron that can model dop
 
 \subsubsection{Receptor Models}
 
-The receptor gating value of each receptor, (AMPA, NMDA, D1, and D2) was described by the following equation:
+The receptor gating value of each receptor, (AMPA, NMDA, $D_1$, and $D_2$) was described by the following equation:
 \begin{equation*}
     r_x = -c_y t_y dt + H(v_{\mathrm{th}}) t_{y_{\max}}
 \end{equation*}
@@ -140,7 +140,7 @@ one where a cue is applied immediately directly to $E_1$ and then removed
 one where no cue is applied to $E_1$ but $E_2$ inputs a cue
 pattern switching simulations too
 
-D2 SHOULD BE FIT TO DOPAMINE-GLUTAMATE PAPER
+$D_2$ SHOULD BE FIT TO DOPAMINE-GLUTAMATE PAPER
 should have svg figure somewhere
 
 maybe analyze manifolds too
@@ -173,7 +173,7 @@ maybe analyze manifolds too
 
 \vspace{1cm}
 
-The D1 stimulation demonstrates that the AMPA, NMDA, and GABAa conductances, along with distortion, have a statistically significant effect on Bayesian accuracy. 
+The $D_1$ stimulation demonstrates that the AMPA, NMDA, and GABAa conductances, along with distortion, have a statistically significant effect on Bayesian accuracy. 
 This is likely due to $C_2$ attractor basins deepening with higher AMPA and lower GABAa conductances by stronger dopamine synapses either directly or indirectly.
 NMDA does not appear to deepen the basins but instead seems to generally increase the bias towards $C_2$ as the prior cue. 
 For 20\% distortion when varying AMPA, increasing AMPA conductance from 0.3 to 0.9 shows a 21.4\% increase in hallucinating the $C_2$ to be the correct cue.
@@ -210,8 +210,8 @@ Interaction & $\Pr(>F)$ \\
 
 \vspace{1cm}
 
-The D2 simulation shows that AMPA, NMDA, and GABAa conductances, along with distortion, also have a clear statistically significant effect on Bayesian accuracy.
-While D2 works in an inhibitory capacity it appears as though the effects of varying AMPA, NMDA, and GABAa conductances are similar to the D1 simulation.
+The $D_2$ simulation shows that AMPA, NMDA, and GABAa conductances, along with distortion, also have a clear statistically significant effect on Bayesian accuracy.
+While $D_2$ works in an inhibitory capacity it appears as though the effects of varying AMPA, NMDA, and GABAa conductances are similar to the $D_1$ simulation.
 
 Varying AMPA conductance from 0.3 to 0.9 using a distortion of 20\% demonstrates a 18.7\% decrease in hallucination wheras using a distortion of 80\% shows a 21.1\% increase in hallucination.
 Varying GABAa from minimum to maximum with a distortion of 20\% shows an opposite trend where hallucination increases by 15\% and with a distortion of 80\%, there is a 33.1\% decrease of hallucination.
