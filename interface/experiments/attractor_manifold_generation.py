@@ -143,10 +143,10 @@ setup_neuron = generate_setup_neuron(
 p_on = 0.5
 num_patterns = parsed_toml['simulation_parameters']['num_patterns']
 
-if parse_toml['simulation_parameters']['inputted_patterns'] == None:
+if 'inputted_patterns' not in parsed_toml['simulation_parameters']:
     patterns = generate_patterns(num, p_on, num_patterns, parsed_toml['simulation_parameters']['correlation_threshold'])
 else:
-    patterns = parse_toml['simulation_parameters']['inputted_patterns']
+    patterns = parsed_toml['simulation_parameters']['inputted_patterns']
 
     if any([i not in [0, 1] for i in patterns]):
         raise ValueError('Pattern must be comprised of 0s and 1s')
@@ -273,6 +273,7 @@ for current_state in tqdm(all_states):
         current_value = {}
 
         current_value['firing_rates'] = firing_rate_data
+        current_value['voltages'] = np.array(hist).tolist()
 
         signal = [float(i.mean()) for i in data]
         if parsed_toml['simulation_parameters']['voltages_on']:
