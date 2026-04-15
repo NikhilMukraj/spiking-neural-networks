@@ -3,6 +3,7 @@
 \usepackage{times}
 \usepackage{geometry}
 \usepackage{graphicx}
+\usepackage{subcaption}
 
 \geometry{top=1in, bottom=1.5in}
 \setlength{\emergencystretch}{1em}
@@ -173,6 +174,21 @@ maybe analyze manifolds too
 
 \vspace{1cm}
 
+\begin{figure}[t!]
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d1_exc_bayesian_ampa.png}
+        \caption{AMPA conductance}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d1_exc_bayesian_nmda.png}
+        \caption{NMDA conductance}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d1_exc_bayesian_gaba.png}
+        \caption{GABAa conductance}
+    \end{subfigure}
+\end{figure}
+
 The $D_1$ stimulation demonstrates that the AMPA, NMDA, and GABAa conductances, along with distortion, have a statistically significant effect on Bayesian accuracy. 
 This is likely due to $C_2$ attractor basins deepening with higher AMPA and lower GABAa conductances by stronger dopamine synapses either directly or indirectly.
 NMDA does not appear to deepen the basins but instead seems to generally increase the bias towards $C_2$ as the prior cue. 
@@ -209,6 +225,21 @@ Interaction & $\Pr(>F)$ \\
 \end{tabular}
 
 \vspace{1cm}
+
+\begin{figure}[t!]
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d2_exc_bayesian_ampa.png}
+        \caption{AMPA conductance}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d2_exc_bayesian_nmda.png}
+        \caption{NMDA conductance}
+    \end{subfigure}
+    \begin{subfigure}[t]{0.5\textwidth}
+        \includegraphics[width=\textwidth]{d2_exc_bayesian_gabaa.png}
+        \caption{GABAa conductance}
+    \end{subfigure}
+\end{figure}
 
 The $D_2$ simulation shows that AMPA, NMDA, and GABAa conductances, along with distortion, also have a clear statistically significant effect on Bayesian accuracy.
 While $D_2$ works in an inhibitory capacity it appears as though the effects of varying AMPA, NMDA, and GABAa conductances are similar to the $D_1$ simulation.
