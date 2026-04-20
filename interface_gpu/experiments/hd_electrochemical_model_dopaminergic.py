@@ -72,7 +72,7 @@ shift_right_weight = lambda x, y: -20 * sigmoid_second_derivative(signed_ring_di
 
 glu = ln.GlutamateReceptor()
 gabaa = ln.GABAReceptor()
-dopa = ln.DopamineReceptor()
+dopa = ln.DopamineReceptor(s_d1=1.0)
 receptors = ln.DopaGluGABA()
 receptors.insert(ln.DopaGluGABANeurotransmitterType.Glutamate, glu)
 receptors.insert(ln.DopaGluGABANeurotransmitterType.GABA, gabaa)
@@ -145,15 +145,15 @@ inh_strength = 2
 if args.turning is None:
     args.turning = 10
 if args.dopamine is None:
-    args.dopamine = 0.5
+    args.dopamine = 1
 
 head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells, dopaminergic_cells])
 head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
 head_direction_attractor.connect(dopaminergic, hd_inh_ring, lambda x, y: True, lambda x, y: args.dopamine)
-head_direction_attractor.connect(dopaminergic, left_ring, lambda x, y: True, lambda x, y: args.dopamine)
-head_direction_attractor.connect(dopaminergic, right_ring, lambda x, y: True, lambda x, y: args.dopamine)
-head_direction_attractor.connect(dopaminergic, left_ring_inh, lambda x, y: True, lambda x, y: args.dopamine)
-head_direction_attractor.connect(dopaminergic, right_ring_inh, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, left_ring, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, right_ring, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, left_ring_inh, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, right_ring_inh, lambda x, y: True, lambda x, y: args.dopamine)
 head_direction_attractor.connect(turning, left_ring, lambda x, y: True, lambda x, y: args.turning)
 # head_direction_attractor.connect(3, 1, lambda x, y: True, lambda x, y: 10)
 head_direction_attractor.connect(left_ring, hd_ring, lambda x, y: True, lambda x, y: max(shift_right_weight(x, y), 0))
