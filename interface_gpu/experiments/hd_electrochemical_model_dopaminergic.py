@@ -148,8 +148,10 @@ if args.dopamine is None:
     args.dopamine = 1
 
 head_direction_attractor = ln.IzhikevichNeuronNetwork.generate_network([shift_left, shift_right, shift_left_inh, shift_right_inh, hd_inh, hd], [turning_cells, dopaminergic_cells])
-head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
-head_direction_attractor.connect(dopaminergic, hd_inh_ring, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
+# head_direction_attractor.connect(dopaminergic, hd_inh_ring, lambda x, y: True, lambda x, y: args.dopamine)
+head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: 0)
+head_direction_attractor.connect(dopaminergic, hd_inh_ring, lambda x, y: True, lambda x, y: 0)
 # head_direction_attractor.connect(dopaminergic, left_ring, lambda x, y: True, lambda x, y: args.dopamine)
 # head_direction_attractor.connect(dopaminergic, right_ring, lambda x, y: True, lambda x, y: args.dopamine)
 # head_direction_attractor.connect(dopaminergic, left_ring_inh, lambda x, y: True, lambda x, y: args.dopamine)
@@ -177,6 +179,12 @@ if args.iterations is None:
     iterations = 10_000
 else:
     iterations = int(args.iterations)
+
+for _ in tqdm(range(iterations)):
+    head_direction_attractor.run_lattices(1)
+
+head_direction_attractor.connect(dopaminergic, hd_ring, lambda x, y: True, lambda x, y: args.dopamine)
+head_direction_attractor.connect(dopaminergic, hd_inh_ring, lambda x, y: True, lambda x, y: args.dopamine)
 
 for _ in tqdm(range(iterations)):
     head_direction_attractor.run_lattices(1)
